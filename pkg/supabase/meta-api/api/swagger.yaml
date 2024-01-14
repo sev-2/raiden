@@ -1,0 +1,3102 @@
+openapi: 3.0.3
+info:
+  title: postgres-meta
+  description: A REST API to manage your Postgres database
+  version: 0.0.0-automated
+servers:
+- url: /
+paths:
+  /column-privileges/:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: included_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: excluded_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    post:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/columnprivileges_body'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200'
+                x-content-type: application/json
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    delete:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/columnprivileges_body_1'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200'
+                x-content-type: application/json
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /columns/:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: included_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: excluded_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_1'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    post:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/columns_body'
+        required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_1'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /columns/{tableId}{ordinalPosition}:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: tableId
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      - name: ordinalPosition
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_1'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /columns/{id}:
+    delete:
+      parameters:
+      - name: cascade
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_1'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/columns_id_body'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_1'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /config/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /config/version:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /extensions/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /extensions/{name}:
+    get:
+      parameters:
+      - name: name
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+      - name: name
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    patch:
+      parameters:
+      - name: name
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+  /foreign-tables/:
+    get:
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: include_columns
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_2'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /foreign-tables/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_3'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /functions/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /functions/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+  /materialized-views/:
+    get:
+      parameters:
+      - name: included_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: excluded_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: include_columns
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_4'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /materialized-views/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_5'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /policies/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /policies/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+  /publications/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /publications/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+  /query/:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /query/format:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /query/parse:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /query/deparse:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /schemas/:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_6'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    post:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/schemas_body'
+        required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_6'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /schemas/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_6'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    delete:
+      parameters:
+      - name: cascade
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_6'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/schemas_id_body'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_6'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /roles/:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_7'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    post:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/roles_body'
+        required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_7'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /roles/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          pattern: \d+
+          type: string
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_7'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    delete:
+      parameters:
+      - name: cascade
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          pattern: \d+
+          type: string
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_7'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          pattern: \d+
+          type: string
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/roles_id_body'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_7'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /table-privileges/:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: included_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: excluded_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_8'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    post:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/tableprivileges_body'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_8'
+                x-content-type: application/json
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    delete:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/tableprivileges_body_1'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_8'
+                x-content-type: application/json
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /tables/:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: included_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: excluded_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: include_columns
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_9'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    post:
+      parameters:
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/tables_body'
+        required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_10'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /tables/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_10'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    delete:
+      parameters:
+      - name: cascade
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_10'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/tables_id_body'
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_10'
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /triggers/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /triggers/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+  /types/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /views/:
+    get:
+      parameters:
+      - name: include_system_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: included_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: excluded_schemas
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: integer
+      - name: include_columns
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: boolean
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inline_response_200_11'
+                x-content-type: application/json
+        "500":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /views/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: pg
+        in: header
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_12'
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_500'
+  /generators/typescript/:
+    get:
+      responses:
+        "200":
+          description: Default Response
+components:
+  schemas:
+    columnprivileges_privileges:
+      required:
+      - grantee
+      - grantor
+      - is_grantable
+      - privilege_type
+      type: object
+      properties:
+        grantor:
+          type: string
+        grantee:
+          type: string
+        privilege_type:
+          anyOf:
+          - type: string
+            enum:
+            - SELECT
+          - type: string
+            enum:
+            - INSERT
+          - type: string
+            enum:
+            - UPDATE
+          - type: string
+            enum:
+            - REFERENCES
+        is_grantable:
+          type: boolean
+      example:
+        privilege_type: ""
+        grantee: grantee
+        grantor: grantor
+        is_grantable: true
+    inline_response_200:
+      required:
+      - column_id
+      - column_name
+      - privileges
+      - relation_name
+      - relation_schema
+      type: object
+      properties:
+        column_id:
+          pattern: ^(\d+)\.(\d+)$
+          type: string
+        relation_schema:
+          type: string
+        relation_name:
+          type: string
+        column_name:
+          type: string
+        privileges:
+          type: array
+          items:
+            $ref: '#/components/schemas/columnprivileges_privileges'
+      example:
+        column_id: column_id
+        privileges:
+        - privilege_type: ""
+          grantee: grantee
+          grantor: grantor
+          is_grantable: true
+        - privilege_type: ""
+          grantee: grantee
+          grantor: grantor
+          is_grantable: true
+        column_name: column_name
+        relation_name: relation_name
+        relation_schema: relation_schema
+    inline_response_500:
+      required:
+      - error
+      type: object
+      properties:
+        error:
+          type: string
+    columnprivileges_body:
+      required:
+      - column_id
+      - grantee
+      - privilege_type
+      type: object
+      properties:
+        column_id:
+          pattern: ^(\d+)\.(\d+)$
+          type: string
+        grantee:
+          type: string
+        privilege_type:
+          anyOf:
+          - type: string
+            enum:
+            - ALL
+          - type: string
+            enum:
+            - SELECT
+          - type: string
+            enum:
+            - INSERT
+          - type: string
+            enum:
+            - UPDATE
+          - type: string
+            enum:
+            - REFERENCES
+        is_grantable:
+          type: boolean
+    columnprivileges_body_1:
+      required:
+      - column_id
+      - grantee
+      - privilege_type
+      type: object
+      properties:
+        column_id:
+          pattern: ^(\d+)\.(\d+)$
+          type: string
+        grantee:
+          type: string
+        privilege_type:
+          anyOf:
+          - type: string
+            enum:
+            - ALL
+          - type: string
+            enum:
+            - SELECT
+          - type: string
+            enum:
+            - INSERT
+          - type: string
+            enum:
+            - UPDATE
+          - type: string
+            enum:
+            - REFERENCES
+    inline_response_200_1:
+      required:
+      - check
+      - comment
+      - data_type
+      - default_value
+      - enums
+      - format
+      - id
+      - identity_generation
+      - is_generated
+      - is_identity
+      - is_nullable
+      - is_unique
+      - is_updatable
+      - name
+      - ordinal_position
+      - schema
+      - table
+      - table_id
+      type: object
+      properties:
+        table_id:
+          type: integer
+        schema:
+          type: string
+        table:
+          type: string
+        id:
+          pattern: ^(\d+)\.(\d+)$
+          type: string
+        ordinal_position:
+          type: integer
+        name:
+          type: string
+        default_value: {}
+        data_type:
+          type: string
+        format:
+          type: string
+        is_identity:
+          type: boolean
+        identity_generation:
+          anyOf:
+          - type: string
+            enum:
+            - ALWAYS
+          - type: string
+            enum:
+            - BY DEFAULT
+          - type: "null"
+        is_generated:
+          type: boolean
+        is_nullable:
+          type: boolean
+        is_updatable:
+          type: boolean
+        is_unique:
+          type: boolean
+        enums:
+          type: array
+          items:
+            type: string
+        check:
+          anyOf:
+          - type: string
+          - type: "null"
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+      example:
+        schema: schema
+        is_nullable: true
+        format: format
+        is_updatable: true
+        is_unique: true
+        default_value: ""
+        is_identity: true
+        check: ""
+        table_id: 0
+        is_generated: true
+        enums:
+        - enums
+        - enums
+        ordinal_position: 6
+        name: name
+        data_type: data_type
+        identity_generation: ""
+        comment: ""
+        id: id
+        table: table
+    columns_body:
+      required:
+      - name
+      - table_id
+      - type
+      type: object
+      properties:
+        table_id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+        default_value: {}
+        default_value_format:
+          anyOf:
+          - type: string
+            enum:
+            - expression
+          - type: string
+            enum:
+            - literal
+        is_identity:
+          type: boolean
+        identity_generation:
+          anyOf:
+          - type: string
+            enum:
+            - BY DEFAULT
+          - type: string
+            enum:
+            - ALWAYS
+        is_nullable:
+          type: boolean
+        is_primary_key:
+          type: boolean
+        is_unique:
+          type: boolean
+        comment:
+          type: string
+        check:
+          type: string
+    columns_id_body:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        drop_default:
+          type: boolean
+        default_value: {}
+        default_value_format:
+          anyOf:
+          - type: string
+            enum:
+            - expression
+          - type: string
+            enum:
+            - literal
+        is_identity:
+          type: boolean
+        identity_generation:
+          anyOf:
+          - type: string
+            enum:
+            - BY DEFAULT
+          - type: string
+            enum:
+            - ALWAYS
+        is_nullable:
+          type: boolean
+        is_unique:
+          type: boolean
+        comment:
+          type: string
+        check:
+          anyOf:
+          - type: string
+          - type: "null"
+    inline_response_200_2:
+      required:
+      - comment
+      - id
+      - name
+      - schema
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+      example:
+        schema: schema
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        name: name
+        comment: ""
+        id: 0
+    inline_response_200_3:
+      required:
+      - comment
+      - id
+      - name
+      - schema
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+      example:
+        schema: schema
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        name: name
+        comment: ""
+        id: 0
+    inline_response_200_4:
+      required:
+      - comment
+      - id
+      - is_populated
+      - name
+      - schema
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        is_populated:
+          type: boolean
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+      example:
+        schema: schema
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        name: name
+        is_populated: true
+        comment: ""
+        id: 0
+    inline_response_200_5:
+      required:
+      - comment
+      - id
+      - is_populated
+      - name
+      - schema
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        is_populated:
+          type: boolean
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+      example:
+        schema: schema
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        name: name
+        is_populated: true
+        comment: ""
+        id: 0
+    inline_response_200_6:
+      required:
+      - id
+      - name
+      - owner
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        owner:
+          type: string
+      example:
+        owner: owner
+        name: name
+        id: 0
+    schemas_body:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          type: string
+        owner:
+          type: string
+    schemas_id_body:
+      type: object
+      properties:
+        name:
+          type: string
+        owner:
+          type: string
+    inline_response_200_7:
+      required:
+      - active_connections
+      - can_bypass_rls
+      - can_create_db
+      - can_create_role
+      - can_login
+      - config
+      - connection_limit
+      - id
+      - inherit_role
+      - is_replication_role
+      - is_superuser
+      - name
+      - password
+      - valid_until
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        is_superuser:
+          type: boolean
+        can_create_db:
+          type: boolean
+        can_create_role:
+          type: boolean
+        inherit_role:
+          type: boolean
+        can_login:
+          type: boolean
+        is_replication_role:
+          type: boolean
+        can_bypass_rls:
+          type: boolean
+        active_connections:
+          type: integer
+        connection_limit:
+          type: integer
+        password:
+          type: string
+        valid_until:
+          anyOf:
+          - type: string
+          - type: "null"
+        config:
+          anyOf:
+          - type: string
+          - type: "null"
+          - type: object
+            additionalProperties:
+              type: string
+      example:
+        can_login: true
+        is_superuser: true
+        can_bypass_rls: true
+        active_connections: 6
+        connection_limit: 1
+        password: password
+        valid_until: ""
+        inherit_role: true
+        name: name
+        can_create_db: true
+        can_create_role: true
+        id: 0
+        config: ""
+        is_replication_role: true
+    roles_body:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+        inherit_role:
+          type: boolean
+        can_login:
+          type: boolean
+        is_superuser:
+          type: boolean
+        can_create_db:
+          type: boolean
+        can_create_role:
+          type: boolean
+        is_replication_role:
+          type: boolean
+        can_bypass_rls:
+          type: boolean
+        connection_limit:
+          type: integer
+        member_of:
+          type: array
+          items:
+            type: string
+        members:
+          type: array
+          items:
+            type: string
+        admins:
+          type: array
+          items:
+            type: string
+        valid_until:
+          type: string
+        config:
+          type: object
+          additionalProperties:
+            type: string
+    rolesid_config:
+      required:
+      - op
+      - path
+      type: object
+      properties:
+        op:
+          anyOf:
+          - type: string
+            enum:
+            - remove
+          - type: string
+            enum:
+            - add
+          - type: string
+            enum:
+            - replace
+        path:
+          type: string
+        value:
+          type: string
+    roles_id_body:
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+        inherit_role:
+          type: boolean
+        can_login:
+          type: boolean
+        is_superuser:
+          type: boolean
+        can_create_db:
+          type: boolean
+        can_create_role:
+          type: boolean
+        is_replication_role:
+          type: boolean
+        can_bypass_rls:
+          type: boolean
+        connection_limit:
+          type: integer
+        valid_until:
+          type: string
+        config:
+          type: array
+          items:
+            $ref: '#/components/schemas/rolesid_config'
+    tableprivileges_privileges:
+      required:
+      - grantee
+      - grantor
+      - is_grantable
+      - privilege_type
+      type: object
+      properties:
+        grantor:
+          type: string
+        grantee:
+          type: string
+        privilege_type:
+          anyOf:
+          - type: string
+            enum:
+            - SELECT
+          - type: string
+            enum:
+            - INSERT
+          - type: string
+            enum:
+            - UPDATE
+          - type: string
+            enum:
+            - DELETE
+          - type: string
+            enum:
+            - TRUNCATE
+          - type: string
+            enum:
+            - REFERENCES
+          - type: string
+            enum:
+            - TRIGGER
+        is_grantable:
+          type: boolean
+      example:
+        privilege_type: ""
+        grantee: grantee
+        grantor: grantor
+        is_grantable: true
+    inline_response_200_8:
+      required:
+      - kind
+      - name
+      - privileges
+      - relation_id
+      - schema
+      type: object
+      properties:
+        relation_id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        kind:
+          anyOf:
+          - type: string
+            enum:
+            - table
+          - type: string
+            enum:
+            - view
+          - type: string
+            enum:
+            - materialized_view
+          - type: string
+            enum:
+            - foreign_table
+          - type: string
+            enum:
+            - partitioned_table
+        privileges:
+          type: array
+          items:
+            $ref: '#/components/schemas/tableprivileges_privileges'
+      example:
+        schema: schema
+        privileges:
+        - privilege_type: ""
+          grantee: grantee
+          grantor: grantor
+          is_grantable: true
+        - privilege_type: ""
+          grantee: grantee
+          grantor: grantor
+          is_grantable: true
+        kind: ""
+        name: name
+        relation_id: 0
+    tableprivileges_body:
+      required:
+      - grantee
+      - privilege_type
+      - relation_id
+      type: object
+      properties:
+        relation_id:
+          type: integer
+        grantee:
+          type: string
+        privilege_type:
+          anyOf:
+          - type: string
+            enum:
+            - ALL
+          - type: string
+            enum:
+            - SELECT
+          - type: string
+            enum:
+            - INSERT
+          - type: string
+            enum:
+            - UPDATE
+          - type: string
+            enum:
+            - DELETE
+          - type: string
+            enum:
+            - TRUNCATE
+          - type: string
+            enum:
+            - REFERENCES
+          - type: string
+            enum:
+            - TRIGGER
+        is_grantable:
+          type: boolean
+    tableprivileges_body_1:
+      required:
+      - grantee
+      - privilege_type
+      - relation_id
+      type: object
+      properties:
+        relation_id:
+          type: integer
+        grantee:
+          type: string
+        privilege_type:
+          anyOf:
+          - type: string
+            enum:
+            - ALL
+          - type: string
+            enum:
+            - SELECT
+          - type: string
+            enum:
+            - INSERT
+          - type: string
+            enum:
+            - UPDATE
+          - type: string
+            enum:
+            - DELETE
+          - type: string
+            enum:
+            - TRUNCATE
+          - type: string
+            enum:
+            - REFERENCES
+          - type: string
+            enum:
+            - TRIGGER
+    tables_primary_keys:
+      required:
+      - name
+      - schema
+      - table_id
+      - table_name
+      type: object
+      properties:
+        schema:
+          type: string
+        table_name:
+          type: string
+        name:
+          type: string
+        table_id:
+          type: integer
+      example:
+        schema: schema
+        name: name
+        table_id: 5
+        table_name: table_name
+    tables_relationships:
+      required:
+      - constraint_name
+      - id
+      - source_column_name
+      - source_schema
+      - source_table_name
+      - target_column_name
+      - target_table_name
+      - target_table_schema
+      type: object
+      properties:
+        id:
+          type: integer
+        constraint_name:
+          type: string
+        source_schema:
+          type: string
+        source_table_name:
+          type: string
+        source_column_name:
+          type: string
+        target_table_schema:
+          type: string
+        target_table_name:
+          type: string
+        target_column_name:
+          type: string
+      example:
+        target_table_name: target_table_name
+        constraint_name: constraint_name
+        source_table_name: source_table_name
+        target_table_schema: target_table_schema
+        target_column_name: target_column_name
+        id: 2
+        source_schema: source_schema
+        source_column_name: source_column_name
+    inline_response_200_9:
+      required:
+      - bytes
+      - comment
+      - dead_rows_estimate
+      - id
+      - live_rows_estimate
+      - name
+      - primary_keys
+      - relationships
+      - replica_identity
+      - rls_enabled
+      - rls_forced
+      - schema
+      - size
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        rls_enabled:
+          type: boolean
+        rls_forced:
+          type: boolean
+        replica_identity:
+          anyOf:
+          - type: string
+            enum:
+            - DEFAULT
+          - type: string
+            enum:
+            - INDEX
+          - type: string
+            enum:
+            - FULL
+          - type: string
+            enum:
+            - NOTHING
+        bytes:
+          type: integer
+        size:
+          type: string
+        live_rows_estimate:
+          type: integer
+        dead_rows_estimate:
+          type: integer
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+        primary_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/tables_primary_keys'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/tables_relationships'
+      example:
+        schema: schema
+        replica_identity: ""
+        primary_keys:
+        - schema: schema
+          name: name
+          table_id: 5
+          table_name: table_name
+        - schema: schema
+          name: name
+          table_id: 5
+          table_name: table_name
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        rls_enabled: true
+        live_rows_estimate: 1
+        relationships:
+        - target_table_name: target_table_name
+          constraint_name: constraint_name
+          source_table_name: source_table_name
+          target_table_schema: target_table_schema
+          target_column_name: target_column_name
+          id: 2
+          source_schema: source_schema
+          source_column_name: source_column_name
+        - target_table_name: target_table_name
+          constraint_name: constraint_name
+          source_table_name: source_table_name
+          target_table_schema: target_table_schema
+          target_column_name: target_column_name
+          id: 2
+          source_schema: source_schema
+          source_column_name: source_column_name
+        size: size
+        rls_forced: true
+        bytes: 6
+        name: name
+        dead_rows_estimate: 5
+        comment: ""
+        id: 0
+    tables_body:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          type: string
+        schema:
+          type: string
+        comment:
+          type: string
+    inline_response_200_10:
+      required:
+      - bytes
+      - comment
+      - dead_rows_estimate
+      - id
+      - live_rows_estimate
+      - name
+      - primary_keys
+      - relationships
+      - replica_identity
+      - rls_enabled
+      - rls_forced
+      - schema
+      - size
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        rls_enabled:
+          type: boolean
+        rls_forced:
+          type: boolean
+        replica_identity:
+          anyOf:
+          - type: string
+            enum:
+            - DEFAULT
+          - type: string
+            enum:
+            - INDEX
+          - type: string
+            enum:
+            - FULL
+          - type: string
+            enum:
+            - NOTHING
+        bytes:
+          type: integer
+        size:
+          type: string
+        live_rows_estimate:
+          type: integer
+        dead_rows_estimate:
+          type: integer
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+        primary_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/tables_primary_keys'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/tables_relationships'
+      example:
+        schema: schema
+        replica_identity: ""
+        primary_keys:
+        - schema: schema
+          name: name
+          table_id: 5
+          table_name: table_name
+        - schema: schema
+          name: name
+          table_id: 5
+          table_name: table_name
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        rls_enabled: true
+        live_rows_estimate: 1
+        relationships:
+        - target_table_name: target_table_name
+          constraint_name: constraint_name
+          source_table_name: source_table_name
+          target_table_schema: target_table_schema
+          target_column_name: target_column_name
+          id: 2
+          source_schema: source_schema
+          source_column_name: source_column_name
+        - target_table_name: target_table_name
+          constraint_name: constraint_name
+          source_table_name: source_table_name
+          target_table_schema: target_table_schema
+          target_column_name: target_column_name
+          id: 2
+          source_schema: source_schema
+          source_column_name: source_column_name
+        size: size
+        rls_forced: true
+        bytes: 6
+        name: name
+        dead_rows_estimate: 5
+        comment: ""
+        id: 0
+    tablesid_primary_keys:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          type: string
+    tables_id_body:
+      type: object
+      properties:
+        name:
+          type: string
+        schema:
+          type: string
+        rls_enabled:
+          type: boolean
+        rls_forced:
+          type: boolean
+        replica_identity:
+          anyOf:
+          - type: string
+            enum:
+            - DEFAULT
+          - type: string
+            enum:
+            - INDEX
+          - type: string
+            enum:
+            - FULL
+          - type: string
+            enum:
+            - NOTHING
+        replica_identity_index:
+          type: string
+        primary_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/tablesid_primary_keys'
+        comment:
+          type: string
+    inline_response_200_11:
+      required:
+      - comment
+      - id
+      - is_updatable
+      - name
+      - schema
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        is_updatable:
+          type: boolean
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+      example:
+        schema: schema
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        name: name
+        is_updatable: true
+        comment: ""
+        id: 0
+    inline_response_200_12:
+      required:
+      - comment
+      - id
+      - is_updatable
+      - name
+      - schema
+      type: object
+      properties:
+        id:
+          type: integer
+        schema:
+          type: string
+        name:
+          type: string
+        is_updatable:
+          type: boolean
+        comment:
+          anyOf:
+          - type: string
+          - type: "null"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_1'
+      example:
+        schema: schema
+        columns:
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        - schema: schema
+          is_nullable: true
+          format: format
+          is_updatable: true
+          is_unique: true
+          default_value: ""
+          is_identity: true
+          check: ""
+          table_id: 0
+          is_generated: true
+          enums:
+          - enums
+          - enums
+          ordinal_position: 6
+          name: name
+          data_type: data_type
+          identity_generation: ""
+          comment: ""
+          id: id
+          table: table
+        name: name
+        is_updatable: true
+        comment: ""
+        id: 0
