@@ -7,6 +7,7 @@ require (
 	github.com/fatih/color v1.16.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/spf13/cobra v1.8.0
+	golang.org/x/text v0.14.0
 )
 
 require (
@@ -29,7 +30,6 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	golang.org/x/crypto v0.18.0 // indirect
 	golang.org/x/net v0.20.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	github.com/gertd/go-pluralize v0.2.1
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/mattn/go-colorable v0.1.13 // indirect

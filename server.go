@@ -14,13 +14,13 @@ type Server struct {
 }
 
 func NewServer(config *Config) *Server {
-	host, port := "127.0.0.1", "8080"
-	if config.App.Host != "" {
-		host = config.App.Host
+	host, port := "127.0.0.1", "8002"
+	if config.ServerHost != "" {
+		host = config.ServerHost
 	}
 
-	if config.App.Port != "" {
-		port = config.App.Port
+	if config.ServerPort != "" {
+		port = config.ServerPort
 	}
 
 	serverAddr := fmt.Sprintf("%s:%s", host, port)

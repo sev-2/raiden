@@ -1,4 +1,4 @@
-package handlers
+package raiden
 
 import (
 	"net/http"
@@ -10,17 +10,18 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-func RegisterProxyHandler(
-	e *echo.Echo,
-	path string,
-	upstreamUrl *url.URL,
-	requestInterceptor func(req *http.Request),
-	responseInterceptor func(r *http.Response) error,
-) {
-	e.GET(path, proxyHandler(upstreamUrl, requestInterceptor, responseInterceptor))
+type Controller interface{}
+
+func HealthHandler() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		data := map[string]any{
+			"message": "server up",
+		}
+		return c.JSON(http.StatusOK, data)
+	}
 }
 
-func proxyHandler(
+func ProxyHandler(
 	url *url.URL,
 	requestInterceptor func(req *http.Request),
 	responseInterceptor func(r *http.Response) error,
@@ -30,7 +31,7 @@ func proxyHandler(
 		proxy.Director = func(req *http.Request) {
 			req.URL.Scheme = url.Scheme
 			req.URL.Host = url.Host
-			logger.NewLogger().Infof("Proxying to : %s %s\n", utils.GetColoredHttpMethod(req.Method), req.URL.String())
+			logger.Infof("Proxying to : %s %s\n", utils.GetColoredHttpMethod(req.Method), req.URL.String())
 
 			// intercept request
 			if requestInterceptor != nil {

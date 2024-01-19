@@ -169,37 +169,48 @@ func GetOrganizations() (Organizations, error) {
 	return organizations, nil
 }
 
-func cloudGetTables(projectID string, includeColumn bool) (tables []Table, err error) {
+func getTables(projectId string, includeColumn bool) (tables []Table, err error) {
 	query, err := meta_sql.GenerateTablesQuery([]string{"public", "auth"}, includeColumn)
 	if err != nil {
-		err = fmt.Errorf("failed generate query get table for project id %s : %v", projectID, err)
+		err = fmt.Errorf("failed generate query get table for project id %s : %v", projectId, err)
 		return
 	}
 
-	maybeTables, response, err := getManagementApi().ProjectsBetaApi.V1RunQuery(context.Background(), management_api.RunQueryBody{
+	return executeQuery[[]Table](projectId, "get tables", query)
+}
+
+func getRoles(projectId string) (roles []Role, err error) {
+	return executeQuery[[]Role](projectId, "get roles", meta_sql.GetRolesQuery)
+}
+
+func getPolicies(projectId string) (policies []Policy, err error) {
+	return executeQuery[[]Policy](projectId, "get policies", meta_sql.GetPoliciesQuery)
+}
+
+func executeQuery[T any](projectId, action, query string) (result T, err error) {
+	anyResult, response, err := getManagementApi().ProjectsBetaApi.V1RunQuery(context.Background(), management_api.RunQueryBody{
 		Query: query,
-	}, projectID)
+	}, projectId)
 
 	if err != nil {
-		err = fmt.Errorf("failed get table for project id %s : %v", projectID, err)
+		err = fmt.Errorf("failed %s for project id %s : %v", action, projectId, err)
 		return
 	}
 
 	if response.StatusCode != http.StatusCreated {
-		err = fmt.Errorf("get all tables for project id %s got status code %v", projectID, response.StatusCode)
+		err = fmt.Errorf("%s for project id %s got status code %v", action, projectId, response.StatusCode)
 		return
 	}
 
-	jsonStr, err := json.Marshal(maybeTables)
+	jsonStr, err := json.Marshal(anyResult)
 	if err != nil {
-		err = fmt.Errorf("invalid marshall data for get tables with project id %s : %v", projectID, err)
+		err = fmt.Errorf("invalid marshall data for %s with project id %s : %v", action, projectId, err)
 		return
 	}
 
-	if err = json.Unmarshal(jsonStr, &tables); err != nil {
-		err = fmt.Errorf("invalid response data for get tables with project id %s : %v", projectID, err)
+	if err = json.Unmarshal(jsonStr, &result); err != nil {
+		err = fmt.Errorf("invalid response data for %s with project id %s : %v", action, projectId, err)
 		return
 	}
-
 	return
 }

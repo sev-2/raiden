@@ -10,7 +10,7 @@ func Command() *cobra.Command {
 	return &cobra.Command{
 		Use:   "generate",
 		Short: "Generate application resource",
-		Long:  "Generate deployment manifest, main backend application function, and frontend application",
+		Long:  "Generate deployment manifest and main function backend application",
 		Run:   generateCmd,
 	}
 }

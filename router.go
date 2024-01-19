@@ -7,7 +7,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/sev-2/raiden/pkg/raiden/handlers"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -23,7 +22,7 @@ func NewRouter(config *Config) *router {
 	applyDefaultMiddleware(r.echo)
 
 	// register health check
-	handlers.RegisterHealthHandler(r.echo)
+	r.echo.GET("/health", HealthHandler())
 
 	// set reserved group
 	r.functionRoute = r.echo.Group("/functions/v1")

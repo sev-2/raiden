@@ -4,20 +4,15 @@ import (
 	"errors"
 
 	"github.com/manifoldco/promptui"
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase"
 	management_api "github.com/sev-2/raiden/pkg/supabase/management-api"
-)
-
-type DeploymentTarget string
-
-const (
-	DeploymentTargetCloud      DeploymentTarget = "cloud"
-	DeploymentTargetSelfHosted DeploymentTarget = "self_hosted"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type CreateInput struct {
 	ProjectName    string
-	Target         DeploymentTarget
+	Target         raiden.DeploymentTarget
 	AccessToken    string
 	SupabaseApiUrl string
 }
@@ -32,26 +27,40 @@ func (ca *CreateInput) PromptAll() error {
 	}
 
 	switch ca.Target {
-	case DeploymentTargetCloud:
+	case raiden.DeploymentTargetCloud:
 		if err := ca.PromptSupabaseApiUrl(); err != nil {
 			return err
 		}
 		if err := ca.PromptAccessToken(); err != nil {
 			return err
 		}
-	case DeploymentTargetSelfHosted:
+	case raiden.DeploymentTargetSelfHosted:
 	}
 
 	return nil
 }
 
+func (ca *CreateInput) ToAppConfig() *raiden.Config {
+	return &raiden.Config{
+		ProjectName:      ca.ProjectName,
+		DeploymentTarget: ca.Target,
+		CloudAccessToken: ca.AccessToken,
+		SupabaseApiUrl:   ca.SupabaseApiUrl,
+	}
+}
+
 func (ca *CreateInput) PromptProjectName() error {
 	promp := promptui.Prompt{
-		Label: "Enter app name",
+		Label: "Enter project name",
 		Validate: func(s string) error {
 			if s == "" {
-				return errors.New("app name")
+				return errors.New("project name can`t be empty")
 			}
+
+			if utils.IsStringContainSpace(s) {
+				return errors.New("project name can`t contain spaces character")
+			}
+
 			return nil
 		},
 	}
@@ -68,7 +77,7 @@ func (ca *CreateInput) PromptProjectName() error {
 func (ca *CreateInput) PromptTarget() error {
 	promp := promptui.Select{
 		Label: "Enter your target deployment",
-		Items: []DeploymentTarget{DeploymentTargetCloud, DeploymentTargetSelfHosted},
+		Items: []raiden.DeploymentTarget{raiden.DeploymentTargetCloud, raiden.DeploymentTargetSelfHosted},
 	}
 
 	_, inputText, err := promp.Run()
@@ -76,7 +85,7 @@ func (ca *CreateInput) PromptTarget() error {
 		return err
 	}
 
-	ca.Target = DeploymentTarget(inputText)
+	ca.Target = raiden.DeploymentTarget(inputText)
 	return nil
 }
 
@@ -90,7 +99,7 @@ func (ca *CreateInput) PromptAccessToken() error {
 
 			return nil
 		},
-		HideEntered: true,
+		Mask: '*',
 	}
 
 	inputText, err := promp.Run()
@@ -105,7 +114,7 @@ func (ca *CreateInput) PromptAccessToken() error {
 func (ca *CreateInput) PromptSupabaseApiUrl() error {
 	promp := promptui.Prompt{
 		Label:   "Enter supabase api url",
-		Default: "https://api.supabase.com",
+		Default: supabase.DefaultApiUrl,
 	}
 
 	inputText, err := promp.Run()
@@ -145,7 +154,6 @@ func (cp *createProjectInput) PromptOrganizations() error {
 	}
 
 	// todo : create new organization if doesn`t have organization
-
 	var organizationOptions []string
 	var selectedOrganization string
 

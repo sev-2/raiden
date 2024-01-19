@@ -1,7 +1,12 @@
 package supabase
 
+import (
+	"time"
+)
+
 var (
-	apiUrl string
+	DefaultApiUrl = "https://api.supabase.com"
+	apiUrl        string
 )
 
 // Table
@@ -63,11 +68,88 @@ type PrimaryKey struct {
 
 func GetTables(projectId *string) ([]Table, error) {
 	if projectId != nil {
-		return cloudGetTables(*projectId, true)
+		return getTables(*projectId, true)
 	}
 
-	return nil, nil
+	// todo : get from pg meta
+
+	return []Table{}, nil
 }
 
 // Role
-type Roles struct{}
+type Role struct {
+	ActiveConnections int        `json:"active_connections"`
+	CanBypassRLS      bool       `json:"can_bypass_rls"`
+	CanCreateDB       bool       `json:"can_create_db"`
+	CanCreateRole     bool       `json:"can_create_role"`
+	CanLogin          bool       `json:"can_login"`
+	Config            []string   `json:"config"`
+	ConnectionLimit   int        `json:"connection_limit"`
+	ID                int        `json:"id"`
+	InheritRole       bool       `json:"inherit_role"`
+	IsReplicationRole bool       `json:"is_replication_role"`
+	IsSuperuser       bool       `json:"is_superuser"`
+	Name              string     `json:"name"`
+	Password          string     `json:"password"`
+	ValidUntil        *time.Time `json:"valid_until"`
+}
+
+func GetRoles(projectId *string) ([]Role, error) {
+	if projectId != nil {
+		return getRoles(*projectId)
+	}
+
+	// todo : get from pg meta
+
+	return []Role{}, nil
+}
+
+// Policies
+
+type Policy struct {
+	ID         int           `json:"id"`
+	Schema     string        `json:"schema"`
+	Table      string        `json:"table"`
+	TableID    int           `json:"table_id"`
+	Name       string        `json:"name"`
+	Action     string        `json:"action"`
+	Roles      []string      `json:"roles"`
+	Command    PolicyCommand `json:"command"`
+	Definition string        `json:"definition"`
+	Check      *string       `json:"check"`
+}
+type PolicyCommand string
+
+const (
+	PolicyCommandSelect PolicyCommand = "SELECT"
+	PolicyCommandInsert PolicyCommand = "INSERT"
+	PolicyCommandUpdate PolicyCommand = "UPDATE"
+	PolicyCommandDelete PolicyCommand = "DELETE"
+)
+
+type Policies []Policy
+
+func GetPolicies(projectId *string) ([]Policy, error) {
+	if projectId != nil {
+		return getPolicies(*projectId)
+	}
+
+	// todo : get from pg meta
+
+	return []Policy{}, nil
+}
+
+func (p *Policies) FilterByTable(table string) Policies {
+	var filteredData Policies
+	if p == nil {
+		return filteredData
+	}
+
+	for _, v := range *p {
+		if v.Table == table {
+			filteredData = append(filteredData, v)
+		}
+	}
+
+	return filteredData
+}
