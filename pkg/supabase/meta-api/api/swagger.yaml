@@ -5,6 +5,7 @@ info:
   version: 0.0.0-automated
 servers:
 - url: /
+
 paths:
   /column-privileges/:
     get:
@@ -628,12 +629,62 @@ paths:
   /policies/:
     get:
       responses:
-        "200":
-          description: Default Response
+        '200':
+          description: Receive policies data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/policy'
     post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/policy'
       responses:
-        "200":
-          description: Default Response
+        '200':
+          description: Policy created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/policy'  
+    patch:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: id
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/policy'
+      responses:
+        '200':
+          description: Receive updated policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/policy'
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: id
+          required: true
+      responses:
+        '200':
+          description: Receive deleted policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/policy' 
   /policies/{id}:
     get:
       parameters:
@@ -1795,7 +1846,7 @@ components:
           - type: string
             enum:
             - BY DEFAULT
-          - type: "null"
+          nullable: true
         is_generated:
           type: boolean
         is_nullable:
@@ -1811,11 +1862,11 @@ components:
         check:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
       example:
         schema: schema
         is_nullable: true
@@ -1916,7 +1967,7 @@ components:
         check:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
     inline_response_200_2:
       required:
       - comment
@@ -1934,7 +1985,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -2002,7 +2053,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -2073,7 +2124,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -2145,7 +2196,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -2275,14 +2326,14 @@ components:
         valid_until:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         config:
           anyOf:
           - type: string
-          - type: "null"
           - type: object
             additionalProperties:
               type: string
+          nullable: true
       example:
         can_login: true
         is_superuser: true
@@ -2669,7 +2720,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -2824,7 +2875,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -2976,7 +3027,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -3048,7 +3099,7 @@ components:
         comment:
           anyOf:
           - type: string
-          - type: "null"
+          nullable: true
         columns:
           type: array
           items:
@@ -3100,3 +3151,55 @@ components:
         is_updatable: true
         comment: ""
         id: 0
+
+    policy :
+      type: object
+      required:
+       - table
+       - name
+       - action
+       - roles
+       - command
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        schema:
+          type: string
+          default: public
+        table:
+          type: string
+          example: tasks
+        table_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          example: Enable delete for users based on user_id
+        action:
+          type: string
+          example: PERMISSIVE
+        roles:
+          type: array
+          items:
+            type: string
+            example: authenticated
+        command:
+          $ref: '#/components/schemas/commandEnum'
+        definition:
+          type: string
+          nullable: true
+          example: "(uid() = user_id)"
+        check:
+          type: string
+          nullable: true
+          
+    commandEnum:
+      type: string
+      enum:
+        - INSERT
+        - UPDATE
+        - DELETE
+        - SELECT
+        - ALL
+      example: UPDATE

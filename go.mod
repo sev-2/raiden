@@ -39,6 +39,7 @@ require (
 
 require (
 	github.com/gertd/go-pluralize v0.2.1
+	github.com/google/uuid v1.5.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/mattn/go-colorable v0.1.13 // indirect

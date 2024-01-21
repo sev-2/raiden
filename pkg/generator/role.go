@@ -51,35 +51,17 @@ func GenerateRole(projectName string, role supabase.Role) error {
 	fields := make([]map[string]any, 0)
 	instanceType := reflect.TypeOf(role)
 
+	// Todo : convert build to recursive
 	for i := 0; i < instanceType.NumField(); i++ {
+		newField := make(map[string]any)
 		field := instanceType.Field(i)
 		if field.Name == "Password" {
 			continue
 		}
 		fieldValue := reflect.ValueOf(role).Field(i)
 
-		newField := make(map[string]any)
 		newField["Name"] = field.Name
-
-		switch field.Type.Kind() {
-		case reflect.String:
-			newField["Value"] = fmt.Sprintf("%q", fieldValue.String())
-		case reflect.Ptr:
-			if !fieldValue.IsNil() {
-				newField["Value"] = fieldValue.Elem()
-			} else {
-				newField["Value"] = "nil"
-			}
-		case reflect.Slice:
-			if field.Type.Elem().Kind() == reflect.String {
-				newField["Value"] = formatArrayDataTypes(fieldValue)
-			}
-		case reflect.Struct:
-			newField["Value"] = formatCustomStructDataType(fieldValue)
-		default:
-			newField["Value"] = fmt.Sprintf("%v", fieldValue.Interface())
-		}
-
+		newField["Value"] = getRoleValue(field, fieldValue)
 		fields = append(fields, newField)
 	}
 	// Create or open the output file
@@ -102,4 +84,51 @@ func GenerateRole(projectName string, role supabase.Role) error {
 	}
 
 	return nil
+}
+
+func getRoleValue(field reflect.StructField, value reflect.Value) string {
+	switch field.Type.Kind() {
+	case reflect.String:
+		return fmt.Sprintf("%q", value.String())
+	case reflect.Ptr:
+		if !value.IsNil() {
+			return value.Elem().String()
+		} else {
+			return "nil"
+		}
+	case reflect.Slice:
+		if field.Type.Elem().Kind() == reflect.String {
+			return generateArrayDeclaration(value)
+		}
+	case reflect.Map:
+		if len(value.MapKeys()) == 0 {
+			return "map[string]any{}"
+		}
+		if mapValues, ok := value.Interface().(map[string]any); ok {
+			mapValueStr := generateMapDeclaration(mapValues)
+			return mapValueStr
+		} else {
+			return "map[string]any{}"
+		}
+	case reflect.Struct:
+		return formatCustomStructDataType(value)
+	case reflect.Interface:
+		rv := reflect.ValueOf(value.Interface())
+		if rv.Kind() == reflect.Map {
+			if len(rv.MapKeys()) == 0 {
+				return "map[string]any{}"
+			} else {
+				return generateMapDeclarationFromValue(rv)
+			}
+
+		} else if rv.Kind() == reflect.Slice {
+			return generateArrayDeclaration(rv)
+		} else if !value.IsNil() {
+			return fmt.Sprintf("%v", value.Interface())
+		} else {
+			return "nil"
+		}
+	}
+
+	return fmt.Sprintf("%v", value.Interface())
 }

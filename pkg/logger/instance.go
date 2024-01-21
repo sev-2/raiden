@@ -14,6 +14,21 @@ func SetLogLevel(level LogLevel) {
 	logInstance.SetLevel(level)
 }
 
+func SetDebug() {
+	checkLogInstance()
+	logInstance.SetLevel(LogLevelDebug)
+}
+
+func SetInfo() {
+	checkLogInstance()
+	logInstance.SetLevel(LogLevelInfo)
+}
+
+func SetError() {
+	checkLogInstance()
+	logInstance.SetLevel(LogLevelError)
+}
+
 func SetFormat(format int) {
 	logInstance = NewLoggerWithFormat(format)
 }

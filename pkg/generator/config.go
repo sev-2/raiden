@@ -16,6 +16,7 @@ DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
 CLOUD_ACCESS_TOKEN: {{ .CloudAccessToken }}
 
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
+SUPABASE_API_BASE_PATH: {{ .SupabaseApiBaseUrl }}
 SUPABASE_REST_URL: {{ .SupabaseRestUrl }}
 
 SERVER_HOST: {{ .ServerHost }}

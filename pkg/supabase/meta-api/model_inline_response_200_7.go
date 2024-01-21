@@ -22,5 +22,5 @@ type InlineResponse2007 struct {
 	ConnectionLimit   int32                              `json:"connection_limit"`
 	Password          string                             `json:"password"`
 	ValidUntil        *AnyOfinlineResponse2007ValidUntil `json:"valid_until"`
-	Config            *AnyOfinlineResponse2007Config     `json:"config"`
+	Config            any                                `json:"config"`
 }

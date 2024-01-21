@@ -38,52 +38,61 @@ func createCmd() func(cmd *cobra.Command, args []string) error {
 }
 
 func create(cmd *cobra.Command, args []string, createInput *CreateInput) error {
+	var projectID *string
+
 	switch createInput.Target {
 	case raiden.DeploymentTargetCloud:
-		if err := cloudConfiguration(createInput); err != nil {
+		// setup management api
+		supabase.ConfigureManagementApi(createInput.SupabaseApiUrl, createInput.AccessToken)
+		project, err := supabase.FindProject(createInput.ProjectName)
+		if err != nil {
 			return err
 		}
-	case raiden.DeploymentTargetSelfHosted:
 
+		if project.Id == "" {
+			logger.Infof("%s is not exist, creating new project", createInput.ProjectName)
+			project = createNewSupabaseProject(createInput.ProjectName)
+		}
+		projectID = &project.Id
+	case raiden.DeploymentTargetSelfHosted:
+		supabase.ConfigurationMetaApi(createInput.SupabaseApiUrl, createInput.SupabaseApiBasePath)
+	}
+
+	return generateResource(projectID, createInput)
+}
+
+func generateResource(projectID *string, createInput *CreateInput) error {
+
+	// get supabase resources
+	tables, err := supabase.GetTables(projectID)
+	if err != nil {
+		return err
+	}
+
+	roles, err := supabase.GetRoles(projectID)
+	if err != nil {
+		return err
+	}
+
+	policies, err := supabase.GetPolicies(projectID)
+	if err != nil {
+		return err
+	}
+
+	// generate resources to raiden resources
+	if err := generator.GenerateConfig(*createInput.ToAppConfig()); err != nil {
+		return err
 	}
 
 	// todo : generate controller
-	generator.GenerateConfig(*createInput.ToAppConfig())
 
-	return nil
-}
-
-func cloudConfiguration(createInput *CreateInput) error {
-	// setup management api
-	supabase.ConfigureManagementApi(createInput.SupabaseApiUrl, createInput.AccessToken)
-	project, err := supabase.FindProject(createInput.ProjectName)
-	if err != nil {
+	if err := generator.GenerateModels(createInput.ProjectName, tables, policies); err != nil {
 		return err
 	}
 
-	if project.Id == "" {
-		logger.Infof("%s is not exist, creating new project", createInput.ProjectName)
-		project = createNewSupabaseProject(createInput.ProjectName)
-	}
-
-	// generate existing resource (table, role, rls and etc...)
-	tables, err := supabase.GetTables(&project.Id)
-	if err != nil {
+	if err := generator.GenerateRoles(createInput.ProjectName, roles); err != nil {
 		return err
 	}
-
-	roles, err := supabase.GetRoles(&project.Id)
-	if err != nil {
-		return err
-	}
-
-	policies, err := supabase.GetPolicies(&project.Id)
-	if err != nil {
-		return err
-	}
-
-	generator.GenerateModels(createInput.ProjectName, tables, policies)
-	generator.GenerateRoles(createInput.ProjectName, roles)
 
 	return nil
 }

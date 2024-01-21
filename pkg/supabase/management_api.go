@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/sev-2/raiden/pkg/logger"
 	management_api "github.com/sev-2/raiden/pkg/supabase/management-api"
@@ -64,11 +64,8 @@ func NewManagementApi() *management_api.APIClient {
 	managementApiConfiguration.Host = urlParsed.Host
 	managementApiConfiguration.Scheme = urlParsed.Scheme
 	managementApiConfiguration.BasePath = ""
-	// managementApiConfiguration.HTTPClient = &http.Client{
-	// 	Transport: &HttpTransport{
-	// 		Transport: http.DefaultTransport,
-	// 	},
-	// }
+	// managementApiConfiguration.HTTPClient = &LoggerHttpClient
+
 	managementApiConfiguration.AddDefaultHeader("Authorization", "Bearer "+accessToken)
 
 	return management_api.NewAPIClient(managementApiConfiguration)
@@ -79,37 +76,6 @@ func getManagementApi() *management_api.APIClient {
 		managementApi = NewManagementApi()
 	}
 	return managementApi
-}
-
-// CustomTransport is a custom http.RoundTripper that prints request details
-type HttpTransport struct {
-	Transport http.RoundTripper
-}
-
-func (c *HttpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Print the request details
-	dump, err := httputil.DumpRequestOut(req, true)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println("Request:")
-	fmt.Println(string(dump))
-
-	// Use the original transport to perform the actual HTTP round trip
-	resp, err := c.Transport.RoundTrip(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// Print the response details
-	dump, err = httputil.DumpResponse(resp, true)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println("Response:")
-	fmt.Println(string(dump))
-
-	return resp, nil
 }
 
 func ConfigureManagementApi(url, token string) {
@@ -170,24 +136,63 @@ func GetOrganizations() (Organizations, error) {
 }
 
 func getTables(projectId string, includeColumn bool) (tables []Table, err error) {
-	query, err := meta_sql.GenerateTablesQuery([]string{"public", "auth"}, includeColumn)
+	query, err := meta_sql.GenerateTablesQuery(DefaultIncludedSchema, includeColumn)
 	if err != nil {
 		err = fmt.Errorf("failed generate query get table for project id %s : %v", projectId, err)
 		return
 	}
 
-	return executeQuery[[]Table](projectId, "get tables", query)
+	return executeQuery[[]Table](projectId, "get tables", query, nil)
 }
 
 func getRoles(projectId string) (roles []Role, err error) {
-	return executeQuery[[]Role](projectId, "get roles", meta_sql.GetRolesQuery)
+	findConfigFn := func(role any) []any {
+		if roleMap, isMapAny := role.(map[string]any); isMapAny {
+			if configValue, exist := roleMap["config"]; exist {
+				if configArr, isArrayAny := configValue.([]any); isArrayAny {
+					return configArr
+				}
+			}
+		}
+
+		return nil
+	}
+
+	configsToMapFn := func(configs []any) map[string]any {
+		mapConfig := make(map[string]any)
+		for _, configItem := range configs {
+			if configItemStr, isString := configItem.(string); isString {
+				configItemSplitted := strings.Split(configItemStr, "=")
+				if len(configItemSplitted) == 2 {
+					mapConfig[configItemSplitted[0]] = configItemSplitted[1]
+				}
+			}
+		}
+		return mapConfig
+	}
+
+	resultDecoratorFn := func(result any) any {
+		if roles, isRolesArr := result.([]any); isRolesArr {
+			for roleIndex := range roles {
+				roleItem := roles[roleIndex]
+				if foundConfig := findConfigFn(roleItem); foundConfig != nil {
+					config := configsToMapFn(foundConfig)
+					if config != nil {
+						roleItem.(map[string]any)["config"] = config
+					}
+				}
+			}
+		}
+		return result
+	}
+	return executeQuery[[]Role](projectId, "get roles", meta_sql.GetRolesQuery, resultDecoratorFn)
 }
 
 func getPolicies(projectId string) (policies []Policy, err error) {
-	return executeQuery[[]Policy](projectId, "get policies", meta_sql.GetPoliciesQuery)
+	return executeQuery[[]Policy](projectId, "get policies", meta_sql.GetPoliciesQuery, nil)
 }
 
-func executeQuery[T any](projectId, action, query string) (result T, err error) {
+func executeQuery[T any](projectId, action, query string, resultDecorator func(response any) any) (result T, err error) {
 	anyResult, response, err := getManagementApi().ProjectsBetaApi.V1RunQuery(context.Background(), management_api.RunQueryBody{
 		Query: query,
 	}, projectId)
@@ -197,6 +202,11 @@ func executeQuery[T any](projectId, action, query string) (result T, err error) 
 		return
 	}
 
+	if resultDecorator != nil {
+		anyResult = resultDecorator(anyResult)
+	}
+
+	// logger.PrintJson(anyResult, true)
 	if response.StatusCode != http.StatusCreated {
 		err = fmt.Errorf("%s for project id %s got status code %v", action, projectId, response.StatusCode)
 		return

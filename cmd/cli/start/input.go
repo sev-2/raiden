@@ -11,10 +11,11 @@ import (
 )
 
 type CreateInput struct {
-	ProjectName    string
-	Target         raiden.DeploymentTarget
-	AccessToken    string
-	SupabaseApiUrl string
+	ProjectName         string
+	Target              raiden.DeploymentTarget
+	AccessToken         string
+	SupabaseApiUrl      string
+	SupabaseApiBasePath string
 }
 
 func (ca *CreateInput) PromptAll() error {
@@ -35,6 +36,13 @@ func (ca *CreateInput) PromptAll() error {
 			return err
 		}
 	case raiden.DeploymentTargetSelfHosted:
+		if err := ca.PromptSupabaseApiUrl(); err != nil {
+			return err
+		}
+
+		if err := ca.PromptSupabaseApiPath(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -42,10 +50,11 @@ func (ca *CreateInput) PromptAll() error {
 
 func (ca *CreateInput) ToAppConfig() *raiden.Config {
 	return &raiden.Config{
-		ProjectName:      ca.ProjectName,
-		DeploymentTarget: ca.Target,
-		CloudAccessToken: ca.AccessToken,
-		SupabaseApiUrl:   ca.SupabaseApiUrl,
+		ProjectName:        ca.ProjectName,
+		DeploymentTarget:   ca.Target,
+		CloudAccessToken:   ca.AccessToken,
+		SupabaseApiUrl:     ca.SupabaseApiUrl,
+		SupabaseApiBaseUrl: ca.SupabaseApiBasePath,
 	}
 }
 
@@ -112,9 +121,16 @@ func (ca *CreateInput) PromptAccessToken() error {
 }
 
 func (ca *CreateInput) PromptSupabaseApiUrl() error {
+	defaultValue := "http://localhost:54323"
+	switch ca.Target {
+	case raiden.DeploymentTargetCloud:
+		defaultValue = supabase.DefaultApiUrl
+		// other target
+	}
+
 	promp := promptui.Prompt{
 		Label:   "Enter supabase api url",
-		Default: supabase.DefaultApiUrl,
+		Default: defaultValue,
 	}
 
 	inputText, err := promp.Run()
@@ -123,6 +139,21 @@ func (ca *CreateInput) PromptSupabaseApiUrl() error {
 	}
 
 	ca.SupabaseApiUrl = inputText
+	return nil
+}
+
+func (ca *CreateInput) PromptSupabaseApiPath() error {
+	promp := promptui.Prompt{
+		Label:   "Enter supabase api base path",
+		Default: "/api/pg-meta/default",
+	}
+
+	inputText, err := promp.Run()
+	if err != nil {
+		return err
+	}
+
+	ca.SupabaseApiBasePath = inputText
 	return nil
 }
 

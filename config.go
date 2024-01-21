@@ -14,13 +14,14 @@ const (
 )
 
 type Config struct {
-	ProjectName      string           `mapstructure:"PROJECT_NAME"`
-	DeploymentTarget DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
-	CloudAccessToken string           `mapstructure:"CLOUD_ACCESS_TOKEN"`
-	SupabaseApiUrl   string           `mapstructure:"SUPABASE_API_URL"`
-	SupabaseRestUrl  string           `mapstructure:"SUPABASE_REST_URL"`
-	ServerHost       string           `mapstructure:"SERVER_HOST"`
-	ServerPort       string           `mapstructure:"SERVER_PORT"`
+	ProjectName        string           `mapstructure:"PROJECT_NAME"`
+	DeploymentTarget   DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
+	CloudAccessToken   string           `mapstructure:"CLOUD_ACCESS_TOKEN"`
+	SupabaseApiUrl     string           `mapstructure:"SUPABASE_API_URL"`
+	SupabaseApiBaseUrl string           `mapstructure:"SUPABASE_API_BASE_PATH"`
+	SupabaseRestUrl    string           `mapstructure:"SUPABASE_REST_URL"`
+	ServerHost         string           `mapstructure:"SERVER_HOST"`
+	ServerPort         string           `mapstructure:"SERVER_PORT"`
 }
 
 func LoadConfig(path *string) *Config {

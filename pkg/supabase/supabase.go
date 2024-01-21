@@ -1,26 +1,35 @@
 package supabase
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"time"
+
+	"github.com/sev-2/raiden/pkg/logger"
 )
 
 var (
-	DefaultApiUrl = "https://api.supabase.com"
-	apiUrl        string
+	DefaultApiUrl         = "https://api.supabase.com"
+	DefaultIncludedSchema = []string{"public", "auth"}
+	apiUrl                string
 )
 
 // Table
 type Table struct {
 	Bytes            int                  `json:"bytes"`
 	Columns          []Column             `json:"columns"`
-	Comment          string               `json:"comment"`
+	Comment          any                  `json:"comment"`
 	DeadRowsEstimate int                  `json:"dead_rows_estimate"`
 	ID               int                  `json:"id"`
 	LiveRowsEstimate int                  `json:"live_rows_estimate"`
 	Name             string               `json:"name"`
 	PrimaryKeys      []PrimaryKey         `json:"primary_keys"`
 	Relationships    []TablesRelationship `json:"relationships"`
-	ReplicaIdentity  string               `json:"replica_identity"`
+	ReplicaIdentity  any                  `json:"replica_identity"`
 	RLSEnabled       bool                 `json:"rls_enabled"`
 	RLSForced        bool                 `json:"rls_forced"`
 	Schema           string               `json:"schema"`
@@ -55,8 +64,8 @@ type Column struct {
 	IsUpdatable        bool     `json:"is_updatable"`
 	IsUnique           bool     `json:"is_unique"`
 	Enums              []string `json:"enums"`
-	Check              string   `json:"check"`
-	Comment            string   `json:"comment"`
+	Check              any      `json:"check"`
+	Comment            any      `json:"comment"`
 }
 
 type PrimaryKey struct {
@@ -70,38 +79,32 @@ func GetTables(projectId *string) ([]Table, error) {
 	if projectId != nil {
 		return getTables(*projectId, true)
 	}
-
-	// todo : get from pg meta
-
-	return []Table{}, nil
+	return metaGetTables(context.Background(), DefaultIncludedSchema, true)
 }
 
 // Role
 type Role struct {
-	ActiveConnections int        `json:"active_connections"`
-	CanBypassRLS      bool       `json:"can_bypass_rls"`
-	CanCreateDB       bool       `json:"can_create_db"`
-	CanCreateRole     bool       `json:"can_create_role"`
-	CanLogin          bool       `json:"can_login"`
-	Config            []string   `json:"config"`
-	ConnectionLimit   int        `json:"connection_limit"`
-	ID                int        `json:"id"`
-	InheritRole       bool       `json:"inherit_role"`
-	IsReplicationRole bool       `json:"is_replication_role"`
-	IsSuperuser       bool       `json:"is_superuser"`
-	Name              string     `json:"name"`
-	Password          string     `json:"password"`
-	ValidUntil        *time.Time `json:"valid_until"`
+	ActiveConnections int            `json:"active_connections"`
+	CanBypassRLS      bool           `json:"can_bypass_rls"`
+	CanCreateDB       bool           `json:"can_create_db"`
+	CanCreateRole     bool           `json:"can_create_role"`
+	CanLogin          bool           `json:"can_login"`
+	Config            map[string]any `json:"config"`
+	ConnectionLimit   int            `json:"connection_limit"`
+	ID                int            `json:"id"`
+	InheritRole       bool           `json:"inherit_role"`
+	IsReplicationRole bool           `json:"is_replication_role"`
+	IsSuperuser       bool           `json:"is_superuser"`
+	Name              string         `json:"name"`
+	Password          string         `json:"password"`
+	ValidUntil        *time.Time     `json:"valid_until"`
 }
 
 func GetRoles(projectId *string) ([]Role, error) {
 	if projectId != nil {
 		return getRoles(*projectId)
 	}
-
-	// todo : get from pg meta
-
-	return []Role{}, nil
+	return metaGetRoles(context.Background())
 }
 
 // Policies
@@ -133,10 +136,7 @@ func GetPolicies(projectId *string) ([]Policy, error) {
 	if projectId != nil {
 		return getPolicies(*projectId)
 	}
-
-	// todo : get from pg meta
-
-	return []Policy{}, nil
+	return metaGetPolicies(context.Background())
 }
 
 func (p *Policies) FilterByTable(table string) Policies {
@@ -152,4 +152,63 @@ func (p *Policies) FilterByTable(table string) Policies {
 	}
 
 	return filteredData
+}
+
+// custom logger http client
+var LoggerHttpClient = http.Client{
+	Transport: &LoggerHttpTransport{
+		Transport: http.DefaultTransport,
+	},
+}
+
+type LoggerHttpTransport struct {
+	Transport http.RoundTripper
+}
+
+func (c *LoggerHttpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Print the request details
+	dump, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("Request:")
+	logger.Info(string(dump))
+
+	// Use the original transport to perform the actual HTTP round trip
+	resp, err := c.Transport.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Print the response details
+	dump, err = httputil.DumpResponse(resp, true)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("Response:")
+	logger.Info(string(dump))
+
+	return resp, nil
+}
+
+// helper function
+func marshallResponse[T any](action string, data any, response *http.Response) (result T, err error) {
+	if response.StatusCode != http.StatusOK {
+		defaultError := fmt.Sprintf("failed get all table with response code : %v", response.StatusCode)
+		err = errors.New(defaultError)
+		return
+	}
+
+	jsonStr, err := json.Marshal(data)
+	if err != nil {
+		err = fmt.Errorf("invalid marshall data for %s table : %v", action, err)
+		return
+	}
+
+	if err = json.Unmarshal(jsonStr, &result); err != nil {
+		err = fmt.Errorf("invalid response from %s table : %v", action, err)
+		return
+	}
+
+	return
 }
