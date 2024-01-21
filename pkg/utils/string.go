@@ -23,12 +23,15 @@ func ToSnakeCase(s string) string {
 	result.Grow(len(s) + 5) // Preallocate space for a few extra characters
 
 	for i, char := range s {
-		if char >= 'A' && char <= 'Z' {
+		switch {
+		case char >= 'A' && char <= 'Z':
 			if i > 0 {
 				result.WriteRune('_')
 			}
 			result.WriteRune(char + ('a' - 'A'))
-		} else {
+		case char == '-':
+			result.WriteRune('_')
+		default:
 			result.WriteRune(char)
 		}
 	}

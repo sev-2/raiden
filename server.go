@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/valyala/fasthttp"
 )
 
 // Define App Server
 type Server struct {
+	Addr        string
 	Config      *Config
-	HttpServer  *http.Server
 	Controllers []Controller
 }
 
@@ -22,16 +24,12 @@ func NewServer(config *Config) *Server {
 	if config.ServerPort != "" {
 		port = config.ServerPort
 	}
-
 	serverAddr := fmt.Sprintf("%s:%s", host, port)
-
-	Info("set addr to : ", serverAddr)
 	s := &Server{
+		Addr:   serverAddr,
 		Config: config,
-		HttpServer: &http.Server{
-			Addr: serverAddr,
-		},
 	}
+
 	return s
 }
 
@@ -42,12 +40,9 @@ func (s *Server) Run() {
 	// print available route
 	router.PrintRegisteredRoute()
 
-	// setup handler
-	s.HttpServer.Handler = router.GetHandler()
-
 	// run server
-	Info("running server on ", s.HttpServer.Addr)
-	if err := s.HttpServer.ListenAndServe(); err != http.ErrServerClosed {
+	Info("running server on ", s.Addr)
+	if err := fasthttp.ListenAndServe(s.Addr, router.GetHandler()); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }

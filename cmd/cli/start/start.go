@@ -1,6 +1,11 @@
 package start
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
@@ -58,7 +63,11 @@ func create(cmd *cobra.Command, args []string, createInput *CreateInput) error {
 		supabase.ConfigurationMetaApi(createInput.SupabaseApiUrl, createInput.SupabaseApiBasePath)
 	}
 
-	return generateResource(projectID, createInput)
+	if err := generateResource(projectID, createInput); err != nil {
+		return err
+	}
+
+	return initProject(createInput)
 }
 
 func generateResource(projectID *string, createInput *CreateInput) error {
@@ -80,7 +89,8 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 	}
 
 	// generate resources to raiden resources
-	if err := generator.GenerateConfig(*createInput.ToAppConfig()); err != nil {
+	appConfig := createInput.ToAppConfig()
+	if err := generator.GenerateConfig(*appConfig); err != nil {
 		return err
 	}
 
@@ -91,6 +101,10 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 	}
 
 	if err := generator.GenerateRoles(createInput.ProjectName, roles); err != nil {
+		return err
+	}
+
+	if err := generator.GenerateMainFunction(*appConfig); err != nil {
 		return err
 	}
 
@@ -116,4 +130,34 @@ func createNewSupabaseProject(projectName string) supabase.Project {
 	}
 
 	return project
+}
+
+func initProject(createInput *CreateInput) error {
+	currentPath, err := utils.GetCurrentDirectory()
+	if err != nil {
+		return err
+	}
+
+	projectPath := filepath.Join(currentPath, createInput.ProjectName)
+	if err := os.Chdir(projectPath); err != nil {
+		return err
+	}
+
+	cmdModInit := exec.Command("go", "mod", "init", createInput.ProjectName)
+	cmdModInit.Stdout = os.Stdout
+	cmdModInit.Stderr = os.Stderr
+
+	if err := cmdModInit.Run(); err != nil {
+		return fmt.Errorf("error init project : %v", err)
+	}
+
+	cmdModTidy := exec.Command("go", "mod", "tidy")
+	cmdModTidy.Stdout = os.Stdout
+	cmdModTidy.Stderr = os.Stderr
+
+	if err := cmdModTidy.Run(); err != nil {
+		return fmt.Errorf("error install dependency : %v", err)
+	}
+
+	return nil
 }

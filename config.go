@@ -45,7 +45,7 @@ func LoadConfig(path *string) *Config {
 	} else {
 		viper.SetConfigName("app")
 		viper.SetConfigType("yaml")
-		viper.AddConfigPath("./config")
+		viper.AddConfigPath("./configs")
 		Info("read configuration from ")
 	}
 

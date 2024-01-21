@@ -12,13 +12,11 @@ import (
 
 type Controller interface{}
 
-func HealthHandler() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		data := map[string]any{
-			"message": "server up",
-		}
-		return c.JSON(http.StatusOK, data)
+func HealthHandler(ctx *Context) {
+	responseData := map[string]any{
+		"message": "server up",
 	}
+	ctx.SendJson(responseData)
 }
 
 func ProxyHandler(
