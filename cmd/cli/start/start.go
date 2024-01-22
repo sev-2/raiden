@@ -94,7 +94,10 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 		return err
 	}
 
-	// todo : generate controller
+	// generate example controller
+	if err := generator.GenerateHelloWordController(createInput.ProjectName); err != nil {
+		return err
+	}
 
 	if err := generator.GenerateModels(createInput.ProjectName, tables, policies); err != nil {
 		return err
@@ -104,7 +107,9 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 		return err
 	}
 
-	if err := generator.GenerateMainFunction(*appConfig); err != nil {
+	// get controllers
+
+	if err := generateMainFunction(*appConfig); err != nil {
 		return err
 	}
 
@@ -132,6 +137,33 @@ func createNewSupabaseProject(projectName string) supabase.Project {
 	return project
 }
 
+func generateMainFunction(appConfig raiden.Config) error {
+	currentPath, err := utils.GetCurrentDirectory()
+	if err != nil {
+		return err
+	}
+
+	controllerPath := filepath.Join(currentPath, appConfig.ProjectName, generator.ControllerDir)
+	mapController, err := generator.MapGetControllers(controllerPath)
+	if err != nil {
+		return err
+	}
+
+	controllerNameArr := make([]string, 0)
+	for k := range mapController {
+		if k != "" {
+			controllerNameArr = append(controllerNameArr, k)
+		}
+	}
+
+	controllerPackage := filepath.Join(appConfig.ProjectName, generator.ControllerDir)
+	if err := generator.GenerateMainFunction(appConfig, controllerPackage, controllerNameArr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func initProject(createInput *CreateInput) error {
 	currentPath, err := utils.GetCurrentDirectory()
 	if err != nil {
@@ -142,8 +174,7 @@ func initProject(createInput *CreateInput) error {
 	if err := os.Chdir(projectPath); err != nil {
 		return err
 	}
-
-	cmdModInit := exec.Command("go", "mod", "init", createInput.ProjectName)
+	cmdModInit := exec.Command("go", "mod", "init", createInput.GoModuleName)
 	cmdModInit.Stdout = os.Stdout
 	cmdModInit.Stderr = os.Stderr
 

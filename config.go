@@ -16,6 +16,7 @@ const (
 type Config struct {
 	ProjectName        string           `mapstructure:"PROJECT_NAME"`
 	DeploymentTarget   DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
+	GoModuleName       string           `mapstructure:"GO_MODULE_NAME"`
 	CloudAccessToken   string           `mapstructure:"CLOUD_ACCESS_TOKEN"`
 	SupabaseApiUrl     string           `mapstructure:"SUPABASE_API_URL"`
 	SupabaseApiBaseUrl string           `mapstructure:"SUPABASE_API_BASE_PATH"`

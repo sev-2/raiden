@@ -1,9 +1,6 @@
 package raiden
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/valyala/fasthttp"
 )
 
@@ -16,16 +13,32 @@ func (c *Context) GetConfig() *Config {
 	return c.config
 }
 
-func (c *Context) SendJson(data any) {
-	c.SetContentType("application/json")
+func (c *Context) SendData(data any) *JsonPresenter {
+	presenter := NewJsonPresenter(c.RequestCtx)
+	presenter.SetData(data)
+	return presenter
+}
 
-	jStr, err := json.Marshal(data)
-	if err != nil {
-		c.SetStatusCode(fasthttp.StatusInternalServerError)
-		c.WriteString(fmt.Sprintf("{\"message\" : %q}", err))
-		return
+func (c *Context) SendError(err error) *JsonPresenter {
+	presenter := NewJsonPresenter(c.RequestCtx)
+	presenter.SetError(err)
+	return presenter
+}
+
+func (c *Context) SendErrorWithCode(statusCode int, err error) *JsonPresenter {
+	presenter := NewJsonPresenter(c.RequestCtx)
+	if errResponse, ok := err.(*ErrorResponse); ok {
+		errResponse.StatusCode = statusCode
+		err = errResponse
+	} else {
+		errResponse := &ErrorResponse{
+			Message:    err.Error(),
+			StatusCode: statusCode,
+			Code:       fasthttp.StatusMessage(statusCode),
+		}
+		err = errResponse
 	}
 
-	c.SetStatusCode(fasthttp.StatusOK)
-	c.Write(jStr)
+	presenter.SetError(err)
+	return presenter
 }

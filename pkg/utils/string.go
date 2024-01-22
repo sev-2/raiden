@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -37,6 +38,12 @@ func ToSnakeCase(s string) string {
 	}
 
 	return result.String()
+}
+
+func ToGoModuleName(s string) string {
+	reg := regexp.MustCompile("[^a-zA-Z]+")
+	result := reg.ReplaceAllString(s, "")
+	return strings.ToLower(result)
 }
 
 func SnakeCaseToPascalCase(s string) string {

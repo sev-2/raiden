@@ -11,8 +11,7 @@ import (
 )
 
 var roleDir = "roles"
-var roleInstanceTemplate = `
-package roles
+var roleInstanceTemplate = `package roles
 
 import (
 	"github.com/sev-2/raiden/pkg/postgres"

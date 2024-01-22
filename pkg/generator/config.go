@@ -12,6 +12,7 @@ import (
 var configDir = "configs"
 var configFile = "app"
 var configTemplate = `PROJECT_NAME: {{ .ProjectName }}
+GO_MODULE_NAME: {{ .GoModuleName }}
 DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
 CLOUD_ACCESS_TOKEN: {{ .CloudAccessToken }}
 

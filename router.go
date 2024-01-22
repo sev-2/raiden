@@ -9,7 +9,7 @@ import (
 	fs_router "github.com/fasthttp/router"
 )
 
-type RouteHandler func(ctx *Context)
+type RouteHandler func(ctx *Context) Presenter
 
 // Build router
 func NewRouter(config *Config) *router {
@@ -17,16 +17,6 @@ func NewRouter(config *Config) *router {
 	r := &router{}
 	r.fsRouter = fs_router.New()
 	r.config = config
-
-	// Setup App Context
-	// applyAppContext(r.echo, config)
-	// applyDefaultMiddleware(r.echo)
-
-	defaultAppCtx := Context{
-		config: config,
-	}
-	// register health check
-	r.fsRouter.GET("/health", wrapRouteHandler(defaultAppCtx, HealthHandler))
 
 	// set reserved group
 	r.functionRoute = r.fsRouter.Group("/functions/v1")
@@ -49,6 +39,30 @@ type router struct {
 	storageRoute  *fs_router.Group
 }
 
+func (r *router) RegisterControllers(controllers []Controller) {
+	for i := range controllers {
+		c := controllers[i]
+		switch c.Options.Type {
+		case ControllerTypeFunction:
+			r.functionRoute.POST(c.Options.Path, wrapRouteHandler(r.config, &c))
+		case ControllerTypeHttpHandler:
+			switch strings.ToUpper(c.Options.Method) {
+			case fasthttp.MethodGet:
+				r.fsRouter.GET(c.Options.Path, wrapRouteHandler(r.config, &c))
+			case fasthttp.MethodPost:
+				r.fsRouter.POST(c.Options.Path, wrapRouteHandler(r.config, &c))
+			case fasthttp.MethodPut:
+				r.fsRouter.PUT(c.Options.Path, wrapRouteHandler(r.config, &c))
+			case fasthttp.MethodPatch:
+				r.fsRouter.PATCH(c.Options.Path, wrapRouteHandler(r.config, &c))
+			case fasthttp.MethodDelete:
+				r.fsRouter.DELETE(c.Options.Path, wrapRouteHandler(r.config, &c))
+			}
+		}
+
+	}
+}
+
 func (r *router) GetHandler() fasthttp.RequestHandler {
 	return r.fsRouter.Handler
 }
@@ -57,7 +71,7 @@ func (r *router) PrintRegisteredRoute() {
 	registeredRoutes := r.fsRouter.List()
 	Infof("%s Registered Route %s ", strings.Repeat("=", 11), strings.Repeat("=", 11))
 	for method, routes := range registeredRoutes {
-		Infof("%s registered paths : ", utils.GetColoredHttpMethod(method))
+		Infof("%s", utils.GetColoredHttpMethod(method))
 		for _, route := range routes {
 			Infof("- %s", route)
 		}
@@ -65,9 +79,13 @@ func (r *router) PrintRegisteredRoute() {
 	Info(strings.Repeat("=", 40))
 }
 
-func wrapRouteHandler(appCtx Context, next RouteHandler) fasthttp.RequestHandler {
+func wrapRouteHandler(config *Config, controller *Controller) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		appCtx.RequestCtx = ctx
-		next(&appCtx)
+		appCtx := &Context{
+			RequestCtx: ctx,
+			config:     config,
+		}
+		presenter := controller.Handler(appCtx)
+		presenter.Write()
 	}
 }

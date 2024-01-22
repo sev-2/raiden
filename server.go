@@ -15,7 +15,7 @@ type Server struct {
 	Controllers []Controller
 }
 
-func NewServer(config *Config) *Server {
+func NewServer(config *Config, controllers []Controller) *Server {
 	host, port := "127.0.0.1", "8002"
 	if config.ServerHost != "" {
 		host = config.ServerHost
@@ -26,8 +26,9 @@ func NewServer(config *Config) *Server {
 	}
 	serverAddr := fmt.Sprintf("%s:%s", host, port)
 	s := &Server{
-		Addr:   serverAddr,
-		Config: config,
+		Addr:        serverAddr,
+		Config:      config,
+		Controllers: controllers,
 	}
 
 	return s
@@ -36,6 +37,7 @@ func NewServer(config *Config) *Server {
 func (s *Server) Run() {
 	// initial route
 	router := NewRouter(s.Config)
+	router.RegisterControllers(s.Controllers)
 
 	// print available route
 	router.PrintRegisteredRoute()

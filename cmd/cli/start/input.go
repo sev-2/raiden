@@ -11,15 +11,20 @@ import (
 )
 
 type CreateInput struct {
-	ProjectName         string
-	Target              raiden.DeploymentTarget
 	AccessToken         string
+	ProjectName         string
+	GoModuleName        string
 	SupabaseApiUrl      string
 	SupabaseApiBasePath string
+	Target              raiden.DeploymentTarget
 }
 
 func (ca *CreateInput) PromptAll() error {
 	if err := ca.PromptProjectName(); err != nil {
+		return err
+	}
+
+	if err := ca.PromptGoModuleName(); err != nil {
 		return err
 	}
 
@@ -50,9 +55,10 @@ func (ca *CreateInput) PromptAll() error {
 
 func (ca *CreateInput) ToAppConfig() *raiden.Config {
 	return &raiden.Config{
-		ProjectName:        ca.ProjectName,
-		DeploymentTarget:   ca.Target,
 		CloudAccessToken:   ca.AccessToken,
+		DeploymentTarget:   ca.Target,
+		ProjectName:        ca.ProjectName,
+		GoModuleName:       ca.GoModuleName,
 		SupabaseApiUrl:     ca.SupabaseApiUrl,
 		SupabaseApiBaseUrl: ca.SupabaseApiBasePath,
 	}
@@ -80,6 +86,21 @@ func (ca *CreateInput) PromptProjectName() error {
 	}
 
 	ca.ProjectName = inputText
+	return nil
+}
+
+func (ca *CreateInput) PromptGoModuleName() error {
+	promp := promptui.Prompt{
+		Label:   "Enter go module name",
+		Default: utils.ToGoModuleName(ca.ProjectName),
+	}
+
+	inputText, err := promp.Run()
+	if err != nil {
+		return err
+	}
+
+	ca.GoModuleName = inputText
 	return nil
 }
 
