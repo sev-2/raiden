@@ -6,7 +6,7 @@ import (
 
 // @type function
 // @route /hello-word
-func HelloWordHandler(ctx *raiden.Context) raiden.Presenter {
+func HelloWordHandler(ctx raiden.Context) raiden.Presenter {
 	response := map[string]any{
 		"message": "hello word",
 	}
@@ -15,7 +15,7 @@ func HelloWordHandler(ctx *raiden.Context) raiden.Presenter {
 
 // @type function
 // @route /greeting
-func GreetingHandler(ctx *raiden.Context) raiden.Presenter {
+func GreetingHandler(ctx raiden.Context) raiden.Presenter {
 	response := map[string]any{
 		"message": "hello raiden",
 	}

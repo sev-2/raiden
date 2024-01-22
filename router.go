@@ -9,23 +9,21 @@ import (
 	fs_router "github.com/fasthttp/router"
 )
 
-type RouteHandler func(ctx *Context) Presenter
+type RouteHandler func(ctx Context) Presenter
 
 // Build router
 func NewRouter(config *Config) *router {
 	Info("Setup New Router")
-	r := &router{}
-	r.fsRouter = fs_router.New()
-	r.config = config
-
-	// set reserved group
-	r.functionRoute = r.fsRouter.Group("/functions/v1")
-	r.modelRoute = r.fsRouter.Group("/rest/v1")
-	r.rpcRoute = r.fsRouter.Group("/rest/v1/rpc")
-	r.realtimeRoute = r.fsRouter.Group("/realtime/v1")
-	r.storageRoute = r.fsRouter.Group("/storage/v1")
-
-	return r
+	fsRouter := fs_router.New()
+	return &router{
+		fsRouter:      fsRouter,
+		config:        config,
+		functionRoute: fsRouter.Group("/functions/v1"),
+		modelRoute:    fsRouter.Group("/rest/v1"),
+		rpcRoute:      fsRouter.Group("/rest/v1/rpc"),
+		realtimeRoute: fsRouter.Group("/realtime/v1"),
+		storageRoute:  fsRouter.Group("/storage/v1"),
+	}
 }
 
 type router struct {
@@ -81,7 +79,7 @@ func (r *router) PrintRegisteredRoute() {
 
 func wrapRouteHandler(config *Config, controller *Controller) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		appCtx := &Context{
+		appCtx := &context{
 			RequestCtx: ctx,
 			config:     config,
 		}

@@ -4,16 +4,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
 
-	"github.com/labstack/echo/v4"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/valyala/fasthttp"
 )
 
@@ -94,7 +90,7 @@ func (cr *ControllerRegistry) getController(h RouteHandler) Controller {
 		}
 	}
 
-	options := marshallComment(comment)
+	options := parseToOptions(comment)
 	return Controller{
 		Options: options,
 		Handler: h,
@@ -136,7 +132,7 @@ func extractComments(doc *ast.CommentGroup) string {
 	return strings.Join(comments, "\n")
 }
 
-func marshallComment(comment string) ControllerOptions {
+func parseToOptions(comment string) ControllerOptions {
 	trimmedComment := strings.ReplaceAll(comment, "\n", " ")
 
 	var filteredComments []string
@@ -155,21 +151,23 @@ func marshallComment(comment string) ControllerOptions {
 	for _, fc := range filteredComments {
 		splitedComments := strings.Split(fc, " ")
 		switch splitedComments[0] {
+		case string(ControllerOptionTypeKey):
+			if len(splitedComments) >= 2 {
+				options.Type = ControllerType(splitedComments[1])
+
+				// setup method by type
+				switch options.Type {
+				case ControllerTypeFunction:
+					options.Method = fasthttp.MethodPost
+
+				}
+			}
 		case string(ControllerOptionRouteKey):
 			if len(splitedComments) > 2 {
 				options.Method = strings.ToUpper(splitedComments[1])
 				options.Path = splitedComments[2]
 			} else if len(splitedComments) == 2 {
 				options.Path = splitedComments[1]
-			}
-		case string(ControllerOptionTypeKey):
-			if len(splitedComments) >= 2 {
-				options.Type = ControllerType(splitedComments[1])
-
-				switch options.Type {
-				case ControllerTypeFunction:
-					options.Path = fasthttp.MethodPost
-				}
 			}
 		}
 	}
@@ -179,7 +177,7 @@ func marshallComment(comment string) ControllerOptions {
 
 // @type http-handler
 // @route GET /health
-func HealthHandler(ctx *Context) Presenter {
+func HealthHandler(ctx Context) Presenter {
 	responseData := map[string]any{
 		"message": "server up",
 	}
@@ -187,28 +185,33 @@ func HealthHandler(ctx *Context) Presenter {
 }
 
 func ProxyHandler(
-	url *url.URL,
-	requestInterceptor func(req *http.Request),
-	responseInterceptor func(r *http.Response) error,
-) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		proxy := httputil.NewSingleHostReverseProxy(url)
-		proxy.Director = func(req *http.Request) {
-			req.URL.Scheme = url.Scheme
-			req.URL.Host = url.Host
-			logger.Infof("Proxying to : %s %s\n", utils.GetColoredHttpMethod(req.Method), req.URL.String())
+	targetURL *url.URL,
+	requestInterceptor func(req *fasthttp.Request),
+	responseInterceptor func(resp *fasthttp.Response) error,
+) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		req, res := &ctx.Request, &ctx.Response
 
-			// intercept request
-			if requestInterceptor != nil {
-				requestInterceptor(req)
-			}
+		req.SetRequestURI(targetURL.String())
+		req.URI().SetScheme(targetURL.Scheme)
+		req.URI().SetHost(targetURL.Host)
+
+		logger.Infof("Proxying to : %s %s\n", req.Header.Method(), req.URI().FullURI())
+
+		if requestInterceptor != nil {
+			requestInterceptor(req)
+		}
+
+		if err := fasthttp.Do(req, res); err != nil {
+			logger.Error(err)
+			return
 		}
 
 		if responseInterceptor != nil {
-			proxy.ModifyResponse = responseInterceptor
+			if err := responseInterceptor(res); err != nil {
+				logger.Error(err)
+				return
+			}
 		}
-
-		proxy.ServeHTTP(c.Response(), c.Request())
-		return nil
 	}
 }

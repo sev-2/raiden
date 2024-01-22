@@ -107,8 +107,6 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 		return err
 	}
 
-	// get controllers
-
 	if err := generateMainFunction(*appConfig); err != nil {
 		return err
 	}

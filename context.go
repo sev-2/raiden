@@ -4,28 +4,37 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-type Context struct {
-	*fasthttp.RequestCtx
-	config *Config
-}
+type (
+	Context interface {
+		GetConfig() *Config
+		SendData(data any) Presenter
+		SendError(err error) Presenter
+		SendErrorWithCode(statusCode int, err error) Presenter
+	}
 
-func (c *Context) GetConfig() *Config {
+	context struct {
+		*fasthttp.RequestCtx
+		config *Config
+	}
+)
+
+func (c *context) GetConfig() *Config {
 	return c.config
 }
 
-func (c *Context) SendData(data any) *JsonPresenter {
+func (c *context) SendData(data any) Presenter {
 	presenter := NewJsonPresenter(c.RequestCtx)
 	presenter.SetData(data)
 	return presenter
 }
 
-func (c *Context) SendError(err error) *JsonPresenter {
+func (c *context) SendError(err error) Presenter {
 	presenter := NewJsonPresenter(c.RequestCtx)
 	presenter.SetError(err)
 	return presenter
 }
 
-func (c *Context) SendErrorWithCode(statusCode int, err error) *JsonPresenter {
+func (c *context) SendErrorWithCode(statusCode int, err error) Presenter {
 	presenter := NewJsonPresenter(c.RequestCtx)
 	if errResponse, ok := err.(*ErrorResponse); ok {
 		errResponse.StatusCode = statusCode
