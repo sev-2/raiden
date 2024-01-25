@@ -15,25 +15,26 @@ package main
 {{ if gt (len .Imports) 0 }}
 import(
 {{- range .Imports}}
-	"{{.}}"
+	{{.}}
 {{- end}}
 )
 {{ end }}
 
 func main() {
+	// load configuretion
 	config := raiden.LoadConfig(nil)
 
+	// register controller
 	controllerRegistry := raiden.NewControllerRegistry()
 	controllerRegistry.Register(
-		raiden.HealthHandler,
 		{{- range .Controllers}}
 		controllers.{{.}},
 		{{- end}}
 	)
 
 	// Setup server
-	app := raiden.NewServer(config, controllerRegistry.Controllers)
-	app.Run()
+	server := raiden.NewServer(config, controllerRegistry.Controllers)
+	server.Run()
 }
 `
 
@@ -66,11 +67,11 @@ func GenerateMainFunction(config raiden.Config, controllerPackage string, contro
 
 	// setup template parameters
 	importPaths := []string{
-		"github.com/sev-2/raiden",
+		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
 	}
 
 	if len(controllerNames) > 0 {
-		importPaths = append(importPaths, controllerPackage)
+		importPaths = append(importPaths, fmt.Sprintf("%q", controllerPackage))
 	}
 
 	// Execute the template and write to the file

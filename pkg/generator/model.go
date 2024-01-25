@@ -11,7 +11,7 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var modelDir = "models"
+var modelDir = "internal/models"
 var modelTemplate = `package models
 {{ if gt (len .Imports) 0 }}
 import(
@@ -36,6 +36,13 @@ type Rls struct {
 }
 
 func GenerateModels(projectName string, tables []supabase.Table, rlsList supabase.Policies) (err error) {
+	internalFolderPath := filepath.Join(projectName, "internal")
+	if exist := utils.IsFolderExists(internalFolderPath); !exist {
+		if err := utils.CreateFolder(internalFolderPath); err != nil {
+			return err
+		}
+	}
+
 	folderPath := filepath.Join(projectName, modelDir)
 	err = utils.CreateFolder(folderPath)
 	if err != nil {

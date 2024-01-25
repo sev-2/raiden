@@ -14,15 +14,20 @@ const (
 )
 
 type Config struct {
-	ProjectName        string           `mapstructure:"PROJECT_NAME"`
+	CloudAccessToken   string           `mapstructure:"CLOUD_ACCESS_TOKEN"`
+	Environment        string           `mapstructure:"ENVIRONMENT"`
 	DeploymentTarget   DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
 	GoModuleName       string           `mapstructure:"GO_MODULE_NAME"`
-	CloudAccessToken   string           `mapstructure:"CLOUD_ACCESS_TOKEN"`
+	ProjectName        string           `mapstructure:"PROJECT_NAME"`
 	SupabaseApiUrl     string           `mapstructure:"SUPABASE_API_URL"`
 	SupabaseApiBaseUrl string           `mapstructure:"SUPABASE_API_BASE_PATH"`
 	SupabaseRestUrl    string           `mapstructure:"SUPABASE_REST_URL"`
 	ServerHost         string           `mapstructure:"SERVER_HOST"`
 	ServerPort         string           `mapstructure:"SERVER_PORT"`
+	TraceEnable        bool             `mapstructure:"TRACE_ENABLE"`
+	TraceCollector     string           `mapstructure:"TRACE_COLLECTOR"`
+	TraceEndpoint      string           `mapstructure:"TRACE_ENDPOINT"`
+	Version            string           `mapstructure:"VERSION"`
 }
 
 func LoadConfig(path *string) *Config {
@@ -33,21 +38,13 @@ func LoadConfig(path *string) *Config {
 		fileExtension := filepath.Ext(file)[1:]
 		fileName := file[:len(file)-len(fileExtension)-1]
 
-		Info("set config file name to ", fileName)
 		viper.SetConfigName(fileName)
-
-		Info("set config extension to ", fileExtension)
 		viper.SetConfigType(fileExtension)
-
-		Info("set config folder to ", folderPath)
 		viper.AddConfigPath(folderPath)
-
-		Info("read configuration from ", *path)
 	} else {
 		viper.SetConfigName("app")
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("./configs")
-		Info("read configuration from ")
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -56,7 +53,7 @@ func LoadConfig(path *string) *Config {
 	}
 
 	var config Config
-	Info("try marshall configuration")
+	Info("load configuration")
 	if err := viper.Unmarshal(&config); err != nil {
 		Errorf("Error unmarshalling config: %s\n", err)
 		return nil

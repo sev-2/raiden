@@ -10,7 +10,7 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var roleDir = "roles"
+var roleDir = "internal/roles"
 var roleInstanceTemplate = `package roles
 
 import (
@@ -25,6 +25,13 @@ var {{ .RoleName | ToGoIdentifier }} = &postgres.Role{
 `
 
 func GenerateRoles(projectName string, roles []supabase.Role) (err error) {
+	internalFolderPath := filepath.Join(projectName, "internal")
+	if exist := utils.IsFolderExists(internalFolderPath); !exist {
+		if err := utils.CreateFolder(internalFolderPath); err != nil {
+			return err
+		}
+	}
+
 	err = utils.CreateFolder(filepath.Join(projectName, roleDir))
 	if err != nil {
 		return err

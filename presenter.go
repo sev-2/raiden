@@ -7,6 +7,8 @@ import (
 )
 
 type Presenter interface {
+	GetError() error
+
 	WriteData() error
 	WriteError(err error)
 	Write()
@@ -29,7 +31,16 @@ func (p *JsonPresenter) SetData(data any) {
 }
 
 func (p *JsonPresenter) SetError(err error) {
+	if errResponse, ok := err.(*ErrorResponse); ok {
+		p.reqCtx.SetStatusCode(errResponse.StatusCode)
+	} else {
+		p.reqCtx.SetStatusCode(fasthttp.StatusInternalServerError)
+	}
 	p.err = err
+}
+
+func (p *JsonPresenter) GetError() error {
+	return p.err
 }
 
 func (p *JsonPresenter) WriteData() error {
@@ -59,13 +70,13 @@ func (p *JsonPresenter) WriteError(err error) {
 
 func (p *JsonPresenter) Write() {
 	p.reqCtx.SetContentType("application/json")
-
 	if p.err != nil {
 		p.WriteError(p.err)
 		return
 	}
 
 	if err := p.WriteData(); err != nil {
+		p.err = err
 		p.WriteError(err)
 	}
 }

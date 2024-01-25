@@ -11,10 +11,12 @@ func Command() *cobra.Command {
 		Use:   "generate",
 		Short: "Generate application resource",
 		Long:  "Generate deployment manifest and main function backend application",
-		Run:   generateCmd,
+		RunE:  generateCmd,
 	}
 }
 
-func generateCmd(cmd *cobra.Command, args []string) {
+func generateCmd(cmd *cobra.Command, args []string) error {
 	fmt.Println("Must be implementation soon :)")
+
+	return nil
 }

@@ -2,9 +2,9 @@ package raiden
 
 type ErrorResponse struct {
 	StatusCode int
-	Code       string `json:"code"`
-	Details    any    `json:"details"`
-	Hint       string `json:"hint"`
+	Code       string `json:"code,omitempty"`
+	Details    any    `json:"details,omitempty"`
+	Hint       string `json:"hint,omitempty"`
 	Message    string `json:"message"`
 }
 

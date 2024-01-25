@@ -14,14 +14,21 @@ var configFile = "app"
 var configTemplate = `PROJECT_NAME: {{ .ProjectName }}
 GO_MODULE_NAME: {{ .GoModuleName }}
 DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
-CLOUD_ACCESS_TOKEN: {{ .CloudAccessToken }}
+{{ if .CloudAccessToken }}CLOUD_ACCESS_TOKEN: {{ .CloudAccessToken }}{{ end }}
+
+ENVIRONMENT=development
+VERSION=1.0.0
 
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
-SUPABASE_API_BASE_PATH: {{ .SupabaseApiBaseUrl }}
-SUPABASE_REST_URL: {{ .SupabaseRestUrl }}
+{{ if .SupabaseApiBaseUrl }}SUPABASE_API_BASE_PATH: {{ .SupabaseApiBaseUrl }}{{ end }}
+{{ if .SupabaseRestUrl }}SUPABASE_REST_URL: {{ .SupabaseRestUrl }}{{ end }}
 
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
+
+{{ if .TraceEnable }}TRACE_ENABLE: {{ .TraceEnable }}{{ end }}
+{{ if .TraceCollector }}TRACE_COLLECTOR: {{ .TraceCollector }}{{ end }}
+{{ if .TraceEndpoint }}TRACE_ENDPOINT: {{ .TraceEndpoint }}{{ end }}
 `
 
 func GenerateConfig(config raiden.Config) error {

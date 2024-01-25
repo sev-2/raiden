@@ -2,6 +2,7 @@ package start
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/manifoldco/promptui"
 	"github.com/sev-2/raiden"
@@ -17,6 +18,9 @@ type CreateInput struct {
 	SupabaseApiUrl      string
 	SupabaseApiBasePath string
 	Target              raiden.DeploymentTarget
+	TraceEnable         bool
+	TraceEndpoint       string
+	TraceCollector      string
 }
 
 func (ca *CreateInput) PromptAll() error {
@@ -50,6 +54,19 @@ func (ca *CreateInput) PromptAll() error {
 		}
 	}
 
+	if err := ca.PrompTraceEnable(); err != nil {
+		return err
+	}
+
+	if ca.TraceEnable {
+		if err := ca.PromptTraceCollector(); err != nil {
+			return err
+		}
+
+		if err := ca.PromptTraceEndpoint(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -61,6 +78,9 @@ func (ca *CreateInput) ToAppConfig() *raiden.Config {
 		GoModuleName:       ca.GoModuleName,
 		SupabaseApiUrl:     ca.SupabaseApiUrl,
 		SupabaseApiBaseUrl: ca.SupabaseApiBasePath,
+		TraceEnable:        ca.TraceEnable,
+		TraceCollector:     ca.TraceCollector,
+		TraceEndpoint:      ca.TraceEndpoint,
 	}
 }
 
@@ -175,6 +195,60 @@ func (ca *CreateInput) PromptSupabaseApiPath() error {
 	}
 
 	ca.SupabaseApiBasePath = inputText
+	return nil
+}
+
+func (ca *CreateInput) PrompTraceEnable() error {
+	promp := promptui.Prompt{
+		Label:     "Enable Tracer",
+		Default:   "n",
+		IsConfirm: true,
+	}
+
+	inputText, err := promp.Run()
+	if err != nil {
+		return err
+	}
+
+	if strings.ToLower(inputText) == "y" {
+		ca.TraceEnable = true
+	} else {
+		ca.TraceEnable = false
+	}
+	return nil
+}
+
+func (ca *CreateInput) PromptTraceCollector() error {
+	promp := promptui.Select{
+		Label: "Choose collector",
+		Items: []string{"otpl"},
+	}
+
+	_, inputText, err := promp.Run()
+	if err != nil {
+		return err
+	}
+	ca.TraceCollector = inputText
+	return nil
+}
+
+func (ca *CreateInput) PromptTraceEndpoint() error {
+	promp := promptui.Prompt{
+		Label:   "Enter trace endpoint",
+		Default: "localhost:4317",
+		Validate: func(s string) error {
+			if s == "" {
+				return errors.New("trace endpoint can`t be empty")
+			}
+			return nil
+		},
+	}
+
+	inputText, err := promp.Run()
+	if err != nil {
+		return err
+	}
+	ca.TraceEndpoint = inputText
 	return nil
 }
 

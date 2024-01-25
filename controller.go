@@ -1,12 +1,16 @@
 package raiden
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"net/url"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/sev-2/raiden/pkg/logger"
@@ -24,7 +28,7 @@ type (
 
 	Controller struct {
 		Options ControllerOptions
-		Handler RouteHandler
+		Handler RouteHandlerFn
 	}
 
 	ControllerRegistry struct {
@@ -42,14 +46,16 @@ const (
 	ControllerOptionRouteKey ControllerOptionKey = "route"
 )
 
-// controller registry
+// ----- Controller Functionality -----
 func NewControllerRegistry() *ControllerRegistry {
-	return &ControllerRegistry{
+	registry := &ControllerRegistry{
 		ControllerComments: map[string]string{},
 	}
+	registry.Register(HealthController)
+	return registry
 }
 
-func (cr *ControllerRegistry) Register(routeHandlers ...RouteHandler) {
+func (cr *ControllerRegistry) Register(routeHandlers ...RouteHandlerFn) {
 	var controller []Controller
 	for i := range routeHandlers {
 		h := routeHandlers[i]
@@ -60,7 +66,7 @@ func (cr *ControllerRegistry) Register(routeHandlers ...RouteHandler) {
 	cr.Controllers = append(cr.Controllers, controller...)
 }
 
-func (cr *ControllerRegistry) getController(h RouteHandler) Controller {
+func (cr *ControllerRegistry) getController(h RouteHandlerFn) Controller {
 	controller := Controller{
 		Handler: nil,
 	}
@@ -71,7 +77,6 @@ func (cr *ControllerRegistry) getController(h RouteHandler) Controller {
 	funcNameArr := strings.Split(funcInfo.Name(), ".")
 	funcName := funcNameArr[len(funcNameArr)-1]
 
-	// find in registry
 	comment, ok := cr.ControllerComments[funcName]
 	if !ok {
 		file, _ := funcInfo.FileLine(funcPtr)
@@ -97,7 +102,6 @@ func (cr *ControllerRegistry) getController(h RouteHandler) Controller {
 	}
 }
 
-// Get Controller Options
 func GetHandlerComment(file string) []map[string]string {
 	fSet := token.NewFileSet()
 	node, err := parser.ParseFile(fSet, file, nil, parser.ParseComments)
@@ -175,13 +179,87 @@ func parseToOptions(comment string) ControllerOptions {
 	return options
 }
 
+// ----- Helper Functionality -----
+func UnmarshalRequest[T any](ctx Context) (*T, error) {
+	reqType := reflect.TypeOf((*T)(nil)).Elem()
+	reqPtr := reflect.New(reqType).Interface()
+	reqValue := reflect.ValueOf(reqPtr).Elem()
+
+	if reqType.Kind() != reflect.Struct {
+		return nil, errors.New("marshall request must passing struct type")
+	}
+
+	for i := 0; i < reqType.NumField(); i++ {
+		field := reqType.Field(i)
+
+		tagPath, tagQuery := field.Tag.Get("path"), field.Tag.Get("query")
+		if field.Tag.Get("json") != "" {
+			continue
+		}
+
+		var value string
+		if tagPath != "" {
+			tagValue := ctx.FastHttpRequestContext().UserValue(tagPath)
+			if tagValueString, isString := tagValue.(string); isString {
+				value = tagValueString
+			}
+		} else if tagQuery != "" {
+			value = string(ctx.FastHttpRequestContext().Request.URI().QueryArgs().Peek(tagQuery))
+		} else {
+			continue
+		}
+
+		if err := setPayloadValue(reqValue.Field(i), value); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := json.Unmarshal(ctx.FastHttpRequestContext().Request.Body(), reqPtr); err != nil {
+		return nil, err
+	}
+
+	return reqPtr.(*T), nil
+}
+
+func UnmarshalRequestAndValidate[T any](ctx Context, requestValidators ...ValidatorRequest) (*T, error) {
+	payload, err := UnmarshalRequest[T](ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := Validate(payload); err != nil {
+		return nil, err
+	}
+
+	return payload, nil
+}
+
+func setPayloadValue(fieldValue reflect.Value, value string) error {
+	switch fieldValue.Kind() {
+	case reflect.String:
+		fieldValue.SetString(value)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		intValue, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("%s : must be integer value", fieldValue.Type().Name())
+		}
+		fieldValue.SetInt(int64(intValue))
+	default:
+		return fmt.Errorf("%s : unsupported field type %s", fieldValue.Type().Name(), fieldValue.Kind())
+	}
+
+	return nil
+}
+
+// ----- Handlers -----
+
 // @type http-handler
 // @route GET /health
-func HealthHandler(ctx Context) Presenter {
+func HealthController(ctx Context) Presenter {
 	responseData := map[string]any{
 		"message": "server up",
 	}
-	return ctx.SendData(responseData)
+	return ctx.SendJson(responseData)
 }
 
 func ProxyHandler(

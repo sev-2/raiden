@@ -11,24 +11,51 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var ControllerDir = "controllers"
+var ControllerDir = "internal/controllers"
 var helloWordControllerTemplate = `package controllers
 
 import (
+	"fmt"
+	
 	"github.com/sev-2/raiden"
 )
 
+type HelloWordRequest struct {
+	Name    string ` + "`path:\"name\" validate:\"required\"`" + ` 
+	Type    string ` + "`query:\"type\" validate:\"required\"`" + `
+	Message string ` + "`json:\"message\" validate:\"required\"`" + `
+}
+
+type HelloWordResponse struct {
+	Type    string ` + "`json:\"type\"`" + `
+	Message string ` + "`json:\"message\"`" + `
+}
+
 // @type function
-// @route /hello
-func HelloWordHandler(ctx *raiden.Context) raiden.Presenter {
-	response := map[string]any{
-		"message": "hello word",
+// @route /hello/{name}
+func HelloWordHandler(ctx raiden.Context) raiden.Presenter {
+	payload, err := raiden.UnmarshalRequestAndValidate[HelloWordRequest](ctx)
+	if err != nil {
+		return ctx.SendJsonError(err)
 	}
-	return ctx.SendData(response)
+
+	response := HelloWordResponse{
+		Message: fmt.Sprintf("hello %s, %s", payload.Name, payload.Message),
+		Type:    payload.Type,
+	}
+
+	return ctx.SendJson(response)
 }
 `
 
 func GenerateHelloWordController(projectName string) (err error) {
+	internalFolderPath := filepath.Join(projectName, "internal")
+	if exist := utils.IsFolderExists(internalFolderPath); !exist {
+		if err := utils.CreateFolder(internalFolderPath); err != nil {
+			return err
+		}
+	}
+
 	folderPath := filepath.Join(projectName, ControllerDir)
 	err = utils.CreateFolder(folderPath)
 	if err != nil {

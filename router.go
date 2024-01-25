@@ -9,15 +9,15 @@ import (
 	fs_router "github.com/fasthttp/router"
 )
 
-type RouteHandler func(ctx Context) Presenter
+type RouteHandlerFn func(ctx Context) Presenter
+type MiddlewareFn func(next RouteHandlerFn) RouteHandlerFn
 
 // Build router
-func NewRouter(config *Config) *router {
-	Info("Setup New Router")
+func NewRouter(appCtx *context) *router {
 	fsRouter := fs_router.New()
 	return &router{
 		fsRouter:      fsRouter,
-		config:        config,
+		appCtx:        appCtx,
 		functionRoute: fsRouter.Group("/functions/v1"),
 		modelRoute:    fsRouter.Group("/rest/v1"),
 		rpcRoute:      fsRouter.Group("/rest/v1/rpc"),
@@ -27,9 +27,9 @@ func NewRouter(config *Config) *router {
 }
 
 type router struct {
-	fsRouter *fs_router.Router
-	config   *Config
-
+	appCtx        *context
+	middlewares   []MiddlewareFn
+	fsRouter      *fs_router.Router
 	functionRoute *fs_router.Group
 	rpcRoute      *fs_router.Group
 	modelRoute    *fs_router.Group
@@ -40,21 +40,27 @@ type router struct {
 func (r *router) RegisterControllers(controllers []Controller) {
 	for i := range controllers {
 		c := controllers[i]
+		h := c.Handler
+
+		for _, m := range r.middlewares {
+			h = m(h)
+		}
+
 		switch c.Options.Type {
 		case ControllerTypeFunction:
-			r.functionRoute.POST(c.Options.Path, wrapRouteHandler(r.config, &c))
+			r.functionRoute.POST(c.Options.Path, WrapRouteHandler(*r.appCtx, h))
 		case ControllerTypeHttpHandler:
 			switch strings.ToUpper(c.Options.Method) {
 			case fasthttp.MethodGet:
-				r.fsRouter.GET(c.Options.Path, wrapRouteHandler(r.config, &c))
+				r.fsRouter.GET(c.Options.Path, WrapRouteHandler(*r.appCtx, h))
 			case fasthttp.MethodPost:
-				r.fsRouter.POST(c.Options.Path, wrapRouteHandler(r.config, &c))
+				r.fsRouter.POST(c.Options.Path, WrapRouteHandler(*r.appCtx, h))
 			case fasthttp.MethodPut:
-				r.fsRouter.PUT(c.Options.Path, wrapRouteHandler(r.config, &c))
+				r.fsRouter.PUT(c.Options.Path, WrapRouteHandler(*r.appCtx, h))
 			case fasthttp.MethodPatch:
-				r.fsRouter.PATCH(c.Options.Path, wrapRouteHandler(r.config, &c))
+				r.fsRouter.PATCH(c.Options.Path, WrapRouteHandler(*r.appCtx, h))
 			case fasthttp.MethodDelete:
-				r.fsRouter.DELETE(c.Options.Path, wrapRouteHandler(r.config, &c))
+				r.fsRouter.DELETE(c.Options.Path, WrapRouteHandler(*r.appCtx, h))
 			}
 		}
 
@@ -63,6 +69,14 @@ func (r *router) RegisterControllers(controllers []Controller) {
 
 func (r *router) GetHandler() fasthttp.RequestHandler {
 	return r.fsRouter.Handler
+}
+
+func (r *router) GetRegisteredRoutes() map[string][]string {
+	return r.fsRouter.List()
+}
+
+func (r *router) RegisterMiddlewares(middlewares []MiddlewareFn) {
+	r.middlewares = append(r.middlewares, middlewares...)
 }
 
 func (r *router) PrintRegisteredRoute() {
@@ -77,13 +91,15 @@ func (r *router) PrintRegisteredRoute() {
 	Info(strings.Repeat("=", 40))
 }
 
-func wrapRouteHandler(config *Config, controller *Controller) fasthttp.RequestHandler {
+// ----- helper function -----
+func WrapMiddleware(handler RouteHandlerFn, middleware MiddlewareFn) RouteHandlerFn {
+	return middleware(handler)
+}
+
+func WrapRouteHandler(appContext context, next RouteHandlerFn) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		appCtx := &context{
-			RequestCtx: ctx,
-			config:     config,
-		}
-		presenter := controller.Handler(appCtx)
+		appContext.RequestCtx = ctx
+		presenter := next(&appContext)
 		presenter.Write()
 	}
 }

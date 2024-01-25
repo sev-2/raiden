@@ -13,7 +13,7 @@ import (
 // @route /test-handler
 func ExampleHandler(ctx raiden.Context) raiden.Presenter {
 	data := map[string]any{"message": "test"}
-	return ctx.SendData(data)
+	return ctx.SendJson(data)
 }
 
 func TestRegisterFunctionHandler(t *testing.T) {
@@ -32,7 +32,7 @@ func TestRegisterFunctionHandler(t *testing.T) {
 // @route GET /test-http-handler
 func ExampleHttpHandler(ctx raiden.Context) raiden.Presenter {
 	data := map[string]any{"message": "test"}
-	return ctx.SendData(data)
+	return ctx.SendJson(data)
 }
 
 func TestRegisterHttpHandlerHandler(t *testing.T) {
@@ -48,21 +48,21 @@ func TestRegisterHttpHandlerHandler(t *testing.T) {
 }
 
 // Health Handler Test
-func TestHealthHandler(t *testing.T) {
+func TestHealthController(t *testing.T) {
 	type mockPresenterCustom struct {
 		mock.MockPresenter
 		Data any
 	}
 
 	mockContext := mock.MockContext{
-		SendDataFn: func(data any) raiden.Presenter {
+		SendJsonFn: func(data any) raiden.Presenter {
 			return &mockPresenterCustom{
 				Data: data,
 			}
 		},
 	}
 
-	presenter := raiden.HealthHandler(&mockContext)
+	presenter := raiden.HealthController(&mockContext)
 	presenterCustom, isMockPresenter := presenter.(*mockPresenterCustom)
 	assert.Equal(t, isMockPresenter, true)
 

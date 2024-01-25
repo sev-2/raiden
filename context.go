@@ -1,40 +1,89 @@
 package raiden
 
 import (
+	go_ctx "context"
+
 	"github.com/valyala/fasthttp"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type (
 	Context interface {
-		GetConfig() *Config
-		SendData(data any) Presenter
-		SendError(err error) Presenter
-		SendErrorWithCode(statusCode int, err error) Presenter
+		Context() go_ctx.Context
+		SetContext(ctx go_ctx.Context)
+
+		Config() *Config
+
+		SendJson(data any) Presenter
+		SendJsonError(err error) Presenter
+		SendJsonErrorWithCode(statusCode int, err error) Presenter
+
+		FastHttpRequestContext() *fasthttp.RequestCtx
+
+		Span() trace.Span
+		SetSpan(span trace.Span)
+
+		Tracer() trace.Tracer
 	}
 
 	context struct {
 		*fasthttp.RequestCtx
-		config *Config
+		config   *Config
+		rContext go_ctx.Context
+		span     trace.Span
+		tracer   trace.Tracer
 	}
 )
 
-func (c *context) GetConfig() *Config {
+func (c *context) Config() *Config {
 	return c.config
 }
 
-func (c *context) SendData(data any) Presenter {
+func (c *context) FastHttpRequestContext() *fasthttp.RequestCtx {
+	return c.RequestCtx
+}
+
+func (c *context) Span() trace.Span {
+	return c.span
+}
+
+func (c *context) SetSpan(span trace.Span) {
+	c.span = span
+}
+
+func (c *context) Tracer() trace.Tracer {
+	return c.tracer
+}
+
+func (c *context) Context() go_ctx.Context {
+	return c.rContext
+}
+
+func (c *context) SetContext(ctx go_ctx.Context) {
+	c.rContext = ctx
+}
+
+func (c *context) SendJson(data any) Presenter {
 	presenter := NewJsonPresenter(c.RequestCtx)
 	presenter.SetData(data)
 	return presenter
 }
 
-func (c *context) SendError(err error) Presenter {
+func (c *context) SendJsonError(err error) Presenter {
 	presenter := NewJsonPresenter(c.RequestCtx)
+	if _, ok := err.(*ErrorResponse); !ok {
+		errResponse := &ErrorResponse{
+			Message:    err.Error(),
+			StatusCode: fasthttp.StatusInternalServerError,
+		}
+		err = errResponse
+	}
+
 	presenter.SetError(err)
 	return presenter
 }
 
-func (c *context) SendErrorWithCode(statusCode int, err error) Presenter {
+func (c *context) SendJsonErrorWithCode(statusCode int, err error) Presenter {
 	presenter := NewJsonPresenter(c.RequestCtx)
 	if errResponse, ok := err.(*ErrorResponse); ok {
 		errResponse.StatusCode = statusCode
