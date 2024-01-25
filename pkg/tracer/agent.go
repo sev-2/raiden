@@ -55,16 +55,9 @@ func StartAgent(c AgentConfig) (func(ctx context.Context) error, error) {
 	}
 
 	// create new exporter
-	traceExporter, additionalResource, err := createExporter(ctx, c)
+	traceExporter, err := createExporter(ctx, c)
 	if err != nil {
 		return nil, err
-	}
-
-	if additionalResource != nil {
-		res, err = resource.Merge(res, additionalResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	// stdOutExporter, _ := newStdOutExporter(log.Writer())
@@ -96,30 +89,30 @@ func newStdOutExporter(w io.Writer) (sdktrace.SpanExporter, error) {
 }
 
 // create new exporter base on agent configuration
-func createExporter(ctx context.Context, c AgentConfig) (sdktrace.SpanExporter, *resource.Resource, error) {
+func createExporter(ctx context.Context, c AgentConfig) (sdktrace.SpanExporter, error) {
 	switch c.Collector {
 	case OtplCollector:
 		return createOtplExported(ctx, c.Endpoint)
 	}
 
-	return nil, nil, fmt.Errorf("unsupported collector : %v", string(c.Collector))
+	return nil, fmt.Errorf("unsupported collector : %v", string(c.Collector))
 }
 
 // create new otpl exporter base on endpoint
 // support http and grpc exporter
-func createOtplExported(ctx context.Context, endpoint string) (sdktrace.SpanExporter, *resource.Resource, error) {
+func createOtplExported(ctx context.Context, endpoint string) (sdktrace.SpanExporter, error) {
 	url, err := url.Parse(endpoint)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	switch url.Scheme {
 	case "http", "https":
 		traceExporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpoint(endpoint))
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create trace exporter: %w", err)
+			return nil, fmt.Errorf("failed to create trace exporter: %w", err)
 		}
-		return traceExporter, nil, nil
+		return traceExporter, nil
 	default:
 		ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
@@ -129,21 +122,14 @@ func createOtplExported(ctx context.Context, endpoint string) (sdktrace.SpanExpo
 			grpc.WithBlock(),
 		)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
-		}
-
-		additionalResources, err := resource.New(ctx, resource.WithAttributes(
-			semconv.RPCSystemGRPC,
-		))
-		if err != nil {
-			return nil, nil, err
+			return nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
 		}
 
 		traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 		if err != nil {
-			return nil, additionalResources, fmt.Errorf("failed to create trace exporter: %w", err)
+			return nil, fmt.Errorf("failed to create trace exporter: %w", err)
 		}
 
-		return traceExporter, nil, nil
+		return traceExporter, nil
 	}
 }

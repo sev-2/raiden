@@ -65,6 +65,14 @@ func (l *Logger) SetLevel(level LogLevel) {
 	l.level = level
 }
 
+func (l *Logger) GetPrintLogger() *log.Logger {
+	return l.printLog
+}
+
+func (l *Logger) GetErrorLogger() *log.Logger {
+	return l.errLog
+}
+
 func (l *Logger) SetOutputLevel(outputLevel int) {
 	l.outputLevel = outputLevel
 }

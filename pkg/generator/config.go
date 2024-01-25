@@ -26,6 +26,8 @@ SUPABASE_API_URL: {{ .SupabaseApiUrl }}
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
 
+BREAKER_ENABLE: {{ .BreakerEnable }}
+
 {{ if .TraceEnable }}TRACE_ENABLE: {{ .TraceEnable }}{{ end }}
 {{ if .TraceCollector }}TRACE_COLLECTOR: {{ .TraceCollector }}{{ end }}
 {{ if .TraceEndpoint }}TRACE_ENDPOINT: {{ .TraceEndpoint }}{{ end }}

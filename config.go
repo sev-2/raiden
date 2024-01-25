@@ -14,9 +14,10 @@ const (
 )
 
 type Config struct {
+	BreakerEnable      bool             `mapstructure:"BREAKER_ENABLE"`
 	CloudAccessToken   string           `mapstructure:"CLOUD_ACCESS_TOKEN"`
-	Environment        string           `mapstructure:"ENVIRONMENT"`
 	DeploymentTarget   DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
+	Environment        string           `mapstructure:"ENVIRONMENT"`
 	GoModuleName       string           `mapstructure:"GO_MODULE_NAME"`
 	ProjectName        string           `mapstructure:"PROJECT_NAME"`
 	SupabaseApiUrl     string           `mapstructure:"SUPABASE_API_URL"`
@@ -59,6 +60,24 @@ func LoadConfig(path *string) *Config {
 		return nil
 	}
 	Info("success load configuration")
+
+	// set default value
+
+	if config.ServerHost == "" {
+		config.ServerHost = "127.0.0.1"
+	}
+
+	if config.ServerPort != "" {
+		config.ServerPort = "8002"
+	}
+
+	if config.Version != "" {
+		config.Version = "1.0.0"
+	}
+
+	if config.Environment == "" {
+		config.Environment = "development"
+	}
 
 	return &config
 }

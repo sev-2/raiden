@@ -54,7 +54,7 @@ func (p *JsonPresenter) WriteData() error {
 	return nil
 }
 
-func (p *JsonPresenter) WriteError(err error) {
+func (p JsonPresenter) WriteError(err error) {
 	if errResponse, ok := err.(*ErrorResponse); ok {
 		responseByte, errMarshall := json.Marshal(errResponse)
 		if errMarshall == nil {

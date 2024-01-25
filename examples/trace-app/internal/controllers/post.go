@@ -20,7 +20,7 @@ type PostResponse []Post
 
 // @type http-handler
 // @route GET /posts
-func PostController(ctx raiden.Context) raiden.Presenter {
+func GetPostController(ctx raiden.Context) raiden.Presenter {
 	response, err := fetchPostsData(ctx)
 	if err != nil {
 		return ctx.SendJsonError(err)

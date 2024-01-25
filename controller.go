@@ -18,10 +18,9 @@ import (
 )
 
 type (
-	ControllerType      string
 	ControllerOptionKey string
 	ControllerOptions   struct {
-		Type   ControllerType
+		Type   RouteType
 		Method string
 		Path   string
 	}
@@ -33,15 +32,11 @@ type (
 
 	ControllerRegistry struct {
 		ControllerComments map[string]string
-		Controllers        []Controller
+		Controllers        []*Controller
 	}
 )
 
 const (
-	ControllerTypeHttpHandler ControllerType = "http-handler"
-	ControllerTypeRpc         ControllerType = "rpc"
-	ControllerTypeFunction    ControllerType = "function"
-
 	ControllerOptionTypeKey  ControllerOptionKey = "type"
 	ControllerOptionRouteKey ControllerOptionKey = "route"
 )
@@ -56,21 +51,17 @@ func NewControllerRegistry() *ControllerRegistry {
 }
 
 func (cr *ControllerRegistry) Register(routeHandlers ...RouteHandlerFn) {
-	var controller []Controller
+	var controller []*Controller
 	for i := range routeHandlers {
 		h := routeHandlers[i]
-		if c := cr.getController(h); c.Handler != nil {
+		if c := cr.getController(h); c != nil {
 			controller = append(controller, cr.getController(h))
 		}
 	}
 	cr.Controllers = append(cr.Controllers, controller...)
 }
 
-func (cr *ControllerRegistry) getController(h RouteHandlerFn) Controller {
-	controller := Controller{
-		Handler: nil,
-	}
-
+func (cr *ControllerRegistry) getController(h RouteHandlerFn) *Controller {
 	funcPtr := reflect.ValueOf(h).Pointer()
 	funcInfo := runtime.FuncForPC(funcPtr)
 
@@ -82,7 +73,7 @@ func (cr *ControllerRegistry) getController(h RouteHandlerFn) Controller {
 		file, _ := funcInfo.FileLine(funcPtr)
 		mapCommentArr := GetHandlerComment(file)
 		if len(mapCommentArr) == 0 {
-			return controller
+			return nil
 		}
 
 		for _, fc := range mapCommentArr {
@@ -91,12 +82,12 @@ func (cr *ControllerRegistry) getController(h RouteHandlerFn) Controller {
 
 		comment, ok = cr.ControllerComments[funcName]
 		if !ok {
-			return controller
+			return nil
 		}
 	}
 
 	options := parseToOptions(comment)
-	return Controller{
+	return &Controller{
 		Options: options,
 		Handler: h,
 	}
@@ -157,11 +148,11 @@ func parseToOptions(comment string) ControllerOptions {
 		switch splitedComments[0] {
 		case string(ControllerOptionTypeKey):
 			if len(splitedComments) >= 2 {
-				options.Type = ControllerType(splitedComments[1])
+				options.Type = RouteType(splitedComments[1])
 
 				// setup method by type
 				switch options.Type {
-				case ControllerTypeFunction:
+				case RouteTypeFunction:
 					options.Method = fasthttp.MethodPost
 
 				}

@@ -18,7 +18,7 @@ func main() {
 	controllerRegistry := raiden.NewControllerRegistry()
 	controllerRegistry.Register(
 		controllers.HelloWordController,
-		controllers.PostController,
+		controllers.GetPostController,
 	)
 
 	server := raiden.NewServer(config, controllerRegistry.Controllers)

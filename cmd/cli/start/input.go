@@ -72,6 +72,7 @@ func (ca *CreateInput) PromptAll() error {
 
 func (ca *CreateInput) ToAppConfig() *raiden.Config {
 	return &raiden.Config{
+		BreakerEnable:      true,
 		CloudAccessToken:   ca.AccessToken,
 		DeploymentTarget:   ca.Target,
 		ProjectName:        ca.ProjectName,

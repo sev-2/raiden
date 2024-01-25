@@ -25,7 +25,7 @@ func TestRegisterFunctionHandler(t *testing.T) {
 	controller := registry.Controllers[0]
 	assert.Equal(t, controller.Options.Path, "/test-handler")
 	assert.Equal(t, controller.Options.Method, fasthttp.MethodPost)
-	assert.Equal(t, controller.Options.Type, raiden.ControllerTypeFunction)
+	assert.Equal(t, controller.Options.Type, raiden.RouteTypeFunction)
 }
 
 // @type http-handler
@@ -44,7 +44,7 @@ func TestRegisterHttpHandlerHandler(t *testing.T) {
 	controller := registry.Controllers[0]
 	assert.Equal(t, controller.Options.Path, "/test-http-handler")
 	assert.Equal(t, controller.Options.Method, fasthttp.MethodGet)
-	assert.Equal(t, controller.Options.Type, raiden.ControllerTypeHttpHandler)
+	assert.Equal(t, controller.Options.Type, raiden.RouteTypeHttpHandler)
 }
 
 // Health Handler Test

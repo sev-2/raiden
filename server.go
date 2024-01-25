@@ -13,48 +13,23 @@ import (
 	"github.com/sev-2/raiden/pkg/tracer"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/reuseport"
-	"go.opentelemetry.io/otel"
 
 	go_context "context"
 )
 
 // --- server configuration ----
 type Server struct {
-	Addr        string
-	Controllers []Controller
-	Context     context
+	Controllers []*Controller
+	Config      *Config
 	HttpServer  *fasthttp.Server
 	Middlewares []MiddlewareFn
 
 	ShutdownFunc []func(ctx go_context.Context) error
 }
 
-func NewServer(config *Config, controllers []Controller) *Server {
-	// setup default configuration
-	host, port := "127.0.0.1", "8002"
-	if config.ServerHost != "" {
-		host = config.ServerHost
-	}
-
-	if config.ServerPort != "" {
-		port = config.ServerPort
-	}
-
-	if config.Version != "" {
-		config.Version = "1.0.0"
-	}
-
-	if config.Environment == "" {
-		config.Environment = "development"
-	}
-	serverAddr := fmt.Sprintf("%s:%s", host, port)
-
+func NewServer(config *Config, controllers []*Controller) *Server {
 	return &Server{
-		Addr: serverAddr,
-		Context: context{
-			config:   config,
-			rContext: go_context.Background(),
-		},
+		Config:      config,
 		Controllers: controllers,
 		HttpServer:  &fasthttp.Server{},
 	}
@@ -77,17 +52,13 @@ func (s *Server) Shutdown(ctx go_context.Context) error {
 	return nil
 }
 
-func (s *Server) ConfigureTracer() {
+func (s *Server) configureTracer() {
 	Info("configure tracer")
-	if !s.Context.Config().TraceEnable {
-		return
-	}
-
 	tracerConfig := tracer.AgentConfig{
-		Name:        s.Context.Config().ProjectName,
-		Collector:   tracer.TraceCollector(s.Context.Config().TraceCollector),
-		Endpoint:    s.Context.Config().TraceEndpoint,
-		Environment: s.Context.Config().Environment,
+		Name:        s.Config.ProjectName,
+		Collector:   tracer.TraceCollector(s.Config.TraceCollector),
+		Endpoint:    s.Config.TraceEndpoint,
+		Environment: s.Config.Environment,
 		Version:     "1.0.0",
 	}
 	shutdownFn, err := tracer.StartAgent(tracerConfig)
@@ -99,17 +70,18 @@ func (s *Server) ConfigureTracer() {
 		"tracer connected to %q with service name %q in environment %q with version %q",
 		tracerConfig.Endpoint, tracerConfig.Name, tracerConfig.Environment, tracerConfig.Version,
 	)
-	s.Middlewares = append(s.Middlewares, TraceMiddleware)
-	s.Context.tracer = otel.Tracer(fmt.Sprintf("%s tracer", s.Context.Config().ProjectName))
 	s.ShutdownFunc = append(s.ShutdownFunc, shutdownFn)
 }
 
-func (s *Server) ConfigureRoute() {
+func (s *Server) configureRoute() {
 	Info("configure router")
+
 	// initial route
-	router := NewRouter(&s.Context)
-	router.RegisterMiddlewares(s.Middlewares)
-	router.RegisterControllers(s.Controllers)
+	router := NewRouter(s.Config)
+	router.
+		RegisterMiddlewares(s.Middlewares).
+		RegisterControllers(s.Controllers).
+		BuildHandler()
 
 	// print available route
 	router.PrintRegisteredRoute()
@@ -118,8 +90,17 @@ func (s *Server) ConfigureRoute() {
 	s.HttpServer.Handler = router.GetHandler()
 }
 
+func (s *Server) configure() {
+	if s.Config.TraceEnable {
+		s.configureTracer()
+	}
+
+	s.configureRoute()
+}
+
 func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) {
-	ln, err := reuseport.Listen("tcp4", s.Addr)
+	addr := fmt.Sprintf("%s:%s", s.Config.ServerHost, s.Config.ServerPort)
+	ln, err := reuseport.Listen("tcp4", addr)
 	if err != nil {
 		Fatalf("error in reuseport listener: %s", err)
 	}
@@ -147,9 +128,7 @@ func (s *Server) runServer(hostname string, listener net.Listener, errChan chan 
 }
 
 func (s *Server) Run() {
-	// setup
-	s.ConfigureTracer()
-	s.ConfigureRoute()
+	s.configure()
 
 	// prepare server
 	h, l, lErrChan := s.prepareServer()
