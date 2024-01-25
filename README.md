@@ -1,0 +1,51 @@
+# Raiden Framework
+
+## Introduction
+Raiden is a cutting-edge framework designed for seamless integration with Supabase, focusing on enhancing security, streamlining backend processes, and providing consistent schema management. It specifically addresses the need to avoid direct client-side calls to the database, ensuring more secure and efficient data handling.
+
+## Key Objectives
+- Enhanced Security: Prevent direct client-side database calls to bolster security.
+- Unified Backend Management: Introduce a unified layer for managing Remote Procedure Calls (RPC), Edge Functions, and standard APIs, simplifying backend complexity.
+- Consistent Schema Management: Provide tools for consistent and efficient management and persistence of database schemas.
+
+## Features
+- Secure Database Interaction: Ensures secure communication between client and database, mitigating risks associated with direct database access.
+- Unified Backend Layer: Streamlines the creation and management of RPCs, Edge Functions, and APIs, offering a centralized way to handle backend logic.
+- Schema Consistency: Tools to manage database schemas with ease, ensuring consistency across different stages of development.
+
+## Getting Started
+### Prerequisites
+- Go (version 1.21.6 or higher)
+- Supabase account and project setup
+
+### Installation
+Download our binary, or build from your local.
+```
+Usage:
+  raiden [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  generate    Generate application resource
+  help        Help about any command
+  run         Deploy and run application
+  start       Start new app
+  version     Show application information
+
+Flags:
+  -h, --help   help for raiden
+
+Use "raiden [command] --help" for more information about a command.
+```
+
+## Documentation
+For detailed documentation, including security practices and schema management, visit [sev-2.com].
+
+## Contributing
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) for more information.
+
+## License
+Raiden is open source and is licensed under the [MIT License](LICENSE).
+
+## Contact
+For support or queries, please contact us at admin@refactory.id.
