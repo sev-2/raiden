@@ -7,7 +7,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -100,10 +99,10 @@ func attachControllerToMap(mapController map[string]any) filepath.WalkFunc {
 			return err
 		}
 		if strings.HasSuffix(path, ".go") {
-			handlerComments := raiden.GetHandlerComment(path)
-			for _, hc := range handlerComments {
-				mapController[hc["fn"]] = true
-			}
+			// handlerComments := raiden.GetHandlerComment(path)
+			// for _, hc := range handlerComments {
+			// 	mapController[hc["fn"]] = true
+			// }
 		}
 		return nil
 	}

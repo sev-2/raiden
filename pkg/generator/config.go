@@ -12,25 +12,27 @@ import (
 var configDir = "configs"
 var configFile = "app"
 var configTemplate = `PROJECT_NAME: {{ .ProjectName }}
-GO_MODULE_NAME: {{ .GoModuleName }}
 DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
-{{ if .CloudAccessToken }}CLOUD_ACCESS_TOKEN: {{ .CloudAccessToken }}{{ end }}
 
-ENVIRONMENT=development
-VERSION=1.0.0
+ACCESS_TOKEN: {{ .AccessToken }}
+ANON_KEY: {{ .AnonKey }}
+SERVICE_KEY: {{ .ServiceKey }}
 
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
-{{ if .SupabaseApiBaseUrl }}SUPABASE_API_BASE_PATH: {{ .SupabaseApiBaseUrl }}{{ end }}
-{{ if .SupabaseRestUrl }}SUPABASE_REST_URL: {{ .SupabaseRestUrl }}{{ end }}
+SUPABASE_API_BASE_PATH: {{ .SupabaseApiBaseUrl }}
+SUPABASE_PUBLIC_URL: {{ .SupabasePublicUrl }}
 
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
 
+ENVIRONMENT: development
+VERSION: 1.0.0
+
 BREAKER_ENABLE: {{ .BreakerEnable }}
 
-{{ if .TraceEnable }}TRACE_ENABLE: {{ .TraceEnable }}{{ end }}
-{{ if .TraceCollector }}TRACE_COLLECTOR: {{ .TraceCollector }}{{ end }}
-{{ if .TraceEndpoint }}TRACE_ENDPOINT: {{ .TraceEndpoint }}{{ end }}
+TRACE_ENABLE: {{ .TraceEnable }}
+TRACE_COLLECTOR: {{ .TraceCollector }}
+TRACE_ENDPOINT: {{ .TraceEndpoint }}
 `
 
 func GenerateConfig(config raiden.Config) error {

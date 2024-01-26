@@ -9,14 +9,14 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-type ValidatorRequest struct {
+type ValidatorFunc struct {
 	Name      string
 	Validator validator.Func
 }
 
-type WithValidator func(name string, validateFn validator.Func) ValidatorRequest
+type WithValidator func(name string, validateFn validator.Func) ValidatorFunc
 
-func Validate(payload any, requestValidators ...ValidatorRequest) error {
+func Validate(payload any, requestValidators ...ValidatorFunc) error {
 	validatorInstance := validator.New()
 	if len(requestValidators) > 0 {
 		for _, rv := range requestValidators {

@@ -9,16 +9,16 @@ import (
 )
 
 type MockContext struct {
-	ContextFn                func() context.Context
-	SetContextFn             func(ctx context.Context)
-	ConfigFn                 func() *raiden.Config
-	SendJsonFn               func(data any) raiden.Presenter
-	SendJsonErrorFn          func(err error) raiden.Presenter
-	SendJsonErrorWithCodeFn  func(statusCode int, err error) raiden.Presenter
-	FastHttpRequestContextFn func() *fasthttp.RequestCtx
-	SpanFn                   func() trace.Span
-	SetSpanFn                func(span trace.Span)
-	TracerFn                 func() trace.Tracer
+	ContextFn               func() context.Context
+	SetContextFn            func(ctx context.Context)
+	ConfigFn                func() *raiden.Config
+	SendJsonFn              func(data any) raiden.Presenter
+	SendJsonErrorFn         func(err error) raiden.Presenter
+	SendJsonErrorWithCodeFn func(statusCode int, err error) raiden.Presenter
+	RequestContextFn        func() *fasthttp.RequestCtx
+	SpanFn                  func() trace.Span
+	SetSpanFn               func(span trace.Span)
+	TracerFn                func() trace.Tracer
 }
 
 func (c *MockContext) Context() context.Context {
@@ -45,8 +45,8 @@ func (c *MockContext) SendJsonErrorWithCode(statusCode int, err error) raiden.Pr
 	return c.SendJsonErrorWithCodeFn(statusCode, err)
 }
 
-func (c *MockContext) FastHttpRequestContext() *fasthttp.RequestCtx {
-	return c.FastHttpRequestContextFn()
+func (c *MockContext) RequestContext() *fasthttp.RequestCtx {
+	return c.RequestContextFn()
 }
 
 func (c *MockContext) Span() trace.Span {

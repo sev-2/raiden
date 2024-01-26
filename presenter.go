@@ -8,6 +8,7 @@ import (
 
 type Presenter interface {
 	GetError() error
+	GetData() any
 
 	WriteData() error
 	WriteError(err error)
@@ -15,14 +16,14 @@ type Presenter interface {
 }
 
 type JsonPresenter struct {
-	reqCtx *fasthttp.RequestCtx
-	data   any
-	err    error
+	response *fasthttp.Response
+	data     any
+	err      error
 }
 
-func NewJsonPresenter(ctx *fasthttp.RequestCtx) *JsonPresenter {
+func NewJsonPresenter(response *fasthttp.Response) *JsonPresenter {
 	return &JsonPresenter{
-		reqCtx: ctx,
+		response: response,
 	}
 }
 
@@ -32,9 +33,9 @@ func (p *JsonPresenter) SetData(data any) {
 
 func (p *JsonPresenter) SetError(err error) {
 	if errResponse, ok := err.(*ErrorResponse); ok {
-		p.reqCtx.SetStatusCode(errResponse.StatusCode)
+		p.response.SetStatusCode(errResponse.StatusCode)
 	} else {
-		p.reqCtx.SetStatusCode(fasthttp.StatusInternalServerError)
+		p.response.SetStatusCode(fasthttp.StatusInternalServerError)
 	}
 	p.err = err
 }
@@ -43,14 +44,18 @@ func (p *JsonPresenter) GetError() error {
 	return p.err
 }
 
+func (p *JsonPresenter) GetData() any {
+	return p.data
+}
+
 func (p *JsonPresenter) WriteData() error {
 	jStr, err := json.Marshal(p.data)
 	if err != nil {
 		return err
 	}
 
-	p.reqCtx.SetStatusCode(fasthttp.StatusOK)
-	p.reqCtx.Write(jStr)
+	p.response.SetStatusCode(fasthttp.StatusOK)
+	p.response.AppendBody(jStr)
 	return nil
 }
 
@@ -58,18 +63,18 @@ func (p JsonPresenter) WriteError(err error) {
 	if errResponse, ok := err.(*ErrorResponse); ok {
 		responseByte, errMarshall := json.Marshal(errResponse)
 		if errMarshall == nil {
-			p.reqCtx.SetStatusCode(errResponse.StatusCode)
-			p.reqCtx.Write(responseByte)
+			p.response.SetStatusCode(errResponse.StatusCode)
+			p.response.AppendBody(responseByte)
 			return
 		}
 		err = errMarshall
 	}
-	p.reqCtx.SetStatusCode(fasthttp.StatusInternalServerError)
-	p.reqCtx.WriteString(err.Error())
+	p.response.SetStatusCode(fasthttp.StatusInternalServerError)
+	p.response.AppendBodyString(err.Error())
 }
 
 func (p *JsonPresenter) Write() {
-	p.reqCtx.SetContentType("application/json")
+	p.response.Header.SetContentType("application/json")
 	if p.err != nil {
 		p.WriteError(p.err)
 		return

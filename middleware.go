@@ -17,12 +17,12 @@ import (
 // inject trace context and span context to app context
 // capture presenter and set span status
 func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
-	return RouteHandlerFn(func(ctx Context) Presenter {
+	return func(ctx Context) Presenter {
 		if ctx.Tracer() == nil {
 			return next(ctx)
 		}
 
-		r := &ctx.FastHttpRequestContext().Request
+		r := &ctx.RequestContext().Request
 		traceCtx, span := tracer.Extract(ctx.Context(), ctx.Tracer(), r)
 		defer span.End()
 
@@ -31,7 +31,7 @@ func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
 
 		presenter := next(ctx)
 
-		resStatusCode := ctx.FastHttpRequestContext().Response.StatusCode()
+		resStatusCode := ctx.RequestContext().Response.StatusCode()
 		if resStatusCode < 200 || resStatusCode > 399 {
 			span.SetStatus(codes.Error, fasthttp.StatusMessage(resStatusCode))
 			span.RecordError(presenter.GetError())
@@ -43,44 +43,46 @@ func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
 			Error(presenter.GetError())
 		}
 		return presenter
-	})
+	}
 }
 
 const breakerSeparator = "://"
 
 // handler forward to handler base on request error throttle
-func BreakerMiddleware(method string, path string, next RouteHandlerFn) RouteHandlerFn {
+func BreakerMiddleware(method string, path string) MiddlewareFn {
 	brk := breaker.NewBreaker(breaker.WithName(strings.Join([]string{method, path}, breakerSeparator)))
-	return RouteHandlerFn(func(ctx Context) Presenter {
-		promise, err := brk.Allow()
-		if err != nil {
-			Errorf("[http] dropped, %s - %s - %s",
-				string(ctx.FastHttpRequestContext().RequestURI()),
-				ctx.FastHttpRequestContext().RemoteAddr().String(),
-				string(ctx.FastHttpRequestContext().UserAgent()),
-			)
-			err := ErrorResponse{
-				StatusCode: fasthttp.StatusServiceUnavailable,
-				Code:       "Server Unhealthy",
-				Hint:       "circuit breaker open",
-				Details:    fmt.Sprintf("open breaker for %s", ctx.FastHttpRequestContext().RequestURI()),
-				Message:    err.Error(),
+	return func(next RouteHandlerFn) RouteHandlerFn {
+		return func(ctx Context) Presenter {
+			promise, err := brk.Allow()
+			if err != nil {
+				Errorf("[http] dropped, %s - %s - %s",
+					string(ctx.RequestContext().RequestURI()),
+					ctx.RequestContext().RemoteAddr().String(),
+					string(ctx.RequestContext().UserAgent()),
+				)
+				err := ErrorResponse{
+					StatusCode: fasthttp.StatusServiceUnavailable,
+					Code:       "Server Unhealthy",
+					Hint:       "circuit breaker open",
+					Details:    fmt.Sprintf("open breaker for %s", ctx.RequestContext().RequestURI()),
+					Message:    err.Error(),
+				}
+
+				presenter := NewJsonPresenter(&ctx.RequestContext().Response)
+				presenter.SetError(&err)
+				return presenter
 			}
 
-			presenter := NewJsonPresenter(ctx.FastHttpRequestContext())
-			presenter.SetError(&err)
+			presenter := next(ctx)
+			resStatusCode := ctx.RequestContext().Response.StatusCode()
+			if resStatusCode < fasthttp.StatusInternalServerError {
+				promise.Accept()
+			} else {
+				reason := fmt.Sprintf("%d %s", resStatusCode, fasthttp.StatusMessage(resStatusCode))
+				promise.Reject(reason)
+			}
+
 			return presenter
 		}
-
-		presenter := next(ctx)
-		resStatusCode := ctx.FastHttpRequestContext().Response.StatusCode()
-		if resStatusCode < fasthttp.StatusInternalServerError {
-			promise.Accept()
-		} else {
-			reason := fmt.Sprintf("%d %s", resStatusCode, fasthttp.StatusMessage(resStatusCode))
-			promise.Reject(reason)
-		}
-
-		return presenter
-	})
+	}
 }

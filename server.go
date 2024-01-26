@@ -19,24 +19,26 @@ import (
 
 // --- server configuration ----
 type Server struct {
-	Controllers []*Controller
-	Config      *Config
-	HttpServer  *fasthttp.Server
-	Middlewares []MiddlewareFn
-
+	Config       *Config
+	Router       *router
+	HttpServer   *fasthttp.Server
 	ShutdownFunc []func(ctx go_context.Context) error
 }
 
-func NewServer(config *Config, controllers []*Controller) *Server {
+func NewServer(config *Config) *Server {
 	return &Server{
-		Config:      config,
-		Controllers: controllers,
-		HttpServer:  &fasthttp.Server{},
+		Config:     config,
+		Router:     NewRouter(config),
+		HttpServer: &fasthttp.Server{},
 	}
 }
 
+func (s *Server) RegisterRoute(routes []*Route) {
+	s.Router.routes = append(s.Router.routes, routes...)
+}
+
 func (s *Server) Use(middleware MiddlewareFn) {
-	s.Middlewares = append(s.Middlewares, middleware)
+	s.Router.middlewares = append(s.Router.middlewares, middleware)
 }
 
 func (s *Server) Shutdown(ctx go_context.Context) error {
@@ -76,18 +78,14 @@ func (s *Server) configureTracer() {
 func (s *Server) configureRoute() {
 	Info("configure router")
 
-	// initial route
-	router := NewRouter(s.Config)
-	router.
-		RegisterMiddlewares(s.Middlewares).
-		RegisterControllers(s.Controllers).
-		BuildHandler()
+	// build router
+	s.Router.BuildHandler()
 
 	// print available route
-	router.PrintRegisteredRoute()
+	s.Router.PrintRegisteredRoute()
 
 	// set handler
-	s.HttpServer.Handler = router.GetHandler()
+	s.HttpServer.Handler = s.Router.GetHandler()
 }
 
 func (s *Server) configure() {

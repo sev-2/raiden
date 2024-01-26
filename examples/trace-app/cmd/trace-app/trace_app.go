@@ -2,12 +2,13 @@ package main
 
 import (
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/examples/trace-app/internal/controllers"
+	"github.com/sev-2/raiden/examples/trace-app/internal/routes"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
 func main() {
+	// load configuration
 	currDir, err := utils.GetCurrentDirectory()
 	if err != nil {
 		logger.Panic(err)
@@ -15,12 +16,12 @@ func main() {
 	configPath := currDir + "/examples/trace-app/configs/app.yaml"
 	config := raiden.LoadConfig(&configPath)
 
-	controllerRegistry := raiden.NewControllerRegistry()
-	controllerRegistry.Register(
-		controllers.HelloWordController,
-		controllers.GetPostController,
-	)
+	// create new server
+	server := raiden.NewServer(config)
 
-	server := raiden.NewServer(config, controllerRegistry.Controllers)
+	// register route
+	routes.RegisterRoute(server)
+
+	// run server
 	server.Run()
 }

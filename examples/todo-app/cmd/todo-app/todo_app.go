@@ -3,7 +3,6 @@ package main
 
 import (
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/examples/todo-app/internal/controllers"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -16,11 +15,6 @@ func main() {
 	configPath := currDir + "/examples/todo-app/configs/app.yaml"
 	config := raiden.LoadConfig(&configPath)
 
-	controllerRegistry := raiden.NewControllerRegistry()
-	controllerRegistry.Register(
-		controllers.HelloWordController,
-	)
-
-	server := raiden.NewServer(config, controllerRegistry.Controllers)
+	server := raiden.NewServer(config)
 	server.Run()
 }

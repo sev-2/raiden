@@ -9,6 +9,11 @@ func checkLogInstance() {
 	}
 }
 
+func SetOutputLevel(outputLevel int) {
+	checkLogInstance()
+	logInstance.SetOutputLevel(outputLevel)
+}
+
 func SetLogLevel(level LogLevel) {
 	checkLogInstance()
 	logInstance.SetLevel(level)

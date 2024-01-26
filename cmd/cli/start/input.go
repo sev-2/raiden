@@ -13,10 +13,12 @@ import (
 
 type CreateInput struct {
 	AccessToken         string
+	AnonKey             string
 	ProjectName         string
-	GoModuleName        string
-	SupabaseApiUrl      string
+	ServiceKey          string
 	SupabaseApiBasePath string
+	SupabaseApiUrl      string
+	SupabasePublicUrl   string
 	Target              raiden.DeploymentTarget
 	TraceEnable         bool
 	TraceEndpoint       string
@@ -28,7 +30,11 @@ func (ca *CreateInput) PromptAll() error {
 		return err
 	}
 
-	if err := ca.PromptGoModuleName(); err != nil {
+	if err := ca.PromptAnonKey(); err != nil {
+		return err
+	}
+
+	if err := ca.PromptServiceKey(); err != nil {
 		return err
 	}
 
@@ -72,13 +78,15 @@ func (ca *CreateInput) PromptAll() error {
 
 func (ca *CreateInput) ToAppConfig() *raiden.Config {
 	return &raiden.Config{
+		AccessToken:        ca.AccessToken,
+		AnonKey:            ca.AnonKey,
 		BreakerEnable:      true,
-		CloudAccessToken:   ca.AccessToken,
 		DeploymentTarget:   ca.Target,
 		ProjectName:        ca.ProjectName,
-		GoModuleName:       ca.GoModuleName,
+		ServiceKey:         ca.ServiceKey,
 		SupabaseApiUrl:     ca.SupabaseApiUrl,
 		SupabaseApiBaseUrl: ca.SupabaseApiBasePath,
+		SupabasePublicUrl:  ca.SupabasePublicUrl,
 		TraceEnable:        ca.TraceEnable,
 		TraceCollector:     ca.TraceCollector,
 		TraceEndpoint:      ca.TraceEndpoint,
@@ -107,21 +115,6 @@ func (ca *CreateInput) PromptProjectName() error {
 	}
 
 	ca.ProjectName = inputText
-	return nil
-}
-
-func (ca *CreateInput) PromptGoModuleName() error {
-	promp := promptui.Prompt{
-		Label:   "Enter go module name",
-		Default: utils.ToGoModuleName(ca.ProjectName),
-	}
-
-	inputText, err := promp.Run()
-	if err != nil {
-		return err
-	}
-
-	ca.GoModuleName = inputText
 	return nil
 }
 
@@ -162,12 +155,57 @@ func (ca *CreateInput) PromptAccessToken() error {
 	return nil
 }
 
+func (ca *CreateInput) PromptAnonKey() error {
+	promp := promptui.Prompt{
+		Label: "Enter your anon key",
+		Validate: func(s string) error {
+			if s == "" {
+				return errors.New("anon key can`t be empty")
+			}
+
+			return nil
+		},
+		Mask: '*',
+	}
+
+	inputText, err := promp.Run()
+	if err != nil {
+		return err
+	}
+
+	ca.AnonKey = inputText
+	return nil
+}
+
+func (ca *CreateInput) PromptServiceKey() error {
+	promp := promptui.Prompt{
+		Label: "Enter your service key",
+		Validate: func(s string) error {
+			if s == "" {
+				return errors.New("service key can`t be empty")
+			}
+
+			return nil
+		},
+		Mask: '*',
+	}
+
+	inputText, err := promp.Run()
+	if err != nil {
+		return err
+	}
+
+	ca.ServiceKey = inputText
+	return nil
+}
+
 func (ca *CreateInput) PromptSupabaseApiUrl() error {
 	defaultValue := "http://localhost:54323"
 	switch ca.Target {
 	case raiden.DeploymentTargetCloud:
 		defaultValue = supabase.DefaultApiUrl
-		// other target
+
+		// add other target ....
 	}
 
 	promp := promptui.Prompt{

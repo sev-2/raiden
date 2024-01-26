@@ -18,7 +18,7 @@ type (
 		SendJsonError(err error) Presenter
 		SendJsonErrorWithCode(statusCode int, err error) Presenter
 
-		FastHttpRequestContext() *fasthttp.RequestCtx
+		RequestContext() *fasthttp.RequestCtx
 
 		Span() trace.Span
 		SetSpan(span trace.Span)
@@ -39,7 +39,7 @@ func (c *context) Config() *Config {
 	return c.config
 }
 
-func (c *context) FastHttpRequestContext() *fasthttp.RequestCtx {
+func (c *context) RequestContext() *fasthttp.RequestCtx {
 	return c.RequestCtx
 }
 
@@ -64,13 +64,13 @@ func (c *context) SetContext(ctx go_ctx.Context) {
 }
 
 func (c *context) SendJson(data any) Presenter {
-	presenter := NewJsonPresenter(c.RequestCtx)
+	presenter := NewJsonPresenter(&c.Response)
 	presenter.SetData(data)
 	return presenter
 }
 
 func (c *context) SendJsonError(err error) Presenter {
-	presenter := NewJsonPresenter(c.RequestCtx)
+	presenter := NewJsonPresenter(&c.Response)
 	if _, ok := err.(*ErrorResponse); !ok {
 		errResponse := &ErrorResponse{
 			Message:    err.Error(),
@@ -84,7 +84,7 @@ func (c *context) SendJsonError(err error) Presenter {
 }
 
 func (c *context) SendJsonErrorWithCode(statusCode int, err error) Presenter {
-	presenter := NewJsonPresenter(c.RequestCtx)
+	presenter := NewJsonPresenter(&c.Response)
 	if errResponse, ok := err.(*ErrorResponse); ok {
 		errResponse.StatusCode = statusCode
 		err = errResponse

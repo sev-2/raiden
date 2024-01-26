@@ -16,6 +16,13 @@ type (
 	RouteHandlerFn func(ctx Context) Presenter
 	MiddlewareFn   func(next RouteHandlerFn) RouteHandlerFn
 	RouteType      string
+
+	Route struct {
+		Type       RouteType
+		Method     string
+		Path       string
+		Controller Controller
+	}
 )
 
 const (
@@ -50,7 +57,7 @@ type router struct {
 	engine      *fs_router.Router
 	groups      map[RouteType]*fs_router.Group
 	middlewares []MiddlewareFn
-	controllers []*Controller
+	routes      []*Route
 	tracer      trace.Tracer
 }
 
@@ -59,80 +66,84 @@ func (r *router) RegisterMiddlewares(middlewares []MiddlewareFn) *router {
 	return r
 }
 
-func (r *router) RegisterControllers(controllers []*Controller) *router {
-	r.controllers = append(r.controllers, controllers...)
+func (r *router) Register(routes []*Route) *router {
+	r.routes = append(r.routes, routes...)
 	return r
 }
 
 func (r *router) BuildHandler() {
-	for _, c := range r.controllers {
-		if c == nil {
+	for _, route := range r.routes {
+		if route == nil {
 			continue
 		}
 
-		switch c.Options.Type {
+		switch route.Type {
 		case RouteTypeFunction:
-			r.bindFunctionRoute(c)
+			r.bindFunctionRoute(route)
 		case RouteTypeHttpHandler:
-			r.bindHttpHandlerRoute(c)
+			r.bindHttpHandlerRoute(route)
 		case RouteTypeRest, RouteTypeRpc, RouteTypeRealtime, RouteTypeStorage:
-			Infof("register route type %v is not implemented, wait for update :) ", c.Options.Type)
+			Infof("register route type %v is not implemented, wait for update :) ", route.Type)
 		}
 	}
 }
 
-func (r *router) buildNativeMiddleware(c *Controller) RouteHandlerFn {
-	handler := c.Handler
+func (r *router) buildNativeMiddleware(route *Route, chain Chain) Chain {
 	if r.config.TraceEnable {
-		handler = TraceMiddleware(handler)
+		chain = chain.Append(TraceMiddleware)
 	}
 
 	if r.config.BreakerEnable {
-		handler = BreakerMiddleware(c.Options.Method, c.Options.Path, handler)
+		chain = chain.Append(BreakerMiddleware(route.Method, route.Path))
 	}
 
-	return handler
+	return chain
 }
 
-func (r *router) buildAppMiddleware(handler RouteHandlerFn) RouteHandlerFn {
+func (r *router) buildAppMiddleware(chain Chain) Chain {
 	for _, m := range r.middlewares {
-		handler = m(handler)
+		chain.Append(m)
 	}
-	return handler
+	return chain
 }
 
 func (r *router) findRouteGroup(routeType RouteType) *fs_router.Group {
 	return r.groups[routeType]
 }
 
-func (r *router) bindFunctionRoute(c *Controller) {
-	if group := r.findRouteGroup(c.Options.Type); group != nil {
-		handler := r.buildNativeMiddleware(c)
+func (r *router) bindFunctionRoute(route *Route) {
+	chain := NewChain()
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
 		if len(r.middlewares) > 0 {
-			handler = r.buildAppMiddleware(handler)
+			chain = r.buildAppMiddleware(chain)
 		}
 
-		group.POST(c.Options.Path, WrapRouteHandler(r.config, r.tracer, handler))
+		handler := chain.Then(route.Controller)
+		group.POST(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
 	}
 }
 
-func (r *router) bindHttpHandlerRoute(c *Controller) {
-	handler := r.buildNativeMiddleware(c)
+func (r *router) bindHttpHandlerRoute(route *Route) {
+	chain := NewChain()
+	chain = r.buildNativeMiddleware(route, chain)
 	if len(r.middlewares) > 0 {
-		handler = r.buildAppMiddleware(handler)
+		chain = r.buildAppMiddleware(chain)
 	}
 
-	switch strings.ToUpper(c.Options.Method) {
+	handler := chain.Then(route.Controller)
+
+	switch strings.ToUpper(route.Method) {
 	case fasthttp.MethodGet:
-		r.engine.GET(c.Options.Path, WrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.GET(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodPost:
-		r.engine.POST(c.Options.Path, WrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.POST(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodPut:
-		r.engine.PUT(c.Options.Path, WrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.PUT(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodPatch:
-		r.engine.PATCH(c.Options.Path, WrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.PATCH(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodDelete:
-		r.engine.DELETE(c.Options.Path, WrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.DELETE(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
 	}
 }
 
@@ -167,18 +178,15 @@ func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group 
 	}
 }
 
-func WrapMiddleware(handler RouteHandlerFn, middleware MiddlewareFn) RouteHandlerFn {
-	return middleware(handler)
-}
-
-func WrapRouteHandler(config *Config, tracer trace.Tracer, next RouteHandlerFn) fasthttp.RequestHandler {
+func wrapRouteHandler(config *Config, tracer trace.Tracer, handler RouteHandlerFn) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		appContext := &context{
 			RequestCtx: ctx,
 			config:     config,
 			tracer:     tracer,
 		}
-		presenter := next(appContext)
+		// get and execute handler
+		presenter := handler(appContext)
 		presenter.Write()
 	}
 }

@@ -1,10 +1,16 @@
 package mock
 
 type MockPresenter struct {
-	GetErrorFn   func() error
+	GetDataFn  func() any
+	GetErrorFn func() error
+
 	WriteDataFn  func() error
 	WriteErrorFn func(err error)
 	WriteFn      func()
+}
+
+func (p *MockPresenter) GetData() any {
+	return p.GetDataFn()
 }
 
 func (p *MockPresenter) GetError() error {

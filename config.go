@@ -14,17 +14,18 @@ const (
 )
 
 type Config struct {
+	AccessToken        string           `mapstructure:"ACCESS_TOKEN"`
+	AnonKey            string           `mapstructure:"ANON_KEY"`
 	BreakerEnable      bool             `mapstructure:"BREAKER_ENABLE"`
-	CloudAccessToken   string           `mapstructure:"CLOUD_ACCESS_TOKEN"`
 	DeploymentTarget   DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
 	Environment        string           `mapstructure:"ENVIRONMENT"`
-	GoModuleName       string           `mapstructure:"GO_MODULE_NAME"`
 	ProjectName        string           `mapstructure:"PROJECT_NAME"`
-	SupabaseApiUrl     string           `mapstructure:"SUPABASE_API_URL"`
-	SupabaseApiBaseUrl string           `mapstructure:"SUPABASE_API_BASE_PATH"`
-	SupabaseRestUrl    string           `mapstructure:"SUPABASE_REST_URL"`
+	ServiceKey         string           `mapstructure:"SERVICE_KEY"`
 	ServerHost         string           `mapstructure:"SERVER_HOST"`
 	ServerPort         string           `mapstructure:"SERVER_PORT"`
+	SupabaseApiUrl     string           `mapstructure:"SUPABASE_API_URL"`
+	SupabaseApiBaseUrl string           `mapstructure:"SUPABASE_API_BASE_PATH"`
+	SupabasePublicUrl  string           `mapstructure:"SUPABASE_PUBLIC_URL"`
 	TraceEnable        bool             `mapstructure:"TRACE_ENABLE"`
 	TraceCollector     string           `mapstructure:"TRACE_COLLECTOR"`
 	TraceEndpoint      string           `mapstructure:"TRACE_ENDPOINT"`

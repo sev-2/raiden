@@ -11,38 +11,38 @@ import (
 )
 
 func TestJsonPresenterWriteData(t *testing.T) {
-	ctx := &fasthttp.RequestCtx{}
+	response := &fasthttp.Response{}
 
-	presenter := raiden.NewJsonPresenter(ctx)
+	presenter := raiden.NewJsonPresenter(response)
 	data := map[string]interface{}{"message": "test"}
 	presenter.SetData(data)
 
 	err := presenter.WriteData()
 
 	assert.NoError(t, err)
-	assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode())
+	assert.Equal(t, fasthttp.StatusOK, response.StatusCode())
 
 	expectedJSON, _ := json.Marshal(data)
-	assert.Equal(t, expectedJSON, ctx.Response.Body())
+	assert.Equal(t, expectedJSON, response.Body())
 }
 
 func TestJsonPresenterWriteError(t *testing.T) {
-	ctx := &fasthttp.RequestCtx{}
+	response := &fasthttp.Response{}
 
-	presenter := raiden.NewJsonPresenter(ctx)
+	presenter := raiden.NewJsonPresenter(response)
 	err := errors.New("test error")
 
 	presenter.SetError(err)
 	presenter.WriteError(err)
 
-	assert.Equal(t, fasthttp.StatusInternalServerError, ctx.Response.StatusCode())
-	assert.Equal(t, err.Error(), string(ctx.Response.Body()))
+	assert.Equal(t, fasthttp.StatusInternalServerError, response.StatusCode())
+	assert.Equal(t, err.Error(), string(response.Body()))
 }
 
 func TestJsonPresenterWriteCustomError(t *testing.T) {
-	ctx := &fasthttp.RequestCtx{}
+	response := &fasthttp.Response{}
 
-	presenter := raiden.NewJsonPresenter(ctx)
+	presenter := raiden.NewJsonPresenter(response)
 	err := &raiden.ErrorResponse{
 		StatusCode: fasthttp.StatusBadRequest,
 		Code:       fasthttp.StatusMessage(fasthttp.StatusBadRequest),
@@ -57,14 +57,14 @@ func TestJsonPresenterWriteCustomError(t *testing.T) {
 	errByte, errMarshall := json.Marshal(err)
 	assert.NoError(t, errMarshall)
 
-	assert.Equal(t, fasthttp.StatusBadRequest, ctx.Response.StatusCode())
-	assert.Equal(t, string(errByte), string(ctx.Response.Body()))
+	assert.Equal(t, fasthttp.StatusBadRequest, response.StatusCode())
+	assert.Equal(t, string(errByte), string(response.Body()))
 }
 
 func TestJsonPresenterWriteWithErrScenario(t *testing.T) {
-	ctx := &fasthttp.RequestCtx{}
+	response := &fasthttp.Response{}
 
-	presenter := raiden.NewJsonPresenter(ctx)
+	presenter := raiden.NewJsonPresenter(response)
 
 	data := map[string]interface{}{"message": "test"}
 	err := errors.New("test error")
@@ -74,15 +74,15 @@ func TestJsonPresenterWriteWithErrScenario(t *testing.T) {
 	// Call Write method
 	presenter.Write()
 
-	assert.Equal(t, "application/json", string(ctx.Response.Header.ContentType()))
-	assert.Equal(t, fasthttp.StatusInternalServerError, ctx.Response.StatusCode())
-	assert.Equal(t, err.Error(), string(ctx.Response.Body()))
+	assert.Equal(t, "application/json", string(response.Header.ContentType()))
+	assert.Equal(t, fasthttp.StatusInternalServerError, response.StatusCode())
+	assert.Equal(t, err.Error(), string(response.Body()))
 }
 
 func TestJsonPresenterWriteWithSuccessScenario(t *testing.T) {
-	ctx := &fasthttp.RequestCtx{}
+	response := &fasthttp.Response{}
 
-	presenter := raiden.NewJsonPresenter(ctx)
+	presenter := raiden.NewJsonPresenter(response)
 
 	data := map[string]interface{}{"message": "test"}
 	presenter.SetData(data)
@@ -92,7 +92,7 @@ func TestJsonPresenterWriteWithSuccessScenario(t *testing.T) {
 
 	responseByte, err := json.Marshal(data)
 	assert.NoError(t, err)
-	assert.Equal(t, "application/json", string(ctx.Response.Header.ContentType()))
-	assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode())
-	assert.Equal(t, string(responseByte), string(ctx.Response.Body()))
+	assert.Equal(t, "application/json", string(response.Header.ContentType()))
+	assert.Equal(t, fasthttp.StatusOK, response.StatusCode())
+	assert.Equal(t, string(responseByte), string(response.Body()))
 }

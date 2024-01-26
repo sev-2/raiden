@@ -59,6 +59,7 @@ func create(cmd *cobra.Command, args []string, createInput *CreateInput) error {
 			project = createNewSupabaseProject(createInput.ProjectName)
 		}
 		projectID = &project.Id
+		createInput.SupabasePublicUrl = fmt.Sprintf("https://%s.supabase.co/", project.Id)
 	case raiden.DeploymentTargetSelfHosted:
 		supabase.ConfigurationMetaApi(createInput.SupabaseApiUrl, createInput.SupabaseApiBasePath)
 	}
@@ -95,9 +96,9 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 	}
 
 	// generate example controller
-	if err := generator.GenerateHelloWordController(createInput.ProjectName); err != nil {
-		return err
-	}
+	// if err := generator.GenerateHelloWordController(createInput.ProjectName); err != nil {
+	// 	return err
+	// }
 
 	if err := generator.GenerateModels(createInput.ProjectName, tables, policies); err != nil {
 		return err
@@ -107,9 +108,9 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 		return err
 	}
 
-	if err := generateMainFunction(*appConfig); err != nil {
-		return err
-	}
+	// if err := generateMainFunction(*appConfig); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -172,7 +173,7 @@ func initProject(createInput *CreateInput) error {
 	if err := os.Chdir(projectPath); err != nil {
 		return err
 	}
-	cmdModInit := exec.Command("go", "mod", "init", createInput.GoModuleName)
+	cmdModInit := exec.Command("go", "mod", "init", utils.ToGoModuleName(createInput.ProjectName))
 	cmdModInit.Stdout = os.Stdout
 	cmdModInit.Stderr = os.Stderr
 

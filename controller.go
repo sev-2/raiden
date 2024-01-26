@@ -4,173 +4,146 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"net/url"
 	"reflect"
-	"runtime"
 	"strconv"
-	"strings"
 
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/valyala/fasthttp"
 )
 
 type (
-	ControllerOptionKey string
-	ControllerOptions   struct {
-		Type   RouteType
-		Method string
-		Path   string
+	// controller contract and capabilities
+	// executed order
+	// Before -> Handler -> After
+	Controller interface {
+		After(ctx Context) error
+		Before(ctx Context) error
+		Handler(ctx Context) Presenter
 	}
-
-	Controller struct {
-		Options ControllerOptions
-		Handler RouteHandlerFn
-	}
-
-	ControllerRegistry struct {
-		ControllerComments map[string]string
-		Controllers        []*Controller
-	}
+	ControllerBase struct{}
 )
 
-const (
-	ControllerOptionTypeKey  ControllerOptionKey = "type"
-	ControllerOptionRouteKey ControllerOptionKey = "route"
-)
-
-// ----- Controller Functionality -----
-func NewControllerRegistry() *ControllerRegistry {
-	registry := &ControllerRegistry{
-		ControllerComments: map[string]string{},
-	}
-	registry.Register(HealthController)
-	return registry
+// `Before` function executed before `Handler“ function executed
+// overwrite function in embedded struct for custom logic
+// if error is not null, process will be intercepted
+// and return response error message to client with json format
+func (*ControllerBase) Before(ctx Context) error {
+	return nil
 }
 
-func (cr *ControllerRegistry) Register(routeHandlers ...RouteHandlerFn) {
-	var controller []*Controller
-	for i := range routeHandlers {
-		h := routeHandlers[i]
-		if c := cr.getController(h); c != nil {
-			controller = append(controller, cr.getController(h))
-		}
-	}
-	cr.Controllers = append(cr.Controllers, controller...)
+// `Handler“ function is main logic of controller
+// Overwrite function in embedded struct for custom logic
+func (*ControllerBase) Handler(ctx Context) Presenter {
+	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
-func (cr *ControllerRegistry) getController(h RouteHandlerFn) *Controller {
-	funcPtr := reflect.ValueOf(h).Pointer()
-	funcInfo := runtime.FuncForPC(funcPtr)
-
-	funcNameArr := strings.Split(funcInfo.Name(), ".")
-	funcName := funcNameArr[len(funcNameArr)-1]
-
-	comment, ok := cr.ControllerComments[funcName]
-	if !ok {
-		file, _ := funcInfo.FileLine(funcPtr)
-		mapCommentArr := GetHandlerComment(file)
-		if len(mapCommentArr) == 0 {
-			return nil
-		}
-
-		for _, fc := range mapCommentArr {
-			cr.ControllerComments[fc["fn"]] = fc["comment"]
-		}
-
-		comment, ok = cr.ControllerComments[funcName]
-		if !ok {
-			return nil
-		}
-	}
-
-	options := parseToOptions(comment)
-	return &Controller{
-		Options: options,
-		Handler: h,
-	}
-}
-
-func GetHandlerComment(file string) []map[string]string {
-	fSet := token.NewFileSet()
-	node, err := parser.ParseFile(fSet, file, nil, parser.ParseComments)
-	if err != nil {
-		return nil
-	}
-
-	var commentsList []map[string]string
-	for _, decl := range node.Decls {
-		if funcDecl, ok := decl.(*ast.FuncDecl); ok {
-			comments := extractComments(funcDecl.Doc)
-			if len(comments) > 0 {
-				commentsList = append(commentsList, map[string]string{
-					"fn":      funcDecl.Name.Name,
-					"comment": comments,
-				})
-			}
-		}
-	}
-	return commentsList
-}
-
-func extractComments(doc *ast.CommentGroup) string {
-	var comments []string
-	if doc != nil {
-		for _, comment := range doc.List {
-			if strings.Contains(comment.Text, "@") {
-				comments = append(comments, strings.TrimPrefix(comment.Text, "//"))
-			}
-		}
-	}
-	return strings.Join(comments, "\n")
-}
-
-func parseToOptions(comment string) ControllerOptions {
-	trimmedComment := strings.ReplaceAll(comment, "\n", " ")
-
-	var filteredComments []string
-	for _, v := range strings.Split(trimmedComment, "@") {
-		if len(v) == 0 {
-			continue
-		}
-
-		filteredComments = append(filteredComments, v)
-	}
-
-	// create options
-	options := ControllerOptions{}
-
-	// loop for assign to options
-	for _, fc := range filteredComments {
-		splitedComments := strings.Split(fc, " ")
-		switch splitedComments[0] {
-		case string(ControllerOptionTypeKey):
-			if len(splitedComments) >= 2 {
-				options.Type = RouteType(splitedComments[1])
-
-				// setup method by type
-				switch options.Type {
-				case RouteTypeFunction:
-					options.Method = fasthttp.MethodPost
-
-				}
-			}
-		case string(ControllerOptionRouteKey):
-			if len(splitedComments) > 2 {
-				options.Method = strings.ToUpper(splitedComments[1])
-				options.Path = splitedComments[2]
-			} else if len(splitedComments) == 2 {
-				options.Path = splitedComments[1]
-			}
-		}
-	}
-
-	return options
+// `After“ function executed before `Handler“ function executed
+// Overwrite function in embedded struct for custom logic
+// if error is not null, process will be continue processed to client,
+// error message only print to standard output
+func (*ControllerBase) After(ctx Context) error {
+	return nil
 }
 
 // ----- Helper Functionality -----
+
+// Marshall request data (path param, query and body data) to Payload data in
+// actual controller
+//
+// Example :
+//
+//	type Request {
+//			Search 		string	`query:"q"`
+//			Resource 	string	`path:"resource" validate:"required"`
+//	}
+//
+//	Controller {
+//			raiden.ControllerBase
+//			Payload	*Request
+//	}
+//
+// Example Request :
+// GET /hello/{resource}?q="some-resource"
+//
+// base on example above this code will auto marshall data from fasthttp.Request to Request struct
+// and validate all data is appropriate base on validate tag
+func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
+	controllerType := reflect.TypeOf(controller).Elem()
+	controllerValue := reflect.ValueOf(controller).Elem()
+
+	payloadField, isPayloadFound := controllerType.FieldByName("Payload")
+	if !isPayloadFound {
+		return fmt.Errorf("field Payload is not exist in %s", controllerType.Name())
+	}
+
+	payloadType := payloadField.Type.Elem()
+	payloadPtr := reflect.New(payloadType).Interface()
+	payloadValue := reflect.ValueOf(payloadPtr).Elem()
+
+	for i := 0; i < payloadType.NumField(); i++ {
+		field := payloadType.Field(i)
+
+		tagPath, tagQuery := field.Tag.Get("path"), field.Tag.Get("query")
+		if field.Tag.Get("json") != "" {
+			continue
+		}
+
+		var value string
+		if tagPath != "" {
+			tagValue := ctx.UserValue(tagPath)
+			if tagValueString, isString := tagValue.(string); isString {
+				value = tagValueString
+			}
+		} else if tagQuery != "" {
+			value = string(ctx.Request.URI().QueryArgs().Peek(tagQuery))
+		} else {
+			continue
+		}
+
+		if err := setPayloadValue(payloadValue.Field(i), value); err != nil {
+			return err
+		}
+	}
+
+	if err := json.Unmarshal(ctx.Request.Body(), payloadPtr); err != nil {
+		return err
+	}
+
+	if err := Validate(payloadPtr); err != nil {
+		logger.Debugf("validate error : %v", err)
+		return err
+	}
+
+	filedValue := controllerValue.FieldByName("Payload")
+	filedValue.Set(reflect.ValueOf(payloadPtr))
+	return nil
+}
+
+// create http handler from controller
+// inside handler running auto inject and validate payload
+// and running lifecycle
+func BuildHandler(c Controller) RouteHandlerFn {
+	return func(ctx Context) Presenter {
+		if err := MarshallAndValidate(ctx.RequestContext(), c); err != nil {
+			return ctx.SendJsonError(err)
+		}
+
+		if err := c.Before(ctx); err != nil {
+			return ctx.SendJsonError(err)
+		}
+
+		presenter := c.Handler(ctx)
+
+		if err := c.After(ctx); err != nil {
+			Error(err)
+		}
+
+		return presenter
+	}
+
+}
+
 func UnmarshalRequest[T any](ctx Context) (*T, error) {
 	reqType := reflect.TypeOf((*T)(nil)).Elem()
 	reqPtr := reflect.New(reqType).Interface()
@@ -190,12 +163,12 @@ func UnmarshalRequest[T any](ctx Context) (*T, error) {
 
 		var value string
 		if tagPath != "" {
-			tagValue := ctx.FastHttpRequestContext().UserValue(tagPath)
+			tagValue := ctx.RequestContext().UserValue(tagPath)
 			if tagValueString, isString := tagValue.(string); isString {
 				value = tagValueString
 			}
 		} else if tagQuery != "" {
-			value = string(ctx.FastHttpRequestContext().Request.URI().QueryArgs().Peek(tagQuery))
+			value = string(ctx.RequestContext().Request.URI().QueryArgs().Peek(tagQuery))
 		} else {
 			continue
 		}
@@ -205,14 +178,14 @@ func UnmarshalRequest[T any](ctx Context) (*T, error) {
 		}
 	}
 
-	if err := json.Unmarshal(ctx.FastHttpRequestContext().Request.Body(), reqPtr); err != nil {
+	if err := json.Unmarshal(ctx.RequestContext().Request.Body(), reqPtr); err != nil {
 		return nil, err
 	}
 
 	return reqPtr.(*T), nil
 }
 
-func UnmarshalRequestAndValidate[T any](ctx Context, requestValidators ...ValidatorRequest) (*T, error) {
+func UnmarshalRequestAndValidate[T any](ctx Context, requestValidators ...ValidatorFunc) (*T, error) {
 	payload, err := UnmarshalRequest[T](ctx)
 	if err != nil {
 		return nil, err
