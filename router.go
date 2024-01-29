@@ -45,11 +45,21 @@ func NewRouter(config *Config) *router {
 		tracer = otel.Tracer(fmt.Sprintf("%s tracer", config.ProjectName))
 	}
 
+	defaultRoutes := []*Route{
+		{
+			Type:       RouteTypeHttpHandler,
+			Method:     fasthttp.MethodGet,
+			Path:       "/health",
+			Controller: &HealthController{},
+		},
+	}
+
 	return &router{
 		engine: engine,
 		config: config,
 		groups: groups,
 		tracer: tracer,
+		routes: defaultRoutes,
 	}
 }
 
