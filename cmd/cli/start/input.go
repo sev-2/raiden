@@ -239,9 +239,15 @@ func (ca *CreateInput) PromptSupabaseApiPath() error {
 
 func (ca *CreateInput) PrompTraceEnable() error {
 	promp := promptui.Prompt{
-		Label:     "Enable Tracer",
-		Default:   "n",
-		IsConfirm: true,
+		Label: "Enable Tracer (yes/no)",
+		Validate: func(s string) error {
+			if s != "no" && s != "yes" {
+				return errors.New("invalid answer")
+			}
+
+			return nil
+		},
+		Default: "no",
 	}
 
 	inputText, err := promp.Run()
@@ -249,7 +255,7 @@ func (ca *CreateInput) PrompTraceEnable() error {
 		return err
 	}
 
-	if strings.ToLower(inputText) == "y" {
+	if strings.ToLower(inputText) == "yes" {
 		ca.TraceEnable = true
 	} else {
 		ca.TraceEnable = false

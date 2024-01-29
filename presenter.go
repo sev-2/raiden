@@ -6,6 +6,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+// ----- Presenter Contract ------
 type Presenter interface {
 	GetError() error
 	GetData() any
@@ -15,6 +16,10 @@ type Presenter interface {
 	Write()
 }
 
+// ----- Define native presenter -----
+
+// JSON Presenter
+// handler http output response with json format
 type JsonPresenter struct {
 	response *fasthttp.Response
 	data     any

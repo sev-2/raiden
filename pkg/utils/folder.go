@@ -62,3 +62,12 @@ func DeleteFolder(folderName string) error {
 	}
 	return nil
 }
+
+func GetAbsolutePath(path string) (string, error) {
+	currDir, err := GetCurrentDirectory()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(currDir, path), nil
+}

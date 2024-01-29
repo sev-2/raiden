@@ -21,6 +21,8 @@ type Result struct {
 
 type Controller struct {
 	raiden.ControllerBase
+
+	// Reserver Field
 	Payload *Payload
 	Result  Result
 }

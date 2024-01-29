@@ -3,15 +3,17 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
-	"text/template"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var configDir = "configs"
-var configFile = "app"
-var configTemplate = `PROJECT_NAME: {{ .ProjectName }}
+// ----- Define type, var and constant -----
+
+const (
+	ConfigDir      = "configs"
+	ConfigFile     = "app"
+	ConfigTemplate = `PROJECT_NAME: {{ .ProjectName }}
 DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
 
 ACCESS_TOKEN: {{ .AccessToken }}
@@ -34,25 +36,21 @@ TRACE_ENABLE: {{ .TraceEnable }}
 TRACE_COLLECTOR: {{ .TraceCollector }}
 TRACE_ENDPOINT: {{ .TraceEndpoint }}
 `
+)
 
-func GenerateConfig(config raiden.Config) error {
-	folderPath := filepath.Join(config.ProjectName, configDir)
-	err := utils.CreateFolder(folderPath)
-	if err != nil {
+func GenerateConfig(config *raiden.Config, generateFn GenerateFn) error {
+	// create config folder if not exist
+	folderPath := filepath.Join(config.ProjectName, ConfigDir)
+	if err := utils.CreateFolder(folderPath); err != nil {
 		return err
 	}
 
-	tmpl, err := template.New("configTemplate").Parse(configTemplate)
-	if err != nil {
-		return fmt.Errorf("error parsing template : %v", err)
-	}
-
 	// Create or open the output file
-	file, err := createFile(getAbsolutePath(folderPath), configFile, "yaml")
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", ConfigFile, "yaml"))
+	absolutePath, err := utils.GetAbsolutePath(filePath)
 	if err != nil {
-		return fmt.Errorf("failed create file %s : %v", configFile, err)
+		return err
 	}
-	defer file.Close()
 
 	if config.ServerHost == "" {
 		config.ServerHost = "127.0.01"
@@ -62,11 +60,12 @@ func GenerateConfig(config raiden.Config) error {
 		config.ServerPort = "8002"
 	}
 
-	// Execute the template and write to the file
-	err = tmpl.Execute(file, config)
-	if err != nil {
-		return fmt.Errorf("error executing template: %v", err)
+	input := GenerateInput{
+		BindData:     config,
+		Template:     ConfigTemplate,
+		TemplateName: "configTemplate",
+		OutputPath:   absolutePath,
 	}
 
-	return nil
+	return generateFn(input)
 }

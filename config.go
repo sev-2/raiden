@@ -6,6 +6,8 @@ import (
 	"github.com/ory/viper"
 )
 
+// ----- main configuration functionality -----
+
 type DeploymentTarget string
 
 const (

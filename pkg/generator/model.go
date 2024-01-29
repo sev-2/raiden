@@ -3,7 +3,6 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	"github.com/sev-2/raiden/pkg/postgres"
@@ -11,15 +10,33 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var modelDir = "internal/models"
-var modelTemplate = `package models
-{{ if gt (len .Imports) 0 }}
-import(
+// ----- Define type, van and constant -----
+type Rls struct {
+	CanWrite []string
+	CanRead  []string
+}
+
+type GenerateModelData struct {
+	Columns    []map[string]any
+	Imports    []string
+	StructName string
+	Package    string
+	RlsTag     string
+	Schema     string
+}
+
+const (
+	ModelDir      = "internal/models"
+	ModelTemplate = `package {{ .Package }}
+{{- if gt (len .Imports) 0 }}
+
+import (
 {{- range .Imports}}
 	"{{.}}"
 {{- end}}
 )
-{{ end }}
+{{- end }}
+
 type {{ .StructName }} struct {
 {{- range .Columns }}
 	{{ .Name | ToGoIdentifier }} {{ .GoType }} ` + "`json:\"{{ .Name | ToSnakeCase }},omitempty\" column:\"{{ .Name | ToSnakeCase }}\"`" + `
@@ -29,13 +46,9 @@ type {{ .StructName }} struct {
 	Acl string ` + "`{{ .RlsTag }}`" + `
 }
 `
+)
 
-type Rls struct {
-	CanWrite []string
-	CanRead  []string
-}
-
-func GenerateModels(projectName string, tables []supabase.Table, rlsList supabase.Policies) (err error) {
+func GenerateModels(projectName string, tables []supabase.Table, rlsList supabase.Policies, generateFn GenerateFn) (err error) {
 	internalFolderPath := filepath.Join(projectName, "internal")
 	if exist := utils.IsFolderExists(internalFolderPath); !exist {
 		if err := utils.CreateFolder(internalFolderPath); err != nil {
@@ -43,112 +56,58 @@ func GenerateModels(projectName string, tables []supabase.Table, rlsList supabas
 		}
 	}
 
-	folderPath := filepath.Join(projectName, modelDir)
-	err = utils.CreateFolder(folderPath)
-	if err != nil {
-		return err
+	folderPath := filepath.Join(projectName, ModelDir)
+	if exist := utils.IsFolderExists(folderPath); !exist {
+		if err := utils.CreateFolder(folderPath); err != nil {
+			return err
+		}
 	}
 
 	for i, v := range tables {
 		searchTable := tables[i].Name
-		GenerateModel(projectName, v, rlsList.FilterByTable(searchTable))
+		GenerateModel(folderPath, v, rlsList.FilterByTable(searchTable), generateFn)
 	}
 
 	return nil
 }
 
-func GenerateModel(projectName string, table supabase.Table, rlsList supabase.Policies) error {
-	tmpl, err := template.New("modelTemplate").
-		Funcs(template.FuncMap{"ToGoIdentifier": utils.SnakeCaseToPascalCase}).
-		Funcs(template.FuncMap{"ToGoType": postgres.ToGoType}).
-		Funcs(template.FuncMap{"ToSnakeCase": utils.ToSnakeCase}).
-		Parse(modelTemplate)
-	if err != nil {
-		return fmt.Errorf("error parsing template : %v", err)
+func GenerateModel(folderPath string, table supabase.Table, rlsList supabase.Policies, generateFn GenerateFn) error {
+	// define binding func
+	funcMaps := []template.FuncMap{
+		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
+		{"ToGoType": postgres.ToGoType},
+		{"ToSnakeCase": utils.ToSnakeCase},
 	}
 
 	// Map column data
-	columns, importsPath := mapTableToColumn(table)
+	columns, importsPath := mapTableAttributes(table)
 	rlsTag := generateRlsTag(rlsList)
 
 	// Create or open the output file
-	folderPath := fmt.Sprintf("%s/%s", projectName, modelDir)
-	file, err := createFile(getAbsolutePath(folderPath), table.Name, "go")
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", table.Name, "go"))
+	absolutePath, err := utils.GetAbsolutePath(filePath)
 	if err != nil {
-		return fmt.Errorf("failed create file %s : %v", table.Name, err)
-	}
-	defer file.Close()
-
-	// Execute the template and write to the file
-	err = tmpl.Execute(file, map[string]any{
-		"Imports":    importsPath,
-		"StructName": utils.SnakeCaseToPascalCase(table.Name),
-		"Columns":    columns,
-		"Schema":     table.Schema,
-		"RlsTag":     rlsTag,
-	})
-
-	if err != nil {
-		return fmt.Errorf("error executing template: %v", err)
+		return err
 	}
 
-	return nil
-}
-
-// map table to column, map pg type to go type and get dependency import path
-func mapTableToColumn(table supabase.Table) (columns []map[string]any, importsPath []string) {
-	importsMap := make(map[string]any)
-	columns = make([]map[string]any, 0)
-
-	for _, c := range table.Columns {
-		column := map[string]any{
-			"Name": c.Name,
-		}
-
-		goType := postgres.ToGoType(c.DataType, c.IsNullable)
-		column["GoType"] = goType
-
-		splitType := strings.Split(goType, ".")
-		if len(splitType) > 1 {
-			importPackage := splitType[0]
-			if c.IsNullable {
-				importPackage = strings.TrimLeft(importPackage, "*")
-			}
-
-			var importPackageName string
-			switch importPackage {
-			case "time":
-				importPackageName = importPackage
-			case "uuid":
-				importPackageName = "github.com/google/uuid"
-			case "json":
-				importPackageName = "encoding/json"
-			}
-			importsMap[importPackageName] = true
-		}
-
-		columns = append(columns, column)
+	// set data
+	data := GenerateModelData{
+		Package:    "models",
+		Imports:    importsPath,
+		StructName: utils.SnakeCaseToPascalCase(table.Name),
+		Columns:    columns,
+		Schema:     table.Schema,
+		RlsTag:     rlsTag,
 	}
 
-	for key := range importsMap {
-		importsPath = append(importsPath, key)
+	// setup generate input param
+	input := GenerateInput{
+		BindData:     data,
+		FuncMap:      funcMaps,
+		Template:     ModelTemplate,
+		TemplateName: "modelTemplate",
+		OutputPath:   absolutePath,
 	}
 
-	return
-}
-
-func generateRlsTag(rlsList supabase.Policies) string {
-	var rls Rls
-
-	for _, v := range rlsList {
-		switch v.Command {
-		case supabase.PolicyCommandSelect:
-			rls.CanWrite = append(rls.CanWrite, v.Roles...)
-		case supabase.PolicyCommandInsert, supabase.PolicyCommandUpdate, supabase.PolicyCommandDelete:
-			rls.CanWrite = append(rls.CanWrite, v.Roles...)
-		}
-	}
-
-	rlsTag := fmt.Sprintf("read:%q write:%q", strings.Join(rls.CanRead, ","), strings.Join(rls.CanWrite, ","))
-	return rlsTag
+	return generateFn(input)
 }

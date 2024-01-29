@@ -9,13 +9,16 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+// custom struct for validation function
 type ValidatorFunc struct {
 	Name      string
 	Validator validator.Func
 }
 
+// custom type for custom validation function
 type WithValidator func(name string, validateFn validator.Func) ValidatorFunc
 
+// validate payload
 func Validate(payload any, requestValidators ...ValidatorFunc) error {
 	validatorInstance := validator.New()
 	if len(requestValidators) > 0 {
@@ -65,6 +68,8 @@ func Validate(payload any, requestValidators ...ValidatorFunc) error {
 	return nil
 }
 
+// getInvalidMessage is manual mapping for error message base on validation result
+// todo : integrate with i18n
 func getInvalidMessage(field, tag, param string) (errMessage string) {
 	field = strings.ToLower(field)
 	switch tag {

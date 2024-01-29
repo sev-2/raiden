@@ -32,7 +32,7 @@ func (*ControllerBase) Before(ctx Context) error {
 	return nil
 }
 
-// `Handler“ function is main logic of controller
+// `Handler` function is main logic of controller
 // Overwrite function in embedded struct for custom logic
 func (*ControllerBase) Handler(ctx Context) Presenter {
 	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
@@ -85,6 +85,8 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 		field := payloadType.Field(i)
 
 		tagPath, tagQuery := field.Tag.Get("path"), field.Tag.Get("query")
+
+		// handle marshall json with json.unmarshal in next process
 		if field.Tag.Get("json") != "" {
 			continue
 		}
@@ -101,11 +103,14 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 			continue
 		}
 
+		// bind value to struct attribute
 		if err := setPayloadValue(payloadValue.Field(i), value); err != nil {
 			return err
 		}
 	}
 
+	// unmarshal data from request body to payload
+	// only marshall to field with tag json
 	if err := json.Unmarshal(ctx.Request.Body(), payloadPtr); err != nil {
 		return err
 	}
@@ -120,84 +125,7 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 	return nil
 }
 
-// create http handler from controller
-// inside handler running auto inject and validate payload
-// and running lifecycle
-func BuildHandler(c Controller) RouteHandlerFn {
-	return func(ctx Context) Presenter {
-		if err := MarshallAndValidate(ctx.RequestContext(), c); err != nil {
-			return ctx.SendJsonError(err)
-		}
-
-		if err := c.Before(ctx); err != nil {
-			return ctx.SendJsonError(err)
-		}
-
-		presenter := c.Handler(ctx)
-
-		if err := c.After(ctx); err != nil {
-			Error(err)
-		}
-
-		return presenter
-	}
-
-}
-
-func UnmarshalRequest[T any](ctx Context) (*T, error) {
-	reqType := reflect.TypeOf((*T)(nil)).Elem()
-	reqPtr := reflect.New(reqType).Interface()
-	reqValue := reflect.ValueOf(reqPtr).Elem()
-
-	if reqType.Kind() != reflect.Struct {
-		return nil, errors.New("marshall request must passing struct type")
-	}
-
-	for i := 0; i < reqType.NumField(); i++ {
-		field := reqType.Field(i)
-
-		tagPath, tagQuery := field.Tag.Get("path"), field.Tag.Get("query")
-		if field.Tag.Get("json") != "" {
-			continue
-		}
-
-		var value string
-		if tagPath != "" {
-			tagValue := ctx.RequestContext().UserValue(tagPath)
-			if tagValueString, isString := tagValue.(string); isString {
-				value = tagValueString
-			}
-		} else if tagQuery != "" {
-			value = string(ctx.RequestContext().Request.URI().QueryArgs().Peek(tagQuery))
-		} else {
-			continue
-		}
-
-		if err := setPayloadValue(reqValue.Field(i), value); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := json.Unmarshal(ctx.RequestContext().Request.Body(), reqPtr); err != nil {
-		return nil, err
-	}
-
-	return reqPtr.(*T), nil
-}
-
-func UnmarshalRequestAndValidate[T any](ctx Context, requestValidators ...ValidatorFunc) (*T, error) {
-	payload, err := UnmarshalRequest[T](ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := Validate(payload); err != nil {
-		return nil, err
-	}
-
-	return payload, nil
-}
-
+// set value to reflect value field
 func setPayloadValue(fieldValue reflect.Value, value string) error {
 	switch fieldValue.Kind() {
 	case reflect.String:
@@ -217,9 +145,17 @@ func setPayloadValue(fieldValue reflect.Value, value string) error {
 
 // ----- Handlers -----
 
-// @type http-handler
-// @route GET /health
-func HealthController(ctx Context) Presenter {
+type HealthRequest struct{}
+type HealthResponse struct {
+	Message string `json:"message"`
+}
+type HealthController struct {
+	ControllerBase
+	Payload *HealthRequest
+	Result  HealthResponse
+}
+
+func (c *HealthController) Handler(ctx Context) Presenter {
 	responseData := map[string]any{
 		"message": "server up",
 	}

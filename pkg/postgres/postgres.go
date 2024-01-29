@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// Convert postgres type to golang type
 func ToGoType(pgType string, isNullable bool) (goType string) {
 	switch strings.ToLower(pgType) {
 	case "bigint":

@@ -91,26 +91,30 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 
 	// generate resources to raiden resources
 	appConfig := createInput.ToAppConfig()
-	if err := generator.GenerateConfig(*appConfig); err != nil {
+	if err := generator.GenerateConfig(appConfig, generator.Generate); err != nil {
 		return err
 	}
 
 	// generate example controller
-	// if err := generator.GenerateHelloWordController(createInput.ProjectName); err != nil {
-	// 	return err
-	// }
-
-	if err := generator.GenerateModels(createInput.ProjectName, tables, policies); err != nil {
+	if err := generator.GenerateHelloWordController(createInput.ProjectName, generator.Generate); err != nil {
 		return err
 	}
 
-	if err := generator.GenerateRoles(createInput.ProjectName, roles); err != nil {
+	if err := generator.GenerateModels(createInput.ProjectName, tables, policies, generator.Generate); err != nil {
 		return err
 	}
 
-	// if err := generateMainFunction(*appConfig); err != nil {
-	// 	return err
-	// }
+	if err := generator.GenerateRoles(createInput.ProjectName, roles, generator.Generate); err != nil {
+		return err
+	}
+
+	if err := generator.GenerateRoute(createInput.ProjectName, generator.Generate); err != nil {
+		return err
+	}
+
+	if err := generator.GenerateMainFunction(appConfig, generator.Generate); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -134,33 +138,6 @@ func createNewSupabaseProject(projectName string) supabase.Project {
 	}
 
 	return project
-}
-
-func generateMainFunction(appConfig raiden.Config) error {
-	currentPath, err := utils.GetCurrentDirectory()
-	if err != nil {
-		return err
-	}
-
-	controllerPath := filepath.Join(currentPath, appConfig.ProjectName, generator.ControllerDir)
-	mapController, err := generator.MapGetControllers(controllerPath)
-	if err != nil {
-		return err
-	}
-
-	controllerNameArr := make([]string, 0)
-	for k := range mapController {
-		if k != "" {
-			controllerNameArr = append(controllerNameArr, k)
-		}
-	}
-
-	controllerPackage := filepath.Join(appConfig.ProjectName, generator.ControllerDir)
-	if err := generator.GenerateMainFunction(appConfig, controllerPackage, controllerNameArr); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func initProject(createInput *CreateInput) error {

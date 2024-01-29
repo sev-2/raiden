@@ -12,9 +12,9 @@ import (
 	fs_router "github.com/fasthttp/router"
 )
 
+// ----- define route type, constant and variable -----
 type (
 	RouteHandlerFn func(ctx Context) Presenter
-	MiddlewareFn   func(next RouteHandlerFn) RouteHandlerFn
 	RouteType      string
 
 	Route struct {
@@ -34,7 +34,8 @@ const (
 	RouteTypeStorage     RouteType = "storage"
 )
 
-// Build router
+// ----- Route functionality -----
+
 func NewRouter(config *Config) *router {
 	engine := fs_router.New()
 	groups := createRouteGroups(engine)
@@ -168,6 +169,7 @@ func (r *router) PrintRegisteredRoute() {
 }
 
 // ----- helper function -----
+
 func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group {
 	return map[RouteType]*fs_router.Group{
 		RouteTypeFunction: engine.Group("/functions/v1"),
@@ -189,4 +191,34 @@ func wrapRouteHandler(config *Config, tracer trace.Tracer, handler RouteHandlerF
 		presenter := handler(appContext)
 		presenter.Write()
 	}
+}
+
+// create http handler from controller
+// inside http handler will running auto inject and validate payload
+// and running lifecycle
+func buildHandler(c Controller) RouteHandlerFn {
+	return func(ctx Context) Presenter {
+		// marshall and validate http request data
+		// mush return error if `Payload` field is not define in controller
+		if err := MarshallAndValidate(ctx.RequestContext(), c); err != nil {
+			return ctx.SendJsonError(err)
+		}
+
+		// running before middleware
+		if err := c.Before(ctx); err != nil {
+			return ctx.SendJsonError(err)
+		}
+
+		// running http handler
+		presenter := c.Handler(ctx)
+
+		// running after middleware
+		if err := c.After(ctx); err != nil {
+			Error(err)
+		}
+
+		// return presenter
+		return presenter
+	}
+
 }
