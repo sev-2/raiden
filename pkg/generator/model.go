@@ -79,11 +79,11 @@ func GenerateModel(folderPath string, table supabase.Table, rlsList supabase.Pol
 		{"ToSnakeCase": utils.ToSnakeCase},
 	}
 
-	// Map column data
+	// map column data
 	columns, importsPath := mapTableAttributes(table)
 	rlsTag := generateRlsTag(rlsList)
 
-	// Create or open the output file
+	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", table.Name, "go"))
 	absolutePath, err := utils.GetAbsolutePath(filePath)
 	if err != nil {

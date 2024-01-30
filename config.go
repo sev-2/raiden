@@ -34,8 +34,12 @@ type Config struct {
 	Version            string           `mapstructure:"VERSION"`
 }
 
-func LoadConfig(path *string) *Config {
-	if path != nil {
+func LoadConfig(path *string) (*Config, error) {
+	filePath := "./configs/app.yaml"
+
+	if path != nil && *path != "" {
+		filePath = *path
+
 		folderPath := filepath.Dir(*path)
 		file := filepath.Base(*path)
 
@@ -52,17 +56,14 @@ func LoadConfig(path *string) *Config {
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
-		Errorf("Error reading config file: %s\n", err)
-		return nil
+		return nil, err
 	}
 
 	var config Config
-	Info("load configuration")
 	if err := viper.Unmarshal(&config); err != nil {
-		Errorf("Error unmarshalling config: %s\n", err)
-		return nil
+		return nil, err
 	}
-	Info("success load configuration")
+	Infof("success load configuration from : %s", filePath)
 
 	// set default value
 
@@ -82,5 +83,5 @@ func LoadConfig(path *string) *Config {
 		config.Environment = "development"
 	}
 
-	return &config
+	return &config, nil
 }

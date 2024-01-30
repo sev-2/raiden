@@ -119,6 +119,7 @@ func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
 	}
 }
 
+// this middleware is modified version from go-zero (https://github.com/zeromicro/go-zero)
 const breakerSeparator = "://"
 
 // handler forward to handler base on request error throttle

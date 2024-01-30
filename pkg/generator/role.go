@@ -69,7 +69,7 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
 	}
 
-	// Create or open the output file
+	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", role.Name, "go"))
 	absolutePath, err := utils.GetAbsolutePath(filePath)
 	if err != nil {
@@ -84,7 +84,7 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/postgres"),
 	}
 
-	// Execute the template and write to the file
+	// execute the template and write to the file
 	data := GenerateRoleData{
 		Package:   "roles",
 		Imports:   imports,

@@ -58,7 +58,7 @@ type {{ .Name }}Controller struct {
 	Result	{{ .Name }}Response
 }
 
-func (c *Controller) Handler(ctx raiden.Context) raiden.Presenter {
+func (c *{{ .Name }}Controller) Handler(ctx raiden.Context) raiden.Presenter {
 	{{ .DefaultAction }}
 	return ctx.SendJson(c.Result)
 }

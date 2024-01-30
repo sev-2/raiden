@@ -45,7 +45,7 @@ func GenerateConfig(config *raiden.Config, generateFn GenerateFn) error {
 		return err
 	}
 
-	// Create or open the output file
+	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", ConfigFile, "yaml"))
 	absolutePath, err := utils.GetAbsolutePath(filePath)
 	if err != nil {

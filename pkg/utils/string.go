@@ -41,8 +41,18 @@ func ToSnakeCase(s string) string {
 }
 
 func ToGoModuleName(s string) string {
+	var moduleName string
+
+	splitedPath := strings.Split(strings.TrimRight(s, "/"), "/")
+	if len(splitedPath) == 1 {
+		moduleName = splitedPath[0]
+	} else if len(splitedPath) > 0 {
+		moduleName = splitedPath[len(splitedPath)-1]
+	}
+
 	reg := regexp.MustCompile("[^a-zA-Z]+")
-	result := reg.ReplaceAllString(s, "")
+	result := reg.ReplaceAllString(moduleName, "")
+
 	return strings.ToLower(result)
 }
 

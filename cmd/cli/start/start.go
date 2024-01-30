@@ -71,9 +71,12 @@ func create(cmd *cobra.Command, args []string, createInput *CreateInput) error {
 	return initProject(createInput)
 }
 
+// generate new resource.
+// contain supabase resource like table, roles, policy and etc
+// also generate framework resource like controller, route, main function and etc
 func generateResource(projectID *string, createInput *CreateInput) error {
 
-	// get supabase resources
+	// get supabase resources from cloud or pg-meta
 	tables, err := supabase.GetTables(projectID)
 	if err != nil {
 		return err
@@ -100,15 +103,18 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 		return err
 	}
 
+	// generate all model from cloud / pg-meta
 	if err := generator.GenerateModels(createInput.ProjectName, tables, policies, generator.Generate); err != nil {
 		return err
 	}
 
+	// generate all roles from cloud / pg-meta
 	if err := generator.GenerateRoles(createInput.ProjectName, roles, generator.Generate); err != nil {
 		return err
 	}
 
-	if err := generator.GenerateRoute(createInput.ProjectName, generator.Generate); err != nil {
+	// generate route base on controllers
+	if err := generator.GenerateRoute(createInput.ProjectName, createInput.ProjectName, generator.Generate); err != nil {
 		return err
 	}
 

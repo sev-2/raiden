@@ -24,7 +24,7 @@ type (
 	ControllerBase struct{}
 )
 
-// `Before` function executed before `Handler“ function executed
+// `Before` function executed before `Handler` function executed
 // overwrite function in embedded struct for custom logic
 // if error is not null, process will be intercepted
 // and return response error message to client with json format
@@ -38,7 +38,7 @@ func (*ControllerBase) Handler(ctx Context) Presenter {
 	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
-// `After“ function executed before `Handler“ function executed
+// `After` function executed before `Handler` function executed
 // Overwrite function in embedded struct for custom logic
 // if error is not null, process will be continue processed to client,
 // error message only print to standard output
@@ -111,12 +111,14 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 
 	// unmarshal data from request body to payload
 	// only marshall to field with tag json
-	if err := json.Unmarshal(ctx.Request.Body(), payloadPtr); err != nil {
-		return err
+	requestBody := ctx.Request.Body()
+	if requestBody != nil && string(requestBody) != "" {
+		if err := json.Unmarshal(requestBody, payloadPtr); err != nil {
+			return err
+		}
 	}
 
 	if err := Validate(payloadPtr); err != nil {
-		logger.Debugf("validate error : %v", err)
 		return err
 	}
 

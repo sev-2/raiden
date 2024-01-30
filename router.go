@@ -45,6 +45,7 @@ func NewRouter(config *Config) *router {
 		tracer = otel.Tracer(fmt.Sprintf("%s tracer", config.ProjectName))
 	}
 
+	// register native controller
 	defaultRoutes := []*Route{
 		{
 			Type:       RouteTypeHttpHandler,
@@ -131,7 +132,7 @@ func (r *router) bindFunctionRoute(route *Route) {
 		}
 
 		handler := chain.Then(route.Controller)
-		group.POST(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
+		group.POST(route.Path, wrapHandler(r.config, r.tracer, handler))
 	}
 }
 
@@ -146,15 +147,15 @@ func (r *router) bindHttpHandlerRoute(route *Route) {
 
 	switch strings.ToUpper(route.Method) {
 	case fasthttp.MethodGet:
-		r.engine.GET(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.GET(route.Path, wrapHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodPost:
-		r.engine.POST(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.POST(route.Path, wrapHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodPut:
-		r.engine.PUT(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.PUT(route.Path, wrapHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodPatch:
-		r.engine.PATCH(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.PATCH(route.Path, wrapHandler(r.config, r.tracer, handler))
 	case fasthttp.MethodDelete:
-		r.engine.DELETE(route.Path, wrapRouteHandler(r.config, r.tracer, handler))
+		r.engine.DELETE(route.Path, wrapHandler(r.config, r.tracer, handler))
 	}
 }
 
@@ -178,8 +179,6 @@ func (r *router) PrintRegisteredRoute() {
 	Info(strings.Repeat("=", 40))
 }
 
-// ----- helper function -----
-
 func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group {
 	return map[RouteType]*fs_router.Group{
 		RouteTypeFunction: engine.Group("/functions/v1"),
@@ -190,14 +189,14 @@ func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group 
 	}
 }
 
-func wrapRouteHandler(config *Config, tracer trace.Tracer, handler RouteHandlerFn) fasthttp.RequestHandler {
+func wrapHandler(config *Config, tracer trace.Tracer, handler RouteHandlerFn) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		appContext := &context{
 			RequestCtx: ctx,
 			config:     config,
 			tracer:     tracer,
 		}
-		// get and execute handler
+		// execute handler actual handler from controller
 		presenter := handler(appContext)
 		presenter.Write()
 	}

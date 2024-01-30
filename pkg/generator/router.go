@@ -66,22 +66,22 @@ func Register(server *raiden.Server) {
 )
 
 // Generate route configuration file
-func GenerateRoute(projectName string, generateFn GenerateFn) error {
-	internalFolderPath := filepath.Join(projectName, "internal")
+func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) error {
+	internalFolderPath := filepath.Join(basePath, "internal")
 	if exist := utils.IsFolderExists(internalFolderPath); !exist {
 		if err := utils.CreateFolder(internalFolderPath); err != nil {
 			return err
 		}
 	}
 
-	routePath := filepath.Join(projectName, RouterDir)
+	routePath := filepath.Join(basePath, RouterDir)
 	if exist := utils.IsFolderExists(routePath); !exist {
 		if err := utils.CreateFolder(routePath); err != nil {
 			return err
 		}
 	}
 
-	controllerPath, err := utils.GetAbsolutePath(filepath.Join(projectName, ControllerDir))
+	controllerPath, err := utils.GetAbsolutePath(filepath.Join(basePath, ControllerDir))
 	if err != nil {
 		return err
 	}
