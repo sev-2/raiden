@@ -243,7 +243,7 @@ type HealthController struct {
 	Result  HealthResponse
 }
 
-func (c *HealthController) Handler(ctx Context) Presenter {
+func (c *HealthController) Get(ctx Context) Presenter {
 	responseData := map[string]any{
 		"message": "server up",
 	}
