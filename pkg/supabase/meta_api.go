@@ -29,8 +29,11 @@ func NewMetaApi() *meta_api.APIClient {
 
 	metaApiConfiguration := meta_api.NewConfiguration()
 	metaApiConfiguration.Host = urlParsed.Host
+	logger.Debug("Pg-Meta Client - set host : ", metaApiConfiguration.Host)
 	metaApiConfiguration.Scheme = urlParsed.Scheme
+	logger.Debug("Pg-Meta Client - set schema : ", metaApiConfiguration.Scheme)
 	metaApiConfiguration.BasePath = apiBasePath
+	logger.Debug("Pg-Meta Client - base path  : ", metaApiConfiguration.BasePath)
 	// metaApiConfiguration.HTTPClient = &LoggerHttpClient
 
 	return meta_api.NewAPIClient(metaApiConfiguration)

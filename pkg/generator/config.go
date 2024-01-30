@@ -38,19 +38,17 @@ TRACE_ENDPOINT: {{ .TraceEndpoint }}
 `
 )
 
-func GenerateConfig(config *raiden.Config, generateFn GenerateFn) error {
+func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateFn) error {
 	// create config folder if not exist
-	folderPath := filepath.Join(config.ProjectName, ConfigDir)
-	if err := utils.CreateFolder(folderPath); err != nil {
-		return err
+	configPath := filepath.Join(basePath, ConfigDir)
+	if exist := utils.IsFolderExists(configPath); !exist {
+		if err := utils.CreateFolder(configPath); err != nil {
+			return err
+		}
 	}
 
 	// define file path
-	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", ConfigFile, "yaml"))
-	absolutePath, err := utils.GetAbsolutePath(filePath)
-	if err != nil {
-		return err
-	}
+	filePath := filepath.Join(configPath, fmt.Sprintf("%s.%s", ConfigFile, "yaml"))
 
 	if config.ServerHost == "" {
 		config.ServerHost = "127.0.01"
@@ -64,7 +62,7 @@ func GenerateConfig(config *raiden.Config, generateFn GenerateFn) error {
 		BindData:     config,
 		Template:     ConfigTemplate,
 		TemplateName: "configTemplate",
-		OutputPath:   absolutePath,
+		OutputPath:   filePath,
 	}
 
 	return generateFn(input)

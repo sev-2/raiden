@@ -15,34 +15,120 @@ import (
 type (
 	// controller contract and capabilities
 	// executed order
-	// Before -> Handler -> After
+	// Before{HttpMethod} -> HttpMethod -> After{HttpMethod}
 	Controller interface {
-		After(ctx Context) error
-		Before(ctx Context) error
-		Handler(ctx Context) Presenter
+		AfterGet(ctx Context) error
+		BeforeGet(ctx Context) error
+		Get(ctx Context) Presenter
+
+		AfterPost(ctx Context) error
+		BeforePost(ctx Context) error
+		Post(ctx Context) Presenter
+
+		AfterPut(ctx Context) error
+		BeforePut(ctx Context) error
+		Put(ctx Context) Presenter
+
+		AfterPatch(ctx Context) error
+		BeforePatch(ctx Context) error
+		Patch(ctx Context) Presenter
+
+		AfterDelete(ctx Context) error
+		BeforeDelete(ctx Context) error
+		Delete(ctx Context) Presenter
+
+		AfterOptions(ctx Context) error
+		BeforeOptions(ctx Context) error
+		Options(ctx Context) Presenter
+
+		AfterHead(ctx Context) error
+		BeforeHead(ctx Context) error
+		Head(ctx Context) Presenter
 	}
 	ControllerBase struct{}
 )
 
-// `Before` function executed before `Handler` function executed
-// overwrite function in embedded struct for custom logic
-// if error is not null, process will be intercepted
-// and return response error message to client with json format
-func (*ControllerBase) Before(ctx Context) error {
+func (*ControllerBase) BeforeGet(ctx Context) error {
 	return nil
 }
 
-// `Handler` function is main logic of controller
-// Overwrite function in embedded struct for custom logic
-func (*ControllerBase) Handler(ctx Context) Presenter {
+func (*ControllerBase) Get(ctx Context) Presenter {
 	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
-// `After` function executed before `Handler` function executed
-// Overwrite function in embedded struct for custom logic
-// if error is not null, process will be continue processed to client,
-// error message only print to standard output
-func (*ControllerBase) After(ctx Context) error {
+func (*ControllerBase) AfterGet(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) BeforePost(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) Post(ctx Context) Presenter {
+	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+}
+
+func (*ControllerBase) AfterPost(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) BeforePut(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) Put(ctx Context) Presenter {
+	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+}
+
+func (*ControllerBase) AfterPut(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) BeforePatch(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) Patch(ctx Context) Presenter {
+	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+}
+
+func (*ControllerBase) AfterPatch(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) BeforeDelete(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) Delete(ctx Context) Presenter {
+	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+}
+
+func (*ControllerBase) AfterDelete(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) BeforeOptions(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) Options(ctx Context) Presenter {
+	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+}
+
+func (*ControllerBase) AfterOptions(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) BeforeHead(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) Head(ctx Context) Presenter {
+	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+}
+
+func (*ControllerBase) AfterHead(ctx Context) error {
 	return nil
 }
 

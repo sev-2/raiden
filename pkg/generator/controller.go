@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -58,7 +59,7 @@ type {{ .Name }}Controller struct {
 	Result	{{ .Name }}Response
 }
 
-func (c *{{ .Name }}Controller) Handler(ctx raiden.Context) raiden.Presenter {
+func (c *{{ .Name }}Controller) Get(ctx raiden.Context) raiden.Presenter {
 	{{ .DefaultAction }}
 	return ctx.SendJson(c.Result)
 }
@@ -67,25 +68,29 @@ func (c *{{ .Name }}Controller) Handler(ctx raiden.Context) raiden.Presenter {
 
 // ----- Generate controller -----
 func GenerateController(file string, data GenerateControllerData, generateFn GenerateFn) error {
+	logger.Debug("GenerateHelloWordController - create controller input")
 	input := GenerateInput{
 		BindData:     data,
 		Template:     ControllerTemplate,
 		TemplateName: "controllerName",
 		OutputPath:   file,
 	}
+	logger.Debugf("GenerateController - generate controller to %s", input.OutputPath)
 	return generateFn(input)
 }
 
 // ----- Generate hello word -----
-func GenerateHelloWordController(projectName string, generateFn GenerateFn) (err error) {
-	internalFolderPath := filepath.Join(projectName, "internal")
+func GenerateHelloWordController(basePath string, generateFn GenerateFn) (err error) {
+	internalFolderPath := filepath.Join(basePath, "internal")
+	logger.Debugf("GenerateHelloWordController - create %s folder if not exist", internalFolderPath)
 	if exist := utils.IsFolderExists(internalFolderPath); !exist {
 		if err := utils.CreateFolder(internalFolderPath); err != nil {
 			return err
 		}
 	}
 
-	controllerPath := filepath.Join(projectName, ControllerDir)
+	controllerPath := filepath.Join(basePath, ControllerDir)
+	logger.Debugf("GenerateHelloWordController - create %s folder if not exist", controllerPath)
 	if exist := utils.IsFolderExists(controllerPath); !exist {
 		if err := utils.CreateFolder(controllerPath); err != nil {
 			return err
@@ -95,11 +100,8 @@ func GenerateHelloWordController(projectName string, generateFn GenerateFn) (err
 }
 
 func createHelloWordController(controllerPath string, generateFn GenerateFn) error {
+	// set file path
 	filePath := filepath.Join(controllerPath, fmt.Sprintf("%s.go", "hello"))
-	absolutePath, err := utils.GetAbsolutePath(filePath)
-	if err != nil {
-		return err
-	}
 
 	// set imports path
 	imports := []string{
@@ -119,12 +121,12 @@ func createHelloWordController(controllerPath string, generateFn GenerateFn) err
 	data := GenerateControllerData{
 		Name:           "HelloWord",
 		Package:        "controllers",
-		HttpTag:        "`verb:\"post\" path:\"/hello/{name}\" type:\"http-handler\"`",
+		HttpTag:        "`path:\"/hello/{name}\" type:\"custom\"`",
 		Imports:        imports,
 		RequestFields:  requestFields,
 		ResponseFields: responseField,
 		DefaultAction:  "c.Result.Message = \"Welcome to raiden\"",
 	}
 
-	return GenerateController(absolutePath, data, generateFn)
+	return GenerateController(filePath, data, generateFn)
 }

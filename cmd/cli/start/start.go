@@ -15,22 +15,36 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type Flags struct {
+	Verbose bool
+}
+
 func Command() *cobra.Command {
-	return &cobra.Command{
+	flags := Flags{}
+	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start new app",
 		Long:  "Start new project, synchronize resource and scaffold application",
-		RunE:  createCmd(),
+		RunE:  createCmd(&flags),
 	}
+
+	cmd.PersistentFlags().BoolVarP(&flags.Verbose, "verbose", "v", false, "Enable verbose mode")
+
+	return cmd
 }
 
-func createCmd() func(cmd *cobra.Command, args []string) error {
+func createCmd(flags *Flags) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if flags.Verbose {
+			logger.SetDebug()
+		}
+
 		createInput := &CreateInput{}
 		if err := createInput.PromptAll(); err != nil {
 			return err
 		}
 
+		logger.Debug("creating folder : ", createInput.ProjectName)
 		utils.CreateFolder(createInput.ProjectName)
 		err := create(cmd, args, createInput)
 		if err != nil {
@@ -75,6 +89,11 @@ func create(cmd *cobra.Command, args []string, createInput *CreateInput) error {
 // contain supabase resource like table, roles, policy and etc
 // also generate framework resource like controller, route, main function and etc
 func generateResource(projectID *string, createInput *CreateInput) error {
+	basePath, err := utils.GetAbsolutePath(createInput.ProjectName)
+	logger.Debug("Set base path to : ", basePath)
+	if err != nil {
+		return err
+	}
 
 	// get supabase resources from cloud or pg-meta
 	tables, err := supabase.GetTables(projectID)
@@ -94,31 +113,31 @@ func generateResource(projectID *string, createInput *CreateInput) error {
 
 	// generate resources to raiden resources
 	appConfig := createInput.ToAppConfig()
-	if err := generator.GenerateConfig(appConfig, generator.Generate); err != nil {
+	if err := generator.GenerateConfig(basePath, appConfig, generator.Generate); err != nil {
 		return err
 	}
 
 	// generate example controller
-	if err := generator.GenerateHelloWordController(createInput.ProjectName, generator.Generate); err != nil {
+	if err := generator.GenerateHelloWordController(basePath, generator.Generate); err != nil {
 		return err
 	}
 
 	// generate all model from cloud / pg-meta
-	if err := generator.GenerateModels(createInput.ProjectName, tables, policies, generator.Generate); err != nil {
+	if err := generator.GenerateModels(basePath, tables, policies, generator.Generate); err != nil {
 		return err
 	}
 
 	// generate all roles from cloud / pg-meta
-	if err := generator.GenerateRoles(createInput.ProjectName, roles, generator.Generate); err != nil {
+	if err := generator.GenerateRoles(basePath, roles, generator.Generate); err != nil {
 		return err
 	}
 
 	// generate route base on controllers
-	if err := generator.GenerateRoute(createInput.ProjectName, createInput.ProjectName, generator.Generate); err != nil {
+	if err := generator.GenerateRoute(basePath, createInput.ProjectName, generator.Generate); err != nil {
 		return err
 	}
 
-	if err := generator.GenerateMainFunction(appConfig, generator.Generate); err != nil {
+	if err := generator.GenerateMainFunction(basePath, appConfig, generator.Generate); err != nil {
 		return err
 	}
 
@@ -153,10 +172,15 @@ func initProject(createInput *CreateInput) error {
 	}
 
 	projectPath := filepath.Join(currentPath, createInput.ProjectName)
+	logger.Debug("Change directory to : ", projectPath)
 	if err := os.Chdir(projectPath); err != nil {
 		return err
 	}
-	cmdModInit := exec.Command("go", "mod", "init", utils.ToGoModuleName(createInput.ProjectName))
+
+	packageName := utils.ToGoModuleName(createInput.ProjectName)
+	logger.Debug("Execute command : go mod init ", packageName)
+
+	cmdModInit := exec.Command("go", "mod", "init", packageName)
 	cmdModInit.Stdout = os.Stdout
 	cmdModInit.Stderr = os.Stderr
 
@@ -164,6 +188,7 @@ func initProject(createInput *CreateInput) error {
 		return fmt.Errorf("error init project : %v", err)
 	}
 
+	logger.Debug("Execute command : go mod tidy")
 	cmdModTidy := exec.Command("go", "mod", "tidy")
 	cmdModTidy.Stdout = os.Stdout
 	cmdModTidy.Stderr = os.Stderr

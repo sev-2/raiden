@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -27,8 +28,11 @@ import (
 {{- end }}
 
 func main() {
-	// load configuretion
-	config := raiden.LoadConfig(nil)
+	// load configuration
+	config, err := raiden.LoadConfig(nil)
+	if err != nil {
+		raiden.Panic(err)
+	}
 
 	// Setup server
 	server := raiden.NewServer(config)
@@ -44,9 +48,10 @@ func main() {
 
 // ----- Generate main function -----
 
-func GenerateMainFunction(config *raiden.Config, generateFn GenerateFn) error {
+func GenerateMainFunction(basePath string, config *raiden.Config, generateFn GenerateFn) error {
 	// make sure all folder exist
-	cmdFolderPath := filepath.Join(config.ProjectName, "cmd")
+	cmdFolderPath := filepath.Join(basePath, "cmd")
+	logger.Debugf("GenerateMainFunction - create %s folder if not exist", cmdFolderPath)
 	if exist := utils.IsFolderExists(cmdFolderPath); !exist {
 		if err := utils.CreateFolder(cmdFolderPath); err != nil {
 			return err
@@ -54,17 +59,16 @@ func GenerateMainFunction(config *raiden.Config, generateFn GenerateFn) error {
 	}
 
 	mainFunctionDir := fmt.Sprintf(MainFunctionDirTemplate, config.ProjectName)
-	folderPath := filepath.Join(config.ProjectName, mainFunctionDir)
-	if err := utils.CreateFolder(folderPath); err != nil {
-		return err
+	mainFunctionPath := filepath.Join(basePath, mainFunctionDir)
+	logger.Debugf("GenerateMainFunction - create %s folder if not exist", mainFunctionPath)
+	if exist := utils.IsFolderExists(mainFunctionPath); !exist {
+		if err := utils.CreateFolder(mainFunctionPath); err != nil {
+			return err
+		}
 	}
 
 	// set file path
-	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", config.ProjectName, "go"))
-	absolutePath, err := utils.GetAbsolutePath(filePath)
-	if err != nil {
-		return err
-	}
+	filePath := filepath.Join(mainFunctionPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(config.ProjectName), "go"))
 
 	// setup import path
 	importPaths := []string{
@@ -78,12 +82,14 @@ func GenerateMainFunction(config *raiden.Config, generateFn GenerateFn) error {
 	}
 
 	// setup generate input param
+	logger.Debug("GenerateMainFunction - create main function input")
 	input := GenerateInput{
 		BindData:     data,
 		Template:     MainFunctionTemplate,
 		TemplateName: "mainFunctionTemplate",
-		OutputPath:   absolutePath,
+		OutputPath:   filePath,
 	}
 
+	logger.Debugf("GenerateMainFunction - generate main function to %s", input.OutputPath)
 	return generateFn(input)
 }

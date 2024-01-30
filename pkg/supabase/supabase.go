@@ -77,8 +77,10 @@ type PrimaryKey struct {
 
 func GetTables(projectId *string) ([]Table, error) {
 	if projectId != nil {
+		logger.Debug("Get all table from supabase cloud with project id : ", *projectId)
 		return getTables(*projectId, true)
 	}
+	logger.Debug("Get all table from supabase pg-meta")
 	return metaGetTables(context.Background(), DefaultIncludedSchema, true)
 }
 
@@ -102,8 +104,10 @@ type Role struct {
 
 func GetRoles(projectId *string) ([]Role, error) {
 	if projectId != nil {
+		logger.Debug("Get all roles from supabase cloud with project id : ", *projectId)
 		return getRoles(*projectId)
 	}
+	logger.Debug("Get all roles from supabase pg-meta")
 	return metaGetRoles(context.Background())
 }
 
@@ -134,8 +138,10 @@ type Policies []Policy
 
 func GetPolicies(projectId *string) ([]Policy, error) {
 	if projectId != nil {
+		logger.Debug("Get all policy from supabase cloud with project id : ", *projectId)
 		return getPolicies(*projectId)
 	}
+	logger.Debug("Get all policy from supabase pg-meta")
 	return metaGetPolicies(context.Background())
 }
 

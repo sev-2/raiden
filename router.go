@@ -19,19 +19,19 @@ type (
 
 	Route struct {
 		Type       RouteType
-		Method     string
+		Methods    []string
 		Path       string
 		Controller Controller
 	}
 )
 
 const (
-	RouteTypeHttpHandler RouteType = "http-handler"
-	RouteTypeFunction    RouteType = "function"
-	RouteTypeRest        RouteType = "rest"
-	RouteTypeRpc         RouteType = "rpc"
-	RouteTypeRealtime    RouteType = "realtime"
-	RouteTypeStorage     RouteType = "storage"
+	RouteTypeCustom   RouteType = "custom"
+	RouteTypeFunction RouteType = "function"
+	RouteTypeRest     RouteType = "rest"
+	RouteTypeRpc      RouteType = "rpc"
+	RouteTypeRealtime RouteType = "realtime"
+	RouteTypeStorage  RouteType = "storage"
 )
 
 // ----- Route functionality -----
@@ -48,8 +48,8 @@ func NewRouter(config *Config) *router {
 	// register native controller
 	defaultRoutes := []*Route{
 		{
-			Type:       RouteTypeHttpHandler,
-			Method:     fasthttp.MethodGet,
+			Type:       RouteTypeCustom,
+			Methods:    []string{fasthttp.MethodGet},
 			Path:       "/health",
 			Controller: &HealthController{},
 		},
@@ -92,7 +92,7 @@ func (r *router) BuildHandler() {
 		switch route.Type {
 		case RouteTypeFunction:
 			r.bindFunctionRoute(route)
-		case RouteTypeHttpHandler:
+		case RouteTypeCustom:
 			r.bindHttpHandlerRoute(route)
 		case RouteTypeRest, RouteTypeRpc, RouteTypeRealtime, RouteTypeStorage:
 			Infof("register route type %v is not implemented, wait for update :) ", route.Type)
@@ -106,7 +106,7 @@ func (r *router) buildNativeMiddleware(route *Route, chain Chain) Chain {
 	}
 
 	if r.config.BreakerEnable {
-		chain = chain.Append(BreakerMiddleware(route.Method, route.Path))
+		chain = chain.Append(BreakerMiddleware(route.Path))
 	}
 
 	return chain
@@ -123,6 +123,50 @@ func (r *router) findRouteGroup(routeType RouteType) *fs_router.Group {
 	return r.groups[routeType]
 }
 
+func (r *router) bindRouteGroup(group *fs_router.Group, chain Chain, route *Route) {
+	for _, m := range route.Methods {
+		handler := chain.Then(m, route.Controller)
+		switch strings.ToUpper(m) {
+		case fasthttp.MethodGet:
+			group.GET(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPost:
+			group.POST(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPut:
+			group.PUT(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPatch:
+			group.PATCH(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodDelete:
+			group.DELETE(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodOptions:
+			group.OPTIONS(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodHead:
+			group.HEAD(route.Path, wrapHandler(r.config, r.tracer, handler))
+		}
+	}
+}
+
+func (r *router) bindRoute(chain Chain, route *Route) {
+	for _, m := range route.Methods {
+		handler := chain.Then(m, route.Controller)
+		switch strings.ToUpper(m) {
+		case fasthttp.MethodGet:
+			r.engine.GET(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPost:
+			r.engine.POST(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPut:
+			r.engine.PUT(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPatch:
+			r.engine.PATCH(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodDelete:
+			r.engine.DELETE(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodOptions:
+			r.engine.OPTIONS(route.Path, wrapHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodHead:
+			r.engine.HEAD(route.Path, wrapHandler(r.config, r.tracer, handler))
+		}
+	}
+}
+
 func (r *router) bindFunctionRoute(route *Route) {
 	chain := NewChain()
 	if group := r.findRouteGroup(route.Type); group != nil {
@@ -130,9 +174,7 @@ func (r *router) bindFunctionRoute(route *Route) {
 		if len(r.middlewares) > 0 {
 			chain = r.buildAppMiddleware(chain)
 		}
-
-		handler := chain.Then(route.Controller)
-		group.POST(route.Path, wrapHandler(r.config, r.tracer, handler))
+		r.bindRouteGroup(group, chain, route)
 	}
 }
 
@@ -143,20 +185,7 @@ func (r *router) bindHttpHandlerRoute(route *Route) {
 		chain = r.buildAppMiddleware(chain)
 	}
 
-	handler := chain.Then(route.Controller)
-
-	switch strings.ToUpper(route.Method) {
-	case fasthttp.MethodGet:
-		r.engine.GET(route.Path, wrapHandler(r.config, r.tracer, handler))
-	case fasthttp.MethodPost:
-		r.engine.POST(route.Path, wrapHandler(r.config, r.tracer, handler))
-	case fasthttp.MethodPut:
-		r.engine.PUT(route.Path, wrapHandler(r.config, r.tracer, handler))
-	case fasthttp.MethodPatch:
-		r.engine.PATCH(route.Path, wrapHandler(r.config, r.tracer, handler))
-	case fasthttp.MethodDelete:
-		r.engine.DELETE(route.Path, wrapHandler(r.config, r.tracer, handler))
-	}
+	r.bindRoute(chain, route)
 }
 
 func (r *router) GetHandler() fasthttp.RequestHandler {
@@ -180,12 +209,12 @@ func (r *router) PrintRegisteredRoute() {
 }
 
 func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group {
-	return map[RouteType]*fs_router.Group{
-		RouteTypeFunction: engine.Group("/functions/v1"),
-		RouteTypeRest:     engine.Group("/rest/v1"),
-		RouteTypeRpc:      engine.Group("/rest/v1/rpc"),
-		RouteTypeRealtime: engine.Group("/realtime/v1"),
-		RouteTypeStorage:  engine.Group("/storage/v1"),
+	return map[RouteType]*fs_router.Group{ // available type custom
+		RouteTypeFunction: engine.Group("/functions/v1"), // type function
+		RouteTypeRest:     engine.Group("/rest/v1"),      // type rest
+		RouteTypeRpc:      engine.Group("/rest/v1/rpc"),  // type rpc
+		RouteTypeRealtime: engine.Group("/realtime/v1"),  // type realtime
+		RouteTypeStorage:  engine.Group("/storage/v1"),   // type storage
 	}
 }
 
@@ -205,7 +234,7 @@ func wrapHandler(config *Config, tracer trace.Tracer, handler RouteHandlerFn) fa
 // create http handler from controller
 // inside http handler will running auto inject and validate payload
 // and running lifecycle
-func buildHandler(c Controller) RouteHandlerFn {
+func buildHandler(httpMethod string, c Controller) RouteHandlerFn {
 	return func(ctx Context) Presenter {
 		// marshall and validate http request data
 		// mush return error if `Payload` field is not define in controller
@@ -213,17 +242,79 @@ func buildHandler(c Controller) RouteHandlerFn {
 			return ctx.SendJsonError(err)
 		}
 
-		// running before middleware
-		if err := c.Before(ctx); err != nil {
-			return ctx.SendJsonError(err)
-		}
+		var presenter Presenter
 
-		// running http handler
-		presenter := c.Handler(ctx)
+		switch httpMethod {
+		case fasthttp.MethodGet:
+			if err := c.BeforeGet(ctx); err != nil {
+				return ctx.SendJsonError(err)
+			}
 
-		// running after middleware
-		if err := c.After(ctx); err != nil {
-			Error(err)
+			presenter = c.Get(ctx)
+
+			if err := c.AfterGet(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodPost:
+			if err := c.BeforePost(ctx); err != nil {
+				return ctx.SendJsonError(err)
+			}
+
+			presenter = c.Post(ctx)
+
+			if err := c.AfterPost(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodPut:
+			if err := c.BeforePut(ctx); err != nil {
+				return ctx.SendJsonError(err)
+			}
+
+			presenter = c.Put(ctx)
+
+			if err := c.AfterPut(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodPatch:
+			if err := c.BeforePatch(ctx); err != nil {
+				return ctx.SendJsonError(err)
+			}
+
+			presenter = c.Patch(ctx)
+
+			if err := c.AfterPatch(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodDelete:
+			if err := c.BeforeDelete(ctx); err != nil {
+				return ctx.SendJsonError(err)
+			}
+
+			presenter = c.Delete(ctx)
+
+			if err := c.AfterDelete(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodOptions:
+			if err := c.BeforeOptions(ctx); err != nil {
+				return ctx.SendJsonError(err)
+			}
+
+			presenter = c.Options(ctx)
+
+			if err := c.AfterOptions(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodHead:
+			if err := c.BeforeHead(ctx); err != nil {
+				return ctx.SendJsonError(err)
+			}
+
+			presenter = c.Head(ctx)
+
+			if err := c.AfterHead(ctx); err != nil {
+				Error(err)
+			}
 		}
 
 		// return presenter

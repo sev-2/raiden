@@ -48,10 +48,14 @@ func Generate(input GenerateInput) error {
 	return nil
 }
 
-func generateArrayDeclaration(value reflect.Value) string {
+func generateArrayDeclaration(value reflect.Value, withoutQuote bool) string {
 	var arrayValues []string
 	for i := 0; i < value.Len(); i++ {
-		arrayValues = append(arrayValues, fmt.Sprintf("%q", value.Index(i).Interface()))
+		if withoutQuote {
+			arrayValues = append(arrayValues, fmt.Sprintf("%s", value.Index(i).Interface()))
+		} else {
+			arrayValues = append(arrayValues, fmt.Sprintf("%q", value.Index(i).Interface()))
+		}
 	}
 	return "[]string{" + strings.Join(arrayValues, ", ") + "}"
 }

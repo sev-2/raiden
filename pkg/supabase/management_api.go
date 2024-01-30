@@ -62,11 +62,15 @@ func NewManagementApi() *management_api.APIClient {
 
 	managementApiConfiguration := management_api.NewConfiguration()
 	managementApiConfiguration.Host = urlParsed.Host
+	logger.Debug("Supabase Client - set host : ", managementApiConfiguration.Host)
 	managementApiConfiguration.Scheme = urlParsed.Scheme
+	logger.Debug("Supabase Client - set schema : ", managementApiConfiguration.Scheme)
 	managementApiConfiguration.BasePath = ""
+	logger.Debug("Supabase Client - set base path : ", managementApiConfiguration.BasePath)
 	// managementApiConfiguration.HTTPClient = &LoggerHttpClient
 
 	managementApiConfiguration.AddDefaultHeader("Authorization", "Bearer "+accessToken)
+	logger.Debug("Supabase Client - set authorization token : ", accessToken)
 
 	return management_api.NewAPIClient(managementApiConfiguration)
 }
@@ -106,6 +110,12 @@ func FindProject(projectName string) (project Project, err error) {
 }
 
 func CreateNewProject(data management_api.CreateProjectBody) (Project, error) {
+	dataByte, err := json.Marshal(data)
+	if err != nil {
+		return Project{}, err
+	}
+	logger.Debugf("CreateNewProject - with payload : %s", string(dataByte))
+
 	project, response, err := getManagementApi().ProjectsApi.CreateProject(context.Background(), data)
 	if err != nil {
 		err := fmt.Errorf("failed create new project %s : %v", data.Name, err)

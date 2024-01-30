@@ -35,11 +35,7 @@ type Config struct {
 }
 
 func LoadConfig(path *string) (*Config, error) {
-	filePath := "./configs/app.yaml"
-
 	if path != nil && *path != "" {
-		filePath = *path
-
 		folderPath := filepath.Dir(*path)
 		file := filepath.Base(*path)
 
@@ -63,7 +59,6 @@ func LoadConfig(path *string) (*Config, error) {
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, err
 	}
-	Infof("success load configuration from : %s", filePath)
 
 	// set default value
 

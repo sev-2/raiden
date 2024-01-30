@@ -17,7 +17,7 @@ type (
 	Chain interface {
 		Append(middlewares ...MiddlewareFn) Chain
 		Prepend(middlewares ...MiddlewareFn) Chain
-		Then(fn Controller) RouteHandlerFn
+		Then(httpMethod string, fn Controller) RouteHandlerFn
 	}
 
 	// chain acts as a list of http.Handler middlewares.
@@ -68,8 +68,8 @@ func (c chain) Prepend(middlewares ...MiddlewareFn) Chain {
 // When the request comes in, it will be passed to m1, then m2, then m3
 // and finally, the given handler
 // (assuming every middleware calls the following one).
-func (c chain) Then(controller Controller) RouteHandlerFn {
-	handler := buildHandler(controller)
+func (c chain) Then(httpMethod string, controller Controller) RouteHandlerFn {
+	handler := buildHandler(httpMethod, controller)
 	for i := range c.middlewares {
 		handler = c.middlewares[len(c.middlewares)-1-i](handler)
 	}
@@ -123,8 +123,8 @@ func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
 const breakerSeparator = "://"
 
 // handler forward to handler base on request error throttle
-func BreakerMiddleware(method string, path string) MiddlewareFn {
-	brk := breaker.NewBreaker(breaker.WithName(strings.Join([]string{method, path}, breakerSeparator)))
+func BreakerMiddleware(path string) MiddlewareFn {
+	brk := breaker.NewBreaker(breaker.WithName(strings.Join([]string{path}, breakerSeparator)))
 	return func(next RouteHandlerFn) RouteHandlerFn {
 		return func(ctx Context) Presenter {
 			promise, err := brk.Allow()

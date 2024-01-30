@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"text/template"
 
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -39,15 +40,17 @@ var {{ .RoleName | ToGoIdentifier }} = &postgres.Role{
 `
 )
 
-func GenerateRoles(projectName string, roles []supabase.Role, generateFn GenerateFn) (err error) {
-	internalFolderPath := filepath.Join(projectName, "internal")
+func GenerateRoles(basePath string, roles []supabase.Role, generateFn GenerateFn) (err error) {
+	internalFolderPath := filepath.Join(basePath, "internal")
+	logger.Debugf("GenerateRoles - create %s folder if not exist", internalFolderPath)
 	if exist := utils.IsFolderExists(internalFolderPath); !exist {
 		if err := utils.CreateFolder(internalFolderPath); err != nil {
 			return err
 		}
 	}
 
-	folderPath := filepath.Join(projectName, RoleDir)
+	folderPath := filepath.Join(basePath, RoleDir)
+	logger.Debugf("GenerateRoles - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
 		if err := utils.CreateFolder(folderPath); err != nil {
 			return err
@@ -71,10 +74,6 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", role.Name, "go"))
-	absolutePath, err := utils.GetAbsolutePath(filePath)
-	if err != nil {
-		return err
-	}
 
 	// generate fields
 	fields := getRoleFields(role)
@@ -94,14 +93,16 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 	}
 
 	// set input
+	logger.Debugf("GenerateRoles - create role input for role %s", role.Name)
 	input := GenerateInput{
 		BindData:     data,
 		Template:     RoleTemplate,
 		TemplateName: "roleTemplate",
-		OutputPath:   absolutePath,
+		OutputPath:   filePath,
 		FuncMap:      funcMaps,
 	}
 
+	logger.Debugf("GenerateRoles - generate role to %s", input.OutputPath)
 	return generateFn(input)
 }
 
@@ -138,7 +139,7 @@ func getRoleValue(field reflect.StructField, value reflect.Value) string {
 		}
 	case reflect.Slice:
 		if field.Type.Elem().Kind() == reflect.String {
-			return generateArrayDeclaration(value)
+			return generateArrayDeclaration(value, false)
 		}
 	case reflect.Map:
 		if len(value.MapKeys()) == 0 {
@@ -162,7 +163,7 @@ func getRoleValue(field reflect.StructField, value reflect.Value) string {
 			}
 
 		} else if rv.Kind() == reflect.Slice {
-			return generateArrayDeclaration(rv)
+			return generateArrayDeclaration(rv, false)
 		} else if !value.IsNil() {
 			return fmt.Sprintf("%v", value.Interface())
 		} else {

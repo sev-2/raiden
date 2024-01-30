@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"text/template"
 
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -48,15 +49,17 @@ type {{ .StructName }} struct {
 `
 )
 
-func GenerateModels(projectName string, tables []supabase.Table, rlsList supabase.Policies, generateFn GenerateFn) (err error) {
-	internalFolderPath := filepath.Join(projectName, "internal")
+func GenerateModels(basePath string, tables []supabase.Table, rlsList supabase.Policies, generateFn GenerateFn) (err error) {
+	internalFolderPath := filepath.Join(basePath, "internal")
+	logger.Debugf("GenerateModels - create %s folder if not exist", internalFolderPath)
 	if exist := utils.IsFolderExists(internalFolderPath); !exist {
 		if err := utils.CreateFolder(internalFolderPath); err != nil {
 			return err
 		}
 	}
 
-	folderPath := filepath.Join(projectName, ModelDir)
+	folderPath := filepath.Join(basePath, ModelDir)
+	logger.Debugf("GenerateModels - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
 		if err := utils.CreateFolder(folderPath); err != nil {
 			return err
@@ -85,10 +88,6 @@ func GenerateModel(folderPath string, table supabase.Table, rlsList supabase.Pol
 
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", table.Name, "go"))
-	absolutePath, err := utils.GetAbsolutePath(filePath)
-	if err != nil {
-		return err
-	}
 
 	// set data
 	data := GenerateModelData{
@@ -101,13 +100,15 @@ func GenerateModel(folderPath string, table supabase.Table, rlsList supabase.Pol
 	}
 
 	// setup generate input param
+	logger.Debugf("GenerateModels - create model input for model %s", table.Name)
 	input := GenerateInput{
 		BindData:     data,
 		FuncMap:      funcMaps,
 		Template:     ModelTemplate,
 		TemplateName: "modelTemplate",
-		OutputPath:   absolutePath,
+		OutputPath:   filePath,
 	}
 
+	logger.Debugf("GenerateModels - generate model to %s", input.OutputPath)
 	return generateFn(input)
 }
