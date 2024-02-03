@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -14,6 +15,7 @@ const (
 	ConfigDir      = "configs"
 	ConfigFile     = "app"
 	ConfigTemplate = `PROJECT_NAME: {{ .ProjectName }}
+PROJECT_ID: {{ .ProjectId }}
 DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
 
 ACCESS_TOKEN: {{ .AccessToken }}
@@ -33,8 +35,8 @@ VERSION: 1.0.0
 BREAKER_ENABLE: {{ .BreakerEnable }}
 
 TRACE_ENABLE: {{ .TraceEnable }}
-TRACE_COLLECTOR: {{ .TraceCollector }}
-TRACE_ENDPOINT: {{ .TraceEndpoint }}
+TRACE_COLLECTOR: {{ .TraceCollector}}
+TRACE_COLLECTOR_ENDPOINT: {{ .TraceCollectorEndpoint }}
 `
 )
 
@@ -65,5 +67,6 @@ func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateF
 		OutputPath:   filePath,
 	}
 
+	logger.Debugf("GenerateConfig - generate config to %s", input.OutputPath)
 	return generateFn(input)
 }

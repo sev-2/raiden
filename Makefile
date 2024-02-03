@@ -8,13 +8,13 @@ check-build:
 	@mkdir -p $(BUILD_DIR)
 
 build-linux:
-	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(CLI_BINARY_NAME)_linux_$(CLI_VERSION) ./cmd/cli/raiden.go
+	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(CLI_BINARY_NAME)_linux_$(CLI_VERSION) ./cmd/raiden/main.go
 
 build-windows:
-	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(CLI_BINARY_NAME)_windows_$(CLI_VERSION).exe ./cmd/cli/raiden.go
+	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(CLI_BINARY_NAME)_windows_$(CLI_VERSION).exe ./cmd/raiden/main.go
 
 build-macos:
-	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(CLI_BINARY_NAME)_macos_$(CLI_VERSION) ./cmd/cli/raiden.go
+	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(CLI_BINARY_NAME)_macos_$(CLI_VERSION) ./cmd/raiden/main.go
 
 clean:
 	go clean

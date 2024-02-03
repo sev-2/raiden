@@ -59,7 +59,7 @@ type {{ .Name }}Controller struct {
 	Result	{{ .Name }}Response
 }
 
-func (c *{{ .Name }}Controller) Get(ctx raiden.Context) raiden.Presenter {
+func (c *{{ .Name }}Controller) Get(ctx raiden.Context) error {
 	{{ .DefaultAction }}
 	return ctx.SendJson(c.Result)
 }
@@ -68,7 +68,6 @@ func (c *{{ .Name }}Controller) Get(ctx raiden.Context) raiden.Presenter {
 
 // ----- Generate controller -----
 func GenerateController(file string, data GenerateControllerData, generateFn GenerateFn) error {
-	logger.Debug("GenerateHelloWordController - create controller input")
 	input := GenerateInput{
 		BindData:     data,
 		Template:     ControllerTemplate,
@@ -81,14 +80,6 @@ func GenerateController(file string, data GenerateControllerData, generateFn Gen
 
 // ----- Generate hello word -----
 func GenerateHelloWordController(basePath string, generateFn GenerateFn) (err error) {
-	internalFolderPath := filepath.Join(basePath, "internal")
-	logger.Debugf("GenerateHelloWordController - create %s folder if not exist", internalFolderPath)
-	if exist := utils.IsFolderExists(internalFolderPath); !exist {
-		if err := utils.CreateFolder(internalFolderPath); err != nil {
-			return err
-		}
-	}
-
 	controllerPath := filepath.Join(basePath, ControllerDir)
 	logger.Debugf("GenerateHelloWordController - create %s folder if not exist", controllerPath)
 	if exist := utils.IsFolderExists(controllerPath); !exist {

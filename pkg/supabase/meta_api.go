@@ -77,3 +77,30 @@ func metaGetPolicies(ctx context.Context) (policies []Policy, err error) {
 	}
 	return marshallResponse[[]Policy]("get all policy", data, response)
 }
+
+func metaGetFunctions(ctx context.Context) (functions []Function, err error) {
+	data, response, err := getMetaApi().DefaultApi.FunctionsGet(ctx)
+	if err != nil {
+		return functions, fmt.Errorf("failed get all functions : %s", err)
+	}
+	return marshallResponse[[]Function]("get all functions", data, response)
+}
+
+func metaExecQuery(ctx context.Context, query string) (result any, err error) {
+	data, response, err := getMetaApi().DefaultApi.QueryPost(ctx, meta_api.QueryBody{
+		Query: query,
+	})
+
+	if err != nil {
+		err = fmt.Errorf("failed execute query : %v", err)
+		return
+	}
+
+	// logger.PrintJson(anyResult, true)
+	if response.StatusCode >= 400 {
+		err = fmt.Errorf("execute query got status code %v", response.StatusCode)
+		return
+	}
+
+	return data, nil
+}

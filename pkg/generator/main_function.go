@@ -82,7 +82,6 @@ func GenerateMainFunction(basePath string, config *raiden.Config, generateFn Gen
 	}
 
 	// setup generate input param
-	logger.Debug("GenerateMainFunction - create main function input")
 	input := GenerateInput{
 		BindData:     data,
 		Template:     MainFunctionTemplate,

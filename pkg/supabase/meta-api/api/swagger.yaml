@@ -492,8 +492,14 @@ paths:
   /functions/:
     get:
       responses:
-        "200":
-          description: Default Response
+        '200':
+          description: Receive functions data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/function'
     post:
       responses:
         "200":
@@ -770,9 +776,24 @@ paths:
           description: Default Response
   /query/:
     post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+               - query
+              properties:
+                query:
+                  type: string
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
   /query/format:
     post:
       responses:
@@ -3185,16 +3206,15 @@ components:
             type: string
             example: authenticated
         command:
-          $ref: '#/components/schemas/commandEnum'
+          $ref: '#/components/schemas/command_enum'
         definition:
           type: string
           nullable: true
           example: "(uid() = user_id)"
         check:
           type: string
-          nullable: true
-          
-    commandEnum:
+          nullable: true   
+    command_enum:
       type: string
       enum:
         - INSERT
@@ -3203,3 +3223,57 @@ components:
         - SELECT
         - ALL
       example: UPDATE
+    
+    function_arg:
+      type: object
+      properties:
+        mode:
+          type: string
+        name: 
+          type: string
+        type_id: 
+          type: integer
+        has_default:
+          type: boolean
+
+    function:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        schema:
+          type: string
+        name:
+          type: string
+        language:
+          type: string
+        definition:
+          type: string
+        complete_statement:
+          type: string
+        args:
+          type: array
+          items: 
+            $ref: '#/components/schemas/function_arg'
+        argument_types:
+          type: string
+        identity_argument_types:
+          type: string
+        return_type_id:
+          type: integer
+          format: int64
+        return_type:
+          type: string
+        return_type_relation_id:
+          type: integer
+          format: int64
+        is_set_returning_function:
+          type: boolean
+        behavior:
+          type: string
+        security_definer:
+          type: boolean
+        config_params:
+          type: object
+          nullable: true

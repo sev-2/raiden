@@ -20,7 +20,7 @@ type (
 		Then(httpMethod string, fn Controller) RouteHandlerFn
 	}
 
-	// chain acts as a list of http.Handler middlewares.
+	// chain acts as a list of application middlewares.
 	// chain is effectively immutable:
 	// once created, it will always hold
 	// the same set of middlewares in the same order.
@@ -69,7 +69,7 @@ func (c chain) Prepend(middlewares ...MiddlewareFn) Chain {
 // and finally, the given handler
 // (assuming every middleware calls the following one).
 func (c chain) Then(httpMethod string, controller Controller) RouteHandlerFn {
-	handler := buildHandler(httpMethod, controller)
+	handler := createHandleFunc(httpMethod, controller)
 	for i := range c.middlewares {
 		handler = c.middlewares[len(c.middlewares)-1-i](handler)
 	}
@@ -87,46 +87,46 @@ func join(a, b []MiddlewareFn) []MiddlewareFn {
 
 // extract trace id and span id from incoming request
 // and create new trace context and span context,
-// inject trace context and span context to app context
-// capture presenter and set span status
+// inject trace and span context to request context, and set span status
 func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
-	return func(ctx Context) Presenter {
+	return func(ctx Context) error {
 		if ctx.Tracer() == nil {
 			return next(ctx)
 		}
 
 		r := &ctx.RequestContext().Request
-		traceCtx, span := tracer.Extract(ctx.Context(), ctx.Tracer(), r)
+		traceCtx, span := tracer.Extract(ctx.Ctx(), ctx.Tracer(), r)
 		defer span.End()
 
-		ctx.SetContext(traceCtx)
+		ctx.SetCtx(traceCtx)
 		ctx.SetSpan(span)
 
-		presenter := next(ctx)
+		err := next(ctx)
 
 		resStatusCode := ctx.RequestContext().Response.StatusCode()
 		if resStatusCode < 200 || resStatusCode > 399 {
 			span.SetStatus(codes.Error, fasthttp.StatusMessage(resStatusCode))
-			span.RecordError(presenter.GetError())
+			span.RecordError(err)
 		} else {
 			span.SetStatus(codes.Ok, "request ok")
 		}
 
 		if resStatusCode == fasthttp.StatusServiceUnavailable {
-			Error(presenter.GetError())
+			Error(err)
 		}
-		return presenter
+
+		return err
 	}
 }
 
 // this middleware is modified version from go-zero (https://github.com/zeromicro/go-zero)
 const breakerSeparator = "://"
 
-// handler forward to handler base on request error throttle
+// Handler open / close circuit breaker base on request error throttle
 func BreakerMiddleware(path string) MiddlewareFn {
 	brk := breaker.NewBreaker(breaker.WithName(strings.Join([]string{path}, breakerSeparator)))
 	return func(next RouteHandlerFn) RouteHandlerFn {
-		return func(ctx Context) Presenter {
+		return func(ctx Context) error {
 			promise, err := brk.Allow()
 			if err != nil {
 				Errorf("[http] dropped, %s - %s - %s",
@@ -142,12 +142,10 @@ func BreakerMiddleware(path string) MiddlewareFn {
 					Message:    err.Error(),
 				}
 
-				presenter := NewJsonPresenter(&ctx.RequestContext().Response)
-				presenter.SetError(&err)
-				return presenter
+				return &err
 			}
 
-			presenter := next(ctx)
+			err = next(ctx)
 			resStatusCode := ctx.RequestContext().Response.StatusCode()
 			if resStatusCode < fasthttp.StatusInternalServerError {
 				promise.Accept()
@@ -156,7 +154,7 @@ func BreakerMiddleware(path string) MiddlewareFn {
 				promise.Reject(reason)
 			}
 
-			return presenter
+			return err
 		}
 	}
 }

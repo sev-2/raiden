@@ -1,7 +1,7 @@
 package raiden
 
 type ErrorResponse struct {
-	StatusCode int
+	StatusCode int    `json:"-"`
 	Code       string `json:"code,omitempty"`
 	Details    any    `json:"details,omitempty"`
 	Hint       string `json:"hint,omitempty"`

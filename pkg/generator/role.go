@@ -41,14 +41,6 @@ var {{ .RoleName | ToGoIdentifier }} = &postgres.Role{
 )
 
 func GenerateRoles(basePath string, roles []supabase.Role, generateFn GenerateFn) (err error) {
-	internalFolderPath := filepath.Join(basePath, "internal")
-	logger.Debugf("GenerateRoles - create %s folder if not exist", internalFolderPath)
-	if exist := utils.IsFolderExists(internalFolderPath); !exist {
-		if err := utils.CreateFolder(internalFolderPath); err != nil {
-			return err
-		}
-	}
-
 	folderPath := filepath.Join(basePath, RoleDir)
 	logger.Debugf("GenerateRoles - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -93,7 +85,6 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 	}
 
 	// set input
-	logger.Debugf("GenerateRoles - create role input for role %s", role.Name)
 	input := GenerateInput{
 		BindData:     data,
 		Template:     RoleTemplate,

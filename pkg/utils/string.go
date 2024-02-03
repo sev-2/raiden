@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"regexp"
 	"strings"
 	"unicode"
@@ -69,4 +71,41 @@ func SnakeCaseToPascalCase(s string) string {
 func ToPlural(word string) string {
 	client := pluralize.NewClient()
 	return client.Plural(word)
+}
+
+func MatchReplacer(query string, paramKey string, replacement string) string {
+	// Split the query into individual words
+	words := strings.Fields(query)
+
+	// Replace the parameter in the query, considering context
+	for i := 0; i < len(words); i++ {
+		if words[i] == paramKey {
+			// Check if there is a dot (.) before or after the parameter
+			hasDotBefore := i > 0 && strings.HasSuffix(words[i-1], ".")
+			hasDotAfter := i < len(words)-1 && strings.HasPrefix(words[i+1], ".")
+
+			// Replace only if it's not part of a longer identifier (e.g., :u.Role)
+			if !hasDotBefore && !hasDotAfter {
+				words[i] = replacement
+			}
+		}
+	}
+
+	// Join the words back into a string
+	return strings.Join(words, " ")
+}
+
+func CleanUpString(s string) string {
+	return strings.ReplaceAll(
+		strings.ReplaceAll(
+			s, "\t", "",
+		),
+		"\n", "",
+	)
+}
+
+func HashString(query string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(query))
+	return hex.EncodeToString(hasher.Sum(nil))
 }

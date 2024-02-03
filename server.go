@@ -1,6 +1,7 @@
 package raiden
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -13,8 +14,6 @@ import (
 	"github.com/sev-2/raiden/pkg/tracer"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/reuseport"
-
-	go_context "context"
 )
 
 // --- server configuration ----
@@ -22,7 +21,7 @@ type Server struct {
 	Config       *Config
 	Router       *router
 	HttpServer   *fasthttp.Server
-	ShutdownFunc []func(ctx go_context.Context) error
+	ShutdownFunc []func(ctx context.Context) error
 }
 
 func NewServer(config *Config) *Server {
@@ -41,8 +40,8 @@ func (s *Server) Use(middleware MiddlewareFn) {
 	s.Router.middlewares = append(s.Router.middlewares, middleware)
 }
 
-func (s *Server) Shutdown(ctx go_context.Context) error {
-	shutdownCtx, shutdownCancelFn := go_context.WithTimeout(ctx, 10*time.Second)
+func (s *Server) Shutdown(ctx context.Context) error {
+	shutdownCtx, shutdownCancelFn := context.WithTimeout(ctx, 10*time.Second)
 	defer shutdownCancelFn()
 
 	for _, sf := range s.ShutdownFunc {
@@ -59,7 +58,7 @@ func (s *Server) configureTracer() {
 	tracerConfig := tracer.AgentConfig{
 		Name:        s.Config.ProjectName,
 		Collector:   tracer.TraceCollector(s.Config.TraceCollector),
-		Endpoint:    s.Config.TraceEndpoint,
+		Endpoint:    s.Config.TraceCollectorEndpoint,
 		Environment: s.Config.Environment,
 		Version:     "1.0.0",
 	}
@@ -146,7 +145,7 @@ func (s *Server) Run() {
 		case err := <-lErrChan:
 			// running server close for clean up all dependency
 			Infof("%s - Clean up all dependency resource", h)
-			if errShutdown := s.Shutdown(go_context.Background()); errShutdown != nil {
+			if errShutdown := s.Shutdown(context.Background()); errShutdown != nil {
 				Warningf("%s - Server shutdown : %s", h, errShutdown)
 			}
 

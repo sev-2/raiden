@@ -30,6 +30,10 @@ func CreateFile(fullPath string, deleteIfExist bool) (*os.File, error) {
 	return os.Create(file)
 }
 
+func DeleteFile(filePath string) error {
+	return os.Remove(filePath)
+}
+
 func IsFileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	return !os.IsNotExist(err)

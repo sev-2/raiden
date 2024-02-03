@@ -16,24 +16,27 @@ const (
 )
 
 type Config struct {
-	AccessToken        string           `mapstructure:"ACCESS_TOKEN"`
-	AnonKey            string           `mapstructure:"ANON_KEY"`
-	BreakerEnable      bool             `mapstructure:"BREAKER_ENABLE"`
-	DeploymentTarget   DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
-	Environment        string           `mapstructure:"ENVIRONMENT"`
-	ProjectName        string           `mapstructure:"PROJECT_NAME"`
-	ServiceKey         string           `mapstructure:"SERVICE_KEY"`
-	ServerHost         string           `mapstructure:"SERVER_HOST"`
-	ServerPort         string           `mapstructure:"SERVER_PORT"`
-	SupabaseApiUrl     string           `mapstructure:"SUPABASE_API_URL"`
-	SupabaseApiBaseUrl string           `mapstructure:"SUPABASE_API_BASE_PATH"`
-	SupabasePublicUrl  string           `mapstructure:"SUPABASE_PUBLIC_URL"`
-	TraceEnable        bool             `mapstructure:"TRACE_ENABLE"`
-	TraceCollector     string           `mapstructure:"TRACE_COLLECTOR"`
-	TraceEndpoint      string           `mapstructure:"TRACE_ENDPOINT"`
-	Version            string           `mapstructure:"VERSION"`
+	AccessToken            string           `mapstructure:"ACCESS_TOKEN"`
+	AnonKey                string           `mapstructure:"ANON_KEY"`
+	BreakerEnable          bool             `mapstructure:"BREAKER_ENABLE"`
+	DeploymentTarget       DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
+	Environment            string           `mapstructure:"ENVIRONMENT"`
+	ProjectId              string           `mapstructure:"PROJECT_ID"`
+	ProjectName            string           `mapstructure:"PROJECT_NAME"`
+	ServiceKey             string           `mapstructure:"SERVICE_KEY"`
+	ServerHost             string           `mapstructure:"SERVER_HOST"`
+	ServerPort             string           `mapstructure:"SERVER_PORT"`
+	SupabaseApiUrl         string           `mapstructure:"SUPABASE_API_URL"`
+	SupabaseApiBaseUrl     string           `mapstructure:"SUPABASE_API_BASE_PATH"`
+	SupabasePublicUrl      string           `mapstructure:"SUPABASE_PUBLIC_URL"`
+	TraceEnable            bool             `mapstructure:"TRACE_ENABLE"`
+	TraceCollector         string           `mapstructure:"TRACE_COLLECTOR"`
+	TraceCollectorEndpoint string           `mapstructure:"TRACE_COLLECTOR_ENDPOINT"`
+	Version                string           `mapstructure:"VERSION"`
 }
 
+// The function `LoadConfig` loads a configuration file based on the provided path or uses default
+// values if no path is provided.
 func LoadConfig(path *string) (*Config, error) {
 	if path != nil && *path != "" {
 		folderPath := filepath.Dir(*path)
@@ -61,7 +64,6 @@ func LoadConfig(path *string) (*Config, error) {
 	}
 
 	// set default value
-
 	if config.ServerHost == "" {
 		config.ServerHost = "127.0.0.1"
 	}

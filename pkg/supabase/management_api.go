@@ -18,6 +18,7 @@ type (
 	Project       management_api.ProjectResponse
 	Organization  management_api.OrganizationResponseV1
 	Organizations []management_api.OrganizationResponseV1
+	ApiKeys       []management_api.ApiKeyResponse
 )
 
 var (
@@ -87,6 +88,22 @@ func ConfigureManagementApi(url, token string) {
 	accessToken = token
 }
 
+func GetProjectKeys(projectId string) (keys ApiKeys, err error) {
+	keys, response, err := getManagementApi().ProjectsApi.GetProjectApiKeys(context.Background(), projectId)
+	if err != nil {
+		err = fmt.Errorf("failed get project keys : %v", err)
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		err = fmt.Errorf("get project keys got status code %v", response.StatusCode)
+		return
+	}
+
+	return keys, nil
+
+}
+
 func FindProject(projectName string) (project Project, err error) {
 	projects, response, err := getManagementApi().ProjectsApi.GetProjects(context.Background())
 	if err != nil {
@@ -145,17 +162,17 @@ func GetOrganizations() (Organizations, error) {
 	return organizations, nil
 }
 
-func getTables(projectId string, includeColumn bool) (tables []Table, err error) {
+func getTables(ctx context.Context, projectId string, includeColumn bool) (tables []Table, err error) {
 	query, err := meta_sql.GenerateTablesQuery(DefaultIncludedSchema, includeColumn)
 	if err != nil {
 		err = fmt.Errorf("failed generate query get table for project id %s : %v", projectId, err)
 		return
 	}
 
-	return executeQuery[[]Table](projectId, "get tables", query, nil)
+	return executeQuery[[]Table](ctx, projectId, "get tables", query, nil)
 }
 
-func getRoles(projectId string) (roles []Role, err error) {
+func getRoles(ctx context.Context, projectId string) (roles []Role, err error) {
 	findConfigFn := func(role any) []any {
 		if roleMap, isMapAny := role.(map[string]any); isMapAny {
 			if configValue, exist := roleMap["config"]; exist {
@@ -195,15 +212,19 @@ func getRoles(projectId string) (roles []Role, err error) {
 		}
 		return result
 	}
-	return executeQuery[[]Role](projectId, "get roles", meta_sql.GetRolesQuery, resultDecoratorFn)
+	return executeQuery[[]Role](ctx, projectId, "get roles", meta_sql.GetRolesQuery, resultDecoratorFn)
 }
 
-func getPolicies(projectId string) (policies []Policy, err error) {
-	return executeQuery[[]Policy](projectId, "get policies", meta_sql.GetPoliciesQuery, nil)
+func getPolicies(ctx context.Context, projectId string) (policies []Policy, err error) {
+	return executeQuery[[]Policy](ctx, projectId, "get policies", meta_sql.GetPoliciesQuery, nil)
 }
 
-func executeQuery[T any](projectId, action, query string, resultDecorator func(response any) any) (result T, err error) {
-	anyResult, response, err := getManagementApi().ProjectsBetaApi.V1RunQuery(context.Background(), management_api.RunQueryBody{
+func getFunctions(ctx context.Context, projectId string) (functions []Function, err error) {
+	return executeQuery[[]Function](ctx, projectId, "get functions", meta_sql.GetFunctionsQuery, nil)
+}
+
+func executeQuery[T any](ctx context.Context, projectId, action, query string, resultDecorator func(response any) any) (result T, err error) {
+	anyResult, response, err := getManagementApi().ProjectsBetaApi.V1RunQuery(ctx, management_api.RunQueryBody{
 		Query: query,
 	}, projectId)
 
@@ -216,7 +237,6 @@ func executeQuery[T any](projectId, action, query string, resultDecorator func(r
 		anyResult = resultDecorator(anyResult)
 	}
 
-	// logger.PrintJson(anyResult, true)
 	if response.StatusCode != http.StatusCreated {
 		err = fmt.Errorf("%s for project id %s got status code %v", action, projectId, response.StatusCode)
 		return

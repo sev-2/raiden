@@ -40,3 +40,33 @@ func ToGoType(pgType string, isNullable bool) (goType string) {
 
 	return
 }
+
+func ToPostgresType(goType string) (pgType string) {
+	// Map Go types to PostgreSQL types
+	switch goType {
+	case "int64":
+		pgType = "bigint"
+	case "int32", "int":
+		pgType = "integer"
+	case "int16":
+		pgType = "smallint"
+	case "float32":
+		pgType = "real"
+	case "float64":
+		pgType = "double precision"
+	case "bool":
+		pgType = "boolean"
+	case "string":
+		pgType = "text"
+	case "time.Time":
+		pgType = "timestamp with time zone"
+	case "uuid.UUID":
+		pgType = "uuid"
+	case "json.RawMessage":
+		pgType = "jsonb"
+	default:
+		pgType = "varchar"
+	}
+
+	return
+}

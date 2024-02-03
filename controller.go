@@ -13,47 +13,66 @@ import (
 )
 
 type (
-	// controller contract and capabilities
-	// executed order
-	// Before{HttpMethod} -> HttpMethod -> After{HttpMethod}
+	// The `Controller` interface defines a set of methods that a controller in the Raiden framework
+	// should implement. These methods correspond to different HTTP methods (GET, POST, PUT, PATCH,
+	// DELETE, OPTIONS, HEAD) and are used to handle incoming requests and generate responses. Each method
+	// has a "Before" and "After" counterpart, which can be used to perform pre-processing and
+	// post-processing tasks respectively.
 	Controller interface {
+		BeforeAll(ctx Context) error
+		AfterAll(ctx Context) error
+
 		AfterGet(ctx Context) error
 		BeforeGet(ctx Context) error
-		Get(ctx Context) Presenter
+		Get(ctx Context) error
 
 		AfterPost(ctx Context) error
 		BeforePost(ctx Context) error
-		Post(ctx Context) Presenter
+		Post(ctx Context) error
 
 		AfterPut(ctx Context) error
 		BeforePut(ctx Context) error
-		Put(ctx Context) Presenter
+		Put(ctx Context) error
 
 		AfterPatch(ctx Context) error
 		BeforePatch(ctx Context) error
-		Patch(ctx Context) Presenter
+		Patch(ctx Context) error
 
 		AfterDelete(ctx Context) error
 		BeforeDelete(ctx Context) error
-		Delete(ctx Context) Presenter
+		Delete(ctx Context) error
 
 		AfterOptions(ctx Context) error
 		BeforeOptions(ctx Context) error
-		Options(ctx Context) Presenter
+		Options(ctx Context) error
 
 		AfterHead(ctx Context) error
 		BeforeHead(ctx Context) error
-		Head(ctx Context) Presenter
+		Head(ctx Context) error
 	}
+
+	// The `ControllerBase` struct is a base struct that implements the `Controller` interface. It
+	// provides default implementations for all the methods defined in the interface. These default
+	// implementations return a `NotImplemented` error, indicating that the corresponding handler method
+	// is not implemented in the actual controller. The actual controller can embed the `ControllerBase`
+	// struct and override the methods as needed.
 	ControllerBase struct{}
 )
+
+func (*ControllerBase) BeforeAll(ctx Context) error {
+	return nil
+}
+
+func (*ControllerBase) AfterAll(ctx Context) error {
+	return nil
+}
 
 func (*ControllerBase) BeforeGet(ctx Context) error {
 	return nil
 }
 
-func (*ControllerBase) Get(ctx Context) Presenter {
-	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+func (*ControllerBase) Get(ctx Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
 func (*ControllerBase) AfterGet(ctx Context) error {
@@ -64,8 +83,8 @@ func (*ControllerBase) BeforePost(ctx Context) error {
 	return nil
 }
 
-func (*ControllerBase) Post(ctx Context) Presenter {
-	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+func (*ControllerBase) Post(ctx Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
 func (*ControllerBase) AfterPost(ctx Context) error {
@@ -76,8 +95,8 @@ func (*ControllerBase) BeforePut(ctx Context) error {
 	return nil
 }
 
-func (*ControllerBase) Put(ctx Context) Presenter {
-	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+func (*ControllerBase) Put(ctx Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
 func (*ControllerBase) AfterPut(ctx Context) error {
@@ -88,8 +107,8 @@ func (*ControllerBase) BeforePatch(ctx Context) error {
 	return nil
 }
 
-func (*ControllerBase) Patch(ctx Context) Presenter {
-	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+func (*ControllerBase) Patch(ctx Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
 func (*ControllerBase) AfterPatch(ctx Context) error {
@@ -100,8 +119,8 @@ func (*ControllerBase) BeforeDelete(ctx Context) error {
 	return nil
 }
 
-func (*ControllerBase) Delete(ctx Context) Presenter {
-	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+func (*ControllerBase) Delete(ctx Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
 func (*ControllerBase) AfterDelete(ctx Context) error {
@@ -112,8 +131,8 @@ func (*ControllerBase) BeforeOptions(ctx Context) error {
 	return nil
 }
 
-func (*ControllerBase) Options(ctx Context) Presenter {
-	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+func (*ControllerBase) Options(ctx Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
 func (*ControllerBase) AfterOptions(ctx Context) error {
@@ -124,8 +143,8 @@ func (*ControllerBase) BeforeHead(ctx Context) error {
 	return nil
 }
 
-func (*ControllerBase) Head(ctx Context) Presenter {
-	return ctx.SendJsonErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
+func (*ControllerBase) Head(ctx Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusNotImplemented, errors.New("handler not implemented"))
 }
 
 func (*ControllerBase) AfterHead(ctx Context) error {
@@ -204,16 +223,18 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 		}
 	}
 
+	// validate marshalled payload
 	if err := Validate(payloadPtr); err != nil {
 		return err
 	}
 
+	// set value to controller payload
 	filedValue := controllerValue.FieldByName("Payload")
 	filedValue.Set(reflect.ValueOf(payloadPtr))
 	return nil
 }
 
-// set value to reflect value field
+// The function `setPayloadValue` sets the value of a field in a struct based on its type.
 func setPayloadValue(fieldValue reflect.Value, value string) error {
 	switch fieldValue.Kind() {
 	case reflect.String:
@@ -231,7 +252,7 @@ func setPayloadValue(fieldValue reflect.Value, value string) error {
 	return nil
 }
 
-// ----- Handlers -----
+// ----- Native Handlers -----
 
 type HealthRequest struct{}
 type HealthResponse struct {
@@ -243,7 +264,7 @@ type HealthController struct {
 	Result  HealthResponse
 }
 
-func (c *HealthController) Get(ctx Context) Presenter {
+func (c *HealthController) Get(ctx Context) error {
 	responseData := map[string]any{
 		"message": "server up",
 	}
