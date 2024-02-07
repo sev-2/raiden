@@ -44,7 +44,7 @@ var (
 	RelationTypeManyToMany RelationType = "manyToMany"
 )
 
-func MarshalColumnTag(tag string) ColumnTag {
+func UnmarshalColumnTag(tag string) ColumnTag {
 	columnTag := ColumnTag{
 		Nullable: true,
 	}
@@ -85,7 +85,7 @@ func MarshalColumnTag(tag string) ColumnTag {
 	return columnTag
 }
 
-func MarshallJoinTag(tag string) JoinTag {
+func UnmarshalJoinTag(tag string) JoinTag {
 	joinTag := JoinTag{}
 
 	// Regular expression to match key-value pairs

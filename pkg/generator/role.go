@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"text/template"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -13,9 +14,11 @@ import (
 
 // ----- Define type, variable and constant -----
 type GenerateRoleData struct {
-	Imports  []string
-	Package  string
-	RoleName string
+	Imports       []string
+	Package       string
+	RoleName      string
+	MetadataTag   string
+	PermissionTag string
 }
 
 const (
@@ -31,7 +34,8 @@ import (
 {{- end }}
 
 type {{ .RoleName | ToGoIdentifier }} struct {
-	postgres.Role
+	Metadata string ` + "`{{ .MetadataTag }}`" + `
+	Permission string ` + "`{{ .PermissionTag }}`" + `
 }
 `
 )
@@ -64,15 +68,32 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", role.Name, "go"))
 
 	// set imports path
-	imports := []string{
-		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/postgres"),
+	imports := []string{}
+
+	// set tag
+	metaTag := raiden.RoleMetadataTag{
+		Name:              role.Name,
+		Config:            role.Config,
+		ConnectionLimit:   role.ConnectionLimit,
+		InheritRole:       role.InheritRole,
+		IsReplicationRole: role.IsReplicationRole,
+		IsSuperuser:       role.IsSuperuser,
+	}
+
+	permissionTag := raiden.RolePermissionTag{
+		CanBypassRls:  role.CanBypassRLS,
+		CanCreateDB:   role.CanCreateDB,
+		CanCreateRole: role.CanCreateRole,
+		CanLogin:      role.CanLogin,
 	}
 
 	// execute the template and write to the file
 	data := GenerateRoleData{
-		Package:  "roles",
-		Imports:  imports,
-		RoleName: role.Name,
+		Package:       "roles",
+		Imports:       imports,
+		RoleName:      role.Name,
+		MetadataTag:   raiden.MarshalRoleMetadataTag(&metaTag),
+		PermissionTag: raiden.MarshalRolePermissionTag(&permissionTag),
 	}
 
 	// set input

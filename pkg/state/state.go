@@ -2,8 +2,12 @@ package state
 
 import (
 	"encoding/gob"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/sev-2/raiden/pkg/logger"
@@ -11,35 +15,53 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var StateFileDir = "build"
-var StateFileName = "state"
+type (
+	State struct {
+		Tables   []TableState
+		Roles    []RoleState
+		RpcState []RpcState
+	}
 
-type State struct {
-	Tables   []TableState
-	Roles    []RoleState
-	RpcState []RpcState
-}
+	TableState struct {
+		Table       supabase.Table
+		ModelPath   string
+		ModelStruct string
+		LastUpdate  time.Time
+	}
 
-type TableState struct {
-	Table       supabase.Table
-	ModelPath   string
-	ModelStruct string
-	LastUpdate  time.Time
-}
+	RoleState struct {
+		Role       supabase.Role
+		RolePath   string
+		RoleStruct string
+		IsNative   bool
+		LastUpdate time.Time
+	}
 
-type RoleState struct {
-	Role       supabase.Role
-	RolePath   string
-	RoleStruct string
-	LastUpdate time.Time
-}
+	RpcState struct {
+		Function   supabase.Function
+		RpcPath    string
+		RpcStruct  string
+		LastUpdate time.Time
+	}
 
-type RpcState struct {
-	Function   supabase.Function
-	RpcPath    string
-	RpcStruct  string
-	LastUpdate time.Time
-}
+	CompareDiffType     string
+	CompareDiffCategory string
+
+	CompareDiffResult struct {
+		Name             string
+		Category         CompareDiffCategory
+		SupabaseResource any
+		AppResource      any
+	}
+)
+
+var (
+	CompareDiffCategoryConflict      CompareDiffCategory = "conflict"
+	CompareDiffCategoryCloudNofFound CompareDiffCategory = "cloud-not-found"
+	CompareDiffCategoryAppNotFound   CompareDiffCategory = "app-not-found"
+	StateFileDir                                         = "build"
+	StateFileName                                        = "state"
+)
 
 func Save(state *State) error {
 	curDir, err := utils.GetCurrentDirectory()
@@ -96,4 +118,48 @@ func createOrLoadFile(filePath string) (file *os.File, err error) {
 		return os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	}
 	return os.Create(filePath)
+}
+
+func loadFiles(paths []string) (mainFset *token.FileSet, astFiles []*ast.File, err error) {
+	type loadResult struct {
+		Ast  *ast.File
+		Err  error
+		Fset *token.FileSet
+	}
+
+	loadChan := make(chan *loadResult)
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(paths))
+
+	go func() {
+		wg.Wait()
+		close(loadChan)
+	}()
+
+	for _, path := range paths {
+		go func(w *sync.WaitGroup, p string, lChan chan *loadResult) {
+			defer w.Done()
+			fset := token.NewFileSet()
+			file, err := parser.ParseFile(fset, p, nil, parser.ParseComments)
+			if err != nil {
+				lChan <- &loadResult{Err: err}
+			} else {
+				lChan <- &loadResult{Ast: file, Fset: fset, Err: nil}
+			}
+		}(&wg, path, loadChan)
+	}
+
+	for rs := range loadChan {
+		if rs.Err != nil {
+			return nil, nil, err
+		}
+		if mainFset == nil {
+			mainFset = rs.Fset
+		}
+
+		astFiles = append(astFiles, rs.Ast)
+	}
+
+	return
 }

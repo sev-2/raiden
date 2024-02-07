@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -118,4 +119,40 @@ func HashByte(queryByte []byte) string {
 func RemoveParenthesesContent(input string) string {
 	re := regexp.MustCompile(`\([^)]*\)`)
 	return re.ReplaceAllString(input, "")
+}
+
+func ToCamelCase(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+
+	// Convert first character to lowercase
+	camel := strings.ToLower(string(s[0]))
+
+	// Convert subsequent uppercase characters to lowercase preceded by an underscore
+	for _, r := range s[1:] {
+		if unicode.IsUpper(r) {
+			camel += "_" + strings.ToLower(string(r))
+		} else {
+			camel += string(r)
+		}
+	}
+
+	return camel
+}
+
+func ParseTag(rawTag string) map[string]string {
+	tagMap := make(map[string]string)
+	for _, t := range strings.Split(rawTag, " ") {
+		splitTag := strings.SplitN(t, ":", 2)
+		if len(splitTag) == 2 {
+			tagMap[splitTag[0]] = strings.Trim(splitTag[1], "\"")
+		}
+	}
+	return tagMap
+}
+
+func ParseBool(str string) bool {
+	val, _ := strconv.ParseBool(str)
+	return val
 }

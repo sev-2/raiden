@@ -10,7 +10,7 @@ import (
 func TestMarshallColumnTag(t *testing.T) {
 	tag := "name:name;type:varchar(10);nullable"
 
-	column := raiden.MarshalColumnTag(tag)
+	column := raiden.UnmarshalColumnTag(tag)
 
 	assert.Equal(t, "name", column.Name)
 	assert.Equal(t, "varchar(10)", column.Type)

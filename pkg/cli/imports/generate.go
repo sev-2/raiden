@@ -12,14 +12,13 @@ import (
 
 // The `generateResource` function generates various resources such as table, roles, policy and etc
 // also generate framework resource like controller, route, main function and etc
-func generateResource(config *raiden.Config, projectPath string, resource *Resource) error {
+func generateResource(config *raiden.Config, importState *ImportState, projectPath string, resource *Resource) error {
 	if err := generator.CreateInternalFolder(projectPath); err != nil {
 		return err
 	}
 
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan error), make(chan any)
-
-	doneListen := ListenStateResource(stateChan)
+	doneListen := ListenStateResource(importState, stateChan)
 
 	// generate all model from cloud / pg-meta
 	if len(resource.Tables) > 0 {

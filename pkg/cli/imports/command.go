@@ -10,7 +10,7 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/generator"
-	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/postgres/roles"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/spf13/cobra"
@@ -33,9 +33,6 @@ type ManyToManyTable struct {
 	ForeignKey string
 }
 
-// The `Bind` function is a method of the `Flags` struct. It takes a `cmd` parameter of type
-// `*cobra.Command`, which represents a command in the Cobra library for building command-line
-// applications.
 func (f *Flags) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "import rpc only")
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
@@ -56,42 +53,62 @@ func PreRun(projectPath string) error {
 }
 
 func Run(flags *Flags, config *raiden.Config, projectPath string) error {
+	// configure supabase adapter
 	if config.DeploymentTarget == raiden.DeploymentTargetCloud {
 		supabase.ConfigureManagementApi(config.SupabaseApiUrl, config.AccessToken)
 	} else {
 		supabase.ConfigurationMetaApi(config.SupabaseApiUrl, config.SupabaseApiBaseUrl)
 	}
 
-	// load supabase tables
+	// load map native role
+	mapNativeRole, err := loadMapNativeRole()
+	if err != nil {
+		return err
+	}
+
+	// load supabase resource
 	resource, err := Load(flags, config.ProjectId)
 	if err != nil {
 		return err
 	}
+
+	// filter table for with allowed schema
 	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	resource.Roles = filterUserRoleAndBindNativeRole(resource.Roles, mapNativeRole)
 
-	// load app tables
-	appTables, err := loadAppTables()
+	// load app resource
+	appTables, appRoles, err := loadAppResource(flags)
 	if err != nil {
 		return err
 	}
 
-	// compare table
-	diffResult, err := state.CompareTables(resource.Tables, appTables)
-	if err != nil {
-		return err
-	}
-
-	if len(diffResult) > 0 {
-		for i := range diffResult {
-			d := diffResult[i]
-			logger.Debug("[pkg.cli.imports] ", d.Name)
-			printDiff(d.SupabaseResource, d.AppResource, d.Name)
+	// compare
+	if (flags.LoadAll() || flags.ModelsOnly) && len(appTables) > 0 {
+		if err := compareTable(resource.Tables, appTables); err != nil {
+			return err
 		}
-		return errors.New("canceled import resource process, you have conflict table. please fix it first")
+	}
+
+	if (flags.LoadAll() || flags.RolesOnly) && len(appRoles) > 0 {
+		if err := compareRoles(resource.Roles, appRoles); err != nil {
+			return err
+		}
+	}
+
+	// create import state
+	nativeStateRoles, err := createNativeRoleState(mapNativeRole)
+	if err != nil {
+		return err
+	}
+
+	importState := ImportState{
+		State: state.State{
+			Roles: nativeStateRoles,
+		},
 	}
 
 	// generate resource
-	return generateResource(config, projectPath, resource)
+	return generateResource(config, &importState, projectPath, resource)
 }
 
 func filterTableBySchema(input []supabase.Table, allowedSchema ...string) (output []supabase.Table) {
@@ -116,17 +133,7 @@ func filterTableBySchema(input []supabase.Table, allowedSchema ...string) (outpu
 	return
 }
 
-func loadAppTables() (appTable []supabase.Table, err error) {
-	// load app table
-	latestState, err := state.Load()
-	if err != nil {
-		return appTable, err
-	}
-
-	return state.ToSupabaseTable(latestState.Tables)
-}
-
-func printDiff(supabaseResource, appResource interface{}, prefix string) {
+func printDiff(resource string, supabaseResource, appResource interface{}, prefix string) {
 	spValue := reflect.ValueOf(supabaseResource)
 	appValue := reflect.ValueOf(appResource)
 
@@ -135,7 +142,7 @@ func printDiff(supabaseResource, appResource interface{}, prefix string) {
 		fieldApp := appValue.Field(i)
 
 		if fieldSupabase.Kind() == reflect.Struct {
-			printDiff(fieldSupabase.Interface(), fieldApp.Interface(), fmt.Sprintf("%s.%s", prefix, fieldSupabase.Type().Field(i).Name))
+			printDiff(resource, fieldSupabase.Interface(), fieldApp.Interface(), fmt.Sprintf("%s.%s", prefix, fieldSupabase.Type().Field(i).Name))
 			continue
 		}
 
@@ -155,22 +162,11 @@ func printDiff(supabaseResource, appResource interface{}, prefix string) {
 						diffStringArr = append(diffStringArr, fmt.Sprintf("%s=%v", field.Name, fieldValue.Interface()))
 					}
 					diffString := strings.Join(diffStringArr, " ")
-					printDiffDetail(prefix, spValue.Type().Field(i).Name, diffString, "not configure in app")
+					printDiffDetail(resource, prefix, spValue.Type().Field(i).Name, diffString, "not configure in app")
 				}
 
 				appFieldValue := fieldApp.Index(j).Interface()
-				// var appFieldValue any
-				// if fieldApp.Len()-1 > j {
-				// 	fieldApp.Index(j).Interface()
-				// }
-
-				// if appFieldValue == nil {
-				// 	logger.Info("%+v", spFieldValue)
-				// 	printDiffDetail(prefix, spValue.Type().Field(i).Name, "ok", "not configure in app")
-				// 	continue
-				// }
-
-				printDiff(spFieldValue, appFieldValue, fmt.Sprintf("%s.%s[%s]", prefix, spValue.Type().Field(i).Name, fieldIdentifier))
+				printDiff(resource, spFieldValue, appFieldValue, fmt.Sprintf("%s.%s[%s]", prefix, spValue.Type().Field(i).Name, fieldIdentifier))
 			}
 			continue
 		}
@@ -187,18 +183,80 @@ func printDiff(supabaseResource, appResource interface{}, prefix string) {
 
 		spCompareStr, appCompateStr := fmt.Sprintf("%v", fieldSupabaseValue), fmt.Sprintf("%v", fieldAppValue)
 		if spCompareStr != appCompateStr {
-			printDiffDetail(prefix, spValue.Type().Field(i).Name, spCompareStr, appCompateStr)
+			printDiffDetail(resource, prefix, spValue.Type().Field(i).Name, spCompareStr, appCompateStr)
 		}
 	}
 }
 
-func printDiffDetail(prefix string, attribute string, spValue, appValue string) {
+func printDiffDetail(resource, prefix string, attribute string, spValue, appValue string) {
 	print := color.New(color.FgHiBlack).PrintfFunc()
-	print("*** Found different in %s.%s \n", prefix, attribute)
+	print("*** Found different %s in %s.%s \n", resource, prefix, attribute)
 	print = color.New(color.FgGreen).PrintfFunc()
 	print("// Supabase : %s = %s\n", attribute, spValue)
 	print = color.New(color.FgRed).PrintfFunc()
 	print("// App : %s = %s \n", attribute, appValue)
 	print = color.New(color.FgHiBlack).PrintfFunc()
 	print("*** End different \n")
+}
+
+func compareTable(supabaseTable []supabase.Table, appTable []supabase.Table) error {
+	diffResult, err := state.CompareTables(supabaseTable, appTable)
+	if err != nil {
+		return err
+	}
+
+	if len(diffResult) > 0 {
+		for i := range diffResult {
+			d := diffResult[i]
+			printDiff("table", d.SupabaseResource, d.AppResource, d.Name)
+		}
+		return errors.New("import tables is canceled, you have conflict table. please fix it first")
+	}
+
+	return nil
+}
+
+func compareRoles(supabaseRoles []supabase.Role, appRoles []supabase.Role) error {
+	diffResult, err := state.CompareRoles(supabaseRoles, appRoles)
+	if err != nil {
+		return err
+	}
+
+	if len(diffResult) > 0 {
+		for i := range diffResult {
+			d := diffResult[i]
+			printDiff("role", d.SupabaseResource, d.AppResource, d.Name)
+		}
+		return errors.New("import roles is canceled, you have conflict role. please fix it first")
+	}
+
+	return nil
+}
+
+func loadMapNativeRole() (map[string]any, error) {
+	mapRole := make(map[string]any)
+	for _, r := range roles.NativeRoles {
+		role, err := raiden.UnmarshalRole(r)
+		if err != nil {
+			return nil, err
+		}
+		mapRole[role.Name] = &role
+	}
+
+	return mapRole, nil
+}
+
+func filterUserRoleAndBindNativeRole(roles []supabase.Role, mapNativeRole map[string]any) (userRole []supabase.Role) {
+	for i := range roles {
+		r := roles[i]
+		if nr, isExist := mapNativeRole[r.Name]; !isExist {
+			userRole = append(userRole, r)
+		} else {
+			if rl, isRole := nr.(*raiden.Role); isRole {
+				rl.ID = r.ID
+				rl.ValidUntil = r.ValidUntil
+			}
+		}
+	}
+	return
 }

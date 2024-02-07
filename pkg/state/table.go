@@ -5,39 +5,24 @@ import (
 	"fmt"
 	"go/ast"
 	"go/importer"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"strings"
-	"sync"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-type (
-	CompareDiffType     string
-	CompareDiffCategory string
-
-	CompareDiffResult struct {
-		Name             string
-		Category         CompareDiffCategory
-		SupabaseResource any
-		AppResource      any
+func ToTables(tableStates []TableState) (tables []supabase.Table, err error) {
+	var paths []string
+	for i := range tableStates {
+		t := tableStates[i]
+		paths = append(paths, t.ModelPath)
 	}
-)
 
-var (
-	CompareDiffCategoryConflict      CompareDiffCategory = "conflict"
-	CompareDiffCategoryCloudNofFound CompareDiffCategory = "cloud-not-found"
-	CompareDiffCategoryAppNotFound   CompareDiffCategory = "app-not-found"
-)
-
-func ToSupabaseTable(tableStates []TableState) (tables []supabase.Table, err error) {
-	fset, astFiles, err := loadAllFile(tableStates)
+	fset, astFiles, err := loadFiles(paths)
 	if err != nil {
 		return tables, err
 	}
@@ -57,52 +42,6 @@ func ToSupabaseTable(tableStates []TableState) (tables []supabase.Table, err err
 			return tables, err
 		}
 		tables = append(tables, tb)
-	}
-
-	return
-}
-
-func loadAllFile(tableStates []TableState) (mainFset *token.FileSet, astFiles []*ast.File, err error) {
-	type loadResult struct {
-		Ast        *ast.File
-		Err        error
-		Fset       *token.FileSet
-		StructName string
-	}
-
-	loadChan := make(chan *loadResult)
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(tableStates))
-
-	go func() {
-		wg.Wait()
-		close(loadChan)
-	}()
-
-	for i := range tableStates {
-		s := tableStates[i]
-		go func(w *sync.WaitGroup, state *TableState, lChan chan *loadResult) {
-			defer w.Done()
-			fset := token.NewFileSet()
-			file, err := parser.ParseFile(fset, state.ModelPath, nil, parser.ParseComments)
-			if err != nil {
-				lChan <- &loadResult{Err: err}
-			} else {
-				lChan <- &loadResult{Ast: file, StructName: state.ModelStruct, Fset: fset, Err: nil}
-			}
-		}(&wg, &s, loadChan)
-	}
-
-	for rs := range loadChan {
-		if rs.Err != nil {
-			return nil, nil, err
-		}
-		if mainFset == nil {
-			mainFset = rs.Fset
-		}
-
-		astFiles = append(astFiles, rs.Ast)
 	}
 
 	return
@@ -221,7 +160,7 @@ func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.
 }
 
 func buildColumn(fieldName string, mapColumn map[string]supabase.Column, columnTag string) (column supabase.Column) {
-	ct := raiden.MarshalColumnTag(columnTag)
+	ct := raiden.UnmarshalColumnTag(columnTag)
 
 	if ct.Name == "" {
 		ct.Name = utils.ToSnakeCase(fieldName)
@@ -252,7 +191,7 @@ func buildColumn(fieldName string, mapColumn map[string]supabase.Column, columnT
 }
 
 func buildRelation(tableName, fieldName, schema string, mapRelations map[string]supabase.TablesRelationship, joinTag string) (relation supabase.TablesRelationship) {
-	jt := raiden.MarshallJoinTag(joinTag)
+	jt := raiden.UnmarshalJoinTag(joinTag)
 	sourceTable, targetTable := utils.ToSnakeCase(fieldName), utils.ToSnakeCase(tableName)
 
 	var sourceTableName, targetTableName, primaryKey, foreignKey string
@@ -309,7 +248,6 @@ func CompareTables(supabaseTable []supabase.Table, appTable []supabase.Table) (d
 	mapAppTable := make(map[int]supabase.Table)
 	for i := range appTable {
 		t := appTable[i]
-		logger.Debug("[pkg.state.table] app table id : ", t.ID)
 		mapAppTable[t.ID] = t
 	}
 
@@ -317,13 +255,18 @@ func CompareTables(supabaseTable []supabase.Table, appTable []supabase.Table) (d
 		t := supabaseTable[i]
 
 		appTable, isExist := mapAppTable[t.ID]
-		logger.Debug("[pkg.state.table] supabase check id : ", t.ID, " is exist : ", isExist)
 		if isExist {
 			spByte, err := json.Marshal(t)
 			if err != nil {
 				return diffResult, err
 			}
 			spHash := utils.HashByte(spByte)
+
+			// make sure set default to empty array
+			// because default value from response is empty array
+			if appTable.Relationships == nil {
+				appTable.Relationships = make([]supabase.TablesRelationship, 0)
+			}
 
 			appByte, err := json.Marshal(appTable)
 			if err != nil {
