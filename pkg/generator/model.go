@@ -6,34 +6,61 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-// ----- Define type, van and constant -----
-type Rls struct {
-	CanWrite []string
-	CanRead  []string
-}
+// ----- Define type, variable and constant -----
+type (
+	Rls struct {
+		CanWrite []string
+		CanRead  []string
+	}
 
-type Relation struct {
-	Table        string
-	Type         string
-	SourceColumn string
-	TargetColumn string
-}
+	Relation struct {
+		Table        string
+		Type         string
+		RelationType raiden.RelationType
+		PrimaryKey   string
+		ForeignKey   string
+		Tag          string
+		*JoinRelation
+	}
 
-type GenerateModelData struct {
-	Columns    []map[string]any
-	Imports    []string
-	Package    string
-	Relations  []Relation
-	RlsTag     string
-	StructName string
-	Schema     string
-}
+	JoinRelation struct {
+		SourcePrimaryKey      string
+		JoinsSourceForeignKey string
+
+		TargetPrimaryKey     string
+		JoinTargetForeignKey string
+
+		Through string
+	}
+
+	GenerateModelColumn struct {
+		Name string
+		Type string
+		Tag  string
+	}
+
+	GenerateModelData struct {
+		Columns    []GenerateModelColumn
+		Imports    []string
+		Package    string
+		Relations  []Relation
+		RlsTag     string
+		StructName string
+		Schema     string
+	}
+
+	GenerateModelInput struct {
+		Table     supabase.Table
+		Relations []Relation
+	}
+)
 
 const (
 	ModelDir      = "internal/models"
@@ -49,7 +76,7 @@ import (
 
 type {{ .StructName }} struct {
 {{- range .Columns }}
-	{{ .Name | ToGoIdentifier }} {{ .GoType }} ` + "`json:\"{{ .Name | ToSnakeCase }},omitempty\" column:\"{{ .Name | ToSnakeCase }}\"`" + `
+	{{ .Name | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
 {{- end }}
 
 	// Table information
@@ -63,13 +90,13 @@ type {{ .StructName }} struct {
 	// Relations
 {{- end }}
 {{- range .Relations }}
-	{{ .Table | ToGoIdentifier }} {{ .Type }} ` + "`json:\"{{ .Table | ToSnakeCase }},omitempty\" sourceColumn:\"{{ .SourceColumn }}\" targetColumn:\"{{ .TargetColumn }}\"`" + `
+	{{ .Table | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
 {{- end }}
 }
 `
 )
 
-func GenerateModels(basePath string, tables []supabase.Table, rlsList supabase.Policies, generateFn GenerateFn) (err error) {
+func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList supabase.Policies, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, ModelDir)
 	logger.Debugf("GenerateModels - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -79,44 +106,40 @@ func GenerateModels(basePath string, tables []supabase.Table, rlsList supabase.P
 	}
 
 	for i, v := range tables {
-		searchTable := tables[i].Name
+		searchTable := tables[i].Table.Name
 		GenerateModel(folderPath, v, rlsList.FilterByTable(searchTable), generateFn)
 	}
 
 	return nil
 }
 
-func GenerateModel(folderPath string, table supabase.Table, rlsList supabase.Policies, generateFn GenerateFn) error {
+func GenerateModel(folderPath string, input *GenerateModelInput, rlsList supabase.Policies, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
-		{"ToGoType": postgres.ToGoType},
 		{"ToSnakeCase": utils.ToSnakeCase},
 	}
 
 	// map column data
-	columns, importsPath := mapTableAttributes(table)
+	columns, importsPath := mapTableAttributes(input.Table)
 	rlsTag := generateRlsTag(rlsList)
 
-	// map relations
-	relations := mapTableRelation(table)
-
 	// define file path
-	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", table.Name, "go"))
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", input.Table.Name, "go"))
 
 	// set data
 	data := GenerateModelData{
 		Package:    "models",
 		Imports:    importsPath,
-		StructName: utils.SnakeCaseToPascalCase(table.Name),
+		StructName: utils.SnakeCaseToPascalCase(input.Table.Name),
 		Columns:    columns,
-		Schema:     table.Schema,
+		Schema:     input.Table.Schema,
 		RlsTag:     rlsTag,
-		Relations:  relations,
+		Relations:  input.Relations,
 	}
 
 	// setup generate input param
-	input := GenerateInput{
+	generateInput := GenerateInput{
 		BindData:     data,
 		FuncMap:      funcMaps,
 		Template:     ModelTemplate,
@@ -124,24 +147,26 @@ func GenerateModel(folderPath string, table supabase.Table, rlsList supabase.Pol
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateModels - generate model to %s", input.OutputPath)
-	return generateFn(input)
+	logger.Debugf("GenerateModels - generate model to %s", generateInput.OutputPath)
+	return generateFn(generateInput)
 }
 
 // map table to column, map pg type to go type and get dependency import path
-func mapTableAttributes(table supabase.Table) (columns []map[string]any, importsPath []string) {
+func mapTableAttributes(table supabase.Table) (columns []GenerateModelColumn, importsPath []string) {
 	importsMap := make(map[string]any)
-	columns = make([]map[string]any, 0)
+	mapPrimaryKey := map[string]bool{}
+	for _, k := range table.PrimaryKeys {
+		mapPrimaryKey[k.Name] = true
+	}
 
 	for _, c := range table.Columns {
-		column := map[string]any{
-			"Name": c.Name,
+		column := GenerateModelColumn{
+			Name: c.Name,
+			Tag:  generateColumnTag(c, mapPrimaryKey),
+			Type: postgres.ToGoType(postgres.DataType(c.DataType), c.IsNullable),
 		}
 
-		goType := postgres.ToGoType(c.DataType, c.IsNullable)
-		column["GoType"] = goType
-
-		splitType := strings.Split(goType, ".")
+		splitType := strings.Split(column.Type, ".")
 		if len(splitType) > 1 {
 			importPackage := splitType[0]
 			if c.IsNullable {
@@ -170,42 +195,54 @@ func mapTableAttributes(table supabase.Table) (columns []map[string]any, imports
 	return
 }
 
-func mapTableRelation(table supabase.Table) (relations []Relation) {
-	for i := range table.Relationships {
-		r := table.Relationships[i]
-		typePrefix := "*"
+func generateColumnTag(c supabase.Column, mapPk map[string]bool) string {
+	var tags []string
 
-		if r.SourceTableName != table.Name {
-			foundSourceColumn := false
-			for i := range table.Columns {
-				c := table.Columns[i]
-				if c.Name == r.SourceColumnName {
-					foundSourceColumn = true
-					break
-				}
-			}
+	// append json tag
+	jsonTag := fmt.Sprintf("json:%q", utils.ToSnakeCase(c.Name)+",omitempty")
+	tags = append(tags, jsonTag)
 
-			if !foundSourceColumn {
-				typePrefix = "[]*"
-			}
-
-			relations = append(relations, Relation{
-				Table:        r.SourceTableName,
-				Type:         typePrefix + utils.SnakeCaseToPascalCase(r.SourceTableName),
-				SourceColumn: r.SourceColumnName,
-				TargetColumn: r.TargetColumnName,
-			})
-			continue
-		}
-
-		relations = append(relations, Relation{
-			Table:        r.TargetTableName,
-			Type:         typePrefix + utils.SnakeCaseToPascalCase(r.TargetTableName),
-			SourceColumn: r.TargetColumnName,
-			TargetColumn: r.SourceColumnName,
-		})
+	// append column tag
+	columnTags := []string{
+		fmt.Sprintf("name:%s", c.Name),
 	}
-	return
+
+	if postgres.IsValidDataType(c.DataType) {
+		pdType := postgres.GetPgDataTypeName(postgres.DataType(c.DataType), true)
+		columnTags = append(columnTags, "type:"+string(pdType))
+	}
+
+	_, exist := mapPk[c.Name]
+	if exist {
+		columnTags = append(columnTags, "primaryKey")
+	}
+
+	if c.IdentityGeneration != nil {
+		if identityStr, isString := c.IdentityGeneration.(string); isString && len(identityStr) > 0 {
+			columnTags = append(columnTags, "autoIncrement")
+		}
+	}
+
+	if c.IsNullable {
+		columnTags = append(columnTags, "nullable")
+	} else {
+		columnTags = append(columnTags, "nullable:false")
+	}
+
+	if c.DefaultValue != "" {
+		defaultStr, isString := c.DefaultValue.(string)
+		if isString {
+			columnTags = append(columnTags, "default:"+defaultStr)
+		}
+	}
+
+	if c.IsUnique {
+		columnTags = append(columnTags, "unique")
+	}
+
+	tags = append(tags, fmt.Sprintf("column:%q", strings.Join(columnTags, ";")))
+
+	return strings.Join(tags, " ")
 }
 
 func generateRlsTag(rlsList supabase.Policies) string {
@@ -222,4 +259,54 @@ func generateRlsTag(rlsList supabase.Policies) string {
 
 	rlsTag := fmt.Sprintf("read:%q write:%q", strings.Join(rls.CanRead, ","), strings.Join(rls.CanWrite, ","))
 	return rlsTag
+}
+
+// Relation
+func (r *Relation) BuildTag() string {
+	var tags []string
+	var joinTags []string
+
+	// append json tag
+	jsonTag := fmt.Sprintf("json:%q", utils.ToSnakeCase(r.Table)+",omitempty")
+	tags = append(tags, jsonTag)
+
+	// append relation type tag
+	relTypeTag := fmt.Sprintf("joinType:%s", r.RelationType)
+	joinTags = append(joinTags, relTypeTag)
+
+	// append PK tag
+	if r.PrimaryKey != "" {
+		pk := fmt.Sprintf("primaryKey:%s", r.PrimaryKey)
+		joinTags = append(joinTags, pk)
+	}
+
+	// append FK tag
+	if r.PrimaryKey != "" {
+		fk := fmt.Sprintf("foreignKey:%s", r.ForeignKey)
+		joinTags = append(joinTags, fk)
+	}
+
+	if r.RelationType == raiden.RelationTypeManyToMany && r.JoinRelation != nil {
+		th := fmt.Sprintf("through:%s", r.Through)
+		joinTags = append(joinTags, th)
+
+		// append source primary key
+		spk := fmt.Sprintf("sourcePrimaryKey:%s", r.SourcePrimaryKey)
+		joinTags = append(joinTags, spk)
+
+		// append join source foreign key
+		jspk := fmt.Sprintf("sourceForeignKey:%s", r.JoinsSourceForeignKey)
+		joinTags = append(joinTags, jspk)
+
+		// append target primary key
+		tpk := fmt.Sprintf("targetPrimaryKey:%s", r.TargetPrimaryKey)
+		joinTags = append(joinTags, tpk)
+
+		// append join target foreign key
+		jtpk := fmt.Sprintf("targetForeign:%s", r.JoinsSourceForeignKey)
+		joinTags = append(joinTags, jtpk)
+	}
+	tags = append(tags, fmt.Sprintf("join:%q", strings.Join(joinTags, ";")))
+
+	return strings.Join(tags, " ")
 }

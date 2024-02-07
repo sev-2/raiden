@@ -7,19 +7,6 @@ import (
 	"github.com/sev-2/raiden/pkg/supabase"
 )
 
-// The "Resource" type represents a collection of tables, policies, roles, and functions in Supabase.
-// @property {[]supabase.Table} Tables - An array of supabase.Table objects. Each object represents a
-// table in the Supabase database and contains information such as the table name, columns, and
-// constraints.
-// @property Policies - Policies are rules or permissions that define what actions can be performed on
-// the tables in the Supabase database. They control access and security for the database objects.
-// @property {[]supabase.Role} Roles - Roles are a collection of user roles or permissions that can be
-// assigned to users in a Supabase project. Roles define what actions a user can perform on the
-// database tables and functions.
-// @property {[]supabase.Function} Functions - The `Functions` property is an array of
-// `supabase.Function` objects. It represents the functions defined in the Supabase database. Functions
-// in Supabase are serverless functions that can be used to perform custom logic and calculations on
-// the data in the database. They can be written in
 type Resource struct {
 	Tables    []supabase.Table
 	Policies  supabase.Policies

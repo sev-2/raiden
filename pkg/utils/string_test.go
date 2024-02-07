@@ -13,3 +13,10 @@ func TestToGoModuleCorrectWithPathPayload(t *testing.T) {
 	result := utils.ToGoModuleName(folderPath)
 	assert.Equal(t, "hellocontroller", result)
 }
+
+func TestRemoveParenthesesContent(t *testing.T) {
+	testString := "varchar(20)"
+
+	rs := utils.RemoveParenthesesContent(testString)
+	assert.Equal(t, "varchar", rs)
+}

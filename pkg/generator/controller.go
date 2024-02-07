@@ -8,6 +8,7 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
+// ----- Define type, variable and constant -----
 type ControllerFieldAttribute struct {
 	Field string
 	Type  string

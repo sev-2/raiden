@@ -11,13 +11,11 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-// ----- Define type, var and const -----
+// ----- Define type, variable and constant -----
 type GenerateRoleData struct {
-	Fields    []map[string]any
-	Imports   []string
-	Package   string
-	RoleName  string
-	NumFields int
+	Imports  []string
+	Package  string
+	RoleName string
 }
 
 const (
@@ -32,10 +30,8 @@ import (
 )
 {{- end }}
 
-var {{ .RoleName | ToGoIdentifier }} = &postgres.Role{
-{{- range $i, $field := .Fields }}
-	{{ .Name }} : {{ .Value }},
-{{- end }}
+type {{ .RoleName | ToGoIdentifier }} struct {
+	postgres.Role
 }
 `
 )
@@ -67,9 +63,6 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", role.Name, "go"))
 
-	// generate fields
-	fields := getRoleFields(role)
-
 	// set imports path
 	imports := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/postgres"),
@@ -77,11 +70,9 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 
 	// execute the template and write to the file
 	data := GenerateRoleData{
-		Package:   "roles",
-		Imports:   imports,
-		RoleName:  role.Name,
-		Fields:    fields,
-		NumFields: len(fields),
+		Package:  "roles",
+		Imports:  imports,
+		RoleName: role.Name,
 	}
 
 	// set input
@@ -97,7 +88,7 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 	return generateFn(input)
 }
 
-func getRoleFields(role supabase.Role) (fields []map[string]any) {
+func GetRoleFields(role supabase.Role) (fields []map[string]any) {
 	fields = make([]map[string]any, 0)
 	instanceType := reflect.TypeOf(role)
 

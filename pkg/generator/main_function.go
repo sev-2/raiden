@@ -9,7 +9,7 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-// ----- Define type, var and constant -----
+// ----- Define type, variable and constant -----
 type GenerateMainFunctionData struct {
 	Package string
 	Imports []string
@@ -38,7 +38,7 @@ func main() {
 	server := raiden.NewServer(config)
 
 	// register route
-	router.Register(server)
+	bootstrap.RegisterRoute(server)
 
 	// run server
 	server.Run()
@@ -74,7 +74,7 @@ func GenerateMainFunction(basePath string, config *raiden.Config, generateFn Gen
 	importPaths := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
 	}
-	routeImportPath := fmt.Sprintf("\"%s/internal/router\"", utils.ToGoModuleName(config.ProjectName))
+	routeImportPath := fmt.Sprintf("\"%s/internal/bootstrap\"", utils.ToGoModuleName(config.ProjectName))
 	importPaths = append(importPaths, routeImportPath)
 	data := GenerateMainFunctionData{
 		Package: "main",

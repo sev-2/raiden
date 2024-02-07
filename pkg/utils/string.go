@@ -105,7 +105,17 @@ func CleanUpString(s string) string {
 }
 
 func HashString(query string) string {
+	return HashByte([]byte(query))
+}
+
+func HashByte(queryByte []byte) string {
 	hasher := sha256.New()
-	hasher.Write([]byte(query))
+	hasher.Write(queryByte)
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+// RemoveParenthesesContent removes content within parentheses from a string.
+func RemoveParenthesesContent(input string) string {
+	re := regexp.MustCompile(`\([^)]*\)`)
+	return re.ReplaceAllString(input, "")
 }
