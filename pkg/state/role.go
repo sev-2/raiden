@@ -2,6 +2,7 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/importer"
@@ -31,7 +32,7 @@ func ToRoles(roleStates []RoleState, withNativeRole bool) (roles []supabase.Role
 	conf.Importer = importer.Default()
 	pkg, err := conf.Check("roles", fset, astFiles, nil)
 	if err != nil {
-		fmt.Println("Error type-checking code:", err)
+		err = fmt.Errorf("error type-checking code : %s", err.Error())
 		return
 	}
 
@@ -57,14 +58,14 @@ func ToRoles(roleStates []RoleState, withNativeRole bool) (roles []supabase.Role
 func createRoleFromState(pkg *types.Package, astFiles []*ast.File, fset *token.FileSet, state RoleState) (role supabase.Role, err error) {
 	obj := pkg.Scope().Lookup(state.RoleStruct)
 	if obj == nil {
-		fmt.Println("Struct not found:", state.RoleStruct)
+		err = errors.New("struct not found : " + state.RoleStruct)
 		return
 	}
 
 	// Assert the object's type to *types.TypeName
 	typeObj, ok := obj.(*types.TypeName)
 	if !ok {
-		fmt.Println("Unexpected type for object:", obj)
+		err = fmt.Errorf("unexpected type for object : %v", obj)
 		return
 	}
 

@@ -2,6 +2,7 @@ package apply
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli/configure"
@@ -33,5 +34,6 @@ func PreRun(projectPath string) error {
 }
 
 func Run(flags *Flags, config *raiden.Config, projectPath string) error {
+	fmt.Println("Must be implementation soon :)")
 	return nil
 }

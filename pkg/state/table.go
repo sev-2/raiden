@@ -2,6 +2,7 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/importer"
@@ -31,7 +32,7 @@ func ToTables(tableStates []TableState) (tables []supabase.Table, err error) {
 	conf.Importer = importer.Default()
 	pkg, err := conf.Check("models", fset, astFiles, nil)
 	if err != nil {
-		fmt.Println("Error type-checking code:", err)
+		err = fmt.Errorf("error type-checking code :  %s", err.Error())
 		return
 	}
 
@@ -50,14 +51,14 @@ func ToTables(tableStates []TableState) (tables []supabase.Table, err error) {
 func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.FileSet, state TableState) (table supabase.Table, err error) {
 	obj := pkg.Scope().Lookup(state.ModelStruct)
 	if obj == nil {
-		fmt.Println("Struct not found:", state.ModelStruct)
+		err = errors.New("struct not found : " + state.ModelStruct)
 		return
 	}
 
 	// Assert the object's type to *types.TypeName
 	typeObj, ok := obj.(*types.TypeName)
 	if !ok {
-		fmt.Println("Unexpected type for object:", obj)
+		err = fmt.Errorf("unexpected type for object : %v", obj)
 		return
 	}
 

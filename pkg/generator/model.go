@@ -80,10 +80,10 @@ type {{ .StructName }} struct {
 {{- end }}
 
 	// Table information
-	Metadata string ` + "`json:\"metadata,omitempty\" schema:\"{{ .Schema}}\"`" + `
+	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\"`" + `
 
 	// Access control
-	Acl string ` + "`json:\"acl,omitempty\" {{ .RlsTag }}`" + `
+	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
 	
 {{- if gt (len .Relations) 0 }}
 

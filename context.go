@@ -18,8 +18,8 @@ type (
 
 		Config() *Config
 
-		ExecuteRpc(rpc *Rpc, data any) error
-		ExecuteRpcWithParams(rpc *Rpc, params map[string]any, data any) error
+		// ExecuteRpc(rpc *Rpc, data any) error
+		// ExecuteRpcWithParams(rpc *Rpc, params map[string]any, data any) error
 
 		SendJson(data any) error
 		SendError(message string) error
@@ -65,21 +65,21 @@ func (c Ctx) toPointer(data any) any {
 	return data
 }
 
-func (c *Ctx) ExecuteRpc(rpc *Rpc, data any) error {
-	dataPtr := c.toPointer(data)
-	if err := rpc.Execute(&c.Request, c.toPointer(dataPtr)); err != nil {
-		return err
-	}
-	return c.SendJson(dataPtr)
-}
+// func (c *Ctx) ExecuteRpc(rpc *Rpc, data any) error {
+// 	dataPtr := c.toPointer(data)
+// 	if err := rpc.Execute(&c.Request, c.toPointer(dataPtr)); err != nil {
+// 		return err
+// 	}
+// 	return c.SendJson(dataPtr)
+// }
 
-func (c *Ctx) ExecuteRpcWithParams(rpc *Rpc, params map[string]any, data any) error {
-	dataPtr := c.toPointer(data)
-	if err := rpc.ExecuteWithParam(&c.Request, params, dataPtr); err != nil {
-		return err
-	}
-	return c.SendJson(dataPtr)
-}
+// func (c *Ctx) ExecuteRpcWithParams(rpc *Rpc, params map[string]any, data any) error {
+// 	dataPtr := c.toPointer(data)
+// 	if err := rpc.ExecuteWithParam(&c.Request, params, dataPtr); err != nil {
+// 		return err
+// 	}
+// 	return c.SendJson(dataPtr)
+// }
 
 func (c *Ctx) RequestContext() *fasthttp.RequestCtx {
 	return c.RequestCtx

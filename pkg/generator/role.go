@@ -34,8 +34,8 @@ import (
 {{- end }}
 
 type {{ .RoleName | ToGoIdentifier }} struct {
-	Metadata string ` + "`{{ .MetadataTag }}`" + `
-	Permission string ` + "`{{ .PermissionTag }}`" + `
+	Metadata string ` + "`json:\"-\" {{ .MetadataTag }}`" + `
+	Permission string ` + "`json:\"-\" {{ .PermissionTag }}`" + `
 }
 `
 )
