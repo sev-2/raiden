@@ -6,6 +6,7 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -21,13 +22,13 @@ func generateResource(config *raiden.Config, importState *ImportState, projectPa
 	doneListen := ListenStateResource(importState, stateChan)
 
 	// generate all model from cloud / pg-meta
+	tableWithRelation := buildGenerateModelInputs(resource.Tables)
 	if len(resource.Tables) > 0 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			inputs := buildGenerateModelInputs(resource.Tables)
-			captureFunc := StateDecorateFunc(inputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
+			captureFunc := StateDecorateFunc(tableWithRelation, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateModelData); ok {
 					if i.StructName == utils.SnakeCaseToPascalCase(item.Table.Name) {
 						return true
@@ -36,7 +37,7 @@ func generateResource(config *raiden.Config, importState *ImportState, projectPa
 				return false
 			}, stateChan)
 
-			if err := generator.GenerateModels(projectPath, inputs, resource.Policies, captureFunc); err != nil {
+			if err := generator.GenerateModels(projectPath, tableWithRelation, resource.Policies, captureFunc); err != nil {
 				errChan <- err
 			} else {
 				errChan <- nil
@@ -66,13 +67,25 @@ func generateResource(config *raiden.Config, importState *ImportState, projectPa
 		}()
 	}
 
-	// TODO : generate rpc
 	if len(resource.Functions) > 0 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			// TODO : generate all function from cloud / pg-meta
-			errChan <- nil
+
+			captureFunc := StateDecorateFunc(resource.Functions, func(item supabase.Function, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
+					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, captureFunc); errGenRpc != nil {
+				logger.Error(errGenRpc)
+				errChan <- errGenRpc
+			} else {
+				errChan <- nil
+			}
 		}()
 	}
 

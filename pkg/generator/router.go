@@ -90,7 +90,7 @@ func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) e
 	}
 
 	logger.Debugf("GenerateRoute - generate route to %s", input.OutputPath)
-	return generateFn(input)
+	return generateFn(input, nil)
 }
 
 func WalkScanControllers(controllerPath string) ([]GenerateRouteItem, error) {

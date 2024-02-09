@@ -68,5 +68,5 @@ func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateF
 	}
 
 	logger.Debugf("GenerateConfig - generate config to %s", input.OutputPath)
-	return generateFn(input)
+	return generateFn(input, nil)
 }

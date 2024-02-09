@@ -2,6 +2,7 @@ package imports
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -28,6 +29,12 @@ func (s *ImportState) AddRole(role state.RoleState) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 	s.State.Roles = append(s.State.Roles, role)
+}
+
+func (s *ImportState) AddRpc(rpc state.RpcState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+	s.State.RpcState = append(s.State.RpcState, rpc)
 }
 
 func (s *ImportState) Persist() error {
@@ -73,6 +80,20 @@ func ListenStateResource(importState *ImportState, stateChan chan any) (done cha
 						LastUpdate: time.Now(),
 					}
 					importState.AddRole(roleState)
+				case supabase.Function:
+					rpcState := state.RpcState{
+						Function:   parseItem,
+						RpcPath:    genInput.OutputPath,
+						RpcStruct:  utils.SnakeCaseToPascalCase(parseItem.Name),
+						LastUpdate: time.Now(),
+					}
+
+					genData, isRpcGenData := genInput.BindData.(generator.GenerateRpcData)
+					if isRpcGenData {
+						rpcState.GenerateData = genData
+					}
+
+					importState.AddRpc(rpcState)
 				}
 			}
 		}
@@ -82,11 +103,10 @@ func ListenStateResource(importState *ImportState, stateChan chan any) (done cha
 }
 
 func StateDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
-	return func(input generator.GenerateInput) error {
-		if err := generator.Generate(input); err != nil {
+	return func(input generator.GenerateInput, writer io.Writer) error {
+		if err := generator.Generate(input, nil); err != nil {
 			return err
 		}
-
 		if rs, found := FindResource(data, input, findFunc); found {
 			stateChan <- map[string]any{
 				"item":  rs,
@@ -107,11 +127,11 @@ func FindResource[T any](data []T, input generator.GenerateInput, findFunc func(
 	return
 }
 
-func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, err error) {
+func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, functions []supabase.Function, err error) {
 	// load app table
 	latestState, err := state.Load()
 	if err != nil {
-		return tables, roles, err
+		return tables, roles, functions, err
 	}
 
 	if latestState == nil {
@@ -130,6 +150,10 @@ func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, 
 		if err != nil {
 			return
 		}
+	}
+
+	if f.LoadAll() || f.RpcOnly {
+		// logger.PrintJson(latestState.RpcState, true)
 	}
 
 	return

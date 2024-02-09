@@ -99,9 +99,9 @@ func MatchReplacer(query string, paramKey string, replacement string) string {
 func CleanUpString(s string) string {
 	return strings.ReplaceAll(
 		strings.ReplaceAll(
-			s, "\t", "",
+			s, "\t", " ",
 		),
-		"\n", "",
+		"\n", " ",
 	)
 }
 

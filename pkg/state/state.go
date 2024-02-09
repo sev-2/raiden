@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -38,10 +39,11 @@ type (
 	}
 
 	RpcState struct {
-		Function   supabase.Function
-		RpcPath    string
-		RpcStruct  string
-		LastUpdate time.Time
+		Function     supabase.Function
+		GenerateData generator.GenerateRpcData
+		RpcPath      string
+		RpcStruct    string
+		LastUpdate   time.Time
 	}
 
 	CompareDiffType     string

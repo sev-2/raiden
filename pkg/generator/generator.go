@@ -2,6 +2,8 @@ package generator
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -20,15 +22,30 @@ type GenerateInput struct {
 	FuncMap      []template.FuncMap
 }
 
-type GenerateFn func(input GenerateInput) error
+type GenerateFn func(input GenerateInput, writer io.Writer) error
 
 // ----- Generate functionality  -----
-func Generate(input GenerateInput) error {
-	file, err := utils.CreateFile(input.OutputPath, true)
+
+func DefaultWriter(filePath string) (*os.File, error) {
+	file, err := utils.CreateFile(filePath, true)
 	if err != nil {
-		return fmt.Errorf("failed create file %s : %v", input.OutputPath, err)
+		return nil, fmt.Errorf("failed create file %s : %v", filePath, err)
 	}
-	defer file.Close()
+
+	return file, nil
+}
+
+func Generate(input GenerateInput, writer io.Writer) error {
+
+	// set default writer
+	if writer == nil {
+		file, err := DefaultWriter(input.OutputPath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		writer = file
+	}
 
 	tmplInstance := template.New(input.TemplateName)
 	for _, tm := range input.FuncMap {
@@ -40,12 +57,7 @@ func Generate(input GenerateInput) error {
 		return fmt.Errorf("error parsing : %v", err)
 	}
 
-	err = tmpl.Execute(file, input.BindData)
-	if err != nil {
-		return fmt.Errorf("error executing : %v", err)
-	}
-
-	return nil
+	return tmpl.Execute(writer, input.BindData)
 }
 
 func CreateInternalFolder(basePath string) (err error) {

@@ -90,5 +90,5 @@ func GenerateMainFunction(basePath string, config *raiden.Config, generateFn Gen
 	}
 
 	logger.Debugf("GenerateMainFunction - generate main function to %s", input.OutputPath)
-	return generateFn(input)
+	return generateFn(input, nil)
 }

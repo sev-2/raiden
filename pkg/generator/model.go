@@ -107,7 +107,9 @@ func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList supab
 
 	for i, v := range tables {
 		searchTable := tables[i].Table.Name
-		GenerateModel(folderPath, v, rlsList.FilterByTable(searchTable), generateFn)
+		if err := GenerateModel(folderPath, v, rlsList.FilterByTable(searchTable), generateFn); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -148,7 +150,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, rlsList supabas
 	}
 
 	logger.Debugf("GenerateModels - generate model to %s", generateInput.OutputPath)
-	return generateFn(generateInput)
+	return generateFn(generateInput, nil)
 }
 
 // map table to column, map pg type to go type and get dependency import path

@@ -76,7 +76,7 @@ func GenerateController(file string, data GenerateControllerData, generateFn Gen
 		OutputPath:   file,
 	}
 	logger.Debugf("GenerateController - generate controller to %s", input.OutputPath)
-	return generateFn(input)
+	return generateFn(input, nil)
 }
 
 // ----- Generate hello word -----

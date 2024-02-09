@@ -106,7 +106,7 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 	}
 
 	logger.Debugf("GenerateRoles - generate role to %s", input.OutputPath)
-	return generateFn(input)
+	return generateFn(input, nil)
 }
 
 func GetRoleFields(role supabase.Role) (fields []map[string]any) {

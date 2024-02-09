@@ -2,12 +2,10 @@ package imports
 
 import (
 	"errors"
-	"fmt"
-	"reflect"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/postgres/roles"
@@ -74,10 +72,11 @@ func Run(flags *Flags, config *raiden.Config, projectPath string) error {
 
 	// filter table for with allowed schema
 	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
 	resource.Roles = filterUserRoleAndBindNativeRole(resource.Roles, mapNativeRole)
 
 	// load app resource
-	appTables, appRoles, err := loadAppResource(flags)
+	appTables, appRoles, _, err := loadAppResource(flags)
 	if err != nil {
 		return err
 	}
@@ -133,70 +132,26 @@ func filterTableBySchema(input []supabase.Table, allowedSchema ...string) (outpu
 	return
 }
 
-func printDiff(resource string, supabaseResource, appResource interface{}, prefix string) {
-	spValue := reflect.ValueOf(supabaseResource)
-	appValue := reflect.ValueOf(appResource)
+func filterFunctionBySchema(input []supabase.Function, allowedSchema ...string) (output []supabase.Function) {
+	filterSchema := []string{"public"}
+	if len(allowedSchema) > 0 && allowedSchema[0] != "" {
+		filterSchema = allowedSchema
+	}
 
-	for i := 0; i < spValue.NumField(); i++ {
-		fieldSupabase := spValue.Field(i)
-		fieldApp := appValue.Field(i)
+	mapSchema := map[string]bool{}
+	for _, s := range filterSchema {
+		mapSchema[s] = true
+	}
 
-		if fieldSupabase.Kind() == reflect.Struct {
-			printDiff(resource, fieldSupabase.Interface(), fieldApp.Interface(), fmt.Sprintf("%s.%s", prefix, fieldSupabase.Type().Field(i).Name))
-			continue
-		}
+	for i := range input {
+		t := input[i]
 
-		if fieldSupabase.Kind() == reflect.Slice || fieldSupabase.Kind() == reflect.Array {
-			for j := 0; j < fieldSupabase.Len(); j++ {
-				fieldIdentifier := fmt.Sprintf("%v", j)
-				spField := fieldSupabase.Index(j)
-				spFieldValue := spField.Interface()
-				if spColum, isSpColumn := spFieldValue.(supabase.Column); isSpColumn {
-					fieldIdentifier = spColum.Name
-				}
-
-				if j >= fieldApp.Len() {
-					var diffStringArr []string
-					for i := 0; i < spField.NumField(); i++ {
-						field, fieldValue := spField.Type().Field(i), spField.Field(i)
-						diffStringArr = append(diffStringArr, fmt.Sprintf("%s=%v", field.Name, fieldValue.Interface()))
-					}
-					diffString := strings.Join(diffStringArr, " ")
-					printDiffDetail(resource, prefix, spValue.Type().Field(i).Name, diffString, "not configure in app")
-				}
-
-				appFieldValue := fieldApp.Index(j).Interface()
-				printDiff(resource, spFieldValue, appFieldValue, fmt.Sprintf("%s.%s[%s]", prefix, spValue.Type().Field(i).Name, fieldIdentifier))
-			}
-			continue
-		}
-
-		fieldSupabaseValue := reflect.ValueOf(fieldSupabase.Interface())
-		if fieldSupabaseValue.Kind() == reflect.Pointer {
-			fieldSupabaseValue = fieldSupabaseValue.Elem()
-		}
-
-		fieldAppValue := reflect.ValueOf(fieldApp.Interface())
-		if fieldAppValue.Kind() == reflect.Pointer {
-			fieldAppValue = fieldAppValue.Elem()
-		}
-
-		spCompareStr, appCompateStr := fmt.Sprintf("%v", fieldSupabaseValue), fmt.Sprintf("%v", fieldAppValue)
-		if spCompareStr != appCompateStr {
-			printDiffDetail(resource, prefix, spValue.Type().Field(i).Name, spCompareStr, appCompateStr)
+		if _, exist := mapSchema[t.Schema]; exist {
+			output = append(output, t)
 		}
 	}
-}
 
-func printDiffDetail(resource, prefix string, attribute string, spValue, appValue string) {
-	print := color.New(color.FgHiBlack).PrintfFunc()
-	print("*** Found different %s in %s.%s \n", resource, prefix, attribute)
-	print = color.New(color.FgGreen).PrintfFunc()
-	print("// Supabase : %s = %s\n", attribute, spValue)
-	print = color.New(color.FgRed).PrintfFunc()
-	print("// App : %s = %s \n", attribute, appValue)
-	print = color.New(color.FgHiBlack).PrintfFunc()
-	print("*** End different \n")
+	return
 }
 
 func compareTable(supabaseTable []supabase.Table, appTable []supabase.Table) error {
@@ -208,7 +163,7 @@ func compareTable(supabaseTable []supabase.Table, appTable []supabase.Table) err
 	if len(diffResult) > 0 {
 		for i := range diffResult {
 			d := diffResult[i]
-			printDiff("table", d.SupabaseResource, d.AppResource, d.Name)
+			cli.PrintDiff("table", d.SupabaseResource, d.AppResource, d.Name)
 		}
 		return errors.New("import tables is canceled, you have conflict table. please fix it first")
 	}
@@ -225,7 +180,7 @@ func compareRoles(supabaseRoles []supabase.Role, appRoles []supabase.Role) error
 	if len(diffResult) > 0 {
 		for i := range diffResult {
 			d := diffResult[i]
-			printDiff("role", d.SupabaseResource, d.AppResource, d.Name)
+			cli.PrintDiff("role", d.SupabaseResource, d.AppResource, d.Name)
 		}
 		return errors.New("import roles is canceled, you have conflict role. please fix it first")
 	}

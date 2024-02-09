@@ -58,7 +58,7 @@ func ToRoles(roleStates []RoleState, withNativeRole bool) (roles []supabase.Role
 func createRoleFromState(pkg *types.Package, astFiles []*ast.File, fset *token.FileSet, state RoleState) (role supabase.Role, err error) {
 	obj := pkg.Scope().Lookup(state.RoleStruct)
 	if obj == nil {
-		err = errors.New("struct not found : " + state.RoleStruct)
+		err = errors.New("role not found : " + state.RoleStruct)
 		return
 	}
 
