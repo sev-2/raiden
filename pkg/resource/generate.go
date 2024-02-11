@@ -1,4 +1,4 @@
-package imports
+package resource
 
 import (
 	"fmt"
@@ -10,6 +10,16 @@ import (
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+type MapTable map[string]*supabase.Table
+type MapRelations map[string][]*generator.Relation
+type ManyToManyTable struct {
+	Table      string
+	Schema     string
+	PivotTable string
+	PrimaryKey string
+	ForeignKey string
+}
 
 // The `generateResource` function generates various resources such as table, roles, policy and etc
 // also generate framework resource like controller, route, main function and etc

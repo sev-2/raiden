@@ -2,17 +2,22 @@ package imports
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
-	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/generator"
-	"github.com/sev-2/raiden/pkg/postgres/roles"
-	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
+
+var buildDir = "build"
 
 type Flags struct {
 	RpcOnly       bool
@@ -50,168 +55,70 @@ func PreRun(projectPath string) error {
 	return nil
 }
 
-func Run(flags *Flags, config *raiden.Config, projectPath string) error {
-	// configure supabase adapter
-	if config.DeploymentTarget == raiden.DeploymentTargetCloud {
-		supabase.ConfigureManagementApi(config.SupabaseApiUrl, config.AccessToken)
-	} else {
-		supabase.ConfigurationMetaApi(config.SupabaseApiUrl, config.SupabaseApiBaseUrl)
+func Run(flags *Flags, projectPath string, verbose bool) error {
+	mainFile := "cmd/import/main.go"
+
+	// set abs file path
+	mainFilePath := filepath.Join(projectPath, mainFile)
+
+	// set output
+	output := GetBuildFilePath(projectPath, runtime.GOOS, "import")
+
+	if utils.IsFileExists(output) {
+		utils.DeleteFile(output)
 	}
 
-	// load map native role
-	mapNativeRole, err := loadMapNativeRole()
-	if err != nil {
-		return err
+	// Run the "go build" command
+	logger.Debugf("Execute command : go build -o %s %s", output, mainFilePath)
+	cmd := exec.Command("go", "build", "-o", output, mainFilePath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// Run the command
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error building binary: %v", err)
 	}
 
-	// load supabase resource
-	resource, err := Load(flags, config.ProjectId)
-	if err != nil {
-		return err
+	logger.Debug("prepare exec binary from : ", output)
+
+	var args []string
+	if flags.RpcOnly {
+		args = append(args, "--rpc-only")
 	}
 
-	// filter table for with allowed schema
-	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
-	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
-	resource.Roles = filterUserRoleAndBindNativeRole(resource.Roles, mapNativeRole)
-
-	// load app resource
-	appTables, appRoles, _, err := loadAppResource(flags)
-	if err != nil {
-		return err
+	if flags.ModelsOnly {
+		args = append(args, "--models-only")
 	}
 
-	// compare
-	if (flags.LoadAll() || flags.ModelsOnly) && len(appTables) > 0 {
-		if err := compareTable(resource.Tables, appTables); err != nil {
-			return err
-		}
+	if flags.RolesOnly {
+		args = append(args, "--roles-only")
 	}
 
-	if (flags.LoadAll() || flags.RolesOnly) && len(appRoles) > 0 {
-		if err := compareRoles(resource.Roles, appRoles); err != nil {
-			return err
-		}
+	if flags.AllowedSchema != "" {
+		args = append(args, "--schema "+flags.AllowedSchema)
 	}
 
-	// create import state
-	nativeStateRoles, err := createNativeRoleState(mapNativeRole)
-	if err != nil {
-		return err
+	if verbose {
+		args = append(args, "-v")
 	}
 
-	importState := ImportState{
-		State: state.State{
-			Roles: nativeStateRoles,
-		},
-	}
+	logger.Debugf("%s %s", output, strings.Join(args, " "))
+	runCmd := exec.Command(output, args...)
 
-	// generate resource
-	return generateResource(config, &importState, projectPath, resource)
+	// Redirect standard input, output, and error to the current process
+	runCmd.Stdin = os.Stdin
+	runCmd.Stdout = os.Stdout
+	runCmd.Stderr = os.Stderr
+
+	// Run the command
+	return runCmd.Run()
 }
 
-func filterTableBySchema(input []supabase.Table, allowedSchema ...string) (output []supabase.Table) {
-	filterSchema := []string{"public"}
-	if len(allowedSchema) > 0 && allowedSchema[0] != "" {
-		filterSchema = allowedSchema
+func GetBuildFilePath(projectPath, targetOs string, fileName string) string {
+	fullFilePath := filepath.Join(projectPath, buildDir, fileName)
+	if targetOs == "windows" {
+		fullFilePath += ".exe"
 	}
 
-	mapSchema := map[string]bool{}
-	for _, s := range filterSchema {
-		mapSchema[s] = true
-	}
-
-	for i := range input {
-		t := input[i]
-
-		if _, exist := mapSchema[t.Schema]; exist {
-			output = append(output, t)
-		}
-	}
-
-	return
-}
-
-func filterFunctionBySchema(input []supabase.Function, allowedSchema ...string) (output []supabase.Function) {
-	filterSchema := []string{"public"}
-	if len(allowedSchema) > 0 && allowedSchema[0] != "" {
-		filterSchema = allowedSchema
-	}
-
-	mapSchema := map[string]bool{}
-	for _, s := range filterSchema {
-		mapSchema[s] = true
-	}
-
-	for i := range input {
-		t := input[i]
-
-		if _, exist := mapSchema[t.Schema]; exist {
-			output = append(output, t)
-		}
-	}
-
-	return
-}
-
-func compareTable(supabaseTable []supabase.Table, appTable []supabase.Table) error {
-	diffResult, err := state.CompareTables(supabaseTable, appTable)
-	if err != nil {
-		return err
-	}
-
-	if len(diffResult) > 0 {
-		for i := range diffResult {
-			d := diffResult[i]
-			cli.PrintDiff("table", d.SupabaseResource, d.AppResource, d.Name)
-		}
-		return errors.New("import tables is canceled, you have conflict table. please fix it first")
-	}
-
-	return nil
-}
-
-func compareRoles(supabaseRoles []supabase.Role, appRoles []supabase.Role) error {
-	diffResult, err := state.CompareRoles(supabaseRoles, appRoles)
-	if err != nil {
-		return err
-	}
-
-	if len(diffResult) > 0 {
-		for i := range diffResult {
-			d := diffResult[i]
-			cli.PrintDiff("role", d.SupabaseResource, d.AppResource, d.Name)
-		}
-		return errors.New("import roles is canceled, you have conflict role. please fix it first")
-	}
-
-	return nil
-}
-
-func loadMapNativeRole() (map[string]any, error) {
-	mapRole := make(map[string]any)
-	for _, r := range roles.NativeRoles {
-		role, err := raiden.UnmarshalRole(r)
-		if err != nil {
-			return nil, err
-		}
-		mapRole[role.Name] = &role
-	}
-
-	return mapRole, nil
-}
-
-func filterUserRoleAndBindNativeRole(roles []supabase.Role, mapNativeRole map[string]any) (userRole []supabase.Role) {
-	for i := range roles {
-		r := roles[i]
-		if nr, isExist := mapNativeRole[r.Name]; !isExist {
-			userRole = append(userRole, r)
-		} else {
-			if rl, isRole := nr.(*raiden.Role); isRole {
-				rl.ID = r.ID
-				rl.ValidUntil = r.ValidUntil
-			}
-		}
-	}
-	return
+	return fullFilePath
 }

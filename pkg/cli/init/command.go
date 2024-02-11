@@ -81,7 +81,7 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 		repoName += "@" + flags.Target
 	}
 	logger.Debugf("Execute command : go get %s ", repoName)
-	cmdRaidenInit := exec.Command("go", "get", repoName)
+	cmdRaidenInit := exec.Command("go", "get", "-u", repoName)
 	cmdRaidenInit.Stdout = os.Stdout
 	cmdRaidenInit.Stderr = os.Stderr
 

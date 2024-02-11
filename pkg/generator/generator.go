@@ -62,7 +62,7 @@ func Generate(input GenerateInput, writer io.Writer) error {
 
 func CreateInternalFolder(basePath string) (err error) {
 	internalFolderPath := filepath.Join(basePath, "internal")
-	logger.Debugf("CreateInternalFolder - create %s folder if not exist", internalFolderPath)
+	logger.Debugf("CreateInternalFolder - create `%s` folder if not exist", internalFolderPath)
 	if exist := utils.IsFolderExists(internalFolderPath); !exist {
 		if err := utils.CreateFolder(internalFolderPath); err != nil {
 			return err

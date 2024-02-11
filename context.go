@@ -18,8 +18,8 @@ type (
 
 		Config() *Config
 
-		// ExecuteRpc(rpc *Rpc, data any) error
-		// ExecuteRpcWithParams(rpc *Rpc, params map[string]any, data any) error
+		// SendRpc(Rpc) error
+		// ExecuteRpc(Rpc) error
 
 		SendJson(data any) error
 		SendError(message string) error
@@ -80,6 +80,14 @@ func (c Ctx) toPointer(data any) any {
 // 	}
 // 	return c.SendJson(dataPtr)
 // }
+
+func (c *Ctx) SendRpc(Rpc) error {
+	return nil
+}
+
+func (c *Ctx) ExecuteRpc(Rpc) error {
+	return nil
+}
 
 func (c *Ctx) RequestContext() *fasthttp.RequestCtx {
 	return c.RequestCtx

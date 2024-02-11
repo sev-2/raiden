@@ -4,6 +4,7 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/configure"
+	"github.com/sev-2/raiden/pkg/cli/generate"
 	"github.com/sev-2/raiden/pkg/cli/imports"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -12,7 +13,8 @@ import (
 
 type ImportsFlags struct {
 	cli.Flags
-	Imports imports.Flags
+	Imports  imports.Flags
+	Generate generate.Flags
 }
 
 func ImportCommand() *cobra.Command {
@@ -24,7 +26,7 @@ func ImportCommand() *cobra.Command {
 		Long:    "Fetch supabase resource and generate to file",
 		PreRunE: PreRunE(&f.Flags, imports.PreRun),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f.CheckAndActivateDebug(cmd)
+			verbose := f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
@@ -40,11 +42,18 @@ func ImportCommand() *cobra.Command {
 				return err
 			}
 
-			return imports.Run(&f.Imports, config, currentDir)
+			// 1. generate all resource
+			if err = generate.Run(&f.Generate, config, currentDir, false); err != nil {
+				return err
+			}
+
+			// 2. run import
+			return imports.Run(&f.Imports, currentDir, verbose)
 		},
 	}
 
 	f.Imports.Bind(cmd)
+	f.Generate.Bind(cmd)
 
 	return cmd
 }

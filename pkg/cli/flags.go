@@ -13,9 +13,10 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&f.Verbose, "verbose", "v", false, "enable verbose output")
 }
 
-func (f Flags) CheckAndActivateDebug(cmd *cobra.Command) {
+func (f Flags) CheckAndActivateDebug(cmd *cobra.Command) bool {
 	verbose, _ := cmd.Root().PersistentFlags().GetBool("verbose")
 	if verbose {
 		logger.SetDebug()
 	}
+	return verbose
 }

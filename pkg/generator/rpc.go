@@ -29,28 +29,28 @@ type (
 	}
 
 	ExtractRpcDataResult struct {
-		Definition       string
-		BindModelDecl    string
-		ResultDecl       string
-		ResultTag        string
-		ResultColumn     []RpcColumn
-		IsResultArr      bool
-		ImportResultPath []string
-		MetadataTag      string
+		Rpc                raiden.RpcBase
+		MapScannedTable    map[string]*RpcScannedTable
+		OriginalReturnType string
 	}
 
 	GenerateRpcData struct {
-		Definition   string
-		Imports      []string
-		Package      string
-		Params       []RpcColumn
-		MetadataTag  string
-		Models       string
-		Name         string
-		ResultDecl   string
-		ResultTag    string
-		ResultColumn []RpcColumn
-		IsResultArr  bool
+		Package string
+		Imports []string
+		Params  []RpcColumn
+
+		ReturnType   string
+		ReturnColumn []RpcColumn
+		ReturnDecl   string
+		IsReturnArr  bool
+
+		Name     string
+		Schema   string
+		Security string
+		Behavior string
+
+		Models     string
+		Definition string
 	}
 )
 
@@ -68,32 +68,60 @@ import (
 
 type {{ .Name }}Params struct {
 	{{- range .Params }}
-	{{ .Field | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
+	{{ .Field }} {{ .Type }} ` + "`{{ .Tag }}`" + `
 	{{- end }}
 }
 
-{{- if gt (len .ResultColumn) 0 }}
+{{- if gt (len .ReturnColumn) 0 }}
 type {{ .Name }}Item struct {
-	{{- range .ResultColumn }}
-	{{ .Field | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
+	{{- range .ReturnColumn }}
+	{{ .Field }} {{ .Type }} ` + "`{{ .Tag }}`" + `
 	{{- end }}
 }
 
-type {{ .Name }}Result {{ if .IsResultArr }}[]{{ end }}{{ .Name }}Item
+type {{ .Name }}Result {{ if .IsReturnArr }}[]{{ end }}{{ .Name }}Item
 {{- else }}
-type {{ .Name }}Result {{ if .IsResultArr }}[]{{ end }}{{ .ResultDecl }}
+type {{ .Name }}Result {{ if .IsReturnArr }}[]{{ end }}{{ .ReturnDecl }}
 {{- end }}
 
 type {{ .Name }} struct {
 	raiden.RpcBase
-	Params   {{ .Name }}Params
-	Result   {{ .Name }}Result ` + "`json:\"-\" {{ .ResultTag }}`" + `
-	Metadata string ` + "`json:\"-\" {{ .MetadataTag }}`" + `
+	Params   *{{ .Name }}Params ` + "`json:\"-\"`" + `
+	Return   {{ .Name }}Result ` + "`json:\"-\"`" + `
 }
 
+func (r *{{ .Name }}) GetName() string {
+	return "{{ .Name | ToSnakeCase }}"
+}
+
+{{- if ne .Schema "public" }}
+func (r *{{.Name }}) GetSchema() string {
+	return "{{ .Schema }}"
+}
+
+{{- end }}
+{{- if ne .Security "RpcSecurityTypeInvoker" }}
+func (r *{{.Name }}) GetScurity() raiden.RpcSecurityType {
+	return raiden.{{ .Security }}
+}
+
+{{- end }}
+{{- if ne .Behavior "RpcBehaviorVolatile" }}
+func (r *{{.Name }}) GetBehavior() raiden.RpcBehaviorType {
+	return raiden.{{ .Behavior }}
+}
+
+{{- end }}
+
+func (r *{{.Name }}) GetReturnType() raiden.RpcReturnDataType {
+	return raiden.{{ .ReturnType }}
+}
+
+{{- if ne .Models "" }}
 func (r *{{ .Name }}) BindModels() {
 	{{ .Models }}
 }
+{{- end }}
 
 func (r *{{ .Name }}) GetDefinition() string {
 	return ` + "`{{ .Definition }}`" + `
@@ -122,7 +150,7 @@ func GenerateRpc(basePath string, projectName string, functions []supabase.Funct
 func generateRpcItem(folderPath string, projectName string, function *supabase.Function, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
-		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
+		{"ToSnakeCase": utils.ToSnakeCase},
 	}
 
 	// set imports path
@@ -137,14 +165,23 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(function.Name), "go"))
 
-	// extract rpc params
-	params, err := ExtractRpcParam(function, importsMap)
+	// // extract rpc function
+	result, err := ExtractRpcFunction(function)
 	if err != nil {
 		return err
 	}
 
-	// extract rpc function
-	resultExtract, err := ExtractRpcData(function, importsMap)
+	rpcParams, err := result.GetParams(importsMap)
+	if err != nil {
+		return err
+	}
+
+	returnDecl, returnColumns, IsReturnArr, err := result.GetReturn(importsMap)
+	if err != nil {
+		return err
+	}
+
+	returnTypeDecl, err := raiden.GetValidRpcReturnNameDecl(result.Rpc.ReturnType, true)
 	if err != nil {
 		return err
 	}
@@ -159,14 +196,16 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 		Package:      "rpc",
 		Imports:      importsPath,
 		Name:         utils.SnakeCaseToPascalCase(function.Name),
-		Definition:   resultExtract.Definition,
-		Params:       params,
-		MetadataTag:  resultExtract.MetadataTag,
-		Models:       resultExtract.BindModelDecl,
-		ResultDecl:   resultExtract.ResultDecl,
-		ResultTag:    resultExtract.ResultTag,
-		ResultColumn: resultExtract.ResultColumn,
-		IsResultArr:  resultExtract.IsResultArr,
+		Params:       rpcParams,
+		ReturnType:   returnTypeDecl,
+		ReturnDecl:   returnDecl,
+		ReturnColumn: returnColumns,
+		IsReturnArr:  IsReturnArr,
+		Schema:       result.Rpc.Schema,
+		Security:     result.GetSecurity(),
+		Behavior:     result.GetBehavior(),
+		Models:       result.GetModelDecl(),
+		Definition:   result.Rpc.Definition,
 	}
 
 	// setup generate input param
@@ -182,13 +221,74 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 	return generateFn(generateInput, nil)
 }
 
-func ExtractRpcParam(fn *supabase.Function, importsMap map[string]bool) (params []RpcColumn, err error) {
+func ExtractRpcFunction(fn *supabase.Function) (result ExtractRpcDataResult, err error) {
+	//  extract param
+	params, e := ExtractRpcParam(fn)
+	if e != nil {
+		err = e
+		return
+	}
+
+	// get model and definition
+	cleanDef := strings.ReplaceAll(fn.Definition, "\\n", "")
+	definition, mapScannedTable, e := ExtractRpcTable(cleanDef)
+	if e != nil {
+		err = e
+		return
+	}
+
+	// normalize aliases
+	if e := RpcNormalizeTableAliases(mapScannedTable); e != nil {
+		if e != nil {
+			err = e
+			return
+		}
+		return
+	}
+
+	// set return type
+	securityType := raiden.RpcSecurityTypeInvoker
+	if fn.SecurityDefiner {
+		securityType = raiden.RpcSecurityTypeDefiner
+	}
+
+	returnType := raiden.RpcReturnDataTypeVoid
+	returnTypeLc := strings.ToLower(fn.ReturnType)
+	if strings.Contains(returnTypeLc, "setof") {
+		returnType = raiden.RpcReturnDataTypeSetOf
+	} else if strings.Contains(returnTypeLc, "table") {
+		returnType = raiden.RpcReturnDataTypeTable
+	} else {
+		returnType, err = raiden.GetValidRpcReturnType(fn.ReturnType, true)
+		if err != nil {
+			return
+		}
+	}
+
+	// assign rpc params
+	result.Rpc.Params = params
+	result.Rpc.Schema = fn.Schema
+	result.Rpc.Behavior = raiden.RpcBehaviorType(fn.Behavior)
+	result.Rpc.Name = fn.Name
+	result.Rpc.Definition = bindModelToDefinition(definition, mapScannedTable)
+	result.Rpc.CompleteStatement = fn.CompleteStatement
+	result.Rpc.SecurityType = securityType
+	result.Rpc.ReturnType = returnType
+
+	result.OriginalReturnType = fn.ReturnType
+	result.MapScannedTable = mapScannedTable
+
+	return
+}
+
+func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, err error) {
 	mapParam := make(map[string]string)
 
 	// bind param to map
 	// example argument value :
 	// - "in_candidate_name character varying DEFAULT 'anon'::character varying, in_voter_name character varying DEFAULT 'anon'::character varying"
 	for _, at := range strings.Split(fn.ArgumentTypes, ",") {
+		// at example : in_candidate_name character varying DEFAULT 'anon'::character varying
 		if strings.Contains(at, "DEFAULT") {
 			splitTextDefault := strings.Split(at, "DEFAULT")
 			if len(splitTextDefault) != 2 {
@@ -196,15 +296,21 @@ func ExtractRpcParam(fn *supabase.Function, importsMap map[string]bool) (params 
 			}
 
 			// update param text type
+			// splitTextDefault[0] example : in_candidate_name character varying
 			typeParamStr := strings.TrimLeft(strings.TrimRight(splitTextDefault[0], " "), " ")
+
+			// example splitIat :  ["in_candidate_name", "character varying"]
 			splitIat := strings.SplitN(typeParamStr, " ", 2)
 			if len(splitIat) >= 2 {
+				// example : mapParam["in_candidate_name"] =  "character varying"
 				mapParam[splitIat[0]] = splitIat[1]
 			}
 
 			// bind default value to map
+			// splitTextDefault[1] example : 'anon'::character varyings
 			defaultTextArr := strings.Split(splitTextDefault[1], "::")
 			if len(defaultTextArr) > 0 {
+				// example : mapParam["in_candidate_name_default"] =  "anon"
 				mapParam[splitIat[0]+"_default"] = strings.ReplaceAll(
 					strings.ReplaceAll(
 						strings.TrimLeft(
@@ -230,12 +336,9 @@ func ExtractRpcParam(fn *supabase.Function, importsMap map[string]bool) (params 
 		}
 
 		fieldName := strings.ReplaceAll(fa.Name, raiden.DefaultParamPrefix, "")
-		p := RpcColumn{
-			Field: utils.SnakeCaseToPascalCase(fieldName),
-			Type:  "string",
-		}
-		pTag := raiden.RpcParamTag{
+		p := raiden.RpcParam{
 			Name: fieldName,
+			Type: raiden.RpcParamDataTypeText,
 		}
 
 		// get data type
@@ -245,76 +348,16 @@ func ExtractRpcParam(fn *supabase.Function, importsMap map[string]bool) (params 
 			if err != nil {
 				return params, err
 			}
-			p.Type = raiden.RpcParamToGoType(paramType)
-			pTag.Type = string(paramType)
-
-			// update import path
-			splitType := strings.Split(p.Type, ".")
-			if len(splitType) > 1 {
-				importPackage := splitType[0]
-
-				var importPackageName string
-				switch importPackage {
-				case "time":
-					importPackageName = importPackage
-				case "uuid":
-					importPackageName = "github.com/google/uuid"
-				case "json":
-					importPackageName = "encoding/json"
-				}
-				key := fmt.Sprintf("%q", importPackageName)
-				importsMap[key] = true
-			}
+			p.Type = paramType
 		}
 
 		// get default value
 		if d, isDefaultExist := mapParam[fa.Name+"_default"]; isDefaultExist && fa.HasDefault {
-			pTag.DefaultValue = d
+			p.Default = &d
 		}
-
-		// create param tag
-		ptStr, err := raiden.MarshalRpcParamTag(&pTag)
-		if err != nil {
-			return params, err
-		}
-		tagArr := []string{
-			fmt.Sprintf("json:%q", fieldName),
-			fmt.Sprintf("param:%q", ptStr),
-		}
-		p.Tag = strings.Join(tagArr, " ")
-
 		params = append(params, p)
 	}
 
-	return
-}
-
-func ExtractRpcData(fn *supabase.Function, importsMap map[string]bool) (result ExtractRpcDataResult, err error) {
-	// set default definition
-	result.Definition = strings.ReplaceAll(fn.Definition, "\\n", "")
-
-	// extract table
-	def, mapTable, e := ExtractRpcTable(result.Definition)
-	if e != nil {
-		err = e
-		return
-	}
-
-	// make sure all table have binding alias
-	if e := RpcNormalizeTableAliases(mapTable); e != nil {
-		err = e
-		return
-	}
-
-	if err = bindRpcFunctionResult(fn, mapTable, &result, importsMap); err != nil {
-		return
-	}
-
-	bindModelDecl(def, mapTable, &result)
-
-	// update definitions and set bind model decl
-
-	err = bindRpcMetadataTag(fn, &result)
 	return
 }
 
@@ -448,6 +491,14 @@ func RpcNormalizeTableAliases(mapTables map[string]*RpcScannedTable) error {
 	return nil
 }
 
+func bindModelToDefinition(def string, mapTable map[string]*RpcScannedTable) string {
+	for _, v := range mapTable {
+		pattern := fmt.Sprintf(`\b%s\b`, regexp.QuoteMeta(v.Name))
+		def = regexp.MustCompile(pattern).ReplaceAllString(def, ":"+v.Alias)
+	}
+	return def
+}
+
 func findAvailableAlias(tableName string, mapAlias map[string]bool, sub int) (alias string) {
 	if len(tableName) == sub {
 		return ""
@@ -462,123 +513,164 @@ func findAvailableAlias(tableName string, mapAlias map[string]bool, sub int) (al
 	return findAvailableAlias(tableName, mapAlias, sub+1)
 }
 
-func bindRpcMetadataTag(fn *supabase.Function, result *ExtractRpcDataResult) error {
-	// set metadata
-	metadataTagInstance := raiden.RpcMetadataTag{
-		Name:     fn.Name,
-		Schema:   fn.Schema,
-		Security: raiden.RpcSecurityTypeInvoker,
-		Behavior: raiden.RpcBehaviorVolatile,
-	}
+func (r *ExtractRpcDataResult) GetParams(mapImports map[string]bool) (columns []RpcColumn, err error) {
+	for i := range r.Rpc.Params {
+		p := r.Rpc.Params[i]
 
-	// set metadata security definer
-	if fn.SecurityDefiner {
-		metadataTagInstance.Security = raiden.RpcSecurityTypeDefiner
-	}
+		tag := raiden.RpcParamTag{
+			Name: p.Name,
+			Type: string(p.Type),
+		}
 
-	// set metadata behavior
-	switch strings.ToUpper(fn.Behavior) {
-	case string(raiden.RpcBehaviorVolatile):
-		metadataTagInstance.Behavior = raiden.RpcBehaviorVolatile
-	case string(raiden.RpcBehaviorStable):
-		metadataTagInstance.Behavior = raiden.RpcBehaviorStable
-	case string(raiden.RpcBehaviorImmutable):
-		metadataTagInstance.Behavior = raiden.RpcBehaviorImmutable
-	}
+		if p.Default != nil {
+			tag.DefaultValue = *p.Default
+		}
 
-	tag, err := raiden.MarshalRpcMetadataTag(&metadataTagInstance)
-	if err != nil {
-		return err
-	}
+		rpcTag, e := raiden.MarshalRpcParamTag(&tag)
+		if e != nil {
+			err = e
+			return
+		}
 
-	result.MetadataTag = tag
-	return nil
+		c := RpcColumn{
+			Field: utils.SnakeCaseToPascalCase(p.Name),
+			Type:  raiden.RpcParamToGoType(p.Type),
+			Tag:   fmt.Sprintf("json:%q column:%q", p.Name, rpcTag),
+		}
+
+		splitType := strings.Split(c.Type, ".")
+		if len(splitType) > 1 {
+			importPackage := splitType[0]
+			var importPackageName string
+			switch importPackage {
+			case "time":
+				importPackageName = importPackage
+			case "uuid":
+				importPackageName = "github.com/google/uuid"
+			case "json":
+				importPackageName = "encoding/json"
+			}
+			key := fmt.Sprintf("%q", importPackageName)
+			mapImports[key] = true
+		}
+
+		columns = append(columns, c)
+	}
+	return
 }
 
-func bindRpcFunctionResult(fn *supabase.Function, mapTable map[string]*RpcScannedTable, result *ExtractRpcDataResult, importsMap map[string]bool) error {
+func (r *ExtractRpcDataResult) GetModelDecl() (modelDecl string) {
+	if len(r.MapScannedTable) == 0 {
+		return
+	}
+
+	var bindModelDeclArr []string
+	for _, v := range r.MapScannedTable {
+		bindModelDeclArr = append(bindModelDeclArr, fmt.Sprintf("BindModel(models.%s{}, %q)", utils.SnakeCaseToPascalCase(v.Name), v.Alias))
+	}
+	return "r." + strings.Join(bindModelDeclArr, ".")
+}
+
+func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl string, returnColumns []RpcColumn, isReturnArr bool, err error) {
 	// set result decl
-	frCheck := strings.ToLower(fn.ReturnType)
-	if strings.Contains(frCheck, "setof") {
-		// example
+	frCheck := strings.ToLower(r.OriginalReturnType)
+	switch r.Rpc.ReturnType {
+	case raiden.RpcReturnDataTypeSetOf:
+
 		split := strings.SplitN(frCheck, " ", 2)
 		if len(split) != 2 {
-			if err := fmt.Errorf("invalid return type for rpc : %s", fn.Name); err != nil {
-				return err
+			if err = fmt.Errorf("invalid return type for rpc : %s", r.Rpc.Name); err != nil {
+				return
 			}
 		}
 
 		tableName := split[1]
-		_, isExist := mapTable[tableName]
+		_, isExist := r.MapScannedTable[tableName]
 		if !isExist {
-			err := fmt.Errorf("table %s is not declare in definition function of rpc %s", tableName, fn.Name)
-			return err
+			err = fmt.Errorf("table %s is not declare in definition function of rpc %s", tableName, r.Rpc.Name)
+			return
 		}
 
-		result.ResultDecl = fmt.Sprintf("models.%s", utils.SnakeCaseToPascalCase(tableName))
-		result.ResultTag = fmt.Sprintf("returnType:%q", strings.ToLower(fn.ReturnType))
-		result.IsResultArr = true
-	} else if strings.Contains(frCheck, "table") {
+		isReturnArr = true
+		returnDecl = fmt.Sprintf("models.%s", utils.SnakeCaseToPascalCase(tableName))
+	case raiden.RpcReturnDataTypeTable:
 		// example : "TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)"
-		result.IsResultArr = true
 		rsType := strings.TrimRight(strings.ReplaceAll(frCheck, "table(", ""), ")")
 		rsSplit := strings.Split(rsType, ",")
-
-		resultColumn := make([]RpcColumn, 0)
-		importsPath := make([]string, 0)
 		for _, v := range rsSplit {
 			splitC := strings.SplitN(strings.TrimLeft(v, " "), " ", 2)
-			if len(splitC) == 2 {
-				cType, err := raiden.GetValidRpcParamType(splitC[1], true)
-				if err != nil {
-					return err
-				}
-
-				rsColum := RpcColumn{
-					Field: utils.SnakeCaseToPascalCase(splitC[0]),
-					Type:  raiden.RpcReturnToGoType(raiden.RpcReturnDataType(cType)),
-					Tag:   fmt.Sprintf("json:%q", utils.ToSnakeCase(splitC[0])),
-				}
-
-				splitType := strings.Split(rsColum.Type, ".")
-				if len(splitType) > 1 {
-					importPackage := splitType[0]
-					var importPackageName string
-					switch importPackage {
-					case "time":
-						importPackageName = importPackage
-					case "uuid":
-						importPackageName = "github.com/google/uuid"
-					case "json":
-						importPackageName = "encoding/json"
-					}
-					key := fmt.Sprintf("%q", importPackageName)
-					importsMap[key] = true
-				}
-
-				resultColumn = append(resultColumn, rsColum)
+			if len(splitC) != 2 {
+				continue
 			}
+			cName := splitC[0]
+			cType, e := raiden.GetValidRpcParamType(splitC[1], true)
+			if e != nil {
+				err = e
+				return
+			}
+
+			tag := raiden.RpcParamTag{
+				Name: cName,
+				Type: string(cType),
+			}
+
+			rpcTag, e := raiden.MarshalRpcParamTag(&tag)
+			if e != nil {
+				err = e
+				return
+			}
+
+			c := RpcColumn{
+				Field: utils.SnakeCaseToPascalCase(cName),
+				Type:  raiden.RpcParamToGoType(cType),
+				Tag:   fmt.Sprintf("json:%q column:%q", cName, rpcTag),
+			}
+
+			splitType := strings.Split(c.Type, ".")
+			if len(splitType) > 1 {
+				importPackage := splitType[0]
+				var importPackageName string
+				switch importPackage {
+				case "time":
+					importPackageName = importPackage
+				case "uuid":
+					importPackageName = "github.com/google/uuid"
+				case "json":
+					importPackageName = "encoding/json"
+				}
+				key := fmt.Sprintf("%q", importPackageName)
+				mapImports[key] = true
+			}
+
+			isReturnArr = true
+			returnColumns = append(returnColumns, c)
 		}
-		result.ImportResultPath = append(result.ImportResultPath, importsPath...)
-		result.ResultTag = fmt.Sprintf("returnType:%q", strings.ToLower(fn.ReturnType))
-		result.ResultColumn = resultColumn
-	} else {
-		result.IsResultArr = false
-		returnName := strings.ToUpper(fn.ReturnType)
-		result.ResultDecl = raiden.RpcReturnToGoType(raiden.RpcReturnDataType(returnName))
-		result.ResultTag = fmt.Sprintf("returnType:%q", fn.ReturnType)
+
+	default:
+		isReturnArr = false
+		returnName := strings.ToUpper(string(r.OriginalReturnType))
+		returnDecl = raiden.RpcReturnToGoType(raiden.RpcReturnDataType(returnName))
 	}
 
-	return nil
+	return
 }
 
-func bindModelDecl(def string, mapTable map[string]*RpcScannedTable, result *ExtractRpcDataResult) {
-	var bindModelDeclArr []string
-
-	for _, v := range mapTable {
-		bindModelDeclArr = append(bindModelDeclArr, fmt.Sprintf("BindModel(models.%s{}, %q)", utils.SnakeCaseToPascalCase(v.Name), v.Alias))
-		pattern := fmt.Sprintf(`\b%s\b`, regexp.QuoteMeta(v.Name))
-		def = regexp.MustCompile(pattern).ReplaceAllString(def, ":"+v.Alias)
+func (r *ExtractRpcDataResult) GetSecurity() (security string) {
+	switch r.Rpc.SecurityType {
+	case raiden.RpcSecurityTypeDefiner:
+		return "RpcSecurityTypeDefiner"
+	default:
+		return "RpcSecurityTypeInvoker"
 	}
-	result.Definition = def
-	result.BindModelDecl = "r." + strings.Join(bindModelDeclArr, ".")
+}
+
+func (r *ExtractRpcDataResult) GetBehavior() (behavior string) {
+	switch r.Rpc.Behavior {
+	case raiden.RpcBehaviorImmutable:
+		return "RpcBehaviorImmutable"
+	case raiden.RpcBehaviorStable:
+		return "RpcBehaviorStable"
+	default:
+		return "RpcBehaviorVolatile"
+	}
 }

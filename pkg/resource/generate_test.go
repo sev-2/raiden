@@ -1,4 +1,4 @@
-package imports
+package resource
 
 import (
 	"encoding/json"

@@ -75,6 +75,10 @@ func PreRun(projectPath string) error {
 // The `Run` function generates code based on the provided flags and configuration, including
 // generating controllers, routes, and a main function.
 func Run(flags *Flags, config *raiden.Config, projectPath string, initialize bool) error {
+	if err := generator.CreateInternalFolder(projectPath); err != nil {
+		return err
+	}
+
 	wg, errChan := sync.WaitGroup{}, make(chan error)
 
 	go func() {
@@ -126,6 +130,26 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			}
 		}()
 	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		// generate main function
+		if err := generator.GenerateRpcRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+			errChan <- err
+		}
+
+		if initialize {
+			if err := generator.GenerateImportMainFunction(projectPath, config, generator.Generate); err != nil {
+				errChan <- err
+			} else {
+				errChan <- nil
+			}
+		} else {
+			errChan <- nil
+		}
+	}()
 
 	var err error
 	for rsErr := range errChan {

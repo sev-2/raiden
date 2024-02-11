@@ -29,7 +29,7 @@ func StartCommand() *cobra.Command {
 		Short: "Start new app",
 		Long:  "Start new project, synchronize resource and scaffold application",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f.CheckAndActivateDebug(cmd)
+			debug := f.CheckAndActivateDebug(cmd)
 
 			// preparation
 			// - get current directory
@@ -55,29 +55,18 @@ func StartCommand() *cobra.Command {
 				return err
 			}
 
-			var executeErr error
-			defer func(path string) {
-				if executeErr != nil {
-					utils.DeleteFolder(path)
-				}
-			}(projectPath)
-
-			// 2. running import
-			if executeErr = imports.Run(&f.Imports, &promptConfig.Config, projectPath); executeErr != nil {
+			// 2. running generate
+			if executeErr := generate.Run(&f.Generate, &promptConfig.Config, projectPath, true); executeErr != nil {
 				return executeErr
 			}
 
-			// 3. running generate
-			if executeErr = generate.Run(&f.Generate, &promptConfig.Config, projectPath, true); executeErr != nil {
+			// 3. running init
+			if executeErr := init_cmd.Run(&f.Init, projectPath, utils.ToGoModuleName(promptConfig.ProjectName)); executeErr != nil {
 				return executeErr
 			}
 
-			// 4. running init
-			if executeErr = init_cmd.Run(&f.Init, projectPath, utils.ToGoModuleName(promptConfig.ProjectName)); executeErr != nil {
-				return executeErr
-			}
-
-			return nil
+			// 4. running import
+			return imports.Run(&f.Imports, projectPath, debug)
 		},
 	}
 

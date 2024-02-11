@@ -1,4 +1,4 @@
-package imports
+package resource
 
 import (
 	"fmt"
@@ -127,11 +127,11 @@ func FindResource[T any](data []T, input generator.GenerateInput, findFunc func(
 	return
 }
 
-func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, functions []supabase.Function, err error) {
+func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, rpcGens []generator.GenerateRpcData, err error) {
 	// load app table
 	latestState, err := state.Load()
 	if err != nil {
-		return tables, roles, functions, err
+		return tables, roles, rpcGens, err
 	}
 
 	if latestState == nil {
@@ -153,6 +153,7 @@ func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, 
 	}
 
 	if f.LoadAll() || f.RpcOnly {
+		// TODO : implement load rpc
 		// logger.PrintJson(latestState.RpcState, true)
 	}
 

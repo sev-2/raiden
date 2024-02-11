@@ -1,12 +1,9 @@
 package raiden
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/sev-2/raiden/pkg/utils"
 )
 
 // ----- Define type, variable and constant -----
@@ -24,20 +21,21 @@ type (
 
 	Rpc interface {
 		BindModels()
+		GetName() string
+		GetSchema() string
+		GetSecurity() RpcSecurityType
+		GetBehavior() RpcBehaviorType
 		GetDefinition() string
-
-		BuildQuery() (q string, hash string)
-		Execute(ctx Context, dest any)
 	}
 
 	RpcBase struct {
-		Schema            string
 		Name              string
+		Schema            string
 		Params            []RpcParam
 		Definition        string
 		SecurityType      RpcSecurityType
 		ReturnType        RpcReturnDataType
-		Hash              string
+		Behavior          RpcBehaviorType
 		CompleteStatement string
 		Models            map[string]any
 	}
@@ -46,13 +44,6 @@ type (
 		Name         string
 		Type         string
 		DefaultValue string
-	}
-
-	RpcMetadataTag struct {
-		Name     string
-		Schema   string
-		Security RpcSecurityType
-		Behavior RpcBehaviorType
 	}
 )
 
@@ -72,28 +63,6 @@ const (
 	RpcTemplate = `CREATE OR REPLACE FUNCTION :function_name(:params) RETURNS :return_type LANGUAGE plpgsql :security AS $function$ :definition $function$`
 )
 
-// ----- Rpc base functionality -----
-func (r *RpcBase) BindModel(model any, alias string) *RpcBase {
-	r.Models[alias] = model
-	return r
-}
-
-func (r *RpcBase) BindModels() {}
-func (r *RpcBase) BindParams() {}
-func (r *RpcBase) GetDefinition() string {
-	return ""
-}
-func (r *RpcBase) GetReturnType() RpcReturnDataType {
-	return ""
-}
-
-func (r *RpcBase) BuildQuery() (q string, hash string) {
-	return
-}
-
-func (r *RpcBase) Execute(ctx Context, dest any) {}
-
-// ---- Rpc Param Tag -----
 func MarshalRpcParamTag(paramTag *RpcParamTag) (string, error) {
 	if paramTag == nil {
 		return "", nil
@@ -146,77 +115,40 @@ func UnmarshalRpcParamTag(tag string) (RpcParamTag, error) {
 	return paramTag, nil
 }
 
-// ----- Rpc Metadata Tag -----
-func MarshalRpcMetadataTag(metadataTag *RpcMetadataTag) (string, error) {
-	if metadataTag == nil {
-		return "", nil
+// ----- Rpc base functionality -----
+func NewRpc(name string) *RpcBase {
+	return &RpcBase{
+		Name:         name,
+		Schema:       DefaultRpcSchema,
+		SecurityType: RpcSecurityTypeInvoker,
+		Behavior:     RpcBehaviorVolatile,
 	}
-
-	var tagArr []string
-
-	if metadataTag.Name != "" {
-		tagArr = append(tagArr, fmt.Sprintf("name:%q", metadataTag.Name))
-	}
-
-	if metadataTag.Schema != "" {
-		tagArr = append(tagArr, fmt.Sprintf("schema:%q", metadataTag.Schema))
-	}
-
-	if metadataTag.Security != "" {
-		tagArr = append(tagArr, fmt.Sprintf("security:%q", strings.ToLower(string(metadataTag.Security))))
-	}
-
-	if metadataTag.Behavior != "" {
-		tagArr = append(tagArr, fmt.Sprintf("behavior:%q", strings.ToLower(string(metadataTag.Behavior))))
-	}
-
-	return strings.Join(tagArr, " "), nil
 }
 
-func UnmarshalRpcMetadataTag(rawTag string) (RpcMetadataTag, error) {
-	var metadata RpcMetadataTag
-	tagMap := utils.ParseTag(rawTag)
-
-	fnName, isExist := tagMap["name"]
-	if !isExist {
-		return metadata, errors.New("rpc metadata : name is must be set in metadata tag")
-	}
-	metadata.Name = fnName
-
-	if fnSchema, isExist := tagMap["schema"]; !isExist {
-		metadata.Schema = DefaultRpcSchema
-	} else {
-		metadata.Schema = fnSchema
-	}
-
-	if fnSecurity, isExist := tagMap["security"]; !isExist {
-		metadata.Security = RpcSecurityTypeInvoker
-	} else {
-		switch strings.ToUpper(fnSecurity) {
-		case string(RpcSecurityTypeInvoker):
-			metadata.Security = RpcSecurityTypeInvoker
-		case string(RpcSecurityTypeDefiner):
-			metadata.Security = RpcSecurityTypeDefiner
-		default:
-			return metadata, errors.New("rpc metadata : invalid security tag " + fnSecurity)
-		}
-
-	}
-
-	if fnBehavior, isExist := tagMap["volatile"]; !isExist {
-		metadata.Behavior = RpcBehaviorVolatile
-	} else {
-		switch strings.ToUpper(fnBehavior) {
-		case string(RpcBehaviorVolatile):
-			metadata.Behavior = RpcBehaviorVolatile
-		case string(RpcBehaviorStable):
-			metadata.Behavior = RpcBehaviorStable
-		case string(RpcBehaviorImmutable):
-			metadata.Behavior = RpcBehaviorImmutable
-		default:
-			return metadata, errors.New("rpc metadata : invalid behavior tag  " + fnBehavior)
-		}
-	}
-
-	return metadata, nil
+func (r *RpcBase) BindModel(model any, alias string) *RpcBase {
+	r.Models[alias] = model
+	return r
 }
+
+func (r *RpcBase) GetName() string {
+	return ""
+}
+
+func (r *RpcBase) GetSchema() string {
+	return DefaultRpcSchema
+}
+
+func (r *RpcBase) GetSecurity() RpcSecurityType {
+	return RpcSecurityTypeInvoker
+}
+
+func (r *RpcBase) GetBehavior() RpcBehaviorType {
+	return RpcBehaviorVolatile
+}
+
+func (r *RpcBase) GetDefinition() string {
+	Panicf("Rpc definition must be set")
+	return ""
+}
+
+func (r *RpcBase) Execute(ctx Context, dest any) {}

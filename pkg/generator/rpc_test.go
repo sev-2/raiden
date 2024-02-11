@@ -3,6 +3,7 @@ package generator_test
 import (
 	"testing"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
@@ -28,18 +29,15 @@ func TestRpcExtractParam(t *testing.T) {
 		ArgumentTypes: "in_candidate_name character varying DEFAULT 'anon'::character varying, in_voter_name character varying DEFAULT 'anon'::character varying",
 	}
 
-	importsPath := map[string]bool{}
-	param, err := generator.ExtractRpcParam(&fn, importsPath)
+	param, err := generator.ExtractRpcParam(&fn)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(param))
-	assert.Equal(t, "CandidateName", param[0].Field)
-	assert.Equal(t, "string", param[0].Type)
-	assert.Equal(t, "json:\"candidate_name\" param:\"name:candidate_name;type:varchar;default:anon\"", param[0].Tag)
+	assert.Equal(t, "candidate_name", param[0].Name)
+	assert.Equal(t, raiden.RpcParamDataTypeVarcharAlias, param[0].Type)
 
-	assert.Equal(t, "VoterName", param[1].Field)
-	assert.Equal(t, "string", param[1].Type)
-	assert.Equal(t, "json:\"voter_name\" param:\"name:voter_name;type:varchar;default:anon\"", param[1].Tag)
+	assert.Equal(t, "voter_name", param[1].Name)
+	assert.Equal(t, raiden.RpcParamDataTypeVarcharAlias, param[1].Type)
 }
 
 func TestExtractRpcData(t *testing.T) {
@@ -83,11 +81,17 @@ func TestExtractRpcData(t *testing.T) {
 		SecurityDefiner: false,
 	}
 
-	importsMap := make(map[string]bool)
-	result, err := generator.ExtractRpcData(&fn, importsMap)
+	result, err := generator.ExtractRpcFunction(&fn)
 	assert.NoError(t, err)
 
-	logger.PrintJson(result, true)
+	assert.Equal(t, fn.Name, result.Rpc.Name)
+	assert.Equal(t, raiden.DefaultRpcSchema, result.Rpc.Schema)
+	assert.Equal(t, raiden.RpcBehaviorVolatile, result.Rpc.Behavior)
+
+	assert.Equal(t, raiden.RpcSecurityTypeInvoker, result.Rpc.SecurityType)
+	assert.Equal(t, raiden.RpcReturnDataTypeTable, result.Rpc.ReturnType)
+	assert.Equal(t, fn.ReturnType, result.OriginalReturnType)
+	assert.Equal(t, 3, len(result.MapScannedTable))
 }
 
 func TestExtractRpcTable(t *testing.T) {
