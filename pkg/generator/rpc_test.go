@@ -130,7 +130,7 @@ func TestExtractRpcTable(t *testing.T) {
 	assert.Equal(t, 1, len(scouter.Relation))
 }
 
-func TestNormalieTableAlias(t *testing.T) {
+func TestNormalizeTableAlias(t *testing.T) {
 	mapAlias := map[string]*generator.RpcScannedTable{
 		"submission": {
 			Name:  "submission",
