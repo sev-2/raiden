@@ -9,20 +9,20 @@ import (
 )
 
 type MockContext struct {
-	CtxFn                  func() context.Context
-	SetCtxFn               func(ctx context.Context)
-	ConfigFn               func() *raiden.Config
-	ExecuteRpcFn           func(rpc *raiden.Rpc, data any) error
-	ExecuteRpcWithParamsFn func(rpc *raiden.Rpc, params map[string]any, data any) error
-	SendJsonFn             func(data any) error
-	SendErrorFn            func(err string) error
-	SendErrorWithCodeFn    func(statusCode int, err error) error
-	RequestContextFn       func() *fasthttp.RequestCtx
-	SpanFn                 func() trace.Span
-	SetSpanFn              func(span trace.Span)
-	TracerFn               func() trace.Tracer
-	WriteFn                func(data []byte)
-	WriteErrorFn           func(err error)
+	CtxFn               func() context.Context
+	SetCtxFn            func(ctx context.Context)
+	ConfigFn            func() *raiden.Config
+	SendJsonFn          func(data any) error
+	SendErrorFn         func(err string) error
+	SendErrorWithCodeFn func(statusCode int, err error) error
+	RequestContextFn    func() *fasthttp.RequestCtx
+	SendRpcFn           func(rpc raiden.Rpc) error
+	ExecuteRpcFn        func(rpc raiden.Rpc) (any, error)
+	SpanFn              func() trace.Span
+	SetSpanFn           func(span trace.Span)
+	TracerFn            func() trace.Tracer
+	WriteFn             func(data []byte)
+	WriteErrorFn        func(err error)
 }
 
 func (c *MockContext) Ctx() context.Context {
@@ -37,12 +37,12 @@ func (c *MockContext) Config() *raiden.Config {
 	return c.ConfigFn()
 }
 
-func (c *MockContext) ExecuteRpc(rpc *raiden.Rpc, data any) error {
-	return c.ExecuteRpcFn(rpc, data)
+func (c *MockContext) SendRpc(rpc raiden.Rpc) error {
+	return c.SendRpcFn(rpc)
 }
 
-func (c *MockContext) ExecuteRpcWithParams(rpc *raiden.Rpc, params map[string]any, data any) error {
-	return c.ExecuteRpcWithParamsFn(rpc, params, data)
+func (c *MockContext) ExecuteRpc(rpc raiden.Rpc) (any, error) {
+	return c.ExecuteRpcFn(rpc)
 }
 
 func (c *MockContext) SendJson(data any) error {
@@ -50,7 +50,7 @@ func (c *MockContext) SendJson(data any) error {
 }
 
 func (c *MockContext) SendError(message string) error {
-	return c.SendError(message)
+	return c.SendErrorFn(message)
 }
 
 func (c *MockContext) SendErrorWithCode(statusCode int, err error) error {

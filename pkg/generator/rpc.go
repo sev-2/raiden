@@ -32,12 +32,15 @@ type (
 		Rpc                raiden.RpcBase
 		MapScannedTable    map[string]*RpcScannedTable
 		OriginalReturnType string
+		UseParamPrefix     bool
 	}
 
 	GenerateRpcData struct {
 		Package string
 		Imports []string
-		Params  []RpcColumn
+
+		UseParamPrefix bool
+		Params         []RpcColumn
 
 		ReturnType   string
 		ReturnColumn []RpcColumn
@@ -95,29 +98,37 @@ func (r *{{ .Name }}) GetName() string {
 }
 
 {{- if ne .Schema "public" }}
+
 func (r *{{.Name }}) GetSchema() string {
 	return "{{ .Schema }}"
 }
 
 {{- end }}
-{{- if ne .Security "RpcSecurityTypeInvoker" }}
-func (r *{{.Name }}) GetScurity() raiden.RpcSecurityType {
-	return raiden.{{ .Security }}
+{{- if not .UseParamPrefix }}
+
+func  (r *{{.Name }}) UseParamPrefix() bool {
+	return false
 }
 
 {{- end }}
+{{- if ne .Security "RpcSecurityTypeInvoker" }}
+
+func (r *{{.Name }}) GetSecurity() raiden.RpcSecurityType {
+	return raiden.{{ .Security }}
+}
+{{- end }}
 {{- if ne .Behavior "RpcBehaviorVolatile" }}
+
 func (r *{{.Name }}) GetBehavior() raiden.RpcBehaviorType {
 	return raiden.{{ .Behavior }}
 }
-
 {{- end }}
 
 func (r *{{.Name }}) GetReturnType() raiden.RpcReturnDataType {
 	return raiden.{{ .ReturnType }}
 }
-
 {{- if ne .Models "" }}
+
 func (r *{{ .Name }}) BindModels() {
 	{{ .Models }}
 }
@@ -154,12 +165,10 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 	}
 
 	// set imports path
-	modelsImportPath := fmt.Sprintf("%s/%s", utils.ToGoModuleName(projectName), ModelDir)
-	modePath := fmt.Sprintf("%q", modelsImportPath)
+
 	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
 	importsMap := map[string]bool{
 		raidenPath: true,
-		modePath:   true,
 	}
 
 	// define file path
@@ -186,6 +195,12 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 		return err
 	}
 
+	if result.GetModelDecl() != "" {
+		modelsImportPath := fmt.Sprintf("%s/%s", utils.ToGoModuleName(projectName), ModelDir)
+		modePath := fmt.Sprintf("%q", modelsImportPath)
+		importsMap[modePath] = true
+	}
+
 	var importsPath []string
 	for key := range importsMap {
 		importsPath = append(importsPath, key)
@@ -193,19 +208,20 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 
 	// set data
 	data := GenerateRpcData{
-		Package:      "rpc",
-		Imports:      importsPath,
-		Name:         utils.SnakeCaseToPascalCase(function.Name),
-		Params:       rpcParams,
-		ReturnType:   returnTypeDecl,
-		ReturnDecl:   returnDecl,
-		ReturnColumn: returnColumns,
-		IsReturnArr:  IsReturnArr,
-		Schema:       result.Rpc.Schema,
-		Security:     result.GetSecurity(),
-		Behavior:     result.GetBehavior(),
-		Models:       result.GetModelDecl(),
-		Definition:   result.Rpc.Definition,
+		Package:        "rpc",
+		Imports:        importsPath,
+		Name:           utils.SnakeCaseToPascalCase(function.Name),
+		Params:         rpcParams,
+		UseParamPrefix: result.UseParamPrefix,
+		ReturnType:     returnTypeDecl,
+		ReturnDecl:     returnDecl,
+		ReturnColumn:   returnColumns,
+		IsReturnArr:    IsReturnArr,
+		Schema:         result.Rpc.Schema,
+		Security:       result.GetSecurity(),
+		Behavior:       result.GetBehavior(),
+		Models:         result.GetModelDecl(),
+		Definition:     result.Rpc.Definition,
 	}
 
 	// setup generate input param
@@ -223,7 +239,7 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 
 func ExtractRpcFunction(fn *supabase.Function) (result ExtractRpcDataResult, err error) {
 	//  extract param
-	params, e := ExtractRpcParam(fn)
+	params, usePrefix, e := ExtractRpcParam(fn)
 	if e != nil {
 		err = e
 		return
@@ -270,18 +286,19 @@ func ExtractRpcFunction(fn *supabase.Function) (result ExtractRpcDataResult, err
 	result.Rpc.Schema = fn.Schema
 	result.Rpc.Behavior = raiden.RpcBehaviorType(fn.Behavior)
 	result.Rpc.Name = fn.Name
-	result.Rpc.Definition = bindModelToDefinition(definition, mapScannedTable)
+	result.Rpc.Definition = bindModelToDefinition(definition, mapScannedTable, result.Rpc.Params, usePrefix)
 	result.Rpc.CompleteStatement = fn.CompleteStatement
 	result.Rpc.SecurityType = securityType
 	result.Rpc.ReturnType = returnType
 
 	result.OriginalReturnType = fn.ReturnType
 	result.MapScannedTable = mapScannedTable
+	result.UseParamPrefix = usePrefix
 
 	return
 }
 
-func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, err error) {
+func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, usePrefix bool, err error) {
 	mapParam := make(map[string]string)
 
 	// bind param to map
@@ -289,8 +306,9 @@ func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, err error
 	// - "in_candidate_name character varying DEFAULT 'anon'::character varying, in_voter_name character varying DEFAULT 'anon'::character varying"
 	for _, at := range strings.Split(fn.ArgumentTypes, ",") {
 		// at example : in_candidate_name character varying DEFAULT 'anon'::character varying
-		if strings.Contains(at, "DEFAULT") {
-			splitTextDefault := strings.Split(at, "DEFAULT")
+		cleanArgType := strings.TrimLeft(strings.TrimRight(at, " "), " ")
+		if strings.Contains(cleanArgType, "DEFAULT") {
+			splitTextDefault := strings.Split(cleanArgType, "DEFAULT")
 			if len(splitTextDefault) != 2 {
 				continue
 			}
@@ -321,11 +339,10 @@ func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, err error
 			continue
 		}
 
-		splitIat := strings.SplitN(at, " ", 2)
+		splitIat := strings.SplitN(cleanArgType, " ", 2)
 		if len(splitIat) == 2 {
 			mapParam[splitIat[0]] = splitIat[1]
 		}
-
 	}
 
 	// loop for create rpc param and add to params variable
@@ -335,7 +352,8 @@ func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, err error
 			continue
 		}
 
-		fieldName := strings.ReplaceAll(fa.Name, raiden.DefaultParamPrefix, "")
+		usePrefix = strings.HasPrefix(fa.Name, raiden.DefaultRpcParamPrefix)
+		fieldName := strings.ReplaceAll(fa.Name, raiden.DefaultRpcParamPrefix, "")
 		p := raiden.RpcParam{
 			Name: fieldName,
 			Type: raiden.RpcParamDataTypeText,
@@ -346,7 +364,7 @@ func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, err error
 			pt = strings.TrimLeft(strings.TrimRight(pt, " "), " ")
 			paramType, err := raiden.GetValidRpcParamType(pt, true)
 			if err != nil {
-				return params, err
+				return params, usePrefix, err
 			}
 			p.Type = paramType
 		}
@@ -491,10 +509,20 @@ func RpcNormalizeTableAliases(mapTables map[string]*RpcScannedTable) error {
 	return nil
 }
 
-func bindModelToDefinition(def string, mapTable map[string]*RpcScannedTable) string {
+func bindModelToDefinition(def string, mapTable map[string]*RpcScannedTable, params []raiden.RpcParam, useParamPrefix bool) string {
 	for _, v := range mapTable {
 		pattern := fmt.Sprintf(`\b%s\b`, regexp.QuoteMeta(v.Name))
 		def = regexp.MustCompile(pattern).ReplaceAllString(def, ":"+v.Alias)
+	}
+
+	for i := range params {
+		p := params[i]
+		key := p.Name
+		if useParamPrefix {
+			key += raiden.DefaultRpcParamPrefix + key
+		}
+		pattern := fmt.Sprintf(`\b%s\b`, regexp.QuoteMeta(key))
+		def = regexp.MustCompile(pattern).ReplaceAllString(def, ":"+key)
 	}
 	return def
 }

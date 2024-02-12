@@ -25,6 +25,7 @@ type (
 
 	TableState struct {
 		Table       supabase.Table
+		Relation    []generator.Relation
 		ModelPath   string
 		ModelStruct string
 		LastUpdate  time.Time
@@ -39,11 +40,10 @@ type (
 	}
 
 	RpcState struct {
-		Function     supabase.Function
-		GenerateData generator.GenerateRpcData
-		RpcPath      string
-		RpcStruct    string
-		LastUpdate   time.Time
+		Function   supabase.Function
+		RpcPath    string
+		RpcStruct  string
+		LastUpdate time.Time
 	}
 
 	CompareDiffType     string

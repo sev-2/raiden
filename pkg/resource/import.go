@@ -37,7 +37,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	resource.Roles = filterUserRoleAndBindNativeRole(resource.Roles, mapNativeRole)
 
 	// load app resource
-	appTables, appRoles, _, err := loadAppResource(flags)
+	appTables, appRoles, appRpcFunctions, err := loadAppResource(flags)
 	if err != nil {
 		return err
 	}
@@ -55,13 +55,19 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
+	if (flags.LoadAll() || flags.RpcOnly) && len(appRpcFunctions) > 0 {
+		if err := compareRpcFunctions(resource.Functions, appRpcFunctions); err != nil {
+			return err
+		}
+	}
+
 	// create import state
 	nativeStateRoles, err := createNativeRoleState(mapNativeRole)
 	if err != nil {
 		return err
 	}
 
-	importState := ImportState{
+	importState := resourceState{
 		State: state.State{
 			Roles: nativeStateRoles,
 		},
@@ -144,6 +150,23 @@ func compareRoles(supabaseRoles []supabase.Role, appRoles []supabase.Role) error
 			cli.PrintDiff("role", d.SupabaseResource, d.AppResource, d.Name)
 		}
 		return errors.New("import roles is canceled, you have conflict role. please fix it first")
+	}
+
+	return nil
+}
+
+func compareRpcFunctions(supabaseFn []supabase.Function, appFn []supabase.Function) error {
+	diffResult, err := state.CompareRpcFunctions(supabaseFn, appFn)
+	if err != nil {
+		return err
+	}
+
+	if len(diffResult) > 0 {
+		for i := range diffResult {
+			d := diffResult[i]
+			cli.PrintDiff("rpc function", d.SupabaseResource, d.AppResource, d.Name)
+		}
+		return errors.New("import rpc function is canceled, you have conflict rpc function. please fix it first")
 	}
 
 	return nil

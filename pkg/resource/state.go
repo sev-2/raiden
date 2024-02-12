@@ -13,37 +13,37 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-type ImportState struct {
+type resourceState struct {
 	State state.State
 	Mutex sync.RWMutex
 }
 
-func (s *ImportState) AddTable(table state.TableState) {
+func (s *resourceState) AddTable(table state.TableState) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 
 	s.State.Tables = append(s.State.Tables, table)
 }
 
-func (s *ImportState) AddRole(role state.RoleState) {
+func (s *resourceState) AddRole(role state.RoleState) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 	s.State.Roles = append(s.State.Roles, role)
 }
 
-func (s *ImportState) AddRpc(rpc state.RpcState) {
+func (s *resourceState) AddRpc(rpc state.RpcState) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 	s.State.RpcState = append(s.State.RpcState, rpc)
 }
 
-func (s *ImportState) Persist() error {
+func (s *resourceState) Persist() error {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return state.Save(&s.State)
 }
 
-func ListenStateResource(importState *ImportState, stateChan chan any) (done chan error) {
+func ListenStateResource(resourceState *resourceState, stateChan chan any) (done chan error) {
 	done = make(chan error)
 	go func() {
 		for rs := range stateChan {
@@ -69,8 +69,9 @@ func ListenStateResource(importState *ImportState, stateChan chan any) (done cha
 						ModelPath:   genInput.OutputPath,
 						ModelStruct: utils.SnakeCaseToPascalCase(parseItem.Table.Name),
 						LastUpdate:  time.Now(),
+						Relation:    parseItem.Relations,
 					}
-					importState.AddTable(tableState)
+					resourceState.AddTable(tableState)
 				case supabase.Role:
 					roleState := state.RoleState{
 						Role:       parseItem,
@@ -79,7 +80,7 @@ func ListenStateResource(importState *ImportState, stateChan chan any) (done cha
 						IsNative:   false,
 						LastUpdate: time.Now(),
 					}
-					importState.AddRole(roleState)
+					resourceState.AddRole(roleState)
 				case supabase.Function:
 					rpcState := state.RpcState{
 						Function:   parseItem,
@@ -88,16 +89,11 @@ func ListenStateResource(importState *ImportState, stateChan chan any) (done cha
 						LastUpdate: time.Now(),
 					}
 
-					genData, isRpcGenData := genInput.BindData.(generator.GenerateRpcData)
-					if isRpcGenData {
-						rpcState.GenerateData = genData
-					}
-
-					importState.AddRpc(rpcState)
+					resourceState.AddRpc(rpcState)
 				}
 			}
 		}
-		done <- importState.Persist()
+		done <- resourceState.Persist()
 	}()
 	return done
 }
@@ -127,11 +123,11 @@ func FindResource[T any](data []T, input generator.GenerateInput, findFunc func(
 	return
 }
 
-func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, rpcGens []generator.GenerateRpcData, err error) {
+func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, rpc []supabase.Function, err error) {
 	// load app table
 	latestState, err := state.Load()
 	if err != nil {
-		return tables, roles, rpcGens, err
+		return tables, roles, rpc, err
 	}
 
 	if latestState == nil {
@@ -153,8 +149,10 @@ func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, 
 	}
 
 	if f.LoadAll() || f.RpcOnly {
-		// TODO : implement load rpc
-		// logger.PrintJson(latestState.RpcState, true)
+		rpc, err = state.ToRpc(latestState.RpcState, registeredRpc)
+		if err != nil {
+			return
+		}
 	}
 
 	return

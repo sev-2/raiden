@@ -3,7 +3,6 @@ package raiden
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 
 	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
@@ -18,8 +17,8 @@ type (
 
 		Config() *Config
 
-		// SendRpc(Rpc) error
-		// ExecuteRpc(Rpc) error
+		SendRpc(Rpc) error
+		ExecuteRpc(Rpc) (any, error)
 
 		SendJson(data any) error
 		SendError(message string) error
@@ -53,40 +52,17 @@ func (c *Ctx) Config() *Config {
 	return c.config
 }
 
-// The `toPointer` function is a method of the `Ctx` struct in the Raiden framework. It takes an
-// argument `data` of type `any` (which is an empty interface{}) and converts it to a pointer if it is
-// not already a pointer.
-func (c Ctx) toPointer(data any) any {
-	valueOfData := reflect.ValueOf(data)
-	if valueOfData.Kind() != reflect.Pointer || valueOfData.Kind() != reflect.Ptr {
-		pointerData := reflect.New(reflect.TypeOf(valueOfData.Interface()))
-		data = pointerData.Interface()
+func (c *Ctx) SendRpc(rpc Rpc) error {
+	rs, err := c.ExecuteRpc(rpc)
+	if err != nil {
+		return err
 	}
-	return data
+
+	return c.SendJson(rs)
 }
 
-// func (c *Ctx) ExecuteRpc(rpc *Rpc, data any) error {
-// 	dataPtr := c.toPointer(data)
-// 	if err := rpc.Execute(&c.Request, c.toPointer(dataPtr)); err != nil {
-// 		return err
-// 	}
-// 	return c.SendJson(dataPtr)
-// }
-
-// func (c *Ctx) ExecuteRpcWithParams(rpc *Rpc, params map[string]any, data any) error {
-// 	dataPtr := c.toPointer(data)
-// 	if err := rpc.ExecuteWithParam(&c.Request, params, dataPtr); err != nil {
-// 		return err
-// 	}
-// 	return c.SendJson(dataPtr)
-// }
-
-func (c *Ctx) SendRpc(Rpc) error {
-	return nil
-}
-
-func (c *Ctx) ExecuteRpc(Rpc) error {
-	return nil
+func (c *Ctx) ExecuteRpc(rpc Rpc) (any, error) {
+	return ExecuteRpc(c, rpc)
 }
 
 func (c *Ctx) RequestContext() *fasthttp.RequestCtx {

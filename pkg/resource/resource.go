@@ -32,10 +32,10 @@ func (f Flags) CheckAndActivateDebug(cmd *cobra.Command) bool {
 	return verbose
 }
 
-var rpc []raiden.Rpc
+var registeredRpc []raiden.Rpc
 
 func RegisterRpc(list ...raiden.Rpc) {
-	rpc = append(rpc, list...)
+	registeredRpc = append(registeredRpc, list...)
 }
 
 func PreRun(projectPath string) error {

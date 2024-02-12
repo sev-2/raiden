@@ -96,7 +96,6 @@ func metaExecQuery(ctx context.Context, query string) (result any, err error) {
 		return
 	}
 
-	// logger.PrintJson(anyResult, true)
 	if response.StatusCode >= 400 {
 		err = fmt.Errorf("execute query got status code %v", response.StatusCode)
 		return

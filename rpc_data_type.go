@@ -95,12 +95,12 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeBoolean, nil
 	case RpcParamDataTypeBytea:
 		return RpcParamDataTypeBytea, nil
-	case RpcParamDataTypeTimestamp:
+	case RpcParamDataTypeTimestamp, RpcParamDataTypeTimestampAlias:
 		if returnAlias {
 			return RpcParamDataTypeTimestampAlias, nil
 		}
 		return RpcParamDataTypeTimestamp, nil
-	case RpcParamDataTypeTimestampTZ:
+	case RpcParamDataTypeTimestampTZ, RpcParamDataTypeTimestampTZAlias:
 		if returnAlias {
 			return RpcParamDataTypeTimestampTZAlias, nil
 		}
@@ -159,12 +159,12 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeBoolean, nil
 	case RpcReturnDataTypeBytea:
 		return RpcReturnDataTypeBytea, nil
-	case RpcReturnDataTypeTimestamp:
+	case RpcReturnDataTypeTimestamp, RpcReturnDataTypeTimestampAlias:
 		if returnAlias {
 			return RpcReturnDataTypeTimestampAlias, nil
 		}
 		return RpcReturnDataTypeTimestamp, nil
-	case RpcReturnDataTypeTimestampTZ:
+	case RpcReturnDataTypeTimestampTZ, RpcReturnDataTypeTimestampTZAlias:
 		if returnAlias {
 			return RpcReturnDataTypeTimestampTZAlias, nil
 		}

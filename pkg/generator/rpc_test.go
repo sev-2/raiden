@@ -5,7 +5,6 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,10 +28,12 @@ func TestRpcExtractParam(t *testing.T) {
 		ArgumentTypes: "in_candidate_name character varying DEFAULT 'anon'::character varying, in_voter_name character varying DEFAULT 'anon'::character varying",
 	}
 
-	param, err := generator.ExtractRpcParam(&fn)
+	param, usePrefix, err := generator.ExtractRpcParam(&fn)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(param))
+	assert.Equal(t, true, usePrefix)
+
 	assert.Equal(t, "candidate_name", param[0].Name)
 	assert.Equal(t, raiden.RpcParamDataTypeVarcharAlias, param[0].Type)
 
@@ -108,7 +109,6 @@ func TestExtractRpcTable(t *testing.T) {
 	`
 
 	_, mapTable, err := generator.ExtractRpcTable(definition)
-	logger.PrintJson(mapTable, true)
 	assert.NoError(t, err)
 
 	submission, isSubmissionExist := mapTable["submission"]

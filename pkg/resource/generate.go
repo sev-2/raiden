@@ -23,7 +23,7 @@ type ManyToManyTable struct {
 
 // The `generateResource` function generates various resources such as table, roles, policy and etc
 // also generate framework resource like controller, route, main function and etc
-func generateResource(config *raiden.Config, importState *ImportState, projectPath string, resource *Resource) error {
+func generateResource(config *raiden.Config, importState *resourceState, projectPath string, resource *Resource) error {
 	if err := generator.CreateInternalFolder(projectPath); err != nil {
 		return err
 	}

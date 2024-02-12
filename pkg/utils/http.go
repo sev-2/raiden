@@ -66,6 +66,7 @@ func getHttpClient() *fasthttp.Client {
 }
 
 func SendRequest(httpMethod string, url string, body []byte, reqInterceptor func(req *fasthttp.Request)) ([]byte, error) {
+
 	// per-request timeout
 	reqTimeout := time.Duration(1000) * time.Millisecond
 
