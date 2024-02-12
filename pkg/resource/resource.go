@@ -5,6 +5,7 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli/configure"
+	"github.com/sev-2/raiden/pkg/cli/generate"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/spf13/cobra"
 )
@@ -17,6 +18,7 @@ type Flags struct {
 	ModelsOnly    bool
 	AllowedSchema string
 	Verbose       bool
+	Generate      generate.Flags
 }
 
 // LoadAll is function to check is all resource need to import or apply

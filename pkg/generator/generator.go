@@ -36,7 +36,6 @@ func DefaultWriter(filePath string) (*os.File, error) {
 }
 
 func Generate(input GenerateInput, writer io.Writer) error {
-
 	// set default writer
 	if writer == nil {
 		file, err := DefaultWriter(input.OutputPath)

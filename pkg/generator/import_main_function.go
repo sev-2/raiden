@@ -49,7 +49,12 @@ func main() {
 			}
 
 			bootstrap.RegisterRpc()
-			return resource.Import(&f, config)
+			
+			if err := resource.Import(&f, config); err != nil {
+				return err
+			}
+
+			return generate.Run(&f.Generate, config, f.ProjectPath, false)
 		},
 	}
 
@@ -59,6 +64,8 @@ func main() {
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
+
+	f.Generate.Bind(cmd)
 
 	cmd.Execute()
 }
@@ -91,6 +98,7 @@ func GenerateImportMainFunction(basePath string, config *raiden.Config, generate
 	// setup import path
 	importPaths := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
+		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/cli/generate"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/logger"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/resource"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/utils"),

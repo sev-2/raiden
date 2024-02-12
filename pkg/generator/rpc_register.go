@@ -72,7 +72,7 @@ func GenerateRpcRegister(basePath string, projectName string, generateFn Generat
 		return err
 	}
 
-	logger.Debugf("GenerateRpcRegister - generate route to %s", input.OutputPath)
+	logger.Debugf("GenerateRpcRegister - generate rpc to %s", input.OutputPath)
 	return generateFn(input, nil)
 }
 
@@ -151,10 +151,6 @@ func getRpc(filePath string) (r []string, err error) {
 			}
 			st, ok := typeSpec.Type.(*ast.StructType)
 			if !ok {
-				continue
-			}
-
-			if typeSpec.Name.Name != "GetVoteBy" {
 				continue
 			}
 
