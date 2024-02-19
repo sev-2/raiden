@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/sev-2/raiden/pkg/supabase/client"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/valyala/fasthttp"
 )
@@ -50,8 +51,8 @@ type (
 		GetReturnType() RpcReturnDataType
 		SetReturnTypeStmt(returnTypeStmt string)
 		GetReturnTypeStmt() string
-		SetDefinition(definition string)
-		GetDefinition() string
+		SetRawDefinition(definition string)
+		GetRawDefinition() string
 		SetCompleteStmt(stmt string)
 		GetCompleteStmt() string
 	}
@@ -232,12 +233,12 @@ func (r *RpcBase) SetReturnType(returnType RpcReturnDataType) {
 	r.ReturnType = returnType
 }
 
-func (r *RpcBase) SetDefinition(definition string) {
+func (r *RpcBase) SetRawDefinition(definition string) {
 	r.Definition = definition
 }
 
-func (r *RpcBase) GetDefinition() (d string) {
-	Panicf("Rpc definition type is not implemented, use GetDefinition for set it")
+func (r *RpcBase) GetRawDefinition() (d string) {
+	Panicf("Rpc definition type is not implemented, use GetRawDefinition for set it")
 	return
 }
 
@@ -364,7 +365,7 @@ func BuildRpc(rpc Rpc) (err error) {
 
 	// build definitions
 	definition := buildRpcDefinition(rpc)
-	rpc.SetDefinition(definition)
+	rpc.SetRawDefinition(definition)
 	q = strings.ReplaceAll(q, ":definition", definition)
 
 	// cleanup
@@ -454,7 +455,7 @@ func buildRpcReturnTable(returnReflectType reflect.Type, rpc Rpc) (q string, err
 }
 
 func buildRpcDefinition(rpc Rpc) string {
-	definition := rpc.GetDefinition()
+	definition := rpc.GetRawDefinition()
 
 	dFields := strings.Fields(utils.CleanUpString(definition))
 	for i := range dFields {
@@ -585,8 +586,8 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 	return returnValue.Interface(), nil
 }
 
-func rpcAttachAuthHeader(inReq *fasthttp.Request) func(*fasthttp.Request) {
-	return func(outReq *fasthttp.Request) {
+func rpcAttachAuthHeader(inReq *fasthttp.Request) client.RequestInterceptor {
+	return func(outReq *fasthttp.Request) error {
 		if authHeader := inReq.Header.Peek("Authorization"); len(authHeader) > 0 {
 			outReq.Header.AddBytesV("Authorization", authHeader)
 		}
@@ -594,11 +595,13 @@ func rpcAttachAuthHeader(inReq *fasthttp.Request) func(*fasthttp.Request) {
 		if apiKey := inReq.Header.Peek("apiKey"); len(apiKey) > 0 {
 			outReq.Header.AddBytesV("apiKey", apiKey)
 		}
+
+		return nil
 	}
 }
 
-func rpcSendRequest(apiUrl string, body []byte, reqInterceptor func(req *fasthttp.Request)) ([]byte, error) {
-	resData, err := utils.SendRequest(fasthttp.MethodPost, apiUrl, body, reqInterceptor)
+func rpcSendRequest(apiUrl string, body []byte, reqInterceptor client.RequestInterceptor) ([]byte, error) {
+	resData, err := client.SendRequest(fasthttp.MethodPost, apiUrl, body, client.DefaultTimeout, reqInterceptor, nil)
 	if err != nil {
 		sendErr, isHaveData := err.(utils.SendRequestError)
 		if isHaveData {

@@ -134,7 +134,7 @@ func (r *{{ .Name }}) BindModels() {
 }
 {{- end }}
 
-func (r *{{ .Name }}) GetDefinition() string {
+func (r *{{ .Name }}) GetRawDefinition() string {
 	return ` + "`{{ .Definition }}`" + `
 }`
 )

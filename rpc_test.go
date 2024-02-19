@@ -49,7 +49,7 @@ func (r *GetSubmissions) BindModels() {
 	r.BindModel(Submission{}, "s").BindModel(Scouter{}, "sc").BindModel(Candidate{}, "c")
 }
 
-func (r *GetSubmissions) GetDefinition() string {
+func (r *GetSubmissions) GetRawDefinition() string {
 	return `BEGIN RETURN QUERY SELECT s.id, s.created_at, sc.name as sc_name, c.name as c_name FROM :s s INNER JOIN :sc sc ON s.scouter_id = sc.scouter_id INNER JOIN :c c ON s.candidate_id = c.candidate_id WHERE sc.name = :scouter_name AND c.name = :candidate_name; END;`
 }
 
