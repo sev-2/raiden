@@ -3,10 +3,8 @@ module github.com/sev-2/raiden
 go 1.21.5
 
 require (
-	github.com/antihax/optional v1.0.0
 	github.com/erikgeiser/promptkit v0.9.0
 	github.com/fatih/color v1.16.0
-	github.com/google/uuid v1.5.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
 	github.com/zeromicro/go-zero v1.6.1
@@ -68,7 +66,6 @@ require (
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/term v0.17.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
@@ -91,6 +88,5 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.22.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.22.0
 	go.opentelemetry.io/otel/sdk v1.22.0
-	golang.org/x/oauth2 v0.16.0
 	golang.org/x/sys v0.17.0 // indirect
 )

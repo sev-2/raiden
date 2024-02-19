@@ -48,7 +48,9 @@ func main() {
 				return err
 			}
 
+			// register app resource
 			bootstrap.RegisterRpc()
+			bootstrap.RegisterRoles()
 			
 			if err := resource.Import(&f, config); err != nil {
 				return err

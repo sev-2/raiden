@@ -2,9 +2,6 @@ package generator
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -45,16 +42,16 @@ func RegisterRpc() {
 )
 
 func GenerateRpcRegister(basePath string, projectName string, generateFn GenerateFn) error {
-	registerRpcDir := filepath.Join(basePath, RpcRegisterDir)
-	logger.Debugf("GenerateRpcRegister - create %s folder if not exist", registerRpcDir)
-	if exist := utils.IsFolderExists(registerRpcDir); !exist {
-		if err := utils.CreateFolder(registerRpcDir); err != nil {
+	rpcRegisterDir := filepath.Join(basePath, RpcRegisterDir)
+	logger.Debugf("GenerateRpcRegister - create %s folder if not exist", rpcRegisterDir)
+	if exist := utils.IsFolderExists(rpcRegisterDir); !exist {
+		if err := utils.CreateFolder(rpcRegisterDir); err != nil {
 			return err
 		}
 	}
 
 	rpcDir := filepath.Join(basePath, RpcDir)
-	logger.Debugf("GenerateRpcRegister - create %s folder if not exist", registerRpcDir)
+	logger.Debugf("GenerateRpcRegister - create %s folder if not exist", rpcDir)
 	if exist := utils.IsFolderExists(rpcDir); !exist {
 		if err := utils.CreateFolder(rpcDir); err != nil {
 			return err
@@ -62,12 +59,12 @@ func GenerateRpcRegister(basePath string, projectName string, generateFn Generat
 	}
 
 	// scan all controller
-	listRpc, err := WalkScanRpc(rpcDir)
+	rpcList, err := WalkScanRpc(rpcDir)
 	if err != nil {
 		return err
 	}
 
-	input, err := createRegisterRpcInput(projectName, registerRpcDir, listRpc)
+	input, err := createRegisterRpcInput(projectName, rpcRegisterDir, rpcList)
 	if err != nil {
 		return err
 	}
@@ -76,16 +73,16 @@ func GenerateRpcRegister(basePath string, projectName string, generateFn Generat
 	return generateFn(input, nil)
 }
 
-func createRegisterRpcInput(projectName string, registerRpcDir string, listRpc []string) (input GenerateInput, err error) {
+func createRegisterRpcInput(projectName string, rpcRegisterDir string, rpcList []string) (input GenerateInput, err error) {
 	// set file path
-	filePath := filepath.Join(registerRpcDir, RpcRegisterFilename)
+	filePath := filepath.Join(rpcRegisterDir, RpcRegisterFilename)
 
 	// set imports path
 	imports := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/resource"),
 	}
 
-	if len(listRpc) > 0 {
+	if len(rpcList) > 0 {
 		rpcImportPath := fmt.Sprintf("%s/internal/rpc", utils.ToGoModuleName(projectName))
 		imports = append(imports, fmt.Sprintf("%q", rpcImportPath))
 	}
@@ -94,7 +91,7 @@ func createRegisterRpcInput(projectName string, registerRpcDir string, listRpc [
 	data := GenerateRegisterRpcData{
 		Package: "bootstrap",
 		Imports: imports,
-		Rpc:     listRpc,
+		Rpc:     rpcList,
 	}
 
 	input = GenerateInput{
@@ -114,7 +111,7 @@ func WalkScanRpc(rpcDir string) ([]string, error) {
 	err := filepath.Walk(rpcDir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
 			logger.Debugf("GenerateRpcRegister - collect rpc from %s", path)
-			rs, e := getRpc(path)
+			rs, e := getStructByBaseName(path, "RpcBase")
 			if e != nil {
 				return e
 			}
@@ -129,44 +126,4 @@ func WalkScanRpc(rpcDir string) ([]string, error) {
 	}
 
 	return rpc, nil
-}
-
-func getRpc(filePath string) (r []string, err error) {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
-	if err != nil {
-		return r, err
-	}
-
-	// Traverse the AST to find the struct with the Http attribute
-	for _, decl := range file.Decls {
-		genDecl, ok := decl.(*ast.GenDecl)
-		if !ok || genDecl.Tok != token.TYPE {
-			continue
-		}
-		for _, spec := range genDecl.Specs {
-			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			st, ok := typeSpec.Type.(*ast.StructType)
-			if !ok {
-				continue
-			}
-
-			if len(st.Fields.List) == 0 {
-				continue
-			}
-
-			for _, f := range st.Fields.List {
-				if se, isSe := f.Type.(*ast.SelectorExpr); isSe && se.Sel.Name == "RpcBase" {
-					r = append(r, typeSpec.Name.Name)
-					continue
-				}
-			}
-
-		}
-	}
-
-	return
 }

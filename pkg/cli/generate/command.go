@@ -135,12 +135,18 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 	go func() {
 		defer wg.Done()
 
-		// generate main function
+		// generate rpc register
 		if err := generator.GenerateRpcRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
 			errChan <- err
 		}
 
+		// generate role register
+		if err := generator.GenerateRoleRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+			errChan <- err
+		}
+
 		if initialize {
+			// generate import main function
 			if err := generator.GenerateImportMainFunction(projectPath, config, generator.Generate); err != nil {
 				errChan <- err
 			} else {

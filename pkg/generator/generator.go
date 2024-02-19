@@ -2,6 +2,9 @@ package generator
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,7 +28,6 @@ type GenerateInput struct {
 type GenerateFn func(input GenerateInput, writer io.Writer) error
 
 // ----- Generate functionality  -----
-
 func DefaultWriter(filePath string) (*os.File, error) {
 	file, err := utils.CreateFile(filePath, true)
 	if err != nil {
@@ -82,43 +84,42 @@ func generateArrayDeclaration(value reflect.Value, withoutQuote bool) string {
 	return "[]string{" + strings.Join(arrayValues, ", ") + "}"
 }
 
-func generateMapDeclarationFromValue(value reflect.Value) string {
-	// Start the map declaration
-	var resultArr []string
-	for _, key := range value.MapKeys() {
-		valueStr := valueToString(value.Interface())
-		resultArr = append(resultArr, fmt.Sprintf(`%q: %s,`, key, valueStr))
+func getStructByBaseName(filePath string, baseStructName string) (r []string, err error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
+	if err != nil {
+		return r, err
 	}
 
-	return "map[string]any{" + strings.Join(resultArr, ", ") + "}"
-}
+	// Traverse the AST to find the struct with the Http attribute
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			st, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
 
-func generateMapDeclaration(mapData map[string]any) string {
-	// Start the map declaration
-	var resultArr []string
-	for key, value := range mapData {
-		valueStr := valueToString(value)
-		resultArr = append(resultArr, fmt.Sprintf(`%q: %s`, key, valueStr))
+			if len(st.Fields.List) == 0 {
+				continue
+			}
+
+			for _, f := range st.Fields.List {
+				if se, isSe := f.Type.(*ast.SelectorExpr); isSe && se.Sel.Name == baseStructName {
+					r = append(r, typeSpec.Name.Name)
+					continue
+				}
+			}
+
+		}
 	}
 
-	return "map[string]any{" + strings.Join(resultArr, ",") + "}"
-}
-
-func generateStructDataType(value reflect.Value) string {
-	return fmt.Sprintf("%v", value.Interface())
-}
-
-func valueToString(value interface{}) string {
-	switch v := value.(type) {
-	case string:
-		return fmt.Sprintf("%q", v)
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%v", v)
-	case float32, float64:
-		return fmt.Sprintf("%v", v)
-	case bool:
-		return fmt.Sprintf("%t", v)
-	default:
-		return fmt.Sprintf(`"%v"`, v) // Default: use fmt.Sprint for other types
-	}
+	return
 }
