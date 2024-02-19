@@ -1,6 +1,13 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type PgsodiumKeymaker struct {
-	Metadata string `connectionLimit:"60" inheritRole:"true" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"false" canLogin:"false"`
+	raiden.RoleBase
+}
+
+func (r *PgsodiumKeymaker) Name() string {
+	return "pgsodium_keymaker"
 }

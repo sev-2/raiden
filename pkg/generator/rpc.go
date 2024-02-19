@@ -10,7 +10,7 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -139,7 +139,7 @@ func (r *{{ .Name }}) GetDefinition() string {
 }`
 )
 
-func GenerateRpc(basePath string, projectName string, functions []supabase.Function, generateFn GenerateFn) (err error) {
+func GenerateRpc(basePath string, projectName string, functions []objects.Function, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, RpcDir)
 	logger.Debugf("GenerateRpc - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -158,7 +158,7 @@ func GenerateRpc(basePath string, projectName string, functions []supabase.Funct
 	return nil
 }
 
-func generateRpcItem(folderPath string, projectName string, function *supabase.Function, generateFn GenerateFn) error {
+func generateRpcItem(folderPath string, projectName string, function *objects.Function, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToSnakeCase": utils.ToSnakeCase},
@@ -237,7 +237,7 @@ func generateRpcItem(folderPath string, projectName string, function *supabase.F
 	return generateFn(generateInput, nil)
 }
 
-func ExtractRpcFunction(fn *supabase.Function) (result ExtractRpcDataResult, err error) {
+func ExtractRpcFunction(fn *objects.Function) (result ExtractRpcDataResult, err error) {
 	//  extract param
 	params, usePrefix, e := ExtractRpcParam(fn)
 	if e != nil {
@@ -298,7 +298,7 @@ func ExtractRpcFunction(fn *supabase.Function) (result ExtractRpcDataResult, err
 	return
 }
 
-func ExtractRpcParam(fn *supabase.Function) (params []raiden.RpcParam, usePrefix bool, err error) {
+func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix bool, err error) {
 	mapParam := make(map[string]string)
 
 	// bind param to map

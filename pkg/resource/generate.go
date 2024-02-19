@@ -7,19 +7,21 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-type MapTable map[string]*supabase.Table
-type MapRelations map[string][]*generator.Relation
-type ManyToManyTable struct {
-	Table      string
-	Schema     string
-	PivotTable string
-	PrimaryKey string
-	ForeignKey string
-}
+type (
+	MapTable        map[string]*objects.Table
+	MapRelations    map[string][]*generator.Relation
+	ManyToManyTable struct {
+		Table      string
+		Schema     string
+		PivotTable string
+		PrimaryKey string
+		ForeignKey string
+	}
+)
 
 // The `generateResource` function generates various resources such as table, roles, policy and etc
 // also generate framework resource like controller, route, main function and etc
@@ -60,9 +62,9 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			captureFunc := StateDecorateFunc(resource.Roles, func(item supabase.Role, input generator.GenerateInput) bool {
+			captureFunc := StateDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
-					if i.RoleName == item.Name {
+					if i.Name == item.Name {
 						return true
 					}
 				}
@@ -82,7 +84,7 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 		go func() {
 			defer wg.Done()
 
-			captureFunc := StateDecorateFunc(resource.Functions, func(item supabase.Function, input generator.GenerateInput) bool {
+			captureFunc := StateDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
 					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
 						return true
@@ -117,7 +119,7 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 	}
 }
 
-func buildGenerateModelInputs(tables []supabase.Table) []*generator.GenerateModelInput {
+func buildGenerateModelInputs(tables []objects.Table) []*generator.GenerateModelInput {
 	mapTable := tableToMap(tables)
 	mapRelations := buildMapRelations(mapTable)
 	return buildGenerateModelInput(mapTable, mapRelations)
@@ -125,7 +127,7 @@ func buildGenerateModelInputs(tables []supabase.Table) []*generator.GenerateMode
 
 // ----- Map Relations -----
 
-func scanTableRelation(table *supabase.Table) (relations []*generator.Relation, manyToManyCandidates []*ManyToManyTable) {
+func scanTableRelation(table *objects.Table) (relations []*generator.Relation, manyToManyCandidates []*ManyToManyTable) {
 	// skip process if doesn`t have relation`
 	if len(table.Relationships) == 0 {
 		return
@@ -178,7 +180,7 @@ func scanTableRelation(table *supabase.Table) (relations []*generator.Relation, 
 	return
 }
 
-func mergeRelations(table *supabase.Table, relations []*generator.Relation, mapRelations MapRelations) {
+func mergeRelations(table *objects.Table, relations []*generator.Relation, mapRelations MapRelations) {
 	key := getMapTableKey(table.Schema, table.Name)
 	tableRelations, isExist := mapRelations[key]
 	if isExist {
@@ -267,7 +269,7 @@ func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations) []*ge
 	return generateInputs
 }
 
-func tableToMap(tables []supabase.Table) MapTable {
+func tableToMap(tables []objects.Table) MapTable {
 	mapTable := make(MapTable)
 	for i := range tables {
 		t := tables[i]

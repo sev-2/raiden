@@ -1,6 +1,25 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type SupabaseFunctionsAdmin struct {
-	Metadata string `config:"search_path:supabase_functions" connectionLimit:"60" inheritRole:"false" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"true" canLogin:"true"`
+	raiden.RoleBase
+}
+
+func (r *SupabaseFunctionsAdmin) Name() string {
+	return "supabase_functions_admin"
+}
+
+func (r *SupabaseFunctionsAdmin) InheritRole() bool {
+	return false
+}
+
+func (r *SupabaseFunctionsAdmin) CanCreateRole() bool {
+	return true
+}
+
+func (r *SupabaseFunctionsAdmin) CanLogin() bool {
+	return true
 }

@@ -6,19 +6,11 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli"
-	"github.com/sev-2/raiden/pkg/postgres/roles"
 	"github.com/sev-2/raiden/pkg/state"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
 func Import(flags *Flags, config *raiden.Config) error {
-	// // configure supabase adapter
-	if config.DeploymentTarget == raiden.DeploymentTargetCloud {
-		supabase.ConfigureManagementApi(config.SupabaseApiUrl, config.AccessToken)
-	} else {
-		supabase.ConfigurationMetaApi(config.SupabaseApiUrl, config.SupabaseApiBaseUrl)
-	}
-
 	// load map native role
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
@@ -26,7 +18,13 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	// load supabase resource
-	resource, err := Load(flags, config.ProjectId)
+	resource, err := Load(flags, config)
+	if err != nil {
+		return err
+	}
+
+	// create import state
+	nativeStateRoles := filterIsNativeRole(mapNativeRole, resource.Roles)
 	if err != nil {
 		return err
 	}
@@ -34,7 +32,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	// filter table for with allowed schema
 	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
 	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
-	resource.Roles = filterUserRoleAndBindNativeRole(resource.Roles, mapNativeRole)
+	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)
 
 	// load app resource
 	appTables, appRoles, appRpcFunctions, err := loadAppResource(flags)
@@ -44,27 +42,21 @@ func Import(flags *Flags, config *raiden.Config) error {
 
 	// compare
 	if (flags.LoadAll() || flags.ModelsOnly) && len(appTables) > 0 {
-		if err := compareTable(resource.Tables, appTables); err != nil {
+		if err := runImportCompareTable(resource.Tables, appTables); err != nil {
 			return err
 		}
 	}
 
 	if (flags.LoadAll() || flags.RolesOnly) && len(appRoles) > 0 {
-		if err := compareRoles(resource.Roles, appRoles); err != nil {
+		if err := runImportCompareRoles(resource.Roles, appRoles); err != nil {
 			return err
 		}
 	}
 
 	if (flags.LoadAll() || flags.RpcOnly) && len(appRpcFunctions) > 0 {
-		if err := compareRpcFunctions(resource.Functions, appRpcFunctions); err != nil {
+		if err := runImportCompareRpcFunctions(resource.Functions, appRpcFunctions); err != nil {
 			return err
 		}
-	}
-
-	// create import state
-	nativeStateRoles, err := createNativeRoleState(mapNativeRole)
-	if err != nil {
-		return err
 	}
 
 	importState := resourceState{
@@ -77,52 +69,8 @@ func Import(flags *Flags, config *raiden.Config) error {
 	return generateResource(config, &importState, flags.ProjectPath, resource)
 }
 
-func filterTableBySchema(input []supabase.Table, allowedSchema ...string) (output []supabase.Table) {
-	filterSchema := []string{"public"}
-	if len(allowedSchema) > 0 && allowedSchema[0] != "" {
-		filterSchema = allowedSchema
-	}
-
-	mapSchema := map[string]bool{}
-	for _, s := range filterSchema {
-		mapSchema[s] = true
-	}
-
-	for i := range input {
-		t := input[i]
-
-		if _, exist := mapSchema[t.Schema]; exist {
-			output = append(output, t)
-		}
-	}
-
-	return
-}
-
-func filterFunctionBySchema(input []supabase.Function, allowedSchema ...string) (output []supabase.Function) {
-	filterSchema := []string{"public"}
-	if len(allowedSchema) > 0 && allowedSchema[0] != "" {
-		filterSchema = allowedSchema
-	}
-
-	mapSchema := map[string]bool{}
-	for _, s := range filterSchema {
-		mapSchema[s] = true
-	}
-
-	for i := range input {
-		t := input[i]
-
-		if _, exist := mapSchema[t.Schema]; exist {
-			output = append(output, t)
-		}
-	}
-
-	return
-}
-
-func compareTable(supabaseTable []supabase.Table, appTable []supabase.Table) error {
-	diffResult, err := state.CompareTables(supabaseTable, appTable)
+func runImportCompareTable(supabaseTable []objects.Table, appTable []objects.Table) error {
+	diffResult, err := CompareTables(supabaseTable, appTable)
 	if err != nil {
 		return err
 	}
@@ -130,7 +78,7 @@ func compareTable(supabaseTable []supabase.Table, appTable []supabase.Table) err
 	if len(diffResult) > 0 {
 		for i := range diffResult {
 			d := diffResult[i]
-			cli.PrintDiff("table", d.SupabaseResource, d.AppResource, d.Name)
+			cli.PrintDiff("table", d.SourceResource, d.TargetResource, d.Name)
 		}
 		return errors.New("import tables is canceled, you have conflict table. please fix it first")
 	}
@@ -138,8 +86,8 @@ func compareTable(supabaseTable []supabase.Table, appTable []supabase.Table) err
 	return nil
 }
 
-func compareRoles(supabaseRoles []supabase.Role, appRoles []supabase.Role) error {
-	diffResult, err := state.CompareRoles(supabaseRoles, appRoles)
+func runImportCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) error {
+	diffResult, err := CompareRoles(supabaseRoles, appRoles)
 	if err != nil {
 		return err
 	}
@@ -147,7 +95,7 @@ func compareRoles(supabaseRoles []supabase.Role, appRoles []supabase.Role) error
 	if len(diffResult) > 0 {
 		for i := range diffResult {
 			d := diffResult[i]
-			cli.PrintDiff("role", d.SupabaseResource, d.AppResource, d.Name)
+			cli.PrintDiff("role", d.SourceResource, d.TargetResource, d.Name)
 		}
 		return errors.New("import roles is canceled, you have conflict role. please fix it first")
 	}
@@ -155,8 +103,8 @@ func compareRoles(supabaseRoles []supabase.Role, appRoles []supabase.Role) error
 	return nil
 }
 
-func compareRpcFunctions(supabaseFn []supabase.Function, appFn []supabase.Function) error {
-	diffResult, err := state.CompareRpcFunctions(supabaseFn, appFn)
+func runImportCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.Function) error {
+	diffResult, err := CompareRpcFunctions(supabaseFn, appFn)
 	if err != nil {
 		return err
 	}
@@ -164,38 +112,10 @@ func compareRpcFunctions(supabaseFn []supabase.Function, appFn []supabase.Functi
 	if len(diffResult) > 0 {
 		for i := range diffResult {
 			d := diffResult[i]
-			cli.PrintDiff("rpc function", d.SupabaseResource, d.AppResource, d.Name)
+			cli.PrintDiff("rpc function", d.SourceResource, d.TargetResource, d.Name)
 		}
 		return errors.New("import rpc function is canceled, you have conflict rpc function. please fix it first")
 	}
 
 	return nil
-}
-
-func loadMapNativeRole() (map[string]any, error) {
-	mapRole := make(map[string]any)
-	for _, r := range roles.NativeRoles {
-		role, err := raiden.UnmarshalRole(r)
-		if err != nil {
-			return nil, err
-		}
-		mapRole[role.Name] = &role
-	}
-
-	return mapRole, nil
-}
-
-func filterUserRoleAndBindNativeRole(roles []supabase.Role, mapNativeRole map[string]any) (userRole []supabase.Role) {
-	for i := range roles {
-		r := roles[i]
-		if nr, isExist := mapNativeRole[r.Name]; !isExist {
-			userRole = append(userRole, r)
-		} else {
-			if rl, isRole := nr.(*raiden.Role); isRole {
-				rl.ID = r.ID
-				rl.ValidUntil = r.ValidUntil
-			}
-		}
-	}
-	return
 }

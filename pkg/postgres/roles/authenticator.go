@@ -1,6 +1,21 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type Authenticator struct {
-	Metadata string `config:"statement_timeout:8s;lock_timeout:8s;session_preload_libraries:supautils, safeupdate" connectionLimit:"60" inheritRole:"false" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"false" canLogin:"true"`
+	raiden.RoleBase
+}
+
+func (r *Authenticator) Name() string {
+	return "authenticator"
+}
+
+func (r *Authenticator) InheritRole() bool {
+	return false
+}
+
+func (r *Authenticator) CanLogin() bool {
+	return true
 }

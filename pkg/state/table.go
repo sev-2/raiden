@@ -1,7 +1,6 @@
 package state
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -12,11 +11,11 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/postgres"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-func ToTables(tableStates []TableState) (tables []supabase.Table, err error) {
+func ToTables(tableStates []TableState) (tables []objects.Table, err error) {
 	var paths []string
 	for i := range tableStates {
 		t := tableStates[i]
@@ -48,17 +47,17 @@ func ToTables(tableStates []TableState) (tables []supabase.Table, err error) {
 	return
 }
 
-func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.FileSet, state TableState) (table supabase.Table, err error) {
+func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.FileSet, state TableState) (table objects.Table, err error) {
 	obj := pkg.Scope().Lookup(state.ModelStruct)
 	if obj == nil {
 		err = errors.New("struct not found : " + state.ModelStruct)
 		return
 	}
 
-	// Assert the object's type to *types.TypeName
+	// Assert the objects's type to *types.TypeName
 	typeObj, ok := obj.(*types.TypeName)
 	if !ok {
-		err = fmt.Errorf("unexpected type for object : %v", obj)
+		err = fmt.Errorf("unexpected type for objects : %v", obj)
 		return
 	}
 
@@ -68,29 +67,29 @@ func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.
 	table.Name = utils.ToSnakeCase(typeObj.Name())
 
 	// map column for make check if column exist and reuse default
-	mapColumn := make(map[string]supabase.Column)
+	mapColumn := make(map[string]objects.Column)
 	for i := range table.Columns {
 		c := table.Columns[i]
 		mapColumn[c.Name] = c
 	}
 
 	// map relation for make check if relation exist and reuse default
-	mapRelation := make(map[string]supabase.TablesRelationship)
+	mapRelation := make(map[string]objects.TablesRelationship)
 	for i := range table.Relationships {
 		r := table.Relationships[i]
 		mapRelation[r.ConstraintName] = r
 	}
 
 	// map relation for make check if relation exist and reuse default
-	mapPrimaryKey := make(map[string]supabase.PrimaryKey)
+	mapPrimaryKey := make(map[string]objects.PrimaryKey)
 	for i := range table.PrimaryKeys {
 		pk := table.PrimaryKeys[i]
 		mapPrimaryKey[pk.Name] = pk
 	}
 
-	var tableColumns []supabase.Column
-	var tableRealtions []supabase.TablesRelationship
-	var tablePrimaryKeys []supabase.PrimaryKey
+	var tableColumns []objects.Column
+	var tableRealtions []objects.TablesRelationship
+	var tablePrimaryKeys []objects.PrimaryKey
 
 	// Iterate over the fields of the struct
 	for i := 0; i < structType.NumFields(); i++ {
@@ -134,7 +133,7 @@ func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.
 						pk.TableName = table.Name
 						tablePrimaryKeys = append(tablePrimaryKeys, pk)
 					} else {
-						tablePrimaryKeys = append(tablePrimaryKeys, supabase.PrimaryKey{
+						tablePrimaryKeys = append(tablePrimaryKeys, objects.PrimaryKey{
 							Name:      c.Name,
 							Schema:    table.Schema,
 							TableID:   table.ID,
@@ -160,7 +159,7 @@ func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.
 	return table, nil
 }
 
-func buildColumn(fieldName string, mapColumn map[string]supabase.Column, columnTag string) (column supabase.Column) {
+func buildColumn(fieldName string, mapColumn map[string]objects.Column, columnTag string) (column objects.Column) {
 	ct := raiden.UnmarshalColumnTag(columnTag)
 
 	if ct.Name == "" {
@@ -191,7 +190,7 @@ func buildColumn(fieldName string, mapColumn map[string]supabase.Column, columnT
 	return
 }
 
-func buildRelation(tableName, fieldName, schema string, mapRelations map[string]supabase.TablesRelationship, joinTag string) (relation supabase.TablesRelationship) {
+func buildRelation(tableName, fieldName, schema string, mapRelations map[string]objects.TablesRelationship, joinTag string) (relation objects.TablesRelationship) {
 	jt := raiden.UnmarshalJoinTag(joinTag)
 	sourceTable, targetTable := utils.ToSnakeCase(fieldName), utils.ToSnakeCase(tableName)
 
@@ -243,48 +242,4 @@ func buildRelation(tableName, fieldName, schema string, mapRelations map[string]
 // get relation table name, base on struct type that defined in relation field
 func getRelationConstrainName(sourceTable, sourceColumn string) string {
 	return fmt.Sprintf("%s_%s_fkey", sourceTable, sourceColumn)
-}
-
-func CompareTables(supabaseTable []supabase.Table, appTable []supabase.Table) (diffResult []CompareDiffResult, err error) {
-	mapAppTable := make(map[int]supabase.Table)
-	for i := range appTable {
-		t := appTable[i]
-		mapAppTable[t.ID] = t
-	}
-
-	for i := range supabaseTable {
-		t := supabaseTable[i]
-
-		appTable, isExist := mapAppTable[t.ID]
-		if isExist {
-			spByte, err := json.Marshal(t)
-			if err != nil {
-				return diffResult, err
-			}
-			spHash := utils.HashByte(spByte)
-
-			// make sure set default to empty array
-			// because default value from response is empty array
-			if appTable.Relationships == nil {
-				appTable.Relationships = make([]supabase.TablesRelationship, 0)
-			}
-
-			appByte, err := json.Marshal(appTable)
-			if err != nil {
-				return diffResult, err
-			}
-			appHash := utils.HashByte(appByte)
-
-			if spHash != appHash {
-				diffResult = append(diffResult, CompareDiffResult{
-					Name:             t.Name,
-					Category:         CompareDiffCategoryConflict,
-					SupabaseResource: t,
-					AppResource:      appTable,
-				})
-			}
-		}
-	}
-
-	return
 }

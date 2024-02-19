@@ -1,6 +1,17 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type ServiceRole struct {
-	Metadata string `connectionLimit:"60" inheritRole:"true" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"true" canCreateDb:"false" canCreateRole:"false" canLogin:"false"`
+	raiden.RoleBase
+}
+
+func (r *ServiceRole) Name() string {
+	return "service_role"
+}
+
+func (r *ServiceRole) CanBypassRls() bool {
+	return true
 }

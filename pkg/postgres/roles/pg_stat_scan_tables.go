@@ -1,6 +1,13 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type PgStatScanTables struct {
-	Metadata string `connectionLimit:"60" inheritRole:"true" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"false" canLogin:"false"`
+	raiden.RoleBase
+}
+
+func (r *PgStatScanTables) Name() string {
+	return "pg_stat_scan_tables"
 }

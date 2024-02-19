@@ -1,6 +1,8 @@
 package roles
 
-var NativeRoles = []any{
+import "github.com/sev-2/raiden"
+
+var NativeRoles = []raiden.Role{
 	&Anon{},
 	&Authenticated{},
 	&Authenticator{},

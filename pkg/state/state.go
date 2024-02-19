@@ -12,7 +12,7 @@ import (
 
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -24,7 +24,7 @@ type (
 	}
 
 	TableState struct {
-		Table       supabase.Table
+		Table       objects.Table
 		Relation    []generator.Relation
 		ModelPath   string
 		ModelStruct string
@@ -32,7 +32,7 @@ type (
 	}
 
 	RoleState struct {
-		Role       supabase.Role
+		Role       objects.Role
 		RolePath   string
 		RoleStruct string
 		IsNative   bool
@@ -40,29 +40,16 @@ type (
 	}
 
 	RpcState struct {
-		Function   supabase.Function
+		Function   objects.Function
 		RpcPath    string
 		RpcStruct  string
 		LastUpdate time.Time
 	}
-
-	CompareDiffType     string
-	CompareDiffCategory string
-
-	CompareDiffResult struct {
-		Name             string
-		Category         CompareDiffCategory
-		SupabaseResource any
-		AppResource      any
-	}
 )
 
 var (
-	CompareDiffCategoryConflict      CompareDiffCategory = "conflict"
-	CompareDiffCategoryCloudNofFound CompareDiffCategory = "cloud-not-found"
-	CompareDiffCategoryAppNotFound   CompareDiffCategory = "app-not-found"
-	StateFileDir                                         = "build"
-	StateFileName                                        = "state"
+	StateFileDir  = "build"
+	StateFileName = "state"
 )
 
 func Save(state *State) error {

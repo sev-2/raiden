@@ -1,6 +1,13 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type Authenticated struct {
-	Metadata string `config:"statement_timeout:8s" connectionLimit:"60" inheritRole:"true" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"false" canLogin:"false"`
+	raiden.RoleBase
+}
+
+func (r *Authenticated) Name() string {
+	return "authenticated"
 }

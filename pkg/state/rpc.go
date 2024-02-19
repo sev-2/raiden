@@ -1,14 +1,11 @@
 package state
 
 import (
-	"strings"
-
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/supabase"
-	"github.com/sev-2/raiden/pkg/utils"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
-func ToRpc(rpcState []RpcState, appRpc []raiden.Rpc) (listRpc []supabase.Function, err error) {
+func ToRpc(rpcState []RpcState, appRpc []raiden.Rpc) (listRpc []objects.Function, err error) {
 	mapRpcState := map[string]RpcState{}
 	for i := range rpcState {
 		r := rpcState[i]
@@ -30,7 +27,7 @@ func ToRpc(rpcState []RpcState, appRpc []raiden.Rpc) (listRpc []supabase.Functio
 	return
 }
 
-func createRpcFunction(mapRpcState map[string]RpcState, rpc raiden.Rpc) (fn supabase.Function, err error) {
+func createRpcFunction(mapRpcState map[string]RpcState, rpc raiden.Rpc) (fn objects.Function, err error) {
 	if err = raiden.BuildRpc(rpc); err != nil {
 		return
 	}
@@ -41,42 +38,5 @@ func createRpcFunction(mapRpcState map[string]RpcState, rpc raiden.Rpc) (fn supa
 	}
 	fn = state.Function
 	fn.CompleteStatement = rpc.GetCompleteStmt()
-	return
-}
-
-func CompareRpcFunctions(supabaseFn []supabase.Function, appFn []supabase.Function) (diffResult []CompareDiffResult, err error) {
-	mapAppFn := make(map[int]supabase.Function)
-	for i := range appFn {
-		f := appFn[i]
-		mapAppFn[f.ID] = f
-	}
-
-	for i := range supabaseFn {
-		sf := supabaseFn[i]
-
-		af, isExist := mapAppFn[sf.ID]
-		if !isExist {
-			continue
-		}
-
-		dFields := strings.Fields(utils.CleanUpString(sf.CompleteStatement))
-		for i := range dFields {
-			d := dFields[i]
-			if strings.HasSuffix(d, ";") && strings.ToLower(d) != "end;" {
-				dFields[i] = strings.ReplaceAll(d, ";", " ;")
-			}
-		}
-		sf.CompleteStatement = strings.ToLower(strings.Join(dFields, " "))
-
-		if af.CompleteStatement != sf.CompleteStatement {
-			diffResult = append(diffResult, CompareDiffResult{
-				Name:             sf.Name,
-				Category:         CompareDiffCategoryConflict,
-				SupabaseResource: sf,
-				AppResource:      af,
-			})
-		}
-	}
-
 	return
 }

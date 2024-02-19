@@ -1,6 +1,25 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type SupabaseStorageAdmin struct {
-	Metadata string `config:"search_path:storage" connectionLimit:"60" inheritRole:"false" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"true" canLogin:"true"`
+	raiden.RoleBase
+}
+
+func (r *SupabaseStorageAdmin) Name() string {
+	return "supabase_storage_admin"
+}
+
+func (r *SupabaseStorageAdmin) InheritRole() bool {
+	return false
+}
+
+func (r *SupabaseStorageAdmin) CanCreateRole() bool {
+	return true
+}
+
+func (r *SupabaseStorageAdmin) CanLogin() bool {
+	return true
 }

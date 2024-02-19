@@ -12,7 +12,7 @@ import (
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +26,7 @@ type Flags struct {
 	AllowedSchema string
 }
 
-type MapTable map[string]*supabase.Table
+type MapTable map[string]*objects.Table
 type MapRelations map[string][]*generator.Relation
 type ManyToManyTable struct {
 	Table      string

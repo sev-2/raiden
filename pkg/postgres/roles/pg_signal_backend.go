@@ -1,6 +1,13 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type PgSignalBackend struct {
-	Metadata string `connectionLimit:"60" inheritRole:"true" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"false" canLogin:"false"`
+	raiden.RoleBase
+}
+
+func (r *PgSignalBackend) Name() string {
+	return "pg_signal_backend"
 }

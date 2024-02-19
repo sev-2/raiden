@@ -1,6 +1,13 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type PgWriteAllData struct {
-	Metadata string `connectionLimit:"60" inheritRole:"true" isReplicationRole:"false" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"false" canLogin:"false"`
+	raiden.RoleBase
+}
+
+func (r *PgWriteAllData) Name() string {
+	return "pg_write_all_data"
 }

@@ -5,13 +5,13 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRpcExtractParam(t *testing.T) {
-	fn := supabase.Function{
-		Args: []supabase.FunctionArg{
+	fn := objects.Function{
+		Args: []objects.FunctionArg{
 			{
 				Mode:       "in",
 				Name:       "in_candidate_name",
@@ -42,7 +42,7 @@ func TestRpcExtractParam(t *testing.T) {
 }
 
 func TestExtractRpcData(t *testing.T) {
-	fn := supabase.Function{
+	fn := objects.Function{
 		Schema:   "public",
 		Name:     "get_submissions",
 		Language: "plpgsql",

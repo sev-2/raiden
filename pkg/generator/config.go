@@ -23,7 +23,7 @@ ANON_KEY: {{ .AnonKey }}
 SERVICE_KEY: {{ .ServiceKey }}
 
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
-SUPABASE_API_BASE_PATH: {{ .SupabaseApiBaseUrl }}
+SUPABASE_API_BASE_PATH: {{ .SupabaseApiBasePath }}
 SUPABASE_PUBLIC_URL: {{ .SupabasePublicUrl }}
 
 SERVER_HOST: {{ .ServerHost }}

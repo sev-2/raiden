@@ -11,7 +11,6 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/supabase"
-	management_api "github.com/sev-2/raiden/pkg/supabase/management-api"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -23,15 +22,6 @@ type (
 	// defined in the `raiden.Config` struct without having to redefine them.
 	Config struct {
 		raiden.Config
-	}
-
-	// The `CreateNewProjectConfig` struct is used to store the configuration data for creating a new
-	// project. It embeds the `management_api.CreateProjectBody` struct, which contains the fields
-	// required to create a project in the Supabase cloud. By embedding the `CreateProjectBody` struct,
-	// the `CreateNewProjectConfig` struct inherits all the fields and methods of the `CreateProjectBody`
-	// struct, making it easier to work with the configuration data.
-	CreateNewProjectConfig struct {
-		management_api.CreateProjectBody
 	}
 
 	// The `Flags` struct is used to store the command line flags that can be passed to the program. In
@@ -306,7 +296,7 @@ func PromptSupabaseApiPath(c *Config) error {
 		return err
 	}
 
-	c.SupabaseApiBaseUrl = inputText
+	c.SupabaseApiBasePath = inputText
 	return nil
 }
 
@@ -378,88 +368,6 @@ func PromptBreakerEnable(c *Config) error {
 	}
 
 	c.BreakerEnable = inputBool
-	return nil
-}
-
-// ----- Create New Project -----
-
-func PromptCreateNewProjectConfig(c *Config) (*CreateNewProjectConfig, error) {
-	projectConfig := &CreateNewProjectConfig{
-		CreateProjectBody: management_api.CreateProjectBody{
-			Name:       c.ProjectName,
-			Plan:       "free",
-			KpsEnabled: false,
-		},
-	}
-
-	if err := promptOrganizations(projectConfig); err != nil {
-		return nil, err
-	}
-
-	if err := promptRegion(projectConfig); err != nil {
-		return nil, err
-	}
-
-	if err := promptDbPassword(projectConfig); err != nil {
-		return nil, err
-	}
-
-	return projectConfig, nil
-}
-
-func promptOrganizations(cc *CreateNewProjectConfig) error {
-	// todo : create new organization if doesn`t have organization
-	orgs, err := GetOrganizationOptions()
-	if err != nil {
-		return err
-	}
-	input := selection.New("Select organization", orgs.ToFlatName())
-	input.PageSize = 4
-
-	inputText, err := input.RunPrompt()
-	if err != nil {
-		return err
-	}
-
-	org, isFound := orgs.FindByName(inputText)
-	if !isFound {
-		return errors.New("no available organization")
-	}
-
-	cc.OrganizationId = org.Id
-	return nil
-}
-
-func promptRegion(cc *CreateNewProjectConfig) error {
-	input := selection.New("Select regions", supabase.AllRegion)
-	input.PageSize = 4
-
-	inputText, err := input.RunPrompt()
-	if err != nil {
-		return err
-	}
-
-	cc.Region = string(inputText)
-	return nil
-}
-
-func promptDbPassword(cc *CreateNewProjectConfig) error {
-	input := textinput.New("Set database password")
-	input.Validate = func(s string) error {
-		if s == "" {
-			return errors.New("database password can`t be empty")
-		}
-		return nil
-	}
-	input.Hidden = true
-	input.HideMask = '*'
-
-	inputText, err := input.RunPrompt()
-	if err != nil {
-		return err
-	}
-
-	cc.DbPass = inputText
 	return nil
 }
 

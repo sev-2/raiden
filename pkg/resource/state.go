@@ -1,15 +1,13 @@
 package resource
 
 import (
-	"fmt"
 	"io"
 	"sync"
 	"time"
 
-	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/state"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -72,7 +70,7 @@ func ListenStateResource(resourceState *resourceState, stateChan chan any) (done
 						Relation:    parseItem.Relations,
 					}
 					resourceState.AddTable(tableState)
-				case supabase.Role:
+				case objects.Role:
 					roleState := state.RoleState{
 						Role:       parseItem,
 						RolePath:   genInput.OutputPath,
@@ -81,7 +79,7 @@ func ListenStateResource(resourceState *resourceState, stateChan chan any) (done
 						LastUpdate: time.Now(),
 					}
 					resourceState.AddRole(roleState)
-				case supabase.Function:
+				case objects.Function:
 					rpcState := state.RpcState{
 						Function:   parseItem,
 						RpcPath:    genInput.OutputPath,
@@ -123,7 +121,7 @@ func FindResource[T any](data []T, input generator.GenerateInput, findFunc func(
 	return
 }
 
-func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, rpc []supabase.Function, err error) {
+func loadAppResource(f *Flags) (tables []objects.Table, roles []objects.Role, rpc []objects.Function, err error) {
 	// load app table
 	latestState, err := state.Load()
 	if err != nil {
@@ -142,7 +140,7 @@ func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, 
 	}
 
 	if f.LoadAll() || f.RolesOnly {
-		roles, err = state.ToRoles(latestState.Roles, false)
+		roles, err = state.ToRoles(latestState.Roles, registeredRoles, false)
 		if err != nil {
 			return
 		}
@@ -155,22 +153,5 @@ func loadAppResource(f *Flags) (tables []supabase.Table, roles []supabase.Role, 
 		}
 	}
 
-	return
-}
-
-func createNativeRoleState(nativeRoleMap map[string]any) (roles []state.RoleState, err error) {
-	for k, v := range nativeRoleMap {
-		role, isRole := v.(*raiden.Role)
-		if !isRole {
-			return roles, fmt.Errorf("%s is not valid role", k)
-		}
-
-		roles = append(roles, state.RoleState{
-			Role:       supabase.Role(*role),
-			IsNative:   true,
-			RoleStruct: utils.SnakeCaseToPascalCase(role.Name),
-			LastUpdate: time.Now(),
-		})
-	}
 	return
 }

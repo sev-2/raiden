@@ -1,6 +1,21 @@
 package roles
 
+import (
+	"github.com/sev-2/raiden"
+)
+
 type SupabaseReplicationAdmin struct {
-	Metadata string `connectionLimit:"60" inheritRole:"true" isReplicationRole:"true" isSuperuser:"false"`
-	Permission string `canBypassRls:"false" canCreateDb:"false" canCreateRole:"false" canLogin:"true"`
+	raiden.RoleBase
+}
+
+func (r *SupabaseReplicationAdmin) Name() string {
+	return "supabase_replication_admin"
+}
+
+func (r *SupabaseReplicationAdmin) IsReplicationRole() bool {
+	return true
+}
+
+func (r *SupabaseReplicationAdmin) CanLogin() bool {
+	return true
 }

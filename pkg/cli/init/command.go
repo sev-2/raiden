@@ -19,11 +19,11 @@ import (
 // @property {string} Version - The `Version` property is a string that represents the version of the
 // Raiden software. It can be specified using a tag, branch, or commit number.
 type Flags struct {
-	Target string
+	Version string
 }
 
 func (f *Flags) Bind(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.Target, "target", "t", "targeted specific raiden version from tag, branch or commit number")
+	cmd.Flags().StringVar(&f.Version, "version", "", "targeted specific raiden version from tag, branch or commit number")
 }
 
 func PreRun(projectPath string) error {
@@ -77,8 +77,8 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 
 	// get raiden app
 	repoName := "github.com/sev-2/raiden"
-	if flags.Target != "" {
-		repoName += "@" + flags.Target
+	if flags.Version != "" {
+		repoName += "@" + flags.Version
 	}
 	logger.Debugf("Execute command : go get %s ", repoName)
 	cmdRaidenInit := exec.Command("go", "get", "-u", repoName)

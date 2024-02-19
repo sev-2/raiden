@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
 func PrintDiff(resource string, supabaseResource, appResource interface{}, prefix string) {
@@ -27,7 +27,7 @@ func PrintDiff(resource string, supabaseResource, appResource interface{}, prefi
 				fieldIdentifier := fmt.Sprintf("%v", j)
 				spField := fieldSupabase.Index(j)
 				spFieldValue := spField.Interface()
-				if spColum, isSpColumn := spFieldValue.(supabase.Column); isSpColumn {
+				if spColum, isSpColumn := spFieldValue.(objects.Column); isSpColumn {
 					fieldIdentifier = spColum.Name
 				}
 

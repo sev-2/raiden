@@ -27,7 +27,7 @@ type Config struct {
 	ServerHost             string           `mapstructure:"SERVER_HOST"`
 	ServerPort             string           `mapstructure:"SERVER_PORT"`
 	SupabaseApiUrl         string           `mapstructure:"SUPABASE_API_URL"`
-	SupabaseApiBaseUrl     string           `mapstructure:"SUPABASE_API_BASE_PATH"`
+	SupabaseApiBasePath    string           `mapstructure:"SUPABASE_API_BASE_PATH"`
 	SupabasePublicUrl      string           `mapstructure:"SUPABASE_PUBLIC_URL"`
 	TraceEnable            bool             `mapstructure:"TRACE_ENABLE"`
 	TraceCollector         string           `mapstructure:"TRACE_COLLECTOR"`

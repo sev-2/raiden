@@ -9,7 +9,7 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -57,7 +57,7 @@ type (
 	}
 
 	GenerateModelInput struct {
-		Table     supabase.Table
+		Table     objects.Table
 		Relations []Relation
 	}
 )
@@ -96,7 +96,7 @@ type {{ .StructName }} struct {
 `
 )
 
-func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList supabase.Policies, generateFn GenerateFn) (err error) {
+func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList objects.Policies, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, ModelDir)
 	logger.Debugf("GenerateModels - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -115,7 +115,7 @@ func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList supab
 	return nil
 }
 
-func GenerateModel(folderPath string, input *GenerateModelInput, rlsList supabase.Policies, generateFn GenerateFn) error {
+func GenerateModel(folderPath string, input *GenerateModelInput, rlsList objects.Policies, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
@@ -154,7 +154,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, rlsList supabas
 }
 
 // map table to column, map pg type to go type and get dependency import path
-func mapTableAttributes(table supabase.Table) (columns []GenerateModelColumn, importsPath []string) {
+func mapTableAttributes(table objects.Table) (columns []GenerateModelColumn, importsPath []string) {
 	importsMap := make(map[string]any)
 	mapPrimaryKey := map[string]bool{}
 	for _, k := range table.PrimaryKeys {
@@ -197,7 +197,7 @@ func mapTableAttributes(table supabase.Table) (columns []GenerateModelColumn, im
 	return
 }
 
-func generateColumnTag(c supabase.Column, mapPk map[string]bool) string {
+func generateColumnTag(c objects.Column, mapPk map[string]bool) string {
 	var tags []string
 
 	// append json tag
@@ -247,14 +247,14 @@ func generateColumnTag(c supabase.Column, mapPk map[string]bool) string {
 	return strings.Join(tags, " ")
 }
 
-func generateRlsTag(rlsList supabase.Policies) string {
+func generateRlsTag(rlsList objects.Policies) string {
 	var rls Rls
 
 	for _, v := range rlsList {
 		switch v.Command {
-		case supabase.PolicyCommandSelect:
+		case objects.PolicyCommandSelect:
 			rls.CanWrite = append(rls.CanWrite, v.Roles...)
-		case supabase.PolicyCommandInsert, supabase.PolicyCommandUpdate, supabase.PolicyCommandDelete:
+		case objects.PolicyCommandInsert, objects.PolicyCommandUpdate, objects.PolicyCommandDelete:
 			rls.CanWrite = append(rls.CanWrite, v.Roles...)
 		}
 	}

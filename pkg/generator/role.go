@@ -3,22 +3,28 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
-	"reflect"
 	"text/template"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
 // ----- Define type, variable and constant -----
 type GenerateRoleData struct {
-	Imports       []string
-	Package       string
-	RoleName      string
-	MetadataTag   string
-	PermissionTag string
+	Imports                []string
+	Package                string
+	Name                   string
+	DefaultLimitConnection int
+	ConnectionLimit        int
+	InheritRole            bool
+	IsReplicationRole      bool
+	IsSuperuser            bool
+	CanBypassRls           bool
+	CanCreateDB            bool
+	CanCreateRole          bool
+	CanLogin               bool
 }
 
 const (
@@ -33,14 +39,67 @@ import (
 )
 {{- end }}
 
-type {{ .RoleName | ToGoIdentifier }} struct {
-	Metadata string ` + "`json:\"-\" {{ .MetadataTag }}`" + `
-	Permission string ` + "`json:\"-\" {{ .PermissionTag }}`" + `
+type {{ .Name | ToGoIdentifier }} struct {
+	raiden.RoleBase
 }
+
+func (r *{{ .Name | ToGoIdentifier }}) Name() string {
+	return "{{ .Name }}"
+}
+
+{{- if ne .ConnectionLimit .DefaultLimitConnection }}
+
+func (r *{{ .Name | ToGoIdentifier }}) ConnectionLimit() int {
+	return {{ .ConnectionLimit }}
+}
+{{- end }}
+{{- if not .InheritRole }}
+
+func (r *{{ .Name | ToGoIdentifier }}) InheritRole() bool {
+	return {{ .InheritRole }}
+}
+{{- end }}
+{{- if .IsReplicationRole }}
+
+func (r *{{ .Name | ToGoIdentifier }}) IsReplicationRole() bool {
+	return {{ .IsReplicationRole }}
+}
+{{- end }}
+{{- if .IsSuperuser }}
+func (r *{{ .Name | ToGoIdentifier }}) IsSuperuser() bool {
+	return {{ .IsSuperuser }}
+}
+
+{{- end }}
+{{- if .CanBypassRls }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanBypassRls() bool {
+	return {{ .CanBypassRls }}
+}
+{{- end }}
+{{- if .CanCreateDB }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanCreateDB() bool {
+	return {{ .CanCreateDB }}
+}
+{{- end }}
+{{- if .CanCreateRole }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanCreateRole() bool {
+	return {{ .CanCreateRole }}
+}
+{{- end }}
+{{- if .CanLogin }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanLogin() bool {
+	return {{ .CanLogin }}
+}
+{{- end }}
+
 `
 )
 
-func GenerateRoles(basePath string, roles []supabase.Role, generateFn GenerateFn) (err error) {
+func GenerateRoles(basePath string, roles []objects.Role, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, RoleDir)
 	logger.Debugf("GenerateRoles - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -58,7 +117,7 @@ func GenerateRoles(basePath string, roles []supabase.Role, generateFn GenerateFn
 	return nil
 }
 
-func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) error {
+func GenerateRole(folderPath string, role objects.Role, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
@@ -68,32 +127,25 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", role.Name, "go"))
 
 	// set imports path
-	imports := []string{}
-
-	// set tag
-	metaTag := raiden.RoleMetadataTag{
-		Name:              role.Name,
-		Config:            role.Config,
-		ConnectionLimit:   role.ConnectionLimit,
-		InheritRole:       role.InheritRole,
-		IsReplicationRole: role.IsReplicationRole,
-		IsSuperuser:       role.IsSuperuser,
-	}
-
-	permissionTag := raiden.RolePermissionTag{
-		CanBypassRls:  role.CanBypassRLS,
-		CanCreateDB:   role.CanCreateDB,
-		CanCreateRole: role.CanCreateRole,
-		CanLogin:      role.CanLogin,
+	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
+	imports := []string{
+		raidenPath,
 	}
 
 	// execute the template and write to the file
 	data := GenerateRoleData{
-		Package:       "roles",
-		Imports:       imports,
-		RoleName:      role.Name,
-		MetadataTag:   raiden.MarshalRoleMetadataTag(&metaTag),
-		PermissionTag: raiden.MarshalRolePermissionTag(&permissionTag),
+		Package:                "roles",
+		Imports:                imports,
+		Name:                   role.Name,
+		ConnectionLimit:        role.ConnectionLimit,
+		DefaultLimitConnection: raiden.DefaultRoleConnectionLimit,
+		InheritRole:            role.InheritRole,
+		IsReplicationRole:      role.IsReplicationRole,
+		IsSuperuser:            role.IsSuperuser,
+		CanBypassRls:           role.CanBypassRLS,
+		CanCreateDB:            role.CanCreateDB,
+		CanCreateRole:          role.CanCreateRole,
+		CanLogin:               role.CanLogin,
 	}
 
 	// set input
@@ -107,72 +159,4 @@ func GenerateRole(folderPath string, role supabase.Role, generateFn GenerateFn) 
 
 	logger.Debugf("GenerateRoles - generate role to %s", input.OutputPath)
 	return generateFn(input, nil)
-}
-
-func GetRoleFields(role supabase.Role) (fields []map[string]any) {
-	fields = make([]map[string]any, 0)
-	instanceType := reflect.TypeOf(role)
-
-	// Todo : convert build to recursive for mode dynamic
-	for i := 0; i < instanceType.NumField(); i++ {
-		newField := make(map[string]any)
-		field := instanceType.Field(i)
-		if field.Name == "Password" {
-			continue
-		}
-		fieldValue := reflect.ValueOf(role).Field(i)
-
-		newField["Name"] = field.Name
-		newField["Value"] = getRoleValue(field, fieldValue)
-		fields = append(fields, newField)
-	}
-
-	return fields
-}
-
-func getRoleValue(field reflect.StructField, value reflect.Value) string {
-	switch field.Type.Kind() {
-	case reflect.String:
-		return fmt.Sprintf("%q", value.String())
-	case reflect.Ptr:
-		if !value.IsNil() {
-			return value.Elem().String()
-		} else {
-			return "nil"
-		}
-	case reflect.Slice:
-		if field.Type.Elem().Kind() == reflect.String {
-			return generateArrayDeclaration(value, false)
-		}
-	case reflect.Map:
-		if len(value.MapKeys()) == 0 {
-			return "map[string]any{}"
-		}
-		if mapValues, ok := value.Interface().(map[string]any); ok {
-			mapValueStr := generateMapDeclaration(mapValues)
-			return mapValueStr
-		} else {
-			return "map[string]any{}"
-		}
-	case reflect.Struct:
-		return generateStructDataType(value)
-	case reflect.Interface:
-		rv := reflect.ValueOf(value.Interface())
-		if rv.Kind() == reflect.Map {
-			if len(rv.MapKeys()) == 0 {
-				return "map[string]any{}"
-			} else {
-				return generateMapDeclarationFromValue(rv)
-			}
-
-		} else if rv.Kind() == reflect.Slice {
-			return generateArrayDeclaration(rv, false)
-		} else if !value.IsNil() {
-			return fmt.Sprintf("%v", value.Interface())
-		} else {
-			return "nil"
-		}
-	}
-
-	return fmt.Sprintf("%v", value.Interface())
 }

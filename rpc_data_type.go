@@ -226,6 +226,6 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 	case RpcReturnDataTypeVoid:
 		return "RpcReturnDataTypeVoid", nil
 	default:
-		return "", fmt.Errorf("unsupported rpc return type  : %s", pType)
+		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}
 }
