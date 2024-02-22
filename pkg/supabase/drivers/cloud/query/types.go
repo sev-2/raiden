@@ -1,4 +1,4 @@
-package sql
+package query
 
 var GetTypesQuery = `
 select

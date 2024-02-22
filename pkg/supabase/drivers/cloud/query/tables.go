@@ -1,4 +1,4 @@
-package sql
+package query
 
 import (
 	"strings"
@@ -122,6 +122,20 @@ where schema {{.FilterSQL}}
 {{end}}
 `
 
+const tableQueryTemplate = `
+WITH tables AS ({{.TablesSQL}})
+{{if .IncludeColumns}}
+  , columns AS ({{.ColumnsSQL}})
+{{end}}
+SELECT
+  *
+{{if .IncludeColumns}}
+  , {{coalesceRowsToArray "columns" "columns.table_id = tables.id"}}
+{{end}}
+FROM tables 
+where schema {{ .FilterSchemaSQL }} AND name {{ .FilterNameSQL }} LIMIT 1
+`
+
 func GenerateTablesQuery(includeSchemas []string, includeColumn bool) (string, error) {
 	tmpl, err := template.New("enrichedTablesSQL").
 		Funcs(template.FuncMap{
@@ -140,6 +154,33 @@ func GenerateTablesQuery(includeSchemas []string, includeColumn bool) (string, e
 		"IncludeColumns": includeColumn,
 		"IncludeSchemas": len(includeSchemas) > 0,
 		"FilterSQL":      filterByList(includeSchemas, nil, nil),
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return result.String(), nil
+}
+
+func GenerateTableQuery(tableName string, schema string, includeColumn bool) (string, error) {
+	tmpl, err := template.New("enrichedTablesSQL").
+		Funcs(template.FuncMap{
+			"coalesceRowsToArray": coalesceRowsToArray,
+		}).
+		Parse(tableQueryTemplate)
+
+	if err != nil {
+		return "", err
+	}
+
+	var result strings.Builder
+	err = tmpl.Execute(&result, map[string]interface{}{
+		"TablesSQL":       GetTablesQuery,
+		"ColumnsSQL":      GetColumnsQuery,
+		"IncludeColumns":  includeColumn,
+		"FilterSchemaSQL": filterByList([]string{schema}, nil, nil),
+		"FilterNameSQL":   filterByList([]string{tableName}, nil, nil),
 	})
 
 	if err != nil {

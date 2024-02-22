@@ -15,6 +15,7 @@ func ToRoles(roleStates []RoleState, appRoles []raiden.Role, withNativeRole bool
 	for _, role := range appRoles {
 		state, isStateExist := mapRoleState[role.Name()]
 		if !isStateExist {
+			// handle new role
 			return
 		}
 

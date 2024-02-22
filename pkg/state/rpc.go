@@ -34,6 +34,7 @@ func createRpcFunction(mapRpcState map[string]RpcState, rpc raiden.Rpc) (fn obje
 
 	state, isStateExist := mapRpcState[rpc.GetName()]
 	if !isStateExist {
+		// handler new rpc
 		return
 	}
 	fn = state.Function

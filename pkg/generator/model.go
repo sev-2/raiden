@@ -52,6 +52,8 @@ type (
 		Package    string
 		Relations  []Relation
 		RlsTag     string
+		RlsEnable  bool
+		RlsForced  bool
 		StructName string
 		Schema     string
 	}
@@ -80,7 +82,7 @@ type {{ .StructName }} struct {
 {{- end }}
 
 	// Table information
-	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\"`" + `
+	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
 
 	// Access control
 	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
@@ -137,6 +139,8 @@ func GenerateModel(folderPath string, input *GenerateModelInput, rlsList objects
 		Columns:    columns,
 		Schema:     input.Table.Schema,
 		RlsTag:     rlsTag,
+		RlsEnable:  input.Table.RLSEnabled,
+		RlsForced:  input.Table.RLSForced,
 		Relations:  input.Relations,
 	}
 

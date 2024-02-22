@@ -1,15 +1,20 @@
 package resource
 
 import (
+	"fmt"
 	"io"
 	"sync"
 	"time"
 
 	"github.com/sev-2/raiden/pkg/generator"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+// ---- Resource state -----
+// temporary collect state date before save to state
 
 type resourceState struct {
 	State state.State
@@ -21,6 +26,45 @@ func (s *resourceState) AddTable(table state.TableState) {
 	defer s.Mutex.Unlock()
 
 	s.State.Tables = append(s.State.Tables, table)
+}
+
+func (s *resourceState) FindTable(tableId int) (index int, tableState state.TableState, found bool) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	found = false
+
+	for i := range s.State.Tables {
+		t := s.State.Tables[i]
+
+		if t.Table.ID == tableId {
+			found = true
+			tableState = t
+			index = i
+			return
+		}
+	}
+	return
+}
+
+func (s *resourceState) DeleteTable(tableId int) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	index := -1
+	for i := range s.State.Tables {
+		t := s.State.Tables[i]
+
+		if t.Table.ID == tableId {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return
+	}
+	s.State.Tables = append(s.State.Tables[:index], s.State.Tables[index+1:]...)
 }
 
 func (s *resourceState) AddRole(role state.RoleState) {
@@ -41,7 +85,7 @@ func (s *resourceState) Persist() error {
 	return state.Save(&s.State)
 }
 
-func ListenStateResource(resourceState *resourceState, stateChan chan any) (done chan error) {
+func ListenImportResource(resourceState *resourceState, stateChan chan any) (done chan error) {
 	done = make(chan error)
 	go func() {
 		for rs := range stateChan {
@@ -96,7 +140,58 @@ func ListenStateResource(resourceState *resourceState, stateChan chan any) (done
 	return done
 }
 
-func StateDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
+func ListenApplyResource(projectPath string, resourceState *resourceState, stateChan chan any) (done chan error) {
+	done = make(chan error)
+	go func() {
+		for rs := range stateChan {
+			if rs == nil {
+				continue
+			}
+			switch m := rs.(type) {
+			case *MigrateItem[objects.Table, objects.UpdateTableItem]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					modelStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					modelPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.ModelDir, utils.ToSnakeCase(m.NewData.Name))
+
+					ts := state.TableState{
+						Table:       m.NewData,
+						ModelPath:   modelPath,
+						ModelStruct: modelStruct,
+						LastUpdate:  time.Now(),
+					}
+
+					logger.Debugf("add table %s to state", ts.Table.Name)
+					resourceState.AddTable(ts)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					logger.Debugf("delete table %s from state", m.OldData.Name)
+					resourceState.DeleteTable(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, tState, found := resourceState.FindTable(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					logger.Debugf("update table %s in state", m.NewData.Name)
+					tState.Table = m.NewData
+					tState.LastUpdate = time.Now()
+					resourceState.State.Tables[fIndex] = tState
+
+				}
+			}
+		}
+		done <- resourceState.Persist()
+	}()
+	return done
+}
+
+func ImportDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
 	return func(input generator.GenerateInput, writer io.Writer) error {
 		if err := generator.Generate(input, nil); err != nil {
 			return err
@@ -121,32 +216,31 @@ func FindResource[T any](data []T, input generator.GenerateInput, findFunc func(
 	return
 }
 
-func loadAppResource(f *Flags) (tables []objects.Table, roles []objects.Role, rpc []objects.Function, err error) {
-	// load app table
-	latestState, err := state.Load()
-	if err != nil {
-		return tables, roles, rpc, err
-	}
+func loadAppResource() (*state.State, error) {
+	return state.Load()
+}
 
+func extractAppResourceState(f *Flags, latestState *state.State) (extractedTable state.ExtractTableResult, roles []objects.Role, rpc []objects.Function, err error) {
 	if latestState == nil {
 		return
 	}
 
-	if f.LoadAll() || f.ModelsOnly {
-		tables, err = state.ToTables(latestState.Tables)
+	if f.All() || f.ModelsOnly {
+		logger.Debug("Extract table from state and app resource")
+		extractedTable, err = state.ExtractTable(latestState.Tables, registeredModels)
 		if err != nil {
 			return
 		}
 	}
 
-	if f.LoadAll() || f.RolesOnly {
+	if f.All() || f.RolesOnly {
 		roles, err = state.ToRoles(latestState.Roles, registeredRoles, false)
 		if err != nil {
 			return
 		}
 	}
 
-	if f.LoadAll() || f.RpcOnly {
+	if f.All() || f.RpcOnly {
 		rpc, err = state.ToRpc(latestState.RpcState, registeredRpc)
 		if err != nil {
 			return

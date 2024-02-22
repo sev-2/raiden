@@ -52,10 +52,7 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 		close(outChan)
 	}()
 
-	// The code block is checking if the `LoadAll()` flag or the `ModelsOnly` flag is set in the `flags`
-	// variable. If either of these flags is set, it adds 2 to the wait group (`wg.Add(2)`) and starts two
-	// goroutines to load Supabase resources.
-	if flags.LoadAll() || flags.ModelsOnly {
+	if flags.All() || flags.ModelsOnly {
 		wg.Add(2)
 		go loadSupabaseResource[[]objects.Table](&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
 			return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
@@ -66,23 +63,14 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 		})
 	}
 
-	// This code block is checking if the `LoadAll()` flag or the `RolesOnly` flag is set in the `flags`
-	// variable. If either of these flags is set, it adds 1 to the wait group (`wg.Add(1)`) and starts a
-	// goroutine to load Supabase roles using the `loadSupabaseResource` function. The
-	// `loadSupabaseResource` function takes a callback function `func(pId *string) ([]objects.Role,
-	// error)` as an argument, which is responsible for fetching the Supabase roles using the
-	// `objects.GetRoles` function. Once the roles are fetched, they are sent to the `outChan` channel.
-	if flags.LoadAll() || flags.RolesOnly {
+	if flags.All() || flags.RolesOnly {
 		wg.Add(1)
 		go loadSupabaseResource[[]objects.Role](&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
 			return supabase.GetRoles(cfg)
 		})
 	}
 
-	// This code block is checking if the `LoadAll()` flag or the `RpcOnly` flag is set in the `flags`
-	// variable. If either of these flags is set, it adds 1 to the wait group (`wg.Add(1)`) and starts a
-	// goroutine to load Supabase functions using the `loadSupabaseResource` function.
-	if flags.LoadAll() || flags.RpcOnly {
+	if flags.All() || flags.RpcOnly {
 		wg.Add(1)
 		go loadSupabaseResource[[]objects.Function](&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
 			return supabase.GetFunctions(cfg)
@@ -92,8 +80,6 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 	return outChan
 }
 
-// The function `loadSupabaseResource` loads a resource from Supabase asynchronously and sends the
-// result or error to an output channel.
 func loadSupabaseResource[T any](wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any, callback func(cfg *raiden.Config) (T, error)) {
 	defer wg.Done()
 

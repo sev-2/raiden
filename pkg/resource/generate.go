@@ -31,7 +31,7 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 	}
 
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan error), make(chan any)
-	doneListen := ListenStateResource(importState, stateChan)
+	doneListen := ListenImportResource(importState, stateChan)
 
 	// generate all model from cloud / pg-meta
 	tableWithRelation := buildGenerateModelInputs(resource.Tables)
@@ -40,7 +40,7 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 		go func() {
 			defer wg.Done()
 
-			captureFunc := StateDecorateFunc(tableWithRelation, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
+			captureFunc := ImportDecorateFunc(tableWithRelation, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateModelData); ok {
 					if i.StructName == utils.SnakeCaseToPascalCase(item.Table.Name) {
 						return true
@@ -62,7 +62,7 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			captureFunc := StateDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
+			captureFunc := ImportDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
 					if i.Name == item.Name {
 						return true
@@ -84,7 +84,7 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 		go func() {
 			defer wg.Done()
 
-			captureFunc := StateDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
+			captureFunc := ImportDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
 					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
 						return true

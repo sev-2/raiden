@@ -14,7 +14,7 @@ type (
 		PrimaryKey    bool
 		AutoIncrement bool
 		Nullable      bool
-		Default       *string
+		Default       any
 		Unique        bool
 	}
 
@@ -46,20 +46,27 @@ var (
 
 func UnmarshalColumnTag(tag string) ColumnTag {
 	columnTag := ColumnTag{
-		Nullable: true,
+		Nullable:      true,
+		PrimaryKey:    false,
+		AutoIncrement: false,
+		Unique:        false,
 	}
 
-	// Regular expression to match key-value pairs
-	re := regexp.MustCompile(`(\w+):([^;]+);?`)
+	tagSplit := strings.Split(tag, ";")
+	tagMap := make(map[string]string)
+	for _, c := range tagSplit {
+		cSplit := strings.Split(c, ":")
+		if len(cSplit) == 2 {
+			tagMap[cSplit[0]] = cSplit[1]
+		} else if len(cSplit) == 1 {
+			tagMap[cSplit[0]] = ""
+		}
+	}
 
-	// Find all matches in the tag string
-	matches := re.FindAllStringSubmatch(tag, -1)
+	defaultValue := "default"
 
 	// Iterate over matches and populate ColumnTag fields
-	for _, match := range matches {
-		key := match[1]
-		value := strings.TrimSpace(match[2])
-
+	for key, value := range tagMap {
 		switch key {
 		case "name":
 			columnTag.Name = value
@@ -75,11 +82,15 @@ func UnmarshalColumnTag(tag string) ColumnTag {
 			}
 		case "default":
 			if value != "" {
-				columnTag.Default = &value
+				defaultValue = value
 			}
 		case "unique":
 			columnTag.Unique = true
 		}
+	}
+
+	if defaultValue != "default" {
+		columnTag.Default = &defaultValue
 	}
 
 	return columnTag

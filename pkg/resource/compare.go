@@ -2,36 +2,31 @@ package resource
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type (
-	CompareMode         string
-	CompareDiffType     string
-	CompareDiffCategory string
+	CompareMode string
 
-	CompareDiffResult struct {
+	CompareDiffResult[T any, D any] struct {
 		Name           string
-		Category       CompareDiffCategory
-		SourceResource any
-		TargetResource any
+		SourceResource T
+		TargetResource T
+		DiffItems      D
+		IsConflict     bool
 	}
 )
 
 const (
 	CompareModeImport CompareMode = "import"
 	CompareModeApply  CompareMode = "apply"
-
-	CompareDiffCategoryConflict      CompareDiffCategory = "conflict"
-	CompareDiffCategoryCloudNofFound CompareDiffCategory = "cloud-not-found"
-	CompareDiffCategoryAppNotFound   CompareDiffCategory = "app-not-found"
 )
 
-func CompareRoles(sourceRole []objects.Role, targetRole []objects.Role) (diffResult []CompareDiffResult, err error) {
+func CompareRoles(sourceRole []objects.Role, targetRole []objects.Role) (diffResult []CompareDiffResult[objects.Role, any], err error) {
 	mapTargetRoles := make(map[int]objects.Role)
 	for i := range targetRole {
 		r := targetRole[i]
@@ -56,9 +51,8 @@ func CompareRoles(sourceRole []objects.Role, targetRole []objects.Role) (diffRes
 			targetHash := utils.HashByte(targetByte)
 
 			if scHash != targetHash {
-				diffResult = append(diffResult, CompareDiffResult{
+				diffResult = append(diffResult, CompareDiffResult[objects.Role, any]{
 					Name:           r.Name,
-					Category:       CompareDiffCategoryConflict,
 					SourceResource: r,
 					TargetResource: targetRole,
 				})
@@ -69,7 +63,11 @@ func CompareRoles(sourceRole []objects.Role, targetRole []objects.Role) (diffRes
 	return
 }
 
-func CompareTables(sourceTable []objects.Table, targetTable []objects.Table) (diffResult []CompareDiffResult, err error) {
+// CompareTables is function for find different table configuration between supabase and app
+//
+// for CompareModeImport source table is supabase table and target table is app table
+// for CompareModeApply source table is app table and target table is supabase table
+func CompareTables(sourceTable []objects.Table, targetTable []objects.Table, mode CompareMode) (diffResult []CompareDiffResult[objects.Table, objects.UpdateTableItem], err error) {
 	mapTargetTable := make(map[int]objects.Table)
 	for i := range targetTable {
 		t := targetTable[i]
@@ -79,41 +77,199 @@ func CompareTables(sourceTable []objects.Table, targetTable []objects.Table) (di
 	for i := range sourceTable {
 		t := sourceTable[i]
 
-		targetTable, isExist := mapTargetTable[t.ID]
-		if isExist {
-			scByte, err := json.Marshal(t)
-			if err != nil {
-				return diffResult, err
-			}
-			scHash := utils.HashByte(scByte)
+		tt, isExist := mapTargetTable[t.ID]
+		if !isExist {
+			continue
+		}
 
+		if mode == CompareModeImport {
 			// make sure set default to empty array
 			// because default value from response is empty array
-			if targetTable.Relationships == nil {
-				targetTable.Relationships = make([]objects.TablesRelationship, 0)
+			if tt.Relationships == nil {
+				tt.Relationships = make([]objects.TablesRelationship, 0)
 			}
 
-			targetByte, err := json.Marshal(targetTable)
+			diff, err := compareTableImportMode(t, tt)
 			if err != nil {
 				return diffResult, err
 			}
-			targetHash := utils.HashByte(targetByte)
 
-			if scHash != targetHash {
-				diffResult = append(diffResult, CompareDiffResult{
-					Name:           t.Name,
-					Category:       CompareDiffCategoryConflict,
-					SourceResource: t,
-					TargetResource: targetTable,
-				})
-			}
+			diffResult = append(diffResult, diff)
+			continue
+		}
+
+		if mode == CompareModeApply {
+			diffResult = append(diffResult, compareTableApplyMode(t, tt))
+			continue
 		}
 	}
 
 	return
 }
 
-func CompareRpcFunctions(sourceFn []objects.Function, targetFn []objects.Function) (diffResult []CompareDiffResult, err error) {
+func compareTableImportMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableItem], err error) {
+	scByte, err := json.Marshal(source)
+	if err != nil {
+		return diffResult, err
+	}
+	scHash := utils.HashByte(scByte)
+
+	targetByte, err := json.Marshal(target)
+	if err != nil {
+		return diffResult, err
+	}
+
+	targetHash := utils.HashByte(targetByte)
+
+	if scHash != targetHash {
+		diffResult = CompareDiffResult[objects.Table, objects.UpdateTableItem]{
+			Name:           source.Name,
+			SourceResource: source,
+			TargetResource: target,
+		}
+	}
+
+	return
+}
+
+func compareTableApplyMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableItem]) {
+	var updateTableItem objects.UpdateTableItem
+
+	// create map pk for compare target pk with source pk
+	mapTargetPrimaryKey := make(map[string]bool)
+	for i := range target.PrimaryKeys {
+		pk := target.PrimaryKeys[i]
+		key := fmt.Sprintf("%s.%s.%s", pk.Schema, pk.TableName, pk.Name)
+		mapTargetPrimaryKey[key] = true
+	}
+
+	// assign diff result object
+	diffResult.SourceResource = source
+	diffResult.TargetResource = target
+
+	// table config compare
+	if source.Name != target.Name {
+		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableName)
+	}
+
+	if source.Schema != target.Schema {
+		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableSchema)
+	}
+
+	if source.RLSEnabled != target.RLSEnabled {
+		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableRlsEnable)
+	}
+
+	if source.RLSForced != target.RLSForced {
+		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableRlsForced)
+	}
+
+	for i := range source.PrimaryKeys {
+		pk := target.PrimaryKeys[i]
+		key := fmt.Sprintf("%s.%s.%s", pk.Schema, pk.TableName, pk.Name)
+		if _, exist := mapTargetPrimaryKey[key]; !exist {
+			updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTablePrimaryKey)
+			break
+		}
+	}
+
+	updateTableItem.Column = compareColumns(source.Columns, target.Columns)
+
+	if len(updateTableItem.UpdateItems) == 0 && len(updateTableItem.Column) == 0 {
+		diffResult.IsConflict = false
+	} else {
+		diffResult.IsConflict = true
+	}
+
+	diffResult.DiffItems = updateTableItem
+	return
+}
+
+func compareColumns(source, target []objects.Column) (updateItems []objects.UpdateColumnItem) {
+	mapTargetColumn := make(map[string]objects.Column)
+	for i := range target {
+		c := target[i]
+		mapTargetColumn[c.Name] = c
+	}
+
+	for i := range source {
+		sc := source[i]
+
+		tc, exist := mapTargetColumn[sc.Name]
+		if !exist {
+			updateItems = append(updateItems, objects.UpdateColumnItem{
+				Name:        sc.Name,
+				UpdateItems: []objects.UpdateColumnType{objects.UpdateColumnNew},
+			})
+			continue
+		}
+
+		var updateColumnItems []objects.UpdateColumnType
+
+		if sc.Name != tc.Name {
+			updateColumnItems = append(updateColumnItems, objects.UpdateColumnName)
+		}
+
+		switch d := sc.DefaultValue.(type) {
+		case string:
+			if d != tc.DefaultValue {
+				updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
+			}
+		case *string:
+			if d != nil {
+				if *d != tc.DefaultValue {
+					updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
+				}
+			} else if d == nil && tc.DefaultValue != nil {
+				updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
+			}
+		case nil:
+			if tc.DefaultValue != nil {
+				updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
+			}
+		}
+
+		if sc.DataType != tc.DataType {
+			updateColumnItems = append(updateColumnItems, objects.UpdateColumnDataType)
+		}
+
+		if sc.IsUnique != tc.IsUnique {
+			updateColumnItems = append(updateColumnItems, objects.UpdateColumnUnique)
+		}
+
+		if sc.IsNullable != tc.IsNullable {
+			updateColumnItems = append(updateColumnItems, objects.UpdateColumnNullable)
+		}
+
+		if sc.IsIdentity != tc.IsIdentity {
+			updateColumnItems = append(updateColumnItems, objects.UpdateColumnIdentity)
+		}
+
+		if len(updateColumnItems) == 0 {
+			delete(mapTargetColumn, sc.Name)
+			continue
+		}
+
+		updateItems = append(updateItems, objects.UpdateColumnItem{
+			Name:        sc.Name,
+			UpdateItems: updateColumnItems,
+		})
+		delete(mapTargetColumn, sc.Name)
+	}
+
+	if len(mapTargetColumn) > 0 {
+		for _, c := range mapTargetColumn {
+			updateItems = append(updateItems, objects.UpdateColumnItem{
+				Name:        c.Name,
+				UpdateItems: []objects.UpdateColumnType{objects.UpdateColumnDelete},
+			})
+		}
+	}
+
+	return
+}
+
+func CompareRpcFunctions(sourceFn []objects.Function, targetFn []objects.Function) (diffResult []CompareDiffResult[objects.Function, any], err error) {
 	mapTargetFn := make(map[int]objects.Function)
 	for i := range targetFn {
 		f := targetFn[i]
@@ -143,10 +299,8 @@ func CompareRpcFunctions(sourceFn []objects.Function, targetFn []objects.Functio
 		sFn.CompleteStatement = strings.ToLower(strings.Join(dFields, " "))
 
 		if sFn.CompleteStatement != tFn.CompleteStatement {
-			logger.Info("source : ", sFn.CompleteStatement)
-			diffResult = append(diffResult, CompareDiffResult{
+			diffResult = append(diffResult, CompareDiffResult[objects.Function, any]{
 				Name:           sFn.Name,
-				Category:       CompareDiffCategoryConflict,
 				SourceResource: sFn,
 				TargetResource: tFn,
 			})

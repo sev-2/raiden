@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/valyala/fasthttp"
 )
 
@@ -110,6 +111,7 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 	if !strings.HasPrefix(strconv.Itoa(statusCode), "2") {
 		err = fmt.Errorf("invalid HTTP response code: %d", statusCode)
 		if resp.Body() != nil && len(resp.Body()) > 0 {
+			logger.Error(string(resp.Body()))
 			sendErr := ReqError{
 				Message: err.Error(),
 				Body:    resp.Body(),

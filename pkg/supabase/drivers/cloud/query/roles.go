@@ -1,4 +1,4 @@
-package sql
+package query
 
 var GetRolesQuery = `
 -- TODO: Consider using pg_authid vs. pg_roles for unencrypted password field

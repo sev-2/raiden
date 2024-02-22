@@ -7,7 +7,7 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase/client"
-	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/sql"
+	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/query"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/valyala/fasthttp"
 )
@@ -33,27 +33,7 @@ func FindProject(cfg *raiden.Config) (objects.Project, error) {
 	return objects.Project{}, nil
 }
 
-func GetTable(cfg *raiden.Config, includedSchemas []string, includeColumn bool) ([]objects.Table, error) {
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-
-	query, err := sql.GenerateTablesQuery(includedSchemas, includeColumn)
-	if err != nil {
-		err = fmt.Errorf("failed generate query get table for project id %s : %v", cfg.ProjectId, err)
-		return []objects.Table{}, err
-	}
-
-	rs, err := ExecuteQuery[[]objects.Table](cfg.SupabaseApiUrl, cfg.ProjectId, query, reqInterceptor, nil)
-	if err != nil {
-		err = fmt.Errorf("get tables error : %s", err)
-	}
-
-	return rs, err
-}
-
-func GetRole(cfg *raiden.Config) ([]objects.Role, error) {
+func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 	reqInterceptor := func(req *fasthttp.Request) error {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
 		return nil
@@ -115,7 +95,7 @@ func GetRole(cfg *raiden.Config) ([]objects.Role, error) {
 		return nil
 	}
 
-	rs, err := ExecuteQuery[[]objects.Role](cfg.SupabaseApiUrl, cfg.ProjectId, sql.GetRolesQuery, reqInterceptor, resInterceptor)
+	rs, err := ExecuteQuery[[]objects.Role](cfg.SupabaseApiUrl, cfg.ProjectId, query.GetRolesQuery, reqInterceptor, resInterceptor)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
 	}
@@ -129,7 +109,7 @@ func GetPolicies(cfg *raiden.Config) ([]objects.Policy, error) {
 		return nil
 	}
 
-	rs, err := ExecuteQuery[[]objects.Policy](cfg.SupabaseApiUrl, cfg.ProjectId, sql.GetPoliciesQuery, reqInterceptor, nil)
+	rs, err := ExecuteQuery[[]objects.Policy](cfg.SupabaseApiUrl, cfg.ProjectId, query.GetPoliciesQuery, reqInterceptor, nil)
 	if err != nil {
 		err = fmt.Errorf("get policies error : %s", err)
 	}
@@ -143,7 +123,7 @@ func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
 		return nil
 	}
 
-	rs, err := ExecuteQuery[[]objects.Function](cfg.SupabaseApiUrl, cfg.ProjectId, sql.GenerateFunctionsQuery([]string{"public"}), reqInterceptor, nil)
+	rs, err := ExecuteQuery[[]objects.Function](cfg.SupabaseApiUrl, cfg.ProjectId, query.GenerateFunctionsQuery([]string{"public"}), reqInterceptor, nil)
 	if err != nil {
 		err = fmt.Errorf("get functions error : %s", err)
 	}

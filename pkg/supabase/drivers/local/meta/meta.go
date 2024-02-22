@@ -11,7 +11,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func GetTable(cfg *raiden.Config, includedSchemas []string, includeColumns bool) ([]objects.Table, error) {
+func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool) ([]objects.Table, error) {
 	url := fmt.Sprintf("%s/%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	reqInterceptor := func(req *fasthttp.Request) error {
 		req.URI().QueryArgs().Set("included_schemas", strings.Join(includedSchemas, "."))
@@ -26,7 +26,7 @@ func GetTable(cfg *raiden.Config, includedSchemas []string, includeColumns bool)
 	return rs, err
 }
 
-func GetRole(cfg *raiden.Config) ([]objects.Role, error) {
+func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 	url := fmt.Sprintf("%s/%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	rs, err := client.Get[[]objects.Role](url, client.DefaultTimeout, nil, nil)
 	if err != nil {

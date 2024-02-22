@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -28,6 +29,29 @@ func CreateFile(fullPath string, deleteIfExist bool) (*os.File, error) {
 	}
 
 	return os.Create(file)
+}
+
+func CopyFile(sourcePath, targetPath string) error {
+	// Open the source file for reading
+	src, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("error opening source file: %s", err)
+	}
+	defer src.Close()
+
+	// Create the destination file
+	dst, err := os.Create(targetPath)
+	if err != nil {
+		return fmt.Errorf("error creating destination file: %s", err)
+	}
+	defer dst.Close()
+
+	// Copy the contents of the source file to the destination file
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("error copying file: %s", err)
+	}
+
+	return nil
 }
 
 func DeleteFile(filePath string) error {

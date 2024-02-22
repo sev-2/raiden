@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +30,7 @@ type (
 		ModelPath   string
 		ModelStruct string
 		LastUpdate  time.Time
+		Policies    []objects.Policy
 	}
 
 	RoleState struct {
@@ -66,6 +68,13 @@ func Save(state *State) error {
 	}
 
 	filePath := filepath.Join(statePath, StateFileName)
+	filePathTmp := filePath + ".tmp"
+	if exist := utils.IsFileExists(filePath); exist {
+		if err := utils.CopyFile(filePath, filePathTmp); err != nil {
+			return err
+		}
+	}
+
 	file, err := createOrLoadFile(filePath)
 	if err != nil {
 		return err
@@ -74,7 +83,14 @@ func Save(state *State) error {
 	logger.Debug("Save state file to : ", filePath)
 
 	encoder := gob.NewEncoder(file)
-	return encoder.Encode(state)
+	if err := encoder.Encode(state); err != nil {
+		utils.DeleteFile(filePath)
+		utils.CopyFile(filePathTmp, filePath)
+		return err
+	}
+
+	utils.DeleteFile(filePathTmp)
+	return nil
 }
 
 func Load() (*State, error) {
@@ -85,7 +101,7 @@ func Load() (*State, error) {
 
 	filePath := filepath.Join(curDir, StateFileDir, StateFileName)
 	if !utils.IsFileExists(filePath) {
-		return nil, err
+		return nil, nil
 	}
 
 	file, err := os.Open(filePath)
@@ -130,6 +146,8 @@ func loadFiles(paths []string) (mainFset *token.FileSet, astFiles []*ast.File, e
 		go func(w *sync.WaitGroup, p string, lChan chan *loadResult) {
 			defer w.Done()
 			fset := token.NewFileSet()
+
+			logger.Debug("Load file : ", p)
 			file, err := parser.ParseFile(fset, p, nil, parser.ParseComments)
 			if err != nil {
 				lChan <- &loadResult{Err: err}
@@ -141,7 +159,10 @@ func loadFiles(paths []string) (mainFset *token.FileSet, astFiles []*ast.File, e
 
 	for rs := range loadChan {
 		if rs.Err != nil {
-			return nil, nil, err
+			if strings.Contains(rs.Err.Error(), "no such file or directory") {
+				continue
+			}
+			return nil, nil, rs.Err
 		}
 		if mainFset == nil {
 			mainFset = rs.Fset
@@ -149,6 +170,5 @@ func loadFiles(paths []string) (mainFset *token.FileSet, astFiles []*ast.File, e
 
 		astFiles = append(astFiles, rs.Ast)
 	}
-
 	return
 }
