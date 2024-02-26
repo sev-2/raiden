@@ -11,22 +11,16 @@ import (
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/query"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/valyala/fasthttp"
 )
 
 func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumn bool) ([]objects.Table, error) {
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-
 	q, err := query.GenerateTablesQuery(includedSchemas, includeColumn)
 	if err != nil {
 		err = fmt.Errorf("failed generate query get table for project id %s : %v", cfg.ProjectId, err)
 		return []objects.Table{}, err
 	}
 
-	rs, err := ExecuteQuery[[]objects.Table](cfg.SupabaseApiUrl, cfg.ProjectId, q, reqInterceptor, nil)
+	rs, err := ExecuteQuery[[]objects.Table](cfg.SupabaseApiUrl, cfg.ProjectId, q, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		err = fmt.Errorf("get tables error : %s", err)
 	}
@@ -35,18 +29,13 @@ func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumn bool)
 }
 
 func GetTableBy(cfg *raiden.Config, name, schema string, includeColumn bool) (result objects.Table, err error) {
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-
 	q, err := query.GenerateTableQuery(name, schema, includeColumn)
 	if err != nil {
 		err = fmt.Errorf("failed generate query get table for project id %s : %v", cfg.ProjectId, err)
 		return result, err
 	}
 
-	rs, err := ExecuteQuery[[]objects.Table](cfg.SupabaseApiUrl, cfg.ProjectId, q, reqInterceptor, nil)
+	rs, err := ExecuteQuery[[]objects.Table](cfg.SupabaseApiUrl, cfg.ProjectId, q, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		err = fmt.Errorf("get tables error : %s", err)
 		return
@@ -91,11 +80,7 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 
 	// execute update
 	logger.Debug("Create Table - execute : ", sql)
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, reqInterceptor, nil)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return result, fmt.Errorf("create new table %s error : %s", newTable.Name, err)
 	}
@@ -103,16 +88,16 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 	return GetTableBy(cfg, newTable.Name, schema, true)
 }
 
-func UpdateTable(cfg *raiden.Config, oldTable objects.Table, newTable objects.Table, updateItem objects.UpdateTableItem) error {
+func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.UpdateTableParam) error {
 	var enableRlsQuery, forceRlsQuery, primaryKeysQuery, replicaIdentityQuery, schemaQuery, nameQuery string
-	alter := fmt.Sprintf("ALTER TABLE %s.%s", oldTable.Schema, oldTable.Name)
-	for _, uType := range updateItem.UpdateItems {
+	alter := fmt.Sprintf("ALTER TABLE %s.%s", updateItem.OldData.Schema, updateItem.OldData.Name)
+	for _, uType := range updateItem.ChangeItems {
 		switch uType {
 		case objects.UpdateTableSchema:
 			schemaQuery = fmt.Sprintf("%s SET SCHEMA %s;", alter, newTable.Schema)
 		case objects.UpdateTableName:
 			if newTable.Name != "" {
-				nameQuery = fmt.Sprintf("ALTER TABLE %s.%s RENAME TO %s;", oldTable.Schema, oldTable.Name, newTable.Name)
+				nameQuery = fmt.Sprintf("%s RENAME TO %s;", alter, newTable.Name)
 			}
 		case objects.UpdateTableRlsEnable:
 			if newTable.RLSEnabled {
@@ -129,7 +114,7 @@ func UpdateTable(cfg *raiden.Config, oldTable objects.Table, newTable objects.Ta
 		case objects.UpdateTableReplicaIdentity:
 			// TODO : implement if needed
 		case objects.UpdateTablePrimaryKey:
-			if len(oldTable.PrimaryKeys) > 0 {
+			if len(updateItem.OldData.PrimaryKeys) > 0 {
 				primaryKeysQuery += fmt.Sprintf(`
 				DO $$
 				DECLARE
@@ -142,7 +127,7 @@ func UpdateTable(cfg *raiden.Config, oldTable objects.Table, newTable objects.Ta
 				  EXECUTE %s || quote_ident(r.conname);
 				END
 				$$;
-				`, oldTable.ID, fmt.Sprintf("%s DROP CONSTRAINT ", alter))
+				`, updateItem.OldData.ID, fmt.Sprintf("%s DROP CONSTRAINT ", alter))
 			}
 
 			if len(newTable.PrimaryKeys) > 0 {
@@ -169,18 +154,14 @@ func UpdateTable(cfg *raiden.Config, oldTable objects.Table, newTable objects.Ta
 
 	// execute update
 	logger.Debug("Update Table - execute : ", sql)
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, reqInterceptor, nil)
+	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("update tables error : %s", err)
 	}
 
 	// execute update column
-	if len(updateItem.Column) > 0 {
-		errors := updateColumnFromTable(cfg, updateItem.Column, newTable.Columns, oldTable.Columns, newTable.PrimaryKeys)
+	if len(updateItem.OldData.Columns) > 0 {
+		errors := updateColumnFromTable(cfg, updateItem.ChangeColumnItems, newTable.Columns, updateItem.OldData.Columns, newTable.PrimaryKeys)
 		if len(errors) > 0 {
 			var errMsg []string
 
@@ -205,11 +186,7 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 
 	// execute delete
 	logger.Debug("Delete Table - execute : ", sql)
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, reqInterceptor, nil)
+	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("delete table %s error : %s", table.Name, err)
 	}
@@ -308,7 +285,7 @@ func updateColumnFromTable(
 func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updateItem objects.UpdateColumnItem) error {
 	// Prepare SQL statements
 	var sqlStatements []string
-
+	var alter = fmt.Sprintf("ALTER TABLE %s.%s", newColumn.Schema, newColumn.Table)
 	for _, uType := range updateItem.UpdateItems {
 		switch uType {
 		case objects.UpdateColumnName:
@@ -316,8 +293,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s RENAME COLUMN %s TO %s;",
-						newColumn.Schema, newColumn.Table, newColumn.Name, newColumn.Name,
+						"%s RENAME COLUMN %s TO %s;", alter, newColumn.Name, newColumn.Name,
 					),
 				)
 			}
@@ -325,8 +301,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 			sqlStatements = append(
 				sqlStatements,
 				fmt.Sprintf(
-					"ALTER TABLE %s.%s ALTER COLUMN %s SET DATA TYPE %s USING %s::%s;",
-					newColumn.Schema, newColumn.Table, oldColumn.Name, newColumn.DataType, oldColumn.Name, newColumn.DataType,
+					"%s ALTER COLUMN %s SET DATA TYPE %s USING %s::%s;", alter, oldColumn.Name, newColumn.DataType, oldColumn.Name, newColumn.DataType,
 				),
 			)
 		case objects.UpdateColumnUnique:
@@ -334,15 +309,13 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s ADD CONSTRAINT %s UNIQUE (%s);",
-						newColumn.Schema, newColumn.Table, fmt.Sprintf("%s_%s_unique", newColumn.Table, newColumn.Name), newColumn.Name),
+						"%s ADD CONSTRAINT %s UNIQUE (%s);", alter, fmt.Sprintf("%s_%s_unique", newColumn.Table, newColumn.Name), newColumn.Name),
 				)
 			} else {
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s DROP CONSTRAINT %s;",
-						newColumn.Schema, newColumn.Table, fmt.Sprintf("%s_%s_unique", newColumn.Table, newColumn.Name),
+						"%s DROP CONSTRAINT %s;", alter, fmt.Sprintf("%s_%s_unique", newColumn.Table, newColumn.Name),
 					),
 				)
 			}
@@ -351,16 +324,14 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s ALTER COLUMN %s DROP NOT NULL;",
-						newColumn.Schema, newColumn.Table, newColumn.Name,
+						"%s ALTER COLUMN %s DROP NOT NULL;", alter, newColumn.Name,
 					),
 				)
 			} else {
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s ALTER COLUMN %s SET NOT NULL;",
-						newColumn.Schema, newColumn.Table, newColumn.Name,
+						"%s ALTER COLUMN %s SET NOT NULL;", alter, newColumn.Name,
 					),
 				)
 			}
@@ -370,8 +341,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s ALTER COLUMN %s DROP DEFAULT;",
-						newColumn.Schema, newColumn.Table, newColumn.Name,
+						"%s ALTER COLUMN %s DROP DEFAULT;", alter, newColumn.Name,
 					),
 				)
 				continue
@@ -403,8 +373,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 			sqlStatements = append(
 				sqlStatements,
 				fmt.Sprintf(
-					"ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT %s;",
-					newColumn.Schema, newColumn.Table, newColumn.Name, defaultValue,
+					"%s ALTER COLUMN %s SET DEFAULT %s;", alter, newColumn.Name, defaultValue,
 				),
 			)
 
@@ -413,16 +382,14 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s ALTER COLUMN %s ADD GENERATED %s AS IDENTITY;",
-						newColumn.Schema, newColumn.Table, newColumn.Name, newColumn.IdentityGeneration,
+						"%s ALTER COLUMN %s ADD GENERATED %s AS IDENTITY;", alter, newColumn.Name, newColumn.IdentityGeneration,
 					),
 				)
 			} else {
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"ALTER TABLE %s.%s ALTER COLUMN %s DROP IDENTITY IF EXISTS;",
-						newColumn.Schema, newColumn.Table, newColumn.Name,
+						"%s ALTER COLUMN %s DROP IDENTITY IF EXISTS;", alter, newColumn.Name,
 					),
 				)
 			}
@@ -438,11 +405,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 
 	// Execute SQL Query
 	logger.Debug("Update Column - execute : ", sql)
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, reqInterceptor, nil)
+	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("update column %s.%s error : %s", newColumn.Table, newColumn.Name, err)
 	}
@@ -485,11 +448,7 @@ func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) err
 
 	// Execute SQL Query
 	logger.Debug("Create Column - execute : ", sql)
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, reqInterceptor, nil)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("create column %s.%s error : %s", column.Table, column.Name, err)
 	}
@@ -500,11 +459,7 @@ func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) err
 func DeleteColumn(cfg *raiden.Config, column objects.Column) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.%s DROP COLUMN %s;", column.Schema, column.Table, column.Name)
 	logger.Debug("Delete Column - execute : ", sql)
-	reqInterceptor := func(req *fasthttp.Request) error {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AccessToken))
-		return nil
-	}
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, reqInterceptor, nil)
+	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("delete column %s.%s error : %s", column.Table, column.Name, err)
 	}

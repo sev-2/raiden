@@ -14,21 +14,23 @@ import (
 )
 
 // ---- Resource state -----
-// temporary collect state date before save to state
+// temporary collect state data before save to state
 
-type resourceState struct {
-	State state.State
-	Mutex sync.RWMutex
+type ResourceState struct {
+	State      state.State
+	NeedUpdate bool
+	Mutex      sync.RWMutex
 }
 
-func (s *resourceState) AddTable(table state.TableState) {
+func (s *ResourceState) AddTable(table state.TableState) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 
 	s.State.Tables = append(s.State.Tables, table)
+	s.NeedUpdate = true
 }
 
-func (s *resourceState) FindTable(tableId int) (index int, tableState state.TableState, found bool) {
+func (s *ResourceState) FindTable(tableId int) (index int, tableState state.TableState, found bool) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 
@@ -47,7 +49,16 @@ func (s *resourceState) FindTable(tableId int) (index int, tableState state.Tabl
 	return
 }
 
-func (s *resourceState) DeleteTable(tableId int) {
+func (s *ResourceState) UpdateTable(index int, state state.TableState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	s.State.Tables[index] = state
+	s.NeedUpdate = true
+	return
+}
+
+func (s *ResourceState) DeleteTable(tableId int) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 
@@ -65,27 +76,125 @@ func (s *resourceState) DeleteTable(tableId int) {
 		return
 	}
 	s.State.Tables = append(s.State.Tables[:index], s.State.Tables[index+1:]...)
+	s.NeedUpdate = true
 }
 
-func (s *resourceState) AddRole(role state.RoleState) {
+func (s *ResourceState) AddRole(role state.RoleState) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
 	s.State.Roles = append(s.State.Roles, role)
+	s.NeedUpdate = true
 }
 
-func (s *resourceState) AddRpc(rpc state.RpcState) {
+func (s *ResourceState) FindRole(roleId int) (index int, roleState state.RoleState, found bool) {
 	s.Mutex.Lock()
 	defer s.Mutex.Unlock()
-	s.State.RpcState = append(s.State.RpcState, rpc)
+
+	found = false
+
+	for i := range s.State.Roles {
+		r := s.State.Roles[i]
+
+		if r.Role.ID == roleId {
+			found = true
+			roleState = r
+			index = i
+			return
+		}
+	}
+	return
 }
 
-func (s *resourceState) Persist() error {
+func (s *ResourceState) UpdateRole(index int, state state.RoleState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	s.State.Roles[index] = state
+	s.NeedUpdate = true
+	return
+}
+
+func (s *ResourceState) DeleteRole(roleId int) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	index := -1
+	for i := range s.State.Roles {
+		r := s.State.Roles[i]
+
+		if r.Role.ID == roleId {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return
+	}
+	s.State.Roles = append(s.State.Roles[:index], s.State.Roles[index+1:]...)
+	s.NeedUpdate = true
+}
+
+func (s *ResourceState) AddRpc(rpc state.RpcState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+	s.State.Rpc = append(s.State.Rpc, rpc)
+	s.NeedUpdate = true
+}
+
+func (s *ResourceState) FindRpc(rpcId int) (index int, rpcState state.RpcState, found bool) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	found = false
+
+	for i := range s.State.Rpc {
+		r := s.State.Rpc[i]
+
+		if r.Function.ID == rpcId {
+			found = true
+			rpcState = r
+			index = i
+			return
+		}
+	}
+	return
+}
+
+func (s *ResourceState) DeleteRpc(rpcId int) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	index := -1
+	for i := range s.State.Rpc {
+		r := s.State.Rpc[i]
+
+		if r.Function.ID == rpcId {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return
+	}
+	s.State.Rpc = append(s.State.Rpc[:index], s.State.Rpc[index+1:]...)
+	s.NeedUpdate = true
+}
+
+func (s *ResourceState) Persist() error {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
-	return state.Save(&s.State)
+	if s.NeedUpdate {
+		if err := state.Save(&s.State); err != nil {
+			return err
+		}
+		s.NeedUpdate = false
+	}
+	return nil
 }
 
-func ListenImportResource(resourceState *resourceState, stateChan chan any) (done chan error) {
+func ListenImportResource(resourceState *ResourceState, stateChan chan any) (done chan error) {
 	done = make(chan error)
 	go func() {
 		for rs := range stateChan {
@@ -112,6 +221,7 @@ func ListenImportResource(resourceState *resourceState, stateChan chan any) (don
 						ModelStruct: utils.SnakeCaseToPascalCase(parseItem.Table.Name),
 						LastUpdate:  time.Now(),
 						Relation:    parseItem.Relations,
+						Policies:    parseItem.Policies,
 					}
 					resourceState.AddTable(tableState)
 				case objects.Role:
@@ -140,15 +250,16 @@ func ListenImportResource(resourceState *resourceState, stateChan chan any) (don
 	return done
 }
 
-func ListenApplyResource(projectPath string, resourceState *resourceState, stateChan chan any) (done chan error) {
+func ListenApplyResource(projectPath string, resourceState *ResourceState, stateChan chan any) (done chan error) {
 	done = make(chan error)
 	go func() {
 		for rs := range stateChan {
 			if rs == nil {
 				continue
 			}
+
 			switch m := rs.(type) {
-			case *MigrateItem[objects.Table, objects.UpdateTableItem]:
+			case *MigrateItem[objects.Table, objects.UpdateTableParam]:
 				switch m.Type {
 				case MigrateTypeCreate:
 					if m.NewData.Name == "" {
@@ -181,8 +292,42 @@ func ListenApplyResource(projectPath string, resourceState *resourceState, state
 					logger.Debugf("update table %s in state", m.NewData.Name)
 					tState.Table = m.NewData
 					tState.LastUpdate = time.Now()
-					resourceState.State.Tables[fIndex] = tState
+					resourceState.UpdateTable(fIndex, tState)
+				}
+			case *MigrateItem[objects.Role, objects.UpdateRoleParam]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					roleStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					rolePath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.RoleDir, utils.ToSnakeCase(m.NewData.Name))
 
+					r := state.RoleState{
+						Role:       m.NewData,
+						RolePath:   rolePath,
+						RoleStruct: roleStruct,
+						LastUpdate: time.Now(),
+					}
+
+					logger.Debugf("add role %s to state", r.Role.Name)
+					resourceState.AddRole(r)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					logger.Debugf("delete role %s from state", m.OldData.Name)
+					resourceState.DeleteRole(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, rState, found := resourceState.FindRole(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					logger.Debugf("update role %s in state", m.NewData.Name)
+					rState.Role = m.NewData
+					rState.LastUpdate = time.Now()
+					resourceState.UpdateRole(fIndex, rState)
 				}
 			}
 		}
@@ -216,11 +361,11 @@ func FindResource[T any](data []T, input generator.GenerateInput, findFunc func(
 	return
 }
 
-func loadAppResource() (*state.State, error) {
+func loadState() (*state.State, error) {
 	return state.Load()
 }
 
-func extractAppResourceState(f *Flags, latestState *state.State) (extractedTable state.ExtractTableResult, roles []objects.Role, rpc []objects.Function, err error) {
+func extractAppResource(f *Flags, latestState *state.State) (extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult, rpc []objects.Function, err error) {
 	if latestState == nil {
 		return
 	}
@@ -234,14 +379,15 @@ func extractAppResourceState(f *Flags, latestState *state.State) (extractedTable
 	}
 
 	if f.All() || f.RolesOnly {
-		roles, err = state.ToRoles(latestState.Roles, registeredRoles, false)
+		logger.Debug("Extract role from state and app resource")
+		extractedRole, err = state.ExtractRole(latestState.Roles, registeredRoles, false)
 		if err != nil {
 			return
 		}
 	}
 
 	if f.All() || f.RpcOnly {
-		rpc, err = state.ToRpc(latestState.RpcState, registeredRpc)
+		rpc, err = state.ExtractRpc(latestState.Rpc, registeredRpc)
 		if err != nil {
 			return
 		}

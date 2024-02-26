@@ -1,51 +1,35 @@
 package state
 
 import (
-	"errors"
 	"fmt"
-	"go/ast"
-	"go/importer"
-	"go/token"
-	"go/types"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
+type ExtractTableItem struct {
+	Table    objects.Table
+	Policies objects.Policies
+}
+
 type ExtractTableResult struct {
-	ExistingTable []objects.Table
-	NewTable      []objects.Table
-	DeleteTable   []objects.Table
+	Existing []ExtractTableItem
+	New      []ExtractTableItem
+	Delete   []ExtractTableItem
 }
 
 func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTableResult, err error) {
-	var paths []string
 	var mapTableState = make(map[string]TableState)
 
 	for i := range tableStates {
 		t := tableStates[i]
 
-		paths = append(paths, t.ModelPath)
 		mapTableState[t.Table.Name] = t
-	}
-
-	fset, astFiles, e := loadFiles(paths)
-	if e != nil {
-		err = e
-		return
-	}
-
-	conf := types.Config{}
-	conf.Importer = importer.Default()
-	pkg, err := conf.Check("models", fset, astFiles, nil)
-	if err != nil {
-		err = fmt.Errorf("error type-checking code :  %s", err.Error())
-		return
 	}
 
 	for _, t := range appTable {
@@ -55,20 +39,20 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 		}
 
 		tableName := utils.ToSnakeCase(tableType.Name())
-
 		ts, isExist := mapTableState[tableName]
+		logger.Debugf("table name : %s; isExist : %v", tableName, isExist)
 		if !isExist {
-			nTable := createTableFromModel(t)
-			result.NewTable = append(result.NewTable, nTable)
+			nt := buildTableFromModel(t)
+			result.New = append(result.New, nt)
 			return
 		}
 
-		tb, e := createTableFromState(pkg, astFiles, fset, ts)
+		tb, e := buildTableFromState(t, ts)
 		if e != nil {
 			err = e
 			return
 		}
-		result.ExistingTable = append(result.ExistingTable, tb)
+		result.Existing = append(result.Existing, tb)
 
 		delete(mapTableState, tableName)
 	}
@@ -76,44 +60,32 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 	// if table from state is not exist in app table,
 	// add table to deleted table arr
 	for _, v := range mapTableState {
-		result.DeleteTable = append(result.DeleteTable, v.Table)
+		result.Delete = append(result.Delete, ExtractTableItem{
+			Table: v.Table,
+		})
 	}
 
 	return
 }
 
-func createTableFromModel(model any) (table objects.Table) {
+func buildTableFromModel(model any) (ei ExtractTableItem) {
 	modelType := reflect.TypeOf(model)
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
 	}
 
-	table.Name = utils.ToSnakeCase(modelType.Name())
+	ei.Table.Name = utils.ToSnakeCase(modelType.Name())
 
 	// add metadata
 	metadataField, isExist := modelType.FieldByName("Metadata")
 	if isExist {
-		if schema := metadataField.Tag.Get("schema"); len(schema) > 0 {
-			table.Schema = schema
-		} else {
-			table.Schema = "public"
-		}
+		bindTableMetadata(&metadataField, &ei.Table)
+	}
 
-		if rlsEnable := metadataField.Tag.Get("rlsEnable"); len(rlsEnable) > 0 {
-			if isRlsEnable, err := strconv.ParseBool(rlsEnable); err == nil {
-				table.RLSEnabled = isRlsEnable
-			}
-		} else {
-			table.RLSEnabled = false
-		}
-
-		if rlsForced := metadataField.Tag.Get("rlsForced"); len(rlsForced) > 0 {
-			if isRlsForced, err := strconv.ParseBool(rlsForced); err == nil {
-				table.RLSForced = isRlsForced
-			}
-		} else {
-			table.RLSForced = false
-		}
+	// add metadata
+	aclField, isExist := modelType.FieldByName("Acl")
+	if isExist {
+		bindTableAcl(&aclField)
 	}
 
 	for i := 0; i < modelType.NumField(); i++ {
@@ -129,56 +101,27 @@ func createTableFromModel(model any) (table objects.Table) {
 				ct := raiden.UnmarshalColumnTag(column)
 
 				c := objects.Column{
-					Table:      table.Name,
-					Schema:     table.Schema,
-					IsNullable: ct.Nullable,
-					IsUnique:   ct.Unique,
+					Table:  ei.Table.Name,
+					Schema: ei.Table.Schema,
 				}
 
-				if ct.Name != "" {
-					c.Name = ct.Name
-				}
+				bindColumn(&field, &ct, &c)
 
-				if ct.AutoIncrement {
-					c.IdentityGeneration = "BY DEFAULT"
-				}
-
-				if ct.Type != "" {
-					pgType := postgres.GetPgDataTypeName(postgres.DataType(ct.Type), false)
-					c.DataType = string(pgType)
-				} else {
-					c.DataType = string(postgres.ToPostgresType(field.Type.Name()))
-				}
-
-				if ct.PrimaryKey {
-					c.IsIdentity = true
-					c.IsUnique = true
-					table.PrimaryKeys = append(table.PrimaryKeys, objects.PrimaryKey{
-						Name:      c.Name,
-						Schema:    table.Schema,
-						TableName: table.Name,
-					})
-				}
-
-				if ct.Default != nil {
-					c.DefaultValue = ct.Default
-				}
-
-				table.Columns = append(table.Columns, c)
+				ei.Table.Columns = append(ei.Table.Columns, c)
 			}
 
 			if join := field.Tag.Get("join"); len(join) > 0 {
 				jt := raiden.UnmarshalJoinTag(join)
 				if jt.JoinType == raiden.RelationTypeHasOne {
 					rel := objects.TablesRelationship{}
-					rel.SourceTableName = table.Name
+					rel.SourceTableName = ei.Table.Name
 					rel.SourceColumnName = jt.ForeignKey
-					rel.SourceSchema = table.Schema
+					rel.SourceSchema = ei.Table.Schema
 					rel.TargetTableName = utils.ToSnakeCase(field.Name)
-					rel.TargetTableSchema = table.Schema
+					rel.TargetTableSchema = ei.Table.Schema
 					rel.TargetColumnName = jt.PrimaryKey
 
-					table.Relationships = append(table.Relationships, rel)
+					ei.Table.Relationships = append(ei.Table.Relationships, rel)
 				}
 			}
 		}
@@ -187,168 +130,173 @@ func createTableFromModel(model any) (table objects.Table) {
 	return
 }
 
-func createTableFromState(pkg *types.Package, astFiles []*ast.File, fset *token.FileSet, state TableState) (table objects.Table, err error) {
-	obj := pkg.Scope().Lookup(state.ModelStruct)
-	if obj == nil {
-		err = errors.New("struct not found : " + state.ModelStruct)
-		return
-	}
-
-	// Assert the objects's type to *types.TypeName
-	typeObj, ok := obj.(*types.TypeName)
-	if !ok {
-		err = fmt.Errorf("unexpected type for objects : %v", obj)
-		return
+func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err error) {
+	modelType := reflect.TypeOf(model)
+	if modelType.Kind() == reflect.Ptr {
+		modelType = modelType.Elem()
 	}
 
 	// Get the reflect.Type of the struct
-	structType := typeObj.Type().Underlying().(*types.Struct)
-	table = state.Table
-	table.Name = utils.ToSnakeCase(typeObj.Name())
+	ei.Table = state.Table
+	ei.Table.Name = utils.ToSnakeCase(modelType.Name())
 
 	// map column for make check if column exist and reuse default
 	mapColumn := make(map[string]objects.Column)
-	for i := range table.Columns {
-		c := table.Columns[i]
+	for i := range ei.Table.Columns {
+		c := ei.Table.Columns[i]
 		mapColumn[c.Name] = c
 	}
 
 	// map relation for make check if relation exist and reuse default
 	mapRelation := make(map[string]objects.TablesRelationship)
-	for i := range table.Relationships {
-		r := table.Relationships[i]
+	for i := range ei.Table.Relationships {
+		r := ei.Table.Relationships[i]
 		mapRelation[r.ConstraintName] = r
 	}
 
 	// map relation for make check if relation exist and reuse default
 	mapPrimaryKey := make(map[string]objects.PrimaryKey)
-	for i := range table.PrimaryKeys {
-		pk := table.PrimaryKeys[i]
+	for i := range ei.Table.PrimaryKeys {
+		pk := ei.Table.PrimaryKeys[i]
 		mapPrimaryKey[pk.Name] = pk
 	}
 
-	var tableColumns []objects.Column
-	var tableRelations []objects.TablesRelationship
-	var tablePrimaryKeys []objects.PrimaryKey
+	var columns []objects.Column
+	var relations []objects.TablesRelationship
+	var primaryKeys []objects.PrimaryKey
+
+	// update metadata
+	metadataField, isExist := modelType.FieldByName("Metadata")
+	if isExist {
+		bindTableMetadata(&metadataField, &ei.Table)
+	}
+
+	// add metadata
+	aclField, isExist := modelType.FieldByName("Acl")
+	if isExist {
+		bindTableAcl(&aclField)
+	}
 
 	// Iterate over the fields of the struct
-	for i := 0; i < structType.NumFields(); i++ {
-		field := structType.Field(i)
+	for i := 0; i < modelType.NumField(); i++ {
+		field := modelType.Field(i)
 		// Get field name and tag
-		fieldName := field.Name()
+		fieldName := field.Name
 
-		// example tag :
-		// "column": "name:id;type:bigint;primaryKey;autoIncrement;nullable:false"
-		// "join": "joinType:manyToMany;through:submission;sourcePrimaryKey:id;sourceForeignKey:scouter_id;targetPrimaryKey:id;targetForeign:scouter_id"
-		fieldTag := structType.Tag(i)
-
-		// change tag to map
-		mapTag := make(map[string]string)
-		for _, rawTag := range strings.Split(fieldTag, " ") {
-			parts := strings.SplitN(rawTag, ":", 2)
-			if len(parts) == 2 {
-				key := strings.Trim(parts[0], `"`)
-				value := strings.Trim(parts[1], `"`)
-				mapTag[key] = value
-			}
-		}
-
-		if fieldName == "Metadata" {
-			if schema, isSet := mapTag["schema"]; isSet {
-				table.Schema = schema
-			}
-
-			if rlsEnable, isSet := mapTag["rlsEnable"]; isSet {
-				if enable, errParse := strconv.ParseBool(rlsEnable); errParse != nil {
-					return table, errParse
-				} else {
-					table.RLSEnabled = enable
-				}
-			}
-
-			if rlsForced, isSet := mapTag["rlsForced"]; isSet {
-				if forced, errParse := strconv.ParseBool(rlsForced); errParse != nil {
-					return table, errParse
-				} else {
-					table.RLSForced = forced
-				}
-			}
-
-		}
-
-		if fieldName == "Acl" {
-			// TODO : implement handle acl
+		switch field.Name {
+		case "Metadata", "Acl":
 			continue
-		}
+		default:
+			// example tag "name:id;type:bigint;primaryKey;autoIncrement;nullable:false"
+			if columnTag := field.Tag.Get("column"); len(columnTag) > 0 {
+				var c objects.Column
 
-		columnTag, exist := mapTag["column"]
-		if exist {
-			if c := buildColumn(fieldName, mapColumn, columnTag); c.Name != "" {
-				tableColumns = append(tableColumns, c)
+				ct := raiden.UnmarshalColumnTag(columnTag)
+				if found, exist := mapColumn[ct.Name]; exist {
+					c = found
+				}
+
+				c.Table = ei.Table.Name
+				c.Schema = ei.Table.Schema
+
+				bindColumn(&field, &ct, &c)
+
 				if c.IsIdentity {
 					if pk, exist := mapPrimaryKey[c.Name]; exist {
 						pk.Schema = c.Schema
-						pk.TableName = table.Name
-						tablePrimaryKeys = append(tablePrimaryKeys, pk)
+						pk.TableName = ei.Table.Name
+						primaryKeys = append(primaryKeys, pk)
 					} else {
-						tablePrimaryKeys = append(tablePrimaryKeys, objects.PrimaryKey{
+						primaryKeys = append(primaryKeys, objects.PrimaryKey{
 							Name:      c.Name,
-							Schema:    table.Schema,
-							TableID:   table.ID,
-							TableName: table.Name,
+							Schema:    ei.Table.Schema,
+							TableID:   ei.Table.ID,
+							TableName: ei.Table.Name,
 						})
 					}
 				}
-			}
-		}
 
-		joinTag, exist := mapTag["join"]
-		if exist {
-			if r := buildRelation(table.Name, fieldName, table.Schema, mapRelation, joinTag); r.ConstraintName != "" {
-				tableRelations = append(tableRelations, r)
+				columns = append(columns, c)
+			}
+
+			if joinTag := field.Tag.Get("join"); len(joinTag) > 0 {
+				if r := buildTableRelation(ei.Table.Name, fieldName, ei.Table.Schema, mapRelation, joinTag); r.ConstraintName != "" {
+					relations = append(relations, r)
+				}
 			}
 		}
 	}
 
-	table.Columns = tableColumns
-	table.Relationships = tableRelations
-	table.PrimaryKeys = tablePrimaryKeys
+	ei.Table.Columns = columns
+	ei.Table.Relationships = relations
+	ei.Table.PrimaryKeys = primaryKeys
 
-	return table, nil
+	return ei, nil
 }
 
-func buildColumn(fieldName string, mapColumn map[string]objects.Column, columnTag string) (column objects.Column) {
-	ct := raiden.UnmarshalColumnTag(columnTag)
+func bindColumn(field *reflect.StructField, ct *raiden.ColumnTag, c *objects.Column) {
+	c.IsNullable = ct.Nullable
+	c.IsUnique = ct.Unique
 
-	if ct.Name == "" {
-		ct.Name = utils.ToSnakeCase(fieldName)
-	}
-
-	if c, exist := mapColumn[ct.Name]; exist {
-		column = c
+	if ct.Name != "" {
+		c.Name = ct.Name
+	} else {
+		ct.Name = utils.ToSnakeCase(field.Name)
 	}
 
 	if ct.PrimaryKey {
-		column.IsIdentity = ct.PrimaryKey
+		c.IsIdentity = true
+		c.IsUnique = true
 	}
 
-	column.IsNullable = ct.Nullable
-	column.DataType = string(postgres.GetPgDataTypeName(postgres.DataType(ct.Type), false))
-	column.DefaultValue = ct.Default
-	column.IsUnique = ct.Unique
+	if ct.Type != "" {
+		pgType := postgres.GetPgDataTypeName(postgres.DataType(ct.Type), false)
+		c.DataType = string(pgType)
+	} else {
+		c.DataType = string(postgres.ToPostgresType(field.Type.Name()))
+	}
+
+	c.DefaultValue = ct.Default
 
 	if ct.AutoIncrement {
-		column.IdentityGeneration = "BY DEFAULT"
+		c.IdentityGeneration = "BY DEFAULT"
 	}
 
-	if len(column.Enums) == 0 {
-		column.Enums = make([]string, 0)
+	if len(c.Enums) == 0 {
+		c.Enums = make([]string, 0)
 	}
-
-	return
 }
 
-func buildRelation(tableName, fieldName, schema string, mapRelations map[string]objects.TablesRelationship, joinTag string) (relation objects.TablesRelationship) {
+func bindTableMetadata(field *reflect.StructField, table *objects.Table) {
+	if schema := field.Tag.Get("schema"); len(schema) > 0 {
+		table.Schema = schema
+	} else {
+		table.Schema = "public"
+	}
+
+	if rlsEnable := field.Tag.Get("rlsEnable"); len(rlsEnable) > 0 {
+		if isRlsEnable, err := strconv.ParseBool(rlsEnable); err == nil {
+			table.RLSEnabled = isRlsEnable
+		}
+	} else {
+		table.RLSEnabled = false
+	}
+
+	if rlsForced := field.Tag.Get("rlsForced"); len(rlsForced) > 0 {
+		if isRlsForced, err := strconv.ParseBool(rlsForced); err == nil {
+			table.RLSForced = isRlsForced
+		}
+	} else {
+		table.RLSForced = false
+	}
+}
+
+// TODO : implement mapping acl
+func bindTableAcl(field *reflect.StructField) {
+
+}
+
+func buildTableRelation(tableName, fieldName, schema string, mapRelations map[string]objects.TablesRelationship, joinTag string) (relation objects.TablesRelationship) {
 	jt := raiden.UnmarshalJoinTag(joinTag)
 	sourceTable, targetTable := utils.ToSnakeCase(fieldName), utils.ToSnakeCase(tableName)
 

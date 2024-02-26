@@ -6,6 +6,9 @@ import (
 )
 
 type (
+	ModelBase struct {
+	}
+
 	// definition of column tag, example :
 	// column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false;unique;default:now()"
 	ColumnTag struct {

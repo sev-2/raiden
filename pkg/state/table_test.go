@@ -48,26 +48,26 @@ func TestExtractTable_NoRelation(t *testing.T) {
 	rs, err := state.ExtractTable(tableState, appTable)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(rs.ExistingTable))
-	assert.Equal(t, 0, len(rs.DeleteTable))
-	assert.Equal(t, 1, len(rs.NewTable))
+	assert.Equal(t, 0, len(rs.Existing))
+	assert.Equal(t, 0, len(rs.Delete))
+	assert.Equal(t, 1, len(rs.New))
 
 	// assert table
-	assert.Equal(t, "candidate", rs.NewTable[0].Name)
-	assert.Equal(t, "public", rs.NewTable[0].Schema)
+	assert.Equal(t, "candidate", rs.New[0].Table.Name)
+	assert.Equal(t, "public", rs.New[0].Table.Schema)
 
 	// assert pk
-	assert.Equal(t, 1, len(rs.NewTable[0].PrimaryKeys))
-	assert.Equal(t, "id", rs.NewTable[0].PrimaryKeys[0].Name)
-	assert.Equal(t, "public", rs.NewTable[0].PrimaryKeys[0].Schema)
-	assert.Equal(t, "candidate", rs.NewTable[0].PrimaryKeys[0].TableName)
+	assert.Equal(t, 1, len(rs.New[0].Table.PrimaryKeys))
+	assert.Equal(t, "id", rs.New[0].Table.PrimaryKeys[0].Name)
+	assert.Equal(t, "public", rs.New[0].Table.PrimaryKeys[0].Schema)
+	assert.Equal(t, "candidate", rs.New[0].Table.PrimaryKeys[0].TableName)
 
 	// assert column
-	assert.Equal(t, 4, len(rs.NewTable[0].Columns))
-	assert.Equal(t, "id", rs.NewTable[0].Columns[0].Name)
-	assert.Equal(t, "name", rs.NewTable[0].Columns[1].Name)
-	assert.Equal(t, "batch", rs.NewTable[0].Columns[2].Name)
-	assert.Equal(t, "created_at", rs.NewTable[0].Columns[3].Name)
+	assert.Equal(t, 4, len(rs.New[0].Table.Columns))
+	assert.Equal(t, "id", rs.New[0].Table.Columns[0].Name)
+	assert.Equal(t, "name", rs.New[0].Table.Columns[1].Name)
+	assert.Equal(t, "batch", rs.New[0].Table.Columns[2].Name)
+	assert.Equal(t, "created_at", rs.New[0].Table.Columns[3].Name)
 }
 
 func TestExtractTable_WithRelation(t *testing.T) {
@@ -76,35 +76,35 @@ func TestExtractTable_WithRelation(t *testing.T) {
 	rs, err := state.ExtractTable(tableState, appTable)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(rs.ExistingTable))
-	assert.Equal(t, 0, len(rs.DeleteTable))
-	assert.Equal(t, 1, len(rs.NewTable))
+	assert.Equal(t, 0, len(rs.Existing))
+	assert.Equal(t, 0, len(rs.Delete))
+	assert.Equal(t, 1, len(rs.New))
 
 	// assert table
-	assert.Equal(t, "submission", rs.NewTable[0].Name)
-	assert.Equal(t, "public", rs.NewTable[0].Schema)
+	assert.Equal(t, "submission", rs.New[0].Table.Name)
+	assert.Equal(t, "public", rs.New[0].Table.Schema)
 
 	// assert pk
-	assert.Equal(t, 1, len(rs.NewTable[0].PrimaryKeys))
-	assert.Equal(t, "id", rs.NewTable[0].PrimaryKeys[0].Name)
-	assert.Equal(t, "public", rs.NewTable[0].PrimaryKeys[0].Schema)
-	assert.Equal(t, "submission", rs.NewTable[0].PrimaryKeys[0].TableName)
+	assert.Equal(t, 1, len(rs.New[0].Table.PrimaryKeys))
+	assert.Equal(t, "id", rs.New[0].Table.PrimaryKeys[0].Name)
+	assert.Equal(t, "public", rs.New[0].Table.PrimaryKeys[0].Schema)
+	assert.Equal(t, "submission", rs.New[0].Table.PrimaryKeys[0].TableName)
 
 	// assert relation
-	assert.Equal(t, 1, len(rs.NewTable[0].Relationships))
-	assert.Equal(t, "public", rs.NewTable[0].Relationships[0].SourceSchema)
-	assert.Equal(t, "submission", rs.NewTable[0].Relationships[0].SourceTableName)
-	assert.Equal(t, "candidate_id", rs.NewTable[0].Relationships[0].SourceColumnName)
-	assert.Equal(t, "public", rs.NewTable[0].Relationships[0].TargetTableSchema)
-	assert.Equal(t, "candidate", rs.NewTable[0].Relationships[0].TargetTableName)
-	assert.Equal(t, "id", rs.NewTable[0].Relationships[0].TargetColumnName)
+	assert.Equal(t, 1, len(rs.New[0].Table.Relationships))
+	assert.Equal(t, "public", rs.New[0].Table.Relationships[0].SourceSchema)
+	assert.Equal(t, "submission", rs.New[0].Table.Relationships[0].SourceTableName)
+	assert.Equal(t, "candidate_id", rs.New[0].Table.Relationships[0].SourceColumnName)
+	assert.Equal(t, "public", rs.New[0].Table.Relationships[0].TargetTableSchema)
+	assert.Equal(t, "candidate", rs.New[0].Table.Relationships[0].TargetTableName)
+	assert.Equal(t, "id", rs.New[0].Table.Relationships[0].TargetColumnName)
 
 	// assert column
-	assert.Equal(t, 6, len(rs.NewTable[0].Columns))
-	assert.Equal(t, "id", rs.NewTable[0].Columns[0].Name)
-	assert.Equal(t, "scouter_id", rs.NewTable[0].Columns[1].Name)
-	assert.Equal(t, "candidate_id", rs.NewTable[0].Columns[2].Name)
-	assert.Equal(t, "score", rs.NewTable[0].Columns[3].Name)
-	assert.Equal(t, "note", rs.NewTable[0].Columns[4].Name)
-	assert.Equal(t, "created_at", rs.NewTable[0].Columns[5].Name)
+	assert.Equal(t, 6, len(rs.New[0].Table.Columns))
+	assert.Equal(t, "id", rs.New[0].Table.Columns[0].Name)
+	assert.Equal(t, "scouter_id", rs.New[0].Table.Columns[1].Name)
+	assert.Equal(t, "candidate_id", rs.New[0].Table.Columns[2].Name)
+	assert.Equal(t, "score", rs.New[0].Table.Columns[3].Name)
+	assert.Equal(t, "note", rs.New[0].Table.Columns[4].Name)
+	assert.Equal(t, "created_at", rs.New[0].Table.Columns[5].Name)
 }

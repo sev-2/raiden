@@ -5,6 +5,7 @@ import (
 	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/apply"
 	"github.com/sev-2/raiden/pkg/cli/configure"
+	"github.com/sev-2/raiden/pkg/cli/generate"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
@@ -12,7 +13,8 @@ import (
 
 type ApplyFlags struct {
 	cli.Flags
-	Apply apply.Flags
+	Apply    apply.Flags
+	Generate generate.Flags
 }
 
 func ApplyCommand() *cobra.Command {
@@ -24,7 +26,7 @@ func ApplyCommand() *cobra.Command {
 		Long:    "Apply model, role, rpc and rls to supabase",
 		PreRunE: PreRunE(&f.Flags, apply.PreRun),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f.CheckAndActivateDebug(cmd)
+			verbose := f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
@@ -40,11 +42,18 @@ func ApplyCommand() *cobra.Command {
 				return err
 			}
 
-			return apply.Run(&f.Apply, config, currentDir)
+			// 1. generate all resource
+			if err = generate.Run(&f.Generate, config, currentDir, false); err != nil {
+				return err
+			}
+
+			// 2. run import
+			return apply.Run(&f.Apply, currentDir, verbose)
 		},
 	}
 
 	f.Apply.Bind(cmd)
+	f.Generate.Bind(cmd)
 
 	return cmd
 }

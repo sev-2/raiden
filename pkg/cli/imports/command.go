@@ -10,9 +10,7 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden/pkg/cli/configure"
-	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -24,16 +22,6 @@ type Flags struct {
 	RolesOnly     bool
 	ModelsOnly    bool
 	AllowedSchema string
-}
-
-type MapTable map[string]*objects.Table
-type MapRelations map[string][]*generator.Relation
-type ManyToManyTable struct {
-	Table      string
-	Schema     string
-	PivotTable string
-	PrimaryKey string
-	ForeignKey string
 }
 
 func (f *Flags) Bind(cmd *cobra.Command) {

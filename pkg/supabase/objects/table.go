@@ -95,7 +95,8 @@ const (
 	UpdateColumnIdentity     UpdateColumnType = "identity"
 )
 
-type UpdateTableItem struct {
-	Column      []UpdateColumnItem
-	UpdateItems []UpdateTableType
+type UpdateTableParam struct {
+	OldData           Table
+	ChangeColumnItems []UpdateColumnItem
+	ChangeItems       []UpdateTableType
 }

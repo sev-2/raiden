@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
@@ -24,59 +25,67 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	// load supabase resource
-	resource, err := Load(flags, config)
+	spResource, err := Load(flags, config)
 	if err != nil {
 		return err
 	}
 
 	// create import state
-	nativeStateRoles := filterIsNativeRole(mapNativeRole, resource.Roles)
+	nativeStateRoles := filterIsNativeRole(mapNativeRole, spResource.Roles)
 	if err != nil {
 		return err
 	}
 
 	// filter table for with allowed schema
-	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
-	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
-	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)
+	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	spResource.Functions = filterFunctionBySchema(spResource.Functions, strings.Split(flags.AllowedSchema, ",")...)
+	spResource.Roles = filterUserRole(spResource.Roles, mapNativeRole)
 
 	// load app resource
-	latestState, err := loadAppResource()
-	if err != nil {
-		return err
-	}
-	appTables, appRoles, appRpcFunctions, err := extractAppResourceState(flags, latestState)
+	latestState, err := loadState()
 	if err != nil {
 		return err
 	}
 
-	// compare
-	if (flags.All() || flags.ModelsOnly) && len(appTables.ExistingTable) > 0 {
-		if err := runImportCompareTable(resource.Tables, appTables.ExistingTable); err != nil {
-			return err
-		}
+	appTables, appRoles, appRpcFunctions, err := extractAppResource(flags, latestState)
+	if err != nil {
+		return err
 	}
 
-	if (flags.All() || flags.RolesOnly) && len(appRoles) > 0 {
-		if err := runImportCompareRoles(resource.Roles, appRoles); err != nil {
-			return err
-		}
-	}
-
-	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions) > 0 {
-		if err := runImportCompareRpcFunctions(resource.Functions, appRpcFunctions); err != nil {
-			return err
-		}
-	}
-
-	importState := resourceState{
+	importState := ResourceState{
 		State: state.State{
 			Roles: nativeStateRoles,
 		},
 	}
 
+	// compare resource
+	if (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
+		// compare table
+		var compareTables []objects.Table
+		for i := range appTables.Existing {
+			et := appTables.Existing[i]
+			compareTables = append(compareTables, et.Table)
+		}
+
+		if err := runImportCompareTable(spResource.Tables, compareTables); err != nil {
+			return err
+		}
+	}
+
+	if (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
+		if err := runImportCompareRoles(spResource.Roles, appRoles.Existing); err != nil {
+			return err
+		}
+	}
+
+	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions) > 0 {
+		if err := runImportCompareRpcFunctions(spResource.Functions, appRpcFunctions); err != nil {
+			return err
+		}
+	}
+
 	// generate resource
-	return generateResource(config, &importState, flags.ProjectPath, resource)
+	return generateResource(config, &importState, flags.ProjectPath, spResource)
 }
 
 func runImportCompareTable(supabaseTable []objects.Table, appTable []objects.Table) error {
@@ -97,12 +106,13 @@ func runImportCompareTable(supabaseTable []objects.Table, appTable []objects.Tab
 }
 
 func runImportCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) error {
-	diffResult, err := CompareRoles(supabaseRoles, appRoles)
+	diffResult, err := CompareRoles(supabaseRoles, appRoles, CompareModeImport)
 	if err != nil {
 		return err
 	}
 
 	if len(diffResult) > 0 {
+		logger.PrintJson(diffResult, true)
 		for i := range diffResult {
 			d := diffResult[i]
 			PrintDiff("role", d.SourceResource, d.TargetResource, d.Name)

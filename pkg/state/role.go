@@ -1,11 +1,20 @@
 package state
 
 import (
+	"reflect"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
-func ToRoles(roleStates []RoleState, appRoles []raiden.Role, withNativeRole bool) (roles []objects.Role, err error) {
+type ExtractRoleResult struct {
+	Existing []objects.Role
+	New      []objects.Role
+	Delete   []objects.Role
+}
+
+func ExtractRole(roleStates []RoleState, appRoles []raiden.Role, withNativeRole bool) (result ExtractRoleResult, err error) {
 	mapRoleState := map[string]RoleState{}
 	for i := range roleStates {
 		r := roleStates[i]
@@ -15,36 +24,54 @@ func ToRoles(roleStates []RoleState, appRoles []raiden.Role, withNativeRole bool
 	for _, role := range appRoles {
 		state, isStateExist := mapRoleState[role.Name()]
 		if !isStateExist {
-			// handle new role
+			r := objects.Role{}
+			bindToSupabaseRole(&r, role)
+			result.New = append(result.New, r)
 			return
 		}
 
 		if state.IsNative && withNativeRole {
-			roles = append(roles, state.Role)
+			result.Existing = append(result.Existing, state.Role)
 		}
 
 		if !state.IsNative {
-			sr, err := createRoleFromState(state, role)
-			if err != nil {
-				return roles, err
-			}
-			roles = append(roles, sr)
+			sr := buildRoleFromState(state, role)
+			result.Existing = append(result.Existing, sr)
 		}
+
+		delete(mapRoleState, role.Name())
+	}
+
+	for _, state := range mapRoleState {
+		result.Delete = append(result.Delete, state.Role)
 	}
 
 	return
 }
 
-func createRoleFromState(rs RoleState, role raiden.Role) (r objects.Role, err error) {
-	r = rs.Role
+func bindToSupabaseRole(r *objects.Role, role raiden.Role) {
+	name := role.Name()
+	if name == "" {
+		rv := reflect.TypeOf(role)
+		name = utils.ToSnakeCase(rv.Name())
+	}
+
+	r.Name = name
 	r.ConnectionLimit = role.ConnectionLimit()
 	r.CanBypassRLS = role.CanBypassRls()
 	r.CanCreateDB = role.CanCreateDB()
 	r.CanCreateRole = role.CanCreateRole()
 	r.CanLogin = role.CanLogin()
 	r.InheritRole = role.InheritRole()
-	r.IsReplicationRole = role.IsReplicationRole()
-	r.IsSuperuser = role.IsSuperuser()
+	r.ValidUntil = role.ValidUntil()
 
+	// need role with superuser to create new superuser role and set replication
+	// r.IsReplicationRole = role.IsReplicationRole()
+	// r.IsSuperuser = role.IsSuperuser()
+}
+
+func buildRoleFromState(rs RoleState, role raiden.Role) (r objects.Role) {
+	r = rs.Role
+	bindToSupabaseRole(&r, role)
 	return
 }

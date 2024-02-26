@@ -1,5 +1,9 @@
 package raiden
 
+import (
+	"github.com/sev-2/raiden/pkg/supabase/objects"
+)
+
 type (
 	Role interface {
 		// name
@@ -11,11 +15,11 @@ type (
 		// default true
 		InheritRole() bool
 
-		// default false
-		IsReplicationRole() bool
-
-		// default false
-		IsSuperuser() bool
+		// Disable for now, because need super user role for set it
+		// // default false
+		// IsReplicationRole() bool
+		// // default false
+		// IsSuperuser() bool
 
 		// default false
 		CanBypassRls() bool
@@ -28,6 +32,9 @@ type (
 
 		// default false
 		CanLogin() bool
+
+		// default nil
+		ValidUntil() *objects.ValidUntil
 	}
 
 	RoleBase struct {
@@ -35,7 +42,8 @@ type (
 )
 
 const (
-	DefaultRoleConnectionLimit = 60
+	DefaultRoleValidUntilLayout = "2006-01-02"
+	DefaultRoleConnectionLimit  = 60
 )
 
 // ----- Base Role Default Func -----
@@ -47,13 +55,13 @@ func (r *RoleBase) InheritRole() bool {
 	return true
 }
 
-func (r *RoleBase) IsReplicationRole() bool {
-	return false
-}
+// func (r *RoleBase) IsReplicationRole() bool {
+// 	return false
+// }
 
-func (r *RoleBase) IsSuperuser() bool {
-	return false
-}
+// func (r *RoleBase) IsSuperuser() bool {
+// 	return false
+// }
 
 func (r *RoleBase) CanBypassRls() bool {
 	return false
@@ -69,4 +77,8 @@ func (r *RoleBase) CanCreateRole() bool {
 
 func (r *RoleBase) CanLogin() bool {
 	return false
+}
+
+func (r *RoleBase) ValidUntil() *objects.ValidUntil {
+	return nil
 }

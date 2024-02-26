@@ -80,7 +80,6 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 	}
 
 	wg, errChan := sync.WaitGroup{}, make(chan error)
-
 	go func() {
 		wg.Wait()
 		close(errChan)
@@ -103,16 +102,6 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 				errChan <- err
 				return
 			}
-			errChan <- nil
-		}()
-	}
-
-	if flags.IsGenerateAll() || flags.RpcOnly {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			// TODO : generate register rpc file
 			errChan <- nil
 		}()
 	}
@@ -145,9 +134,19 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			errChan <- err
 		}
 
+		// generate role register
+		if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+			errChan <- err
+		}
+
 		if initialize {
 			// generate import main function
 			if err := generator.GenerateImportMainFunction(projectPath, config, generator.Generate); err != nil {
+				errChan <- err
+			}
+
+			// generate import main function
+			if err := generator.GenerateApplyMainFunction(projectPath, config, generator.Generate); err != nil {
 				errChan <- err
 			} else {
 				errChan <- nil

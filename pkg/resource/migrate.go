@@ -25,29 +25,58 @@ type MigrateItem[T, D any] struct {
 }
 
 type MigrateData struct {
-	Tables   []MigrateItem[objects.Table, objects.UpdateTableItem]
-	Roles    []MigrateItem[objects.Role, any]
+	Tables   []MigrateItem[objects.Table, objects.UpdateTableParam]
+	Roles    []MigrateItem[objects.Role, objects.UpdateRoleParam]
 	Rpc      []MigrateItem[objects.Function, any]
-	Policies []MigrateItem[objects.Policies, any]
+	Policies []MigrateItem[objects.Policy, any]
 }
 
-func MigrateResource(config *raiden.Config, importState *resourceState, projectPath string, resource *MigrateData) (errors []error) {
+type MigrateCreateFunc[T any] func(cfg *raiden.Config, param T) (response T, err error)
+type MigrateUpdateFunc[T, D any] func(cfg *raiden.Config, param T, items D) (err error)
+type MigrateDeleteFunc[T any] func(cfg *raiden.Config, param T) (err error)
+
+type MigrateActionFunc[T, D any] struct {
+	CreateFunc MigrateCreateFunc[T]
+	UpdateFunc MigrateUpdateFunc[T, D]
+	DeleteFunc MigrateDeleteFunc[T]
+}
+type MigrateFuncParam[T, D any] struct {
+	Config      *raiden.Config
+	StateChan   chan any
+	ErrChan     chan error
+	Data        MigrateItem[T, D]
+	ActionFuncs MigrateActionFunc[T, D]
+}
+type MigrateFunc[T, D any] func(param MigrateFuncParam[T, D])
+
+func MigrateResource(config *raiden.Config, importState *ResourceState, projectPath string, resource *MigrateData) (errors []error) {
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan []error), make(chan any)
 	doneListen := ListenApplyResource(projectPath, importState, stateChan)
+
+	// role must be run first because will be use when create/update rls
+	// and role must be already exist in database
+	if len(resource.Roles) > 0 {
+		actions := MigrateActionFunc[objects.Role, objects.UpdateRoleParam]{
+			CreateFunc: supabase.CreateRole, UpdateFunc: supabase.UpdateRole, DeleteFunc: supabase.DeleteRole,
+		}
+		errors = runMigrateResource[objects.Role, objects.UpdateRoleParam](config, resource.Roles, stateChan, actions, migrateProcess)
+		if len(errors) > 0 {
+			close(stateChan)
+			return errors
+		}
+	}
 
 	if len(resource.Tables) > 0 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errChan <- migrateTables(config, resource.Tables, stateChan)
-		}()
-	}
-
-	if len(resource.Roles) > 0 {
-		// TODO : handler migrate roles
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+			actions := MigrateActionFunc[objects.Table, objects.UpdateTableParam]{
+				CreateFunc: supabase.CreateTable, UpdateFunc: supabase.UpdateTable,
+				DeleteFunc: func(cfg *raiden.Config, param objects.Table) (err error) {
+					return supabase.DeleteTable(cfg, param, true)
+				},
+			}
+			errChan <- runMigrateResource[objects.Table, objects.UpdateTableParam](config, resource.Tables, stateChan, actions, migrateProcess)
 		}()
 	}
 
@@ -88,13 +117,24 @@ func MigrateResource(config *raiden.Config, importState *resourceState, projectP
 	}
 }
 
-func migrateTables(cfg *raiden.Config, tables []MigrateItem[objects.Table, objects.UpdateTableItem], stateChan chan any) (errors []error) {
+func runMigrateResource[T any, D any](cfg *raiden.Config, resources []MigrateItem[T, D], stateChan chan any, actionFunc MigrateActionFunc[T, D], migrateFunc MigrateFunc[T, D]) (errors []error) {
 	wg, errChan := sync.WaitGroup{}, make(chan error)
 
-	for i := range tables {
-		t := tables[i]
+	for i := range resources {
+		t := resources[i]
 		wg.Add(1)
-		go migrateTable(&wg, cfg, stateChan, &t, errChan)
+
+		go func(w *sync.WaitGroup, c *raiden.Config, st chan any, r *MigrateItem[T, D], eChan chan error, acf MigrateActionFunc[T, D]) {
+			defer w.Done()
+			param := MigrateFuncParam[T, D]{
+				Config:      c,
+				Data:        t,
+				StateChan:   st,
+				ErrChan:     eChan,
+				ActionFuncs: acf,
+			}
+			migrateFunc(param)
+		}(&wg, cfg, stateChan, &t, errChan, actionFunc)
 	}
 
 	go func() {
@@ -111,41 +151,40 @@ func migrateTables(cfg *raiden.Config, tables []MigrateItem[objects.Table, objec
 	return
 }
 
-func migrateTable(w *sync.WaitGroup, c *raiden.Config, st chan any, m *MigrateItem[objects.Table, objects.UpdateTableItem], eChan chan error) {
-	defer w.Done()
-
-	switch m.Type {
+func migrateProcess[T, D any](params MigrateFuncParam[T, D]) {
+	switch params.Data.Type {
 	case MigrateTypeCreate:
-		newTable, err := supabase.CreateTable(c, m.NewData)
+		newTable, err := params.ActionFuncs.CreateFunc(params.Config, params.Data.NewData)
 		if err != nil {
-			eChan <- err
+			params.ErrChan <- err
 			return
 		}
-		m.NewData = newTable
+		params.Data.NewData = newTable
 
-		st <- m
-		eChan <- nil
+		params.StateChan <- &params.Data
+		params.ErrChan <- nil
 		return
 	case MigrateTypeUpdate:
-		err := supabase.UpdateTable(c, m.OldData, m.NewData, m.MigrationItems)
+		err := params.ActionFuncs.UpdateFunc(params.Config, params.Data.NewData, params.Data.MigrationItems)
 		if err != nil {
-			eChan <- err
+			params.ErrChan <- err
 			return
 		}
-		st <- m
-		eChan <- nil
+
+		params.StateChan <- &params.Data
+		params.ErrChan <- nil
 		return
 	case MigrateTypeDelete:
-		err := supabase.DeleteTable(c, m.OldData, true)
+		err := params.ActionFuncs.DeleteFunc(params.Config, params.Data.OldData)
 		if err != nil {
-			eChan <- err
+			params.ErrChan <- err
 			return
 		}
-		st <- m
-		eChan <- nil
+		params.StateChan <- &params.Data
+		params.ErrChan <- nil
 		return
 	case MigrateTypeIgnore:
-		eChan <- nil
+		params.ErrChan <- nil
 		return
 	}
 }

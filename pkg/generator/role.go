@@ -25,6 +25,7 @@ type GenerateRoleData struct {
 	CanCreateDB            bool
 	CanCreateRole          bool
 	CanLogin               bool
+	ValidUntil             string
 }
 
 const (
@@ -95,6 +96,17 @@ func (r *{{ .Name | ToGoIdentifier }}) CanLogin() bool {
 	return {{ .CanLogin }}
 }
 {{- end }}
+{{- if ne .ValidUntil ""}}
+
+func (r *{{ .Name | ToGoIdentifier }}) ValidUntil() *objects.ValidUntil {
+	t, err := time.Parse(raiden.DefaultRoleValidUntilLayout, "{{ .ValidUntil }}")
+	if err != nil {
+		raiden.Error(err)
+		return nil
+	}
+	return objects.NewValidUntil(t)
+}
+{{- end }}
 
 `
 )
@@ -127,9 +139,18 @@ func GenerateRole(folderPath string, role objects.Role, generateFn GenerateFn) e
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", role.Name, "go"))
 
 	// set imports path
+	var imports []string
 	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
-	imports := []string{
-		raidenPath,
+	imports = append(imports, raidenPath)
+
+	var validUntil string
+	if role.ValidUntil != nil {
+		imports = append(
+			imports,
+			fmt.Sprintf("%q", "time"),
+			fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/supabase/objects"),
+		)
+		validUntil = role.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
 	}
 
 	// execute the template and write to the file
@@ -146,6 +167,7 @@ func GenerateRole(folderPath string, role objects.Role, generateFn GenerateFn) e
 		CanCreateDB:            role.CanCreateDB,
 		CanCreateRole:          role.CanCreateRole,
 		CanLogin:               role.CanLogin,
+		ValidUntil:             validUntil,
 	}
 
 	// set input

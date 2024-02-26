@@ -35,16 +35,16 @@ func CreateTable(cfg *raiden.Config, table objects.Table) (rs objects.Table, err
 		return cloud.CreateTable(cfg, table)
 	}
 	logger.Debug("Create new table in supabase pg-meta")
-	return rs, errors.New("create new table in supabase meta is not implemented not, stay update :)")
+	return rs, errors.New("create new table in supabase meta is not implemented now, stay update :)")
 }
 
-func UpdateTable(cfg *raiden.Config, oldTable objects.Table, newTable objects.Table, updateItems objects.UpdateTableItem) (err error) {
+func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItems objects.UpdateTableParam) (err error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
-		logger.Debugf("Update table %s in supabase cloud for project id : %s", oldTable.Name, cfg.ProjectId)
-		return cloud.UpdateTable(cfg, oldTable, newTable, updateItems)
+		logger.Debugf("Update table %s in supabase cloud for project id : %s", updateItems.OldData.Name, cfg.ProjectId)
+		return cloud.UpdateTable(cfg, newTable, updateItems)
 	}
-	logger.Debugf("Update table %s in supabase pg-meta", oldTable.Name)
-	return fmt.Errorf("update table %s in supabase meta is not implemented not, stay update :)", oldTable.Name)
+	logger.Debugf("Update table %s in supabase pg-meta", updateItems.OldData.Name)
+	return fmt.Errorf("update table %s in supabase meta is not implemented now, stay update :)", updateItems.OldData.Name)
 }
 
 func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) (err error) {
@@ -53,7 +53,7 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) (err err
 		return cloud.DeleteTable(cfg, table, cascade)
 	}
 	logger.Debugf("Delete table %s in supabase pg-meta", table.Name)
-	return fmt.Errorf("delete table %s in supabase meta is not implemented not, stay update :)", table.Name)
+	return fmt.Errorf("delete table %s in supabase meta is not implemented now, stay update :)", table.Name)
 }
 
 func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
@@ -63,6 +63,33 @@ func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 	}
 	logger.Debug("Get all roles from supabase pg-meta")
 	return meta.GetRoles(cfg)
+}
+
+func CreateRole(cfg *raiden.Config, role objects.Role) (objects.Role, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		logger.Debug("Create role from supabase cloud with project id : ", cfg.ProjectId)
+		return cloud.CreateRole(cfg, role)
+	}
+	logger.Debug("Create role from supabase pg-meta")
+	return objects.Role{}, fmt.Errorf("create role %s in supabase meta is not implemented now, stay update :)", role.Name)
+}
+
+func UpdateRole(cfg *raiden.Config, new objects.Role, updateItems objects.UpdateRoleParam) (err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		logger.Debugf("Update role %s in supabase cloud for project id : %s", updateItems.OldData.Name, cfg.ProjectId)
+		return cloud.UpdateRole(cfg, new, updateItems)
+	}
+	logger.Debugf("Update role %s in supabase pg-meta", updateItems.OldData.Name)
+	return fmt.Errorf("update role %s in supabase meta is not implemented now, stay update :)", updateItems.OldData.Name)
+}
+
+func DeleteRole(cfg *raiden.Config, old objects.Role) (err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		logger.Debugf("Delete role %s in supabase cloud for project id : %s", old.Name, cfg.ProjectId)
+		return cloud.DeleteRole(cfg, old)
+	}
+	logger.Debugf("Delete role %s in supabase pg-meta", old.Name)
+	return fmt.Errorf("delete role %s in supabase meta is not implemented now, stay update :)", old.Name)
 }
 
 func GetPolicies(cfg *raiden.Config) (objects.Policies, error) {

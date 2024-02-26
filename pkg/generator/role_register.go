@@ -69,7 +69,7 @@ func GenerateRoleRegister(basePath string, projectName string, generateFn Genera
 		return err
 	}
 
-	logger.Debugf("GenerateRoleRegister - generate rpc to %s", input.OutputPath)
+	logger.Debugf("GenerateRoleRegister - generate role register to %s", input.OutputPath)
 	return generateFn(input, nil)
 }
 

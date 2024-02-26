@@ -3,8 +3,10 @@ package resource
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -26,7 +28,7 @@ const (
 	CompareModeApply  CompareMode = "apply"
 )
 
-func CompareRoles(sourceRole []objects.Role, targetRole []objects.Role) (diffResult []CompareDiffResult[objects.Role, any], err error) {
+func CompareRoles(sourceRole, targetRole []objects.Role, mode CompareMode) (diffResult []CompareDiffResult[objects.Role, objects.UpdateRoleParam], err error) {
 	mapTargetRoles := make(map[int]objects.Role)
 	for i := range targetRole {
 		r := targetRole[i]
@@ -36,29 +38,150 @@ func CompareRoles(sourceRole []objects.Role, targetRole []objects.Role) (diffRes
 	for i := range sourceRole {
 		r := sourceRole[i]
 
-		targetRole, isExist := mapTargetRoles[r.ID]
-		if isExist {
-			scByte, err := json.Marshal(r)
+		tr, isExist := mapTargetRoles[r.ID]
+		if !isExist {
+			continue
+		}
+
+		if mode == CompareModeImport {
+			diff, err := CompareRoleImportMode(r, tr)
 			if err != nil {
 				return diffResult, err
 			}
-			scHash := utils.HashByte(scByte)
 
-			targetByte, err := json.Marshal(targetRole)
-			if err != nil {
-				return diffResult, err
+			diffResult = append(diffResult, diff)
+			continue
+		}
+
+		if mode == CompareModeApply {
+			diffResult = append(diffResult, compareRoleApplyMode(r, tr))
+			continue
+		}
+
+	}
+
+	return
+}
+
+func CompareRoleImportMode(source, target objects.Role) (diffResult CompareDiffResult[objects.Role, objects.UpdateRoleParam], err error) {
+	scByte, err := json.Marshal(source)
+	if err != nil {
+		return diffResult, err
+	}
+	scHash := utils.HashByte(scByte)
+
+	targetByte, err := json.Marshal(target)
+	if err != nil {
+		return diffResult, err
+	}
+	targetHash := utils.HashByte(targetByte)
+
+	if scHash != targetHash {
+		diffResult = CompareDiffResult[objects.Role, objects.UpdateRoleParam]{
+			Name:           source.Name,
+			SourceResource: source,
+			TargetResource: target,
+		}
+	}
+
+	return
+}
+
+func compareRoleApplyMode(source, target objects.Role) (diffResult CompareDiffResult[objects.Role, objects.UpdateRoleParam]) {
+
+	var updateItem objects.UpdateRoleParam
+
+	// assign diff result object
+	diffResult.SourceResource = source
+	diffResult.TargetResource = target
+
+	if source.Name != target.Name {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleName)
+	}
+
+	if source.ConnectionLimit != target.ConnectionLimit {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateConnectionLimit)
+	}
+
+	if source.CanBypassRLS != target.CanBypassRLS {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleCanBypassRls)
+	}
+
+	if source.CanCreateDB != target.CanCreateDB {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleCanCreateDb)
+	}
+
+	if source.CanCreateRole != target.CanCreateRole {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleCanCreateRole)
+	}
+
+	if source.CanLogin != target.CanLogin {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleCanLogin)
+	}
+
+	if (source.Config == nil && target.Config != nil) || (source.Config != nil && target.Config == nil) || (len(source.Config) != len(target.Config)) {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleConfig)
+	} else if source.Config != nil && target.Config != nil {
+		for k, v := range source.Config {
+			tv, exist := target.Config[k]
+			if !exist {
+				updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleConfig)
+				break
 			}
-			targetHash := utils.HashByte(targetByte)
 
-			if scHash != targetHash {
-				diffResult = append(diffResult, CompareDiffResult[objects.Role, any]{
-					Name:           r.Name,
-					SourceResource: r,
-					TargetResource: targetRole,
-				})
+			svValue := reflect.ValueOf(v)
+			tvValue := reflect.ValueOf(tv)
+
+			if svValue.Kind() != tvValue.Kind() {
+				updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleConfig)
+				break
+			}
+
+			if svValue.Kind() == reflect.Ptr {
+				if svValue.IsNil() && !tvValue.IsNil() {
+					updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleConfig)
+					break
+				}
+
+				if svValue.Interface() != tvValue.Interface() {
+					updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleConfig)
+					break
+				}
+			} else {
+				if svValue.Interface() != tvValue.Interface() {
+					updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleConfig)
+					break
+				}
 			}
 		}
 	}
+
+	if source.InheritRole != target.InheritRole {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleInheritRole)
+	}
+
+	// Unsupported now, because need superuser role
+	// if source.IsReplicationRole != target.IsReplicationRole {
+	// 	updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleIsReplication)
+	// }
+
+	// if source.IsSuperuser != target.IsSuperuser {
+	// 	updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleIsSuperUser)
+	// }
+
+	if (source.ValidUntil != nil && target.ValidUntil == nil) || (source.ValidUntil == nil && target.ValidUntil != nil) {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleValidUntil)
+	} else if source.ValidUntil != nil && target.ValidUntil != nil {
+		sv := source.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
+		tv := target.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
+
+		if sv != tv {
+			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleValidUntil)
+		}
+	}
+
+	diffResult.IsConflict = len(updateItem.ChangeItems) > 0
+	diffResult.DiffItems = updateItem
 
 	return
 }
@@ -67,7 +190,7 @@ func CompareRoles(sourceRole []objects.Role, targetRole []objects.Role) (diffRes
 //
 // for CompareModeImport source table is supabase table and target table is app table
 // for CompareModeApply source table is app table and target table is supabase table
-func CompareTables(sourceTable []objects.Table, targetTable []objects.Table, mode CompareMode) (diffResult []CompareDiffResult[objects.Table, objects.UpdateTableItem], err error) {
+func CompareTables(sourceTable, targetTable []objects.Table, mode CompareMode) (diffResult []CompareDiffResult[objects.Table, objects.UpdateTableParam], err error) {
 	mapTargetTable := make(map[int]objects.Table)
 	for i := range targetTable {
 		t := targetTable[i]
@@ -107,7 +230,7 @@ func CompareTables(sourceTable []objects.Table, targetTable []objects.Table, mod
 	return
 }
 
-func compareTableImportMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableItem], err error) {
+func compareTableImportMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableParam], err error) {
 	scByte, err := json.Marshal(source)
 	if err != nil {
 		return diffResult, err
@@ -122,7 +245,7 @@ func compareTableImportMode(source, target objects.Table) (diffResult CompareDif
 	targetHash := utils.HashByte(targetByte)
 
 	if scHash != targetHash {
-		diffResult = CompareDiffResult[objects.Table, objects.UpdateTableItem]{
+		diffResult = CompareDiffResult[objects.Table, objects.UpdateTableParam]{
 			Name:           source.Name,
 			SourceResource: source,
 			TargetResource: target,
@@ -132,8 +255,8 @@ func compareTableImportMode(source, target objects.Table) (diffResult CompareDif
 	return
 }
 
-func compareTableApplyMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableItem]) {
-	var updateTableItem objects.UpdateTableItem
+func compareTableApplyMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableParam]) {
+	var updateItem objects.UpdateTableParam
 
 	// create map pk for compare target pk with source pk
 	mapTargetPrimaryKey := make(map[string]bool)
@@ -149,39 +272,38 @@ func compareTableApplyMode(source, target objects.Table) (diffResult CompareDiff
 
 	// table config compare
 	if source.Name != target.Name {
-		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableName)
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTableName)
 	}
 
 	if source.Schema != target.Schema {
-		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableSchema)
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTableSchema)
 	}
 
 	if source.RLSEnabled != target.RLSEnabled {
-		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableRlsEnable)
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTableRlsEnable)
 	}
 
 	if source.RLSForced != target.RLSForced {
-		updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTableRlsForced)
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTableRlsForced)
 	}
 
 	for i := range source.PrimaryKeys {
-		pk := target.PrimaryKeys[i]
+		pk := source.PrimaryKeys[i]
 		key := fmt.Sprintf("%s.%s.%s", pk.Schema, pk.TableName, pk.Name)
 		if _, exist := mapTargetPrimaryKey[key]; !exist {
-			updateTableItem.UpdateItems = append(updateTableItem.UpdateItems, objects.UpdateTablePrimaryKey)
+			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTablePrimaryKey)
 			break
 		}
 	}
 
-	updateTableItem.Column = compareColumns(source.Columns, target.Columns)
-
-	if len(updateTableItem.UpdateItems) == 0 && len(updateTableItem.Column) == 0 {
+	updateItem.ChangeColumnItems = compareColumns(source.Columns, target.Columns)
+	if len(updateItem.ChangeItems) == 0 && len(updateItem.ChangeColumnItems) == 0 {
 		diffResult.IsConflict = false
 	} else {
 		diffResult.IsConflict = true
 	}
 
-	diffResult.DiffItems = updateTableItem
+	diffResult.DiffItems = updateItem
 	return
 }
 

@@ -123,6 +123,7 @@ func filterUserRole(roles []objects.Role, mapNativeRole map[string]raiden.Role) 
 			userRole = append(userRole, r)
 		}
 	}
+
 	return
 }
 
@@ -174,6 +175,7 @@ func PrintDiff(resource string, supabaseResource, appResource interface{}, prefi
 					}
 					diffString := strings.Join(diffStringArr, " ")
 					PrintDiffDetail(resource, prefix, spValue.Type().Field(i).Name, diffString, "not configure in app")
+					continue
 				}
 
 				appFieldValue := fieldApp.Index(j).Interface()

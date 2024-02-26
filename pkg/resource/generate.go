@@ -25,7 +25,7 @@ type (
 
 // The `generateResource` function generates various resources such as table, roles, policy and etc
 // also generate framework resource like controller, route, main function and etc
-func generateResource(config *raiden.Config, importState *resourceState, projectPath string, resource *Resource) error {
+func generateResource(config *raiden.Config, importState *ResourceState, projectPath string, resource *Resource) error {
 	if err := generator.CreateInternalFolder(projectPath); err != nil {
 		return err
 	}
@@ -34,13 +34,13 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 	doneListen := ListenImportResource(importState, stateChan)
 
 	// generate all model from cloud / pg-meta
-	tableWithRelation := buildGenerateModelInputs(resource.Tables)
 	if len(resource.Tables) > 0 {
+		tableInputs := buildGenerateModelInputs(resource.Tables, resource.Policies)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			captureFunc := ImportDecorateFunc(tableWithRelation, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
+			captureFunc := ImportDecorateFunc(tableInputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateModelData); ok {
 					if i.StructName == utils.SnakeCaseToPascalCase(item.Table.Name) {
 						return true
@@ -49,7 +49,7 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 				return false
 			}, stateChan)
 
-			if err := generator.GenerateModels(projectPath, tableWithRelation, resource.Policies, captureFunc); err != nil {
+			if err := generator.GenerateModels(projectPath, tableInputs, captureFunc); err != nil {
 				errChan <- err
 			} else {
 				errChan <- nil
@@ -119,10 +119,10 @@ func generateResource(config *raiden.Config, importState *resourceState, project
 	}
 }
 
-func buildGenerateModelInputs(tables []objects.Table) []*generator.GenerateModelInput {
+func buildGenerateModelInputs(tables []objects.Table, policies objects.Policies) []*generator.GenerateModelInput {
 	mapTable := tableToMap(tables)
 	mapRelations := buildMapRelations(mapTable)
-	return buildGenerateModelInput(mapTable, mapRelations)
+	return buildGenerateModelInput(mapTable, mapRelations, policies)
 }
 
 // ----- Map Relations -----
@@ -248,11 +248,12 @@ func buildMapRelations(mapTable MapTable) MapRelations {
 }
 
 // --- attach relation to table
-func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations) []*generator.GenerateModelInput {
+func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations, policies objects.Policies) []*generator.GenerateModelInput {
 	generateInputs := make([]*generator.GenerateModelInput, 0)
 	for k, v := range mapTable {
 		input := generator.GenerateModelInput{
-			Table: *v,
+			Table:    *v,
+			Policies: policies.FilterByTable(v.Name),
 		}
 
 		if r, exist := mapRelations[k]; exist {

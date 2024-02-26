@@ -61,6 +61,7 @@ type (
 	GenerateModelInput struct {
 		Table     objects.Table
 		Relations []Relation
+		Policies  objects.Policies
 	}
 )
 
@@ -77,6 +78,7 @@ import (
 {{- end }}
 
 type {{ .StructName }} struct {
+	raiden.ModelBase
 {{- range .Columns }}
 	{{ .Name | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
 {{- end }}
@@ -98,7 +100,7 @@ type {{ .StructName }} struct {
 `
 )
 
-func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList objects.Policies, generateFn GenerateFn) (err error) {
+func GenerateModels(basePath string, tables []*GenerateModelInput, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, ModelDir)
 	logger.Debugf("GenerateModels - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -107,9 +109,9 @@ func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList objec
 		}
 	}
 
-	for i, v := range tables {
-		searchTable := tables[i].Table.Name
-		if err := GenerateModel(folderPath, v, rlsList.FilterByTable(searchTable), generateFn); err != nil {
+	for i := range tables {
+		t := tables[i]
+		if err := GenerateModel(folderPath, t, generateFn); err != nil {
 			return err
 		}
 	}
@@ -117,7 +119,7 @@ func GenerateModels(basePath string, tables []*GenerateModelInput, rlsList objec
 	return nil
 }
 
-func GenerateModel(folderPath string, input *GenerateModelInput, rlsList objects.Policies, generateFn GenerateFn) error {
+func GenerateModel(folderPath string, input *GenerateModelInput, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
@@ -126,7 +128,9 @@ func GenerateModel(folderPath string, input *GenerateModelInput, rlsList objects
 
 	// map column data
 	columns, importsPath := mapTableAttributes(input.Table)
-	rlsTag := generateRlsTag(rlsList)
+	rlsTag := generateRlsTag(input.Policies)
+	raidenPath := fmt.Sprintf("%s", "github.com/sev-2/raiden")
+	importsPath = append(importsPath, raidenPath)
 
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", input.Table.Name, "go"))

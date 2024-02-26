@@ -5,7 +5,7 @@ import (
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
-func ToRpc(rpcState []RpcState, appRpc []raiden.Rpc) (listRpc []objects.Function, err error) {
+func ExtractRpc(rpcState []RpcState, appRpc []raiden.Rpc) (listRpc []objects.Function, err error) {
 	mapRpcState := map[string]RpcState{}
 	for i := range rpcState {
 		r := rpcState[i]
@@ -34,7 +34,7 @@ func createRpcFunction(mapRpcState map[string]RpcState, rpc raiden.Rpc) (fn obje
 
 	state, isStateExist := mapRpcState[rpc.GetName()]
 	if !isStateExist {
-		// handler new rpc
+		// TODO : handler new rpc
 		return
 	}
 	fn = state.Function
