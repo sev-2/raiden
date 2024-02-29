@@ -1,26 +1,14 @@
 package resource
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
-)
-
-type (
-	MapTable        map[string]*objects.Table
-	MapRelations    map[string][]*generator.Relation
-	ManyToManyTable struct {
-		Table      string
-		Schema     string
-		PivotTable string
-		PrimaryKey string
-		ForeignKey string
-	}
 )
 
 // The `generateResource` function generates various resources such as table, roles, policy and etc
@@ -121,13 +109,40 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 
 func buildGenerateModelInputs(tables []objects.Table, policies objects.Policies) []*generator.GenerateModelInput {
 	mapTable := tableToMap(tables)
-	mapRelations := buildMapRelations(mapTable)
+	mapRelations := buildGenerateMapRelations(mapTable)
 	return buildGenerateModelInput(mapTable, mapRelations, policies)
 }
 
-// ----- Map Relations -----
+// ---- build table relation for generated -----
+type (
+	MapRelations    map[string][]*state.Relation
+	ManyToManyTable struct {
+		Table      string
+		Schema     string
+		PivotTable string
+		PrimaryKey string
+		ForeignKey string
+	}
+)
 
-func scanTableRelation(table *objects.Table) (relations []*generator.Relation, manyToManyCandidates []*ManyToManyTable) {
+func buildGenerateMapRelations(mapTable MapTable) MapRelations {
+	mr := make(MapRelations)
+	for _, t := range mapTable {
+		r, m2m := scanGenerateTableRelation(t)
+		if len(r) == 0 {
+			continue
+		}
+
+		// merge with existing relation
+		mergeGenerateRelations(t, r, mr)
+
+		// merge many to many candidate with table relations
+		mergeGenerateManyToManyCandidate(m2m, mr)
+	}
+	return mr
+}
+
+func scanGenerateTableRelation(table *objects.Table) (relations []*state.Relation, manyToManyCandidates []*ManyToManyTable) {
 	// skip process if doesn`t have relation`
 	if len(table.Relationships) == 0 {
 		return
@@ -166,7 +181,7 @@ func scanTableRelation(table *objects.Table) (relations []*generator.Relation, m
 			tableName = r.SourceTableName
 		}
 
-		relation := generator.Relation{
+		relation := state.Relation{
 			Table:        tableName,
 			Type:         typePrefix + utils.SnakeCaseToPascalCase(tableName),
 			RelationType: relationType,
@@ -180,7 +195,7 @@ func scanTableRelation(table *objects.Table) (relations []*generator.Relation, m
 	return
 }
 
-func mergeRelations(table *objects.Table, relations []*generator.Relation, mapRelations MapRelations) {
+func mergeGenerateRelations(table *objects.Table, relations []*state.Relation, mapRelations MapRelations) {
 	key := getMapTableKey(table.Schema, table.Name)
 	tableRelations, isExist := mapRelations[key]
 	if isExist {
@@ -191,7 +206,7 @@ func mergeRelations(table *objects.Table, relations []*generator.Relation, mapRe
 	mapRelations[key] = tableRelations
 }
 
-func mergeManyToManyCandidate(candidates []*ManyToManyTable, mapRelations MapRelations) {
+func mergeGenerateManyToManyCandidate(candidates []*ManyToManyTable, mapRelations MapRelations) {
 	for sourceTableIndex, sourceTable := range candidates {
 		for targetTableIndex, targetTable := range candidates {
 			if sourceTableIndex == targetTableIndex {
@@ -205,14 +220,14 @@ func mergeManyToManyCandidate(candidates []*ManyToManyTable, mapRelations MapRel
 			key := getMapTableKey(sourceTable.Schema, sourceTable.Table)
 			rs, exist := mapRelations[key]
 			if !exist {
-				rs = make([]*generator.Relation, 0)
+				rs = make([]*state.Relation, 0)
 			}
 
-			r := generator.Relation{
+			r := state.Relation{
 				Table:        targetTable.Table,
 				Type:         "[]*" + utils.SnakeCaseToPascalCase(targetTable.Table),
 				RelationType: raiden.RelationTypeManyToMany,
-				JoinRelation: &generator.JoinRelation{
+				JoinRelation: &state.JoinRelation{
 					Through: sourceTable.PivotTable,
 
 					SourcePrimaryKey:      sourceTable.PrimaryKey,
@@ -230,23 +245,6 @@ func mergeManyToManyCandidate(candidates []*ManyToManyTable, mapRelations MapRel
 	}
 }
 
-func buildMapRelations(mapTable MapTable) MapRelations {
-	mr := make(MapRelations)
-	for _, t := range mapTable {
-		r, m2m := scanTableRelation(t)
-		if len(r) == 0 {
-			continue
-		}
-
-		// merge with existing relation
-		mergeRelations(t, r, mr)
-
-		// merge many to many candidate with table relations
-		mergeManyToManyCandidate(m2m, mr)
-	}
-	return mr
-}
-
 // --- attach relation to table
 func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations, policies objects.Policies) []*generator.GenerateModelInput {
 	generateInputs := make([]*generator.GenerateModelInput, 0)
@@ -259,7 +257,6 @@ func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations, polic
 		if r, exist := mapRelations[k]; exist {
 			for _, v := range r {
 				if v != nil {
-					v.Tag = v.BuildTag()
 					input.Relations = append(input.Relations, *v)
 				}
 			}
@@ -268,18 +265,4 @@ func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations, polic
 		generateInputs = append(generateInputs, &input)
 	}
 	return generateInputs
-}
-
-func tableToMap(tables []objects.Table) MapTable {
-	mapTable := make(MapTable)
-	for i := range tables {
-		t := tables[i]
-		key := getMapTableKey(t.Schema, t.Name)
-		mapTable[key] = &t
-	}
-	return mapTable
-}
-
-func getMapTableKey(schema, name string) string {
-	return fmt.Sprintf("%s.%s", schema, name)
 }

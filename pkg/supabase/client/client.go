@@ -40,7 +40,7 @@ func (s ReqError) Error() string {
 
 func initClient() Client {
 	if httpClientInstance == nil {
-		readTimeout, _ := time.ParseDuration("2s")
+		readTimeout, _ := time.ParseDuration("4s")
 		writeTimeout, _ := time.ParseDuration("4s")
 		maxIdleConnDuration, _ := time.ParseDuration("1h")
 		httpClientInstance = &fasthttp.Client{
@@ -66,7 +66,7 @@ func SetClient(c Client) {
 func SendRequest(method string, url string, body []byte, timeout time.Duration, reqInterceptor RequestInterceptor, resInterceptor ResponseInterceptor) (rawBody []byte, err error) {
 	initClient()
 
-	reqTimeout := time.Duration(1000) * time.Millisecond
+	reqTimeout := time.Duration(4000) * time.Millisecond
 	if timeout != 0 {
 		reqTimeout = timeout
 	}

@@ -18,13 +18,13 @@ import (
 //	[x] create table rls enable
 //	[x] create table rls force
 //	[x] create table with primary key
-//	[ ] create table with relation (ordered apply column)
+//	[x] create table with relation (ordered table by relation)
 //	[ ] create table with acl (rls)
 //	[x] delete table
 //	[x] update table name, schema
 //	[x] update table rls enable
 //	[x] update table rls force
-//	[ ] update table with relation (ordered apply column)
+//	[x] update table with relation - create, update and delete (ordered table by relation)
 //	[ ] create table with acl (rls)
 //	[x] update table column add new column
 //	[x] update table column delete column
@@ -116,12 +116,14 @@ func Apply(flags *Flags, config *raiden.Config) error {
 					name = t.OldData.Name
 				}
 				logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
+				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
 			}
 			logger.Debug(strings.Repeat("=", 5))
 		}
 	}
 
 	if flags.All() || flags.ModelsOnly {
+		// bind app table to resource
 		if err := bindMigratedTables(appTables, resource.Tables, &migrateResource); err != nil {
 			return err
 		}
@@ -140,7 +142,8 @@ func Apply(flags *Flags, config *raiden.Config) error {
 
 				logger.Debugf("- MigrateType : %s, Table : %s", t.Type, name)
 				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
-				logger.Debugf(" update Column  : %+v", t.MigrationItems.ChangeColumnItems)
+				logger.Debugf(" update column  : %+v", t.MigrationItems.ChangeColumnItems)
+				logger.Debugf(" update relations  : %+v", t.MigrationItems.ChangeRelationItems)
 
 			}
 			logger.Debug(strings.Repeat("=", 5))
@@ -174,8 +177,9 @@ func bindMigratedTables(etr state.ExtractTableResult, spTables []objects.Table, 
 		t := spTables[i]
 		mapSpTable[t.ID] = true
 	}
-	var compareTables []objects.Table
 
+	// filter existing table need compare or move to create new
+	var compareTables []objects.Table
 	for i := range etr.Existing {
 		et := etr.Existing[i]
 		if _, isExist := mapSpTable[et.Table.ID]; isExist {
@@ -238,6 +242,12 @@ func bindMigratedTables(etr state.ExtractTableResult, spTables []objects.Table, 
 }
 
 func bindMigratedRoles(er state.ExtractRoleResult, spRoles []objects.Role, mr *MigrateData) error {
+	if rs, err := runApplyCompareRoles(spRoles, er.Existing); err != nil {
+		return err
+	} else {
+		mr.Roles = append(mr.Roles, rs...)
+	}
+
 	// bind new table to migrated data
 	if len(er.New) > 0 {
 		for i := range er.New {
@@ -247,12 +257,6 @@ func bindMigratedRoles(er state.ExtractRoleResult, spRoles []objects.Role, mr *M
 				NewData: t,
 			})
 		}
-	}
-
-	if rs, err := runApplyCompareRoles(spRoles, er.Existing); err != nil {
-		return err
-	} else {
-		mr.Roles = append(mr.Roles, rs...)
 	}
 
 	if len(er.Delete) > 0 {
@@ -294,7 +298,7 @@ func runApplyCompareTable(supabaseTable []objects.Table, appTable []objects.Tabl
 			migrateType = MigrateTypeUpdate
 		}
 
-		r.DiffItems.OldData = r.TargetResource
+		r.DiffItems.OldData.Name = r.Name
 		migratedData = append(migratedData, MigrateItem[objects.Table, objects.UpdateTableParam]{
 			Type:           migrateType,
 			NewData:        r.SourceResource,

@@ -66,7 +66,7 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 	}
 
 	var rlsForcedQuery string
-	if newTable.RLSEnabled {
+	if newTable.RLSForced {
 		rlsForcedQuery = fmt.Sprintf("ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;", newTable.Schema, newTable.Name)
 	}
 
@@ -160,8 +160,20 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 	}
 
 	// execute update column
-	if len(updateItem.OldData.Columns) > 0 {
+	if len(updateItem.ChangeColumnItems) > 0 {
 		errors := updateColumnFromTable(cfg, updateItem.ChangeColumnItems, newTable.Columns, updateItem.OldData.Columns, newTable.PrimaryKeys)
+		if len(errors) > 0 {
+			var errMsg []string
+
+			for _, e := range errors {
+				errMsg = append(errMsg, e.Error())
+			}
+			return fmt.Errorf(strings.Join(errMsg, ";"))
+		}
+	}
+
+	if len(updateItem.ChangeRelationItems) > 0 {
+		errors := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships)
 		if len(errors) > 0 {
 			var errMsg []string
 
@@ -193,6 +205,8 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 
 	return nil
 }
+
+// ----- update column -----
 
 func updateColumnFromTable(
 	cfg *raiden.Config, updateColumns []objects.UpdateColumnItem,
@@ -467,7 +481,7 @@ func DeleteColumn(cfg *raiden.Config, column objects.Column) error {
 	return nil
 }
 
-// ----- build query functionality -----
+// ----- update relation -----
 func BuildCreateQuery(schema string, table objects.Table) (q string, err error) {
 	var tableContains []string
 
@@ -497,7 +511,12 @@ func BuildCreateQuery(schema string, table objects.Table) (q string, err error) 
 			continue
 		}
 
-		fkString := fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s.%s(%s)",
+		if rel.ConstraintName == "" {
+			rel.ConstraintName = fmt.Sprintf("%s_%s_%s_fkey", rel.SourceSchema, rel.SourceTableName, rel.SourceColumnName)
+		}
+
+		fkString := fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s(%s)",
+			rel.ConstraintName,
 			rel.SourceColumnName,
 			rel.TargetTableSchema,
 			rel.TargetTableName,
@@ -506,7 +525,7 @@ func BuildCreateQuery(schema string, table objects.Table) (q string, err error) 
 		tableContains = append(tableContains, fkString)
 	}
 
-	q = fmt.Sprintf("CREATE TABLE %s.%s (%s);", schema, table.Name, strings.Join(tableContains, ","))
+	q = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s (%s);", schema, table.Name, strings.Join(tableContains, ","))
 	return
 }
 
@@ -562,4 +581,137 @@ func BuildColumnDef(column objects.Column) (string, error) {
 
 	q := fmt.Sprintf("%s %s %s %s %s", column.Name, column.DataType, defaultValueClause, isNullableClause, isUniqueClause)
 	return q, nil
+}
+
+func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, relations []objects.TablesRelationship) []error {
+	relationMap := make(map[string]*objects.TablesRelationship)
+	for i := range relations {
+		r := relations[i]
+		relationMap[r.ConstraintName] = &r
+	}
+
+	wg := sync.WaitGroup{}
+	errors := make([]error, 0)
+	errChan := make(chan error)
+	for _, i := range items {
+
+		switch i.Type {
+		case objects.UpdateRelationCreate:
+			rel, exist := relationMap[i.Data.ConstraintName]
+			if !exist {
+				continue
+			}
+
+			wg.Add(1)
+			go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
+				defer w.Done()
+				if err := createForeignKey(cfg, r); err != nil {
+					eChan <- err
+					return
+				}
+				eChan <- nil
+			}(&wg, cfg, rel, errChan)
+		case objects.UpdateRelationUpdate:
+			rel, exist := relationMap[i.Data.ConstraintName]
+			if !exist {
+				continue
+			}
+
+			wg.Add(1)
+			go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
+				defer w.Done()
+				if err := updateForeignKey(cfg, r); err != nil {
+					eChan <- err
+					return
+				}
+				eChan <- nil
+			}(&wg, cfg, rel, errChan)
+		case objects.UpdateRelationDelete:
+			wg.Add(1)
+			go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
+				defer w.Done()
+				if err := deleteForeignKey(cfg, r); err != nil {
+					eChan <- err
+					return
+				}
+				eChan <- nil
+			}(&wg, cfg, &i.Data, errChan)
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	for e := range errChan {
+		if e != nil {
+			errors = append(errors, e)
+		}
+	}
+	return errors
+}
+
+func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) error {
+	sql, err := getFkQuery(objects.UpdateRelationCreate, relation)
+	if err != nil {
+		return err
+	}
+
+	logger.Debug("Create foreign key - execute : ", sql)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	if err != nil {
+		return fmt.Errorf("create foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+	}
+
+	return nil
+}
+
+func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) error {
+	deleteSql, err := getFkQuery(objects.UpdateRelationDelete, relation)
+	if err != nil {
+		return err
+	}
+
+	createSql, err := getFkQuery(objects.UpdateRelationCreate, relation)
+	if err != nil {
+		return err
+	}
+
+	sql := deleteSql + createSql
+	logger.Debug("Update foreign key - execute : ", sql)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	if err != nil {
+		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+	}
+
+	return nil
+}
+
+func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) error {
+	sql, err := getFkQuery(objects.UpdateRelationDelete, relation)
+	if err != nil {
+		return err
+	}
+	logger.Debug("Delete foreign key - execute : ", sql)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	if err != nil {
+		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+	}
+	return nil
+}
+
+func getFkQuery(updateType objects.UpdateRelationType, relation *objects.TablesRelationship) (string, error) {
+	alter := fmt.Sprintf("ALTER TABLE IF EXISTS %s.%s", relation.SourceSchema, relation.SourceTableName)
+	switch updateType {
+	case objects.UpdateRelationCreate:
+		return fmt.Sprintf("%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s (%s);",
+			alter, relation.ConstraintName, relation.SourceColumnName,
+			relation.TargetTableSchema, relation.TargetTableName, relation.TargetColumnName,
+		), nil
+	case objects.UpdateRelationDelete:
+		return fmt.Sprintf("%s DROP CONSTRAINT IF EXISTS %s;", alter, relation.ConstraintName), nil
+	default:
+		return "", fmt.Errorf("update relation with type '%s' is not available", updateType)
+	}
 }

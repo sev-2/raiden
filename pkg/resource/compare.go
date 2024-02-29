@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -296,13 +297,17 @@ func compareTableApplyMode(source, target objects.Table) (diffResult CompareDiff
 		}
 	}
 
+	// compare columns
 	updateItem.ChangeColumnItems = compareColumns(source.Columns, target.Columns)
-	if len(updateItem.ChangeItems) == 0 && len(updateItem.ChangeColumnItems) == 0 {
+
+	// compare relations
+	updateItem.ChangeRelationItems = compareRelations(&source, source.Relationships, target.Relationships)
+
+	if len(updateItem.ChangeItems) == 0 && len(updateItem.ChangeColumnItems) == 0 && len(updateItem.ChangeRelationItems) == 0 {
 		diffResult.IsConflict = false
 	} else {
 		diffResult.IsConflict = true
 	}
-
 	diffResult.DiffItems = updateItem
 	return
 }
@@ -342,7 +347,7 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 				if *d != tc.DefaultValue {
 					updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
 				}
-			} else if d == nil && tc.DefaultValue != nil {
+			} else if tc.DefaultValue != nil {
 				updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
 			}
 		case nil:
@@ -384,6 +389,65 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 			updateItems = append(updateItems, objects.UpdateColumnItem{
 				Name:        c.Name,
 				UpdateItems: []objects.UpdateColumnType{objects.UpdateColumnDelete},
+			})
+		}
+	}
+	return
+}
+
+func compareRelations(table *objects.Table, source, target []objects.TablesRelationship) (updateItems []objects.UpdateRelationItem) {
+	mapTargetRelation := make(map[string]objects.TablesRelationship)
+	for i := range target {
+		c := target[i]
+		mapTargetRelation[c.ConstraintName] = c
+	}
+
+	for i := range source {
+		sc := source[i]
+
+		if sc.SourceTableName != table.Name {
+			continue
+		}
+
+		t, exist := mapTargetRelation[sc.ConstraintName]
+		if !exist {
+			updateItems = append(updateItems, objects.UpdateRelationItem{
+				Data: sc,
+				Type: objects.UpdateRelationCreate,
+			})
+			continue
+		}
+
+		delete(mapTargetRelation, sc.ConstraintName)
+
+		if (sc.SourceSchema != t.SourceSchema) || (sc.SourceTableName != t.SourceTableName) || (sc.SourceColumnName != t.SourceColumnName) {
+			updateItems = append(updateItems, objects.UpdateRelationItem{
+				Data: sc,
+				Type: objects.UpdateRelationUpdate,
+			})
+			logger.Debugf("update %s relation, source not match", sc.ConstraintName)
+			continue
+		}
+
+		if (sc.TargetTableSchema != t.TargetTableSchema) || (sc.TargetTableName != t.TargetTableName) || (sc.TargetColumnName != t.TargetColumnName) {
+			updateItems = append(updateItems, objects.UpdateRelationItem{
+				Data: sc,
+				Type: objects.UpdateRelationUpdate,
+			})
+			logger.Debug("update %s relation, target not match", sc.ConstraintName)
+			continue
+		}
+	}
+
+	if len(mapTargetRelation) > 0 {
+		for _, r := range mapTargetRelation {
+			if r.SourceTableName != table.Name {
+				continue
+			}
+
+			updateItems = append(updateItems, objects.UpdateRelationItem{
+				Data: r,
+				Type: objects.UpdateRelationDelete,
 			})
 		}
 	}

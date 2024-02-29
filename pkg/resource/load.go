@@ -54,25 +54,25 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 
 	if flags.All() || flags.ModelsOnly {
 		wg.Add(2)
-		go loadSupabaseResource[[]objects.Table](&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
 			return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
 		})
 
-		go loadSupabaseResource[[]objects.Policy](&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Policy, error) {
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Policy, error) {
 			return supabase.GetPolicies(cfg)
 		})
 	}
 
 	if flags.All() || flags.RolesOnly {
 		wg.Add(1)
-		go loadSupabaseResource[[]objects.Role](&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
 			return supabase.GetRoles(cfg)
 		})
 	}
 
 	if flags.All() || flags.RpcOnly {
 		wg.Add(1)
-		go loadSupabaseResource[[]objects.Function](&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
 			return supabase.GetFunctions(cfg)
 		})
 	}

@@ -55,7 +55,6 @@ func (s *ResourceState) UpdateTable(index int, state state.TableState) {
 
 	s.State.Tables[index] = state
 	s.NeedUpdate = true
-	return
 }
 
 func (s *ResourceState) DeleteTable(tableId int) {
@@ -111,7 +110,6 @@ func (s *ResourceState) UpdateRole(index int, state state.RoleState) {
 
 	s.State.Roles[index] = state
 	s.NeedUpdate = true
-	return
 }
 
 func (s *ResourceState) DeleteRole(roleId int) {

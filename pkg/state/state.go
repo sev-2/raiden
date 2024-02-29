@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sev-2/raiden/pkg/generator"
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -22,7 +22,7 @@ type (
 
 	TableState struct {
 		Table       objects.Table
-		Relation    []generator.Relation
+		Relation    []Relation
 		ModelPath   string
 		ModelStruct string
 		LastUpdate  time.Time
@@ -42,6 +42,26 @@ type (
 		RpcPath    string
 		RpcStruct  string
 		LastUpdate time.Time
+	}
+
+	Relation struct {
+		Table        string
+		Type         string
+		RelationType raiden.RelationType
+		PrimaryKey   string
+		ForeignKey   string
+		Tag          string
+		*JoinRelation
+	}
+
+	JoinRelation struct {
+		SourcePrimaryKey      string
+		JoinsSourceForeignKey string
+
+		TargetPrimaryKey     string
+		JoinTargetForeignKey string
+
+		Through string
 	}
 )
 

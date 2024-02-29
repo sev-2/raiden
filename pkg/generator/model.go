@@ -9,6 +9,7 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
+	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -18,26 +19,6 @@ type (
 	Rls struct {
 		CanWrite []string
 		CanRead  []string
-	}
-
-	Relation struct {
-		Table        string
-		Type         string
-		RelationType raiden.RelationType
-		PrimaryKey   string
-		ForeignKey   string
-		Tag          string
-		*JoinRelation
-	}
-
-	JoinRelation struct {
-		SourcePrimaryKey      string
-		JoinsSourceForeignKey string
-
-		TargetPrimaryKey     string
-		JoinTargetForeignKey string
-
-		Through string
 	}
 
 	GenerateModelColumn struct {
@@ -50,7 +31,7 @@ type (
 		Columns    []GenerateModelColumn
 		Imports    []string
 		Package    string
-		Relations  []Relation
+		Relations  []state.Relation
 		RlsTag     string
 		RlsEnable  bool
 		RlsForced  bool
@@ -60,7 +41,7 @@ type (
 
 	GenerateModelInput struct {
 		Table     objects.Table
-		Relations []Relation
+		Relations []state.Relation
 		Policies  objects.Policies
 	}
 )
@@ -128,12 +109,20 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 
 	// map column data
 	columns, importsPath := mapTableAttributes(input.Table)
-	rlsTag := generateRlsTag(input.Policies)
-	raidenPath := fmt.Sprintf("%s", "github.com/sev-2/raiden")
+	rlsTag := buildRlsTag(input.Policies)
+	raidenPath := "github.com/sev-2/raiden"
 	importsPath = append(importsPath, raidenPath)
 
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", input.Table.Name, "go"))
+
+	// build relation tag
+	var relation []state.Relation
+	for i := range relation {
+		r := relation[i]
+		r.Tag = buildJoinTag(&r)
+		relation = append(relation, r)
+	}
 
 	// set data
 	data := GenerateModelData{
@@ -145,7 +134,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 		RlsTag:     rlsTag,
 		RlsEnable:  input.Table.RLSEnabled,
 		RlsForced:  input.Table.RLSForced,
-		Relations:  input.Relations,
+		Relations:  relation,
 	}
 
 	// setup generate input param
@@ -172,7 +161,7 @@ func mapTableAttributes(table objects.Table) (columns []GenerateModelColumn, imp
 	for _, c := range table.Columns {
 		column := GenerateModelColumn{
 			Name: c.Name,
-			Tag:  generateColumnTag(c, mapPrimaryKey),
+			Tag:  buildColumnTag(c, mapPrimaryKey),
 			Type: postgres.ToGoType(postgres.DataType(c.DataType), c.IsNullable),
 		}
 
@@ -205,7 +194,7 @@ func mapTableAttributes(table objects.Table) (columns []GenerateModelColumn, imp
 	return
 }
 
-func generateColumnTag(c objects.Column, mapPk map[string]bool) string {
+func buildColumnTag(c objects.Column, mapPk map[string]bool) string {
 	var tags []string
 
 	// append json tag
@@ -255,7 +244,7 @@ func generateColumnTag(c objects.Column, mapPk map[string]bool) string {
 	return strings.Join(tags, " ")
 }
 
-func generateRlsTag(rlsList objects.Policies) string {
+func buildRlsTag(rlsList objects.Policies) string {
 	var rls Rls
 
 	for _, v := range rlsList {
@@ -271,8 +260,7 @@ func generateRlsTag(rlsList objects.Policies) string {
 	return rlsTag
 }
 
-// Relation
-func (r *Relation) BuildTag() string {
+func buildJoinTag(r *state.Relation) string {
 	var tags []string
 	var joinTags []string
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/client"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/query"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -66,6 +67,7 @@ func ExecuteQuery[T any](baseUrl, projectId, query string, reqInterceptor client
 	p := ExecuteQueryParam{Query: query}
 	pByte, err := json.Marshal(p)
 	if err != nil {
+		logger.Errorf("error execute query : %s", query)
 		return result, err
 	}
 

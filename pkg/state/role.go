@@ -27,7 +27,7 @@ func ExtractRole(roleStates []RoleState, appRoles []raiden.Role, withNativeRole 
 			r := objects.Role{}
 			bindToSupabaseRole(&r, role)
 			result.New = append(result.New, r)
-			return
+			continue
 		}
 
 		if state.IsNative && withNativeRole {

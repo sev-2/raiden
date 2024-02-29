@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
@@ -32,9 +31,6 @@ func Import(flags *Flags, config *raiden.Config) error {
 
 	// create import state
 	nativeStateRoles := filterIsNativeRole(mapNativeRole, spResource.Roles)
-	if err != nil {
-		return err
-	}
 
 	// filter table for with allowed schema
 	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
@@ -112,7 +108,6 @@ func runImportCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role
 	}
 
 	if len(diffResult) > 0 {
-		logger.PrintJson(diffResult, true)
 		for i := range diffResult {
 			d := diffResult[i]
 			PrintDiff("role", d.SourceResource, d.TargetResource, d.Name)

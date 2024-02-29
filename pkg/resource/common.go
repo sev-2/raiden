@@ -144,7 +144,7 @@ func filterIsNativeRole(mapNativeRole map[string]raiden.Role, supabaseRole []obj
 	return
 }
 
-// --- print diff -----
+// --- Print diff -----
 func PrintDiff(resource string, supabaseResource, appResource interface{}, prefix string) {
 	spValue := reflect.ValueOf(supabaseResource)
 	appValue := reflect.ValueOf(appResource)
@@ -210,4 +210,21 @@ func PrintDiffDetail(resource, prefix string, attribute string, spValue, appValu
 	print("// App : %s = %s \n", attribute, appValue)
 	print = color.New(color.FgHiBlack).PrintfFunc()
 	print("*** End found diff \n")
+}
+
+// ----- Convert array of table to map table -----
+type MapTable map[string]*objects.Table
+
+func tableToMap(tables []objects.Table) MapTable {
+	mapTable := make(MapTable)
+	for i := range tables {
+		t := tables[i]
+		key := getMapTableKey(t.Schema, t.Name)
+		mapTable[key] = &t
+	}
+	return mapTable
+}
+
+func getMapTableKey(schema, name string) string {
+	return fmt.Sprintf("%s.%s", schema, name)
 }

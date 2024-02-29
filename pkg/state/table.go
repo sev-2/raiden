@@ -40,11 +40,11 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 
 		tableName := utils.ToSnakeCase(tableType.Name())
 		ts, isExist := mapTableState[tableName]
-		logger.Debugf("table name : %s; isExist : %v", tableName, isExist)
+		logger.Debug("check table : ", tableName, " is exist : ", isExist)
 		if !isExist {
 			nt := buildTableFromModel(t)
 			result.New = append(result.New, nt)
-			return
+			continue
 		}
 
 		tb, e := buildTableFromState(t, ts)
@@ -106,8 +106,15 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 				}
 
 				bindColumn(&field, &ct, &c)
-
 				ei.Table.Columns = append(ei.Table.Columns, c)
+
+				if ct.PrimaryKey {
+					ei.Table.PrimaryKeys = append(ei.Table.PrimaryKeys, objects.PrimaryKey{
+						Name:      c.Name,
+						TableName: c.Table,
+						Schema:    c.Schema,
+					})
+				}
 			}
 
 			if join := field.Tag.Get("join"); len(join) > 0 {
@@ -246,7 +253,6 @@ func bindColumn(field *reflect.StructField, ct *raiden.ColumnTag, c *objects.Col
 
 	if ct.PrimaryKey {
 		c.IsIdentity = true
-		c.IsUnique = true
 	}
 
 	if ct.Type != "" {
@@ -298,6 +304,7 @@ func bindTableAcl(field *reflect.StructField) {
 
 func buildTableRelation(tableName, fieldName, schema string, mapRelations map[string]objects.TablesRelationship, joinTag string) (relation objects.TablesRelationship) {
 	jt := raiden.UnmarshalJoinTag(joinTag)
+
 	sourceTable, targetTable := utils.ToSnakeCase(fieldName), utils.ToSnakeCase(tableName)
 
 	var sourceTableName, targetTableName, primaryKey, foreignKey string
@@ -317,19 +324,19 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 
 	// setup primary and foreign key
 	if jt.ForeignKey != "" {
-		foreignKey = fmt.Sprintf("%s_id", utils.ToSnakeCase(targetTableName))
-	} else {
 		foreignKey = jt.ForeignKey
+	} else {
+		foreignKey = fmt.Sprintf("%s_id", utils.ToSnakeCase(targetTableName))
 	}
 
 	if jt.PrimaryKey != "" {
-		primaryKey = "id"
-	} else {
 		primaryKey = jt.PrimaryKey
+	} else {
+		primaryKey = "id"
 	}
 
 	// overwrite with default if relation is exist
-	relation.ConstraintName = getRelationConstrainName(sourceTableName, foreignKey)
+	relation.ConstraintName = getRelationConstrainName(schema, sourceTableName, foreignKey)
 	if r, ok := mapRelations[relation.ConstraintName]; ok {
 		relation = r
 	}
@@ -346,6 +353,6 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 }
 
 // get relation table name, base on struct type that defined in relation field
-func getRelationConstrainName(sourceTable, sourceColumn string) string {
-	return fmt.Sprintf("%s_%s_fkey", sourceTable, sourceColumn)
+func getRelationConstrainName(schema, table, foreignKey string) string {
+	return fmt.Sprintf("%s_%s_%s_fkey", schema, table, foreignKey)
 }

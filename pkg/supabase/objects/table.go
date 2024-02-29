@@ -37,6 +37,7 @@ type Column struct {
 	IsUpdatable        bool     `json:"is_updatable"`
 	IsUnique           bool     `json:"is_unique"`
 	Enums              []string `json:"enums"`
+
 	// TODO : implement check and comment in models
 	Check   any `json:"check"`
 	Comment any `json:"comment"`
@@ -69,11 +70,7 @@ type Table struct {
 // ---- update table struct definitions ----
 type UpdateTableType string
 type UpdateColumnType string
-
-type UpdateColumnItem struct {
-	Name        string
-	UpdateItems []UpdateColumnType
-}
+type UpdateRelationType string
 
 const (
 	UpdateTableSchema          UpdateTableType = "schema"
@@ -95,8 +92,25 @@ const (
 	UpdateColumnIdentity     UpdateColumnType = "identity"
 )
 
+const (
+	UpdateRelationCreate UpdateRelationType = "create"
+	UpdateRelationUpdate UpdateRelationType = "update"
+	UpdateRelationDelete UpdateRelationType = "delete"
+)
+
+type UpdateColumnItem struct {
+	Name        string
+	UpdateItems []UpdateColumnType
+}
+
+type UpdateRelationItem struct {
+	Data TablesRelationship
+	Type UpdateRelationType
+}
+
 type UpdateTableParam struct {
-	OldData           Table
-	ChangeColumnItems []UpdateColumnItem
-	ChangeItems       []UpdateTableType
+	OldData             Table
+	ChangeRelationItems []UpdateRelationItem
+	ChangeColumnItems   []UpdateColumnItem
+	ChangeItems         []UpdateTableType
 }
