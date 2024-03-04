@@ -38,3 +38,17 @@ func (p *Policies) FilterByTable(table string) Policies {
 
 	return filteredData
 }
+
+type UpdatePolicyType string
+
+const (
+	UpdatePolicyName       UpdatePolicyType = "name"
+	UpdatePolicyDefinition UpdatePolicyType = "definition"
+	UpdatePolicyCheck      UpdatePolicyType = "check"
+	UpdatePolicyRoles      UpdatePolicyType = "roles"
+)
+
+type UpdatePolicyParam struct {
+	Name        string
+	ChangeItems []UpdatePolicyType
+}

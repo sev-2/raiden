@@ -21,18 +21,19 @@ func BuildCommand() *cobra.Command {
 	var f BuildFlags
 
 	cmd := &cobra.Command{
-		Use:     "build",
-		Short:   "Build app binary",
-		Long:    "Build app binary base on configuration",
-		PreRunE: PreRunE(&f.Flags, build.PreRun),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:    "build",
+		Short:  "Build app binary",
+		Long:   "Build app binary base on configuration",
+		PreRun: PreRun(&f.Flags, build.PreRun),
+		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
 			// Preparation
 			// - get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			// - load config
@@ -40,16 +41,20 @@ func BuildCommand() *cobra.Command {
 			logger.Debug("Load configuration from : ", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 1. generate
 			if err := generate.Run(&f.Generate, config, currentDir, false); err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 2. build app
-			return build.Run(&f.Build, config, currentDir)
+			if err := build.Run(&f.Build, config, currentDir); err != nil {
+				logger.Error(err)
+			}
 		},
 	}
 

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden/pkg/generator"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -64,7 +63,6 @@ func (s *ResourceState) DeleteTable(tableId int) {
 	index := -1
 	for i := range s.State.Tables {
 		t := s.State.Tables[i]
-
 		if t.Table.ID == tableId {
 			index = i
 			break
@@ -273,13 +271,12 @@ func ListenApplyResource(projectPath string, resourceState *ResourceState, state
 						LastUpdate:  time.Now(),
 					}
 
-					logger.Debugf("add table %s to state", ts.Table.Name)
 					resourceState.AddTable(ts)
 				case MigrateTypeDelete:
 					if m.OldData.Name == "" {
 						continue
 					}
-					logger.Debugf("delete table %s from state", m.OldData.Name)
+
 					resourceState.DeleteTable(m.OldData.ID)
 				case MigrateTypeUpdate:
 					fIndex, tState, found := resourceState.FindTable(m.NewData.ID)
@@ -287,7 +284,6 @@ func ListenApplyResource(projectPath string, resourceState *ResourceState, state
 						continue
 					}
 
-					logger.Debugf("update table %s in state", m.NewData.Name)
 					tState.Table = m.NewData
 					tState.LastUpdate = time.Now()
 					resourceState.UpdateTable(fIndex, tState)
@@ -308,13 +304,11 @@ func ListenApplyResource(projectPath string, resourceState *ResourceState, state
 						LastUpdate: time.Now(),
 					}
 
-					logger.Debugf("add role %s to state", r.Role.Name)
 					resourceState.AddRole(r)
 				case MigrateTypeDelete:
 					if m.OldData.Name == "" {
 						continue
 					}
-					logger.Debugf("delete role %s from state", m.OldData.Name)
 					resourceState.DeleteRole(m.OldData.ID)
 				case MigrateTypeUpdate:
 					fIndex, rState, found := resourceState.FindRole(m.NewData.ID)
@@ -322,10 +316,71 @@ func ListenApplyResource(projectPath string, resourceState *ResourceState, state
 						continue
 					}
 
-					logger.Debugf("update role %s in state", m.NewData.Name)
 					rState.Role = m.NewData
 					rState.LastUpdate = time.Now()
 					resourceState.UpdateRole(fIndex, rState)
+				}
+			case *MigrateItem[objects.Policy, objects.UpdatePolicyParam]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+
+					fIndex, tState, found := resourceState.FindTable(m.NewData.TableID)
+					if !found {
+						continue
+					}
+					tState.Policies = append(tState.Policies, m.NewData)
+					tState.LastUpdate = time.Now()
+					resourceState.UpdateTable(fIndex, tState)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					fIndex, tState, found := resourceState.FindTable(m.OldData.TableID)
+					if !found {
+						continue
+					}
+
+					// find policy index
+					pi := -1
+					for i := range tState.Policies {
+						p := tState.Policies[i]
+						if p.ID == m.OldData.ID {
+							pi = i
+							break
+						}
+					}
+
+					if pi > -1 {
+						tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+						tState.LastUpdate = time.Now()
+						resourceState.UpdateTable(fIndex, tState)
+					}
+				case MigrateTypeUpdate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					fIndex, tState, found := resourceState.FindTable(m.NewData.TableID)
+					if !found {
+						continue
+					}
+
+					// find policy index
+					pi := -1
+					for i := range tState.Policies {
+						p := tState.Policies[i]
+						if p.ID == m.OldData.ID {
+							pi = i
+							break
+						}
+					}
+					if pi > -1 {
+						tState.Policies[pi] = m.NewData
+						tState.LastUpdate = time.Now()
+						resourceState.UpdateTable(fIndex, tState)
+					}
 				}
 			}
 		}
@@ -369,7 +424,6 @@ func extractAppResource(f *Flags, latestState *state.State) (extractedTable stat
 	}
 
 	if f.All() || f.ModelsOnly {
-		logger.Debug("Extract table from state and app resource")
 		extractedTable, err = state.ExtractTable(latestState.Tables, registeredModels)
 		if err != nil {
 			return
@@ -377,7 +431,6 @@ func extractAppResource(f *Flags, latestState *state.State) (extractedTable stat
 	}
 
 	if f.All() || f.RolesOnly {
-		logger.Debug("Extract role from state and app resource")
 		extractedRole, err = state.ExtractRole(latestState.Roles, registeredRoles, false)
 		if err != nil {
 			return

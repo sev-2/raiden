@@ -3,6 +3,7 @@ package commands
 import (
 	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/configure"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -24,25 +25,25 @@ func ConfigureCommand() *cobra.Command {
 		Use:   "configure",
 		Short: "Configure project",
 		Long:  "Configure project and generate config file",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			config, err := configure.Run(&f.Configure, currentDir)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
-			if config == nil {
-				return nil
+			if err = configure.Generate(&config.Config, currentDir); err != nil {
+				logger.Error(err)
 			}
-
-			return configure.Generate(&config.Config, currentDir)
 		},
 	}
 

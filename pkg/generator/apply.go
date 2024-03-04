@@ -10,14 +10,14 @@ import (
 )
 
 // ----- Define type, variable and constant -----
-type GenerateImportMainFunctionData struct {
+type GenerateApplyMainFunctionData struct {
 	Package string
 	Imports []string
 }
 
 const (
-	ImportMainFunctionDirTemplate = "/cmd/import"
-	ImportMainFunctionTemplate    = `package {{ .Package }}
+	ApplyMainFunctionDirTemplate = "/cmd/apply"
+	ApplyMainFunctionTemplate    = `package {{ .Package }}
 {{- if gt (len .Imports) 0 }}
 
 import (
@@ -32,31 +32,37 @@ func main() {
 	f := resource.Flags{}
 
 	cmd := &cobra.Command{
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 			// load configuration
 			if f.ProjectPath == "" {
 				curDir, err := utils.GetCurrentDirectory()
 				if err != nil {
-					logger.Panic(err)
+					logger.Error(err)
+					return
 				}
 				f.ProjectPath = curDir
 			}
 
 			config, err := raiden.LoadConfig(nil)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
+			}
+
+			if err := generate.Run(&f.Generate, config, f.ProjectPath, false); err != nil {
+				logger.Error(err)
+				return
 			}
 
 			// register app resource
 			bootstrap.RegisterRpc()
 			bootstrap.RegisterRoles()
+			bootstrap.RegisterModels()
 			
-			if err := resource.Import(&f, config); err != nil {
-				return err
+			if err = resource.Apply(&f, config); err != nil {
+				logger.Error(err)
 			}
-
-			return generate.Run(&f.Generate, config, f.ProjectPath, false)
 		},
 	}
 
@@ -76,26 +82,26 @@ func main() {
 
 // ----- Generate main function -----
 
-func GenerateImportMainFunction(basePath string, config *raiden.Config, generateFn GenerateFn) error {
+func GenerateApplyMainFunction(basePath string, config *raiden.Config, generateFn GenerateFn) error {
 	// make sure all folder exist
 	cmdFolderPath := filepath.Join(basePath, "cmd")
-	logger.Debugf("GenerateImportMainFunction - create %s folder if not exist", cmdFolderPath)
+	logger.Debugf("GenerateApplyMainFunction - create %s folder if not exist", cmdFolderPath)
 	if exist := utils.IsFolderExists(cmdFolderPath); !exist {
 		if err := utils.CreateFolder(cmdFolderPath); err != nil {
 			return err
 		}
 	}
 
-	importMainFunctionPath := filepath.Join(basePath, ImportMainFunctionDirTemplate)
-	logger.Debugf("GenerateImportMainFunction - create %s folder if not exist", importMainFunctionPath)
-	if exist := utils.IsFolderExists(importMainFunctionPath); !exist {
-		if err := utils.CreateFolder(importMainFunctionPath); err != nil {
+	applyMainFunctionPath := filepath.Join(basePath, ApplyMainFunctionDirTemplate)
+	logger.Debugf("GenerateApplyMainFunction - create %s folder if not exist", applyMainFunctionPath)
+	if exist := utils.IsFolderExists(applyMainFunctionPath); !exist {
+		if err := utils.CreateFolder(applyMainFunctionPath); err != nil {
 			return err
 		}
 	}
 
 	// set file path
-	filePath := filepath.Join(importMainFunctionPath, "main.go")
+	filePath := filepath.Join(applyMainFunctionPath, "main.go")
 
 	// setup import path
 	importPaths := []string{
@@ -108,7 +114,7 @@ func GenerateImportMainFunction(basePath string, config *raiden.Config, generate
 	}
 	rpcImportPath := fmt.Sprintf("\"%s/internal/bootstrap\"", utils.ToGoModuleName(config.ProjectName))
 	importPaths = append(importPaths, rpcImportPath)
-	data := GenerateImportMainFunctionData{
+	data := GenerateApplyMainFunctionData{
 		Package: "main",
 		Imports: importPaths,
 	}
@@ -116,11 +122,11 @@ func GenerateImportMainFunction(basePath string, config *raiden.Config, generate
 	// setup generate input param
 	input := GenerateInput{
 		BindData:     data,
-		Template:     ImportMainFunctionTemplate,
-		TemplateName: "importMainFunctionTemplate",
+		Template:     ApplyMainFunctionTemplate,
+		TemplateName: "applyMainFunctionTemplate",
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateImportMainFunction - generate import main function to %s", input.OutputPath)
+	logger.Debugf("GenerateApplyMainFunction - generate apply main function to %s", input.OutputPath)
 	return generateFn(input, nil)
 }

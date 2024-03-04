@@ -21,17 +21,18 @@ func ImportCommand() *cobra.Command {
 	var f ImportsFlags
 
 	cmd := &cobra.Command{
-		Use:     "imports",
-		Short:   "Import supabase resource",
-		Long:    "Fetch supabase resource and generate to file",
-		PreRunE: PreRunE(&f.Flags, imports.PreRun),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:    "imports",
+		Short:  "Import supabase resource",
+		Long:   "Fetch supabase resource and generate to file",
+		PreRun: PreRun(&f.Flags, imports.PreRun),
+		Run: func(cmd *cobra.Command, args []string) {
 			verbose := f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			// load config
@@ -39,16 +40,21 @@ func ImportCommand() *cobra.Command {
 			logger.Debug("Load configuration from : ", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 1. generate all resource
 			if err = generate.Run(&f.Generate, config, currentDir, false); err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 2. run import
-			return imports.Run(&f.Imports, currentDir, verbose)
+			if err = imports.Run(&f.Imports, currentDir, verbose); err != nil {
+				logger.Error(err)
+				return
+			}
 		},
 	}
 

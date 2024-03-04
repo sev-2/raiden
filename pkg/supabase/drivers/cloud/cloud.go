@@ -36,15 +36,6 @@ func FindProject(cfg *raiden.Config) (objects.Project, error) {
 	return objects.Project{}, nil
 }
 
-func GetPolicies(cfg *raiden.Config) ([]objects.Policy, error) {
-	rs, err := ExecuteQuery[[]objects.Policy](cfg.SupabaseApiUrl, cfg.ProjectId, query.GetPoliciesQuery, DefaultAuthInterceptor(cfg.AccessToken), nil)
-	if err != nil {
-		err = fmt.Errorf("get policies error : %s", err)
-	}
-
-	return rs, err
-}
-
 func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
 	rs, err := ExecuteQuery[[]objects.Function](
 		cfg.SupabaseApiUrl, cfg.ProjectId, query.GenerateFunctionsQuery([]string{"public"}),

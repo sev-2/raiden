@@ -19,17 +19,18 @@ func InitCommand() *cobra.Command {
 	var f InitFlags
 
 	cmd := &cobra.Command{
-		Use:     "init",
-		Short:   "Init golang app",
-		Long:    "Initialize golang app with install raiden dependency",
-		PreRunE: PreRunE(&f.Flags, init_cmd.PreRun),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:    "init",
+		Short:  "Init golang app",
+		Long:   "Initialize golang app with install raiden dependency",
+		PreRun: PreRun(&f.Flags, init_cmd.PreRun),
+		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			// load config
@@ -37,10 +38,13 @@ func InitCommand() *cobra.Command {
 			logger.Debug("Load configuration from : ", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
-			return init_cmd.Run(&f.Init, currentDir, utils.ToGoModuleName(config.ProjectName))
+			if err = init_cmd.Run(&f.Init, currentDir, utils.ToGoModuleName(config.ProjectName)); err != nil {
+				logger.Error(err)
+			}
 		},
 	}
 

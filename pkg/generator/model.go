@@ -118,8 +118,8 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 
 	// build relation tag
 	var relation []state.Relation
-	for i := range relation {
-		r := relation[i]
+	for i := range input.Relations {
+		r := input.Relations[i]
 		r.Tag = buildJoinTag(&r)
 		relation = append(relation, r)
 	}
@@ -247,16 +247,69 @@ func buildColumnTag(c objects.Column, mapPk map[string]bool) string {
 func buildRlsTag(rlsList objects.Policies) string {
 	var rls Rls
 
+	var readUsingTag, writeCheckTag, writeUsingTag string
 	for _, v := range rlsList {
 		switch v.Command {
 		case objects.PolicyCommandSelect:
-			rls.CanWrite = append(rls.CanWrite, v.Roles...)
+			if v.Name == getPolicyName(objects.PolicyCommandSelect, v.Table) {
+				rls.CanRead = append(rls.CanRead, v.Roles...)
+				if v.Definition != "" {
+					readUsingTag = v.Definition
+				}
+			}
 		case objects.PolicyCommandInsert, objects.PolicyCommandUpdate, objects.PolicyCommandDelete:
-			rls.CanWrite = append(rls.CanWrite, v.Roles...)
+			if v.Name == getPolicyName(objects.PolicyCommandInsert, v.Table) {
+				if len(rls.CanWrite) == 0 {
+					rls.CanWrite = append(rls.CanWrite, v.Roles...)
+				}
+
+				if len(writeCheckTag) == 0 && v.Check != nil {
+					writeCheckTag = *v.Check
+				}
+			}
+
+			if v.Name == getPolicyName(objects.PolicyCommandUpdate, v.Table) && len(rls.CanWrite) == 0 {
+				if len(rls.CanWrite) == 0 {
+					rls.CanWrite = append(rls.CanWrite, v.Roles...)
+				}
+
+				if len(writeCheckTag) == 0 && v.Check != nil {
+					writeCheckTag = *v.Check
+				}
+
+				if len(writeUsingTag) == 0 && v.Definition != "" {
+					writeUsingTag = v.Definition
+				}
+			}
+
+			if v.Name == getPolicyName(objects.PolicyCommandDelete, v.Table) && len(rls.CanWrite) == 0 {
+				if len(rls.CanWrite) == 0 {
+					rls.CanWrite = append(rls.CanWrite, v.Roles...)
+				}
+
+				if len(writeUsingTag) == 0 && v.Definition != "" {
+					writeUsingTag = v.Definition
+				}
+			}
 		}
 	}
 
 	rlsTag := fmt.Sprintf("read:%q write:%q", strings.Join(rls.CanRead, ","), strings.Join(rls.CanWrite, ","))
+	if len(readUsingTag) > 0 {
+		cleanTag := strings.TrimLeft(strings.TrimRight(readUsingTag, ")"), "(")
+		rlsTag = fmt.Sprintf("%s readUsing:%q", rlsTag, cleanTag)
+	}
+
+	if len(writeCheckTag) > 0 {
+		cleanTag := strings.TrimLeft(strings.TrimRight(writeCheckTag, ")"), "(")
+		rlsTag = fmt.Sprintf("%s writeCheck:%q", rlsTag, cleanTag)
+	}
+
+	if len(writeUsingTag) > 0 {
+		cleanTag := strings.TrimLeft(strings.TrimRight(writeUsingTag, ")"), "(")
+		rlsTag = fmt.Sprintf("%s writeUsing:%q", rlsTag, cleanTag)
+	}
+
 	return rlsTag
 }
 
@@ -307,4 +360,8 @@ func buildJoinTag(r *state.Relation) string {
 	tags = append(tags, fmt.Sprintf("join:%q", strings.Join(joinTags, ";")))
 
 	return strings.Join(tags, " ")
+}
+
+func getPolicyName(command objects.PolicyCommand, tableName string) string {
+	return strings.ToLower(fmt.Sprintf("enable %s access for table %s", command, tableName))
 }

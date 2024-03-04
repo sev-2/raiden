@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
@@ -13,14 +14,23 @@ import (
 )
 
 type ExtractTableItem struct {
-	Table    objects.Table
-	Policies objects.Policies
+	Table             objects.Table
+	Policies          objects.Policies
+	ExtractedPolicies ExtractedPolicies
+}
+
+type ExtractTableItems []ExtractTableItem
+
+type ExtractedPolicies struct {
+	Existing []objects.Policy
+	New      []objects.Policy
+	Delete   []objects.Policy
 }
 
 type ExtractTableResult struct {
-	Existing []ExtractTableItem
-	New      []ExtractTableItem
-	Delete   []ExtractTableItem
+	Existing ExtractTableItems
+	New      ExtractTableItems
+	Delete   ExtractTableItems
 }
 
 func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTableResult, err error) {
@@ -60,8 +70,16 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 	// if table from state is not exist in app table,
 	// add table to deleted table arr
 	for _, v := range mapTableState {
+		var deletedPolicy []objects.Policy
+		if len(v.Policies) > 0 {
+			deletedPolicy = append(deletedPolicy, v.Policies...)
+		}
+
 		result.Delete = append(result.Delete, ExtractTableItem{
 			Table: v.Table,
+			ExtractedPolicies: ExtractedPolicies{
+				Delete: deletedPolicy,
+			},
 		})
 	}
 
@@ -82,19 +100,10 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 		bindTableMetadata(&metadataField, &ei.Table)
 	}
 
-	// add metadata
-	aclField, isExist := modelType.FieldByName("Acl")
-	if isExist {
-		bindTableAcl(&aclField)
-	}
-
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
 		switch field.Name {
-		case "Metadata":
-			continue
-		case "Acl":
-			// TODO : Implement this
+		case "Metadata", "Acl":
 			continue
 		default:
 			if column := field.Tag.Get("column"); len(column) > 0 {
@@ -134,6 +143,12 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 		}
 	}
 
+	// add metadata
+	aclField, isExist := modelType.FieldByName("Acl")
+	if isExist {
+		ei.ExtractedPolicies.New = getPolicies(&aclField, &ei)
+	}
+
 	return
 }
 
@@ -168,6 +183,12 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err 
 		mapPrimaryKey[pk.Name] = pk
 	}
 
+	mapPolicies := make(map[string]objects.Policy)
+	for ip := range state.Policies {
+		p := state.Policies[ip]
+		mapPolicies[p.Name] = p
+	}
+
 	var columns []objects.Column
 	var relations []objects.TablesRelationship
 	var primaryKeys []objects.PrimaryKey
@@ -176,12 +197,6 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err 
 	metadataField, isExist := modelType.FieldByName("Metadata")
 	if isExist {
 		bindTableMetadata(&metadataField, &ei.Table)
-	}
-
-	// add metadata
-	aclField, isExist := modelType.FieldByName("Acl")
-	if isExist {
-		bindTableAcl(&aclField)
 	}
 
 	// Iterate over the fields of the struct
@@ -231,6 +246,33 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err 
 					relations = append(relations, r)
 				}
 			}
+		}
+	}
+
+	// add acl
+	aclField, isExist := modelType.FieldByName("Acl")
+	if isExist {
+		policies := getPolicies(&aclField, &ei)
+		for ip := range policies {
+			p := policies[ip]
+
+			sp, exist := mapPolicies[p.Name]
+			if !exist {
+				ei.ExtractedPolicies.New = append(ei.ExtractedPolicies.New, p)
+				continue
+			}
+
+			sp.Roles = p.Roles
+			sp.Check = p.Check
+			sp.Definition = p.Definition
+			ei.ExtractedPolicies.Existing = append(ei.ExtractedPolicies.Existing, sp)
+			delete(mapPolicies, p.Name)
+		}
+	}
+
+	if len(mapPolicies) > 0 {
+		for _, v := range mapPolicies {
+			ei.ExtractedPolicies.Delete = append(ei.ExtractedPolicies.Delete, v)
 		}
 	}
 
@@ -298,8 +340,70 @@ func bindTableMetadata(field *reflect.StructField, table *objects.Table) {
 }
 
 // TODO : implement mapping acl
-func bindTableAcl(field *reflect.StructField) {
+func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []objects.Policy) {
+	acl := raiden.UnmarshalAclTag(string(field.Tag))
+	defaultCheck, defaultDefinition := "true", "true"
+	if len(acl.Read.Roles) > 0 {
+		readPolicyName := getPolicyName(objects.PolicyCommandSelect, ei.Table.Name)
+		policy := objects.Policy{
+			Name:       readPolicyName,
+			Schema:     ei.Table.Schema,
+			Table:      ei.Table.Name,
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Roles:      acl.Read.Roles,
+			Definition: acl.Read.Using,
+		}
+		if policy.Definition == "" {
+			policy.Definition = defaultDefinition
+		}
+		policies = append(policies, policy)
+	}
 
+	if len(acl.Write.Roles) > 0 {
+		createPolicy := objects.Policy{
+			Name:    getPolicyName(objects.PolicyCommandInsert, ei.Table.Name),
+			Schema:  ei.Table.Schema,
+			Table:   ei.Table.Name,
+			Action:  "PERMISSIVE",
+			Command: objects.PolicyCommandInsert,
+			Roles:   acl.Write.Roles,
+			Check:   acl.Write.Check,
+		}
+		if createPolicy.Check == nil || (createPolicy.Check != nil && *createPolicy.Check == "") {
+			createPolicy.Check = &defaultCheck
+		}
+
+		updatePolicy := objects.Policy{
+			Name:       getPolicyName(objects.PolicyCommandUpdate, ei.Table.Name),
+			Schema:     ei.Table.Schema,
+			Table:      ei.Table.Name,
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandUpdate,
+			Roles:      acl.Write.Roles,
+			Definition: acl.Write.Using,
+			Check:      acl.Write.Check,
+		}
+		if updatePolicy.Check == nil || (updatePolicy.Check != nil && *updatePolicy.Check == "") {
+			updatePolicy.Check = &defaultCheck
+		}
+
+		deletePolicy := objects.Policy{
+			Name:       getPolicyName(objects.PolicyCommandDelete, ei.Table.Name),
+			Schema:     ei.Table.Schema,
+			Table:      ei.Table.Name,
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandDelete,
+			Roles:      acl.Write.Roles,
+			Definition: acl.Write.Using,
+		}
+		if deletePolicy.Definition == "" {
+			deletePolicy.Definition = "true"
+		}
+		policies = append(policies, createPolicy, updatePolicy, deletePolicy)
+	}
+
+	return
 }
 
 func buildTableRelation(tableName, fieldName, schema string, mapRelations map[string]objects.TablesRelationship, joinTag string) (relation objects.TablesRelationship) {
@@ -355,4 +459,16 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 // get relation table name, base on struct type that defined in relation field
 func getRelationConstrainName(schema, table, foreignKey string) string {
 	return fmt.Sprintf("%s_%s_%s_fkey", schema, table, foreignKey)
+}
+
+func getPolicyName(command objects.PolicyCommand, tableName string) string {
+	return strings.ToLower(fmt.Sprintf("enable %s access for table %s", command, tableName))
+}
+
+func (f ExtractTableItems) ToFlatTable() (tables []objects.Table) {
+	for i := range f {
+		t := f[i]
+		tables = append(tables, t.Table)
+	}
+	return
 }

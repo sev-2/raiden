@@ -76,7 +76,7 @@ func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 
 	rs, err := ExecuteQuery[[]objects.Role](cfg.SupabaseApiUrl, cfg.ProjectId, query.GetRolesQuery, reqInterceptor, resInterceptor)
 	if err != nil {
-		err = fmt.Errorf("get roles error : %s", err)
+		err = fmt.Errorf("get role error : %s", err)
 	}
 
 	return rs, err
@@ -104,7 +104,7 @@ func GetRoleByName(cfg *raiden.Config, name string) (result objects.Role, err er
 
 	rs, err := ExecuteQuery[[]objects.Role](cfg.SupabaseApiUrl, cfg.ProjectId, q, DefaultAuthInterceptor(cfg.AccessToken), resInterceptor)
 	if err != nil {
-		err = fmt.Errorf("get roles error : %s", err)
+		err = fmt.Errorf("get role error : %s", err)
 		return
 	}
 

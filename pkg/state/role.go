@@ -25,7 +25,7 @@ func ExtractRole(roleStates []RoleState, appRoles []raiden.Role, withNativeRole 
 		state, isStateExist := mapRoleState[role.Name()]
 		if !isStateExist {
 			r := objects.Role{}
-			bindToSupabaseRole(&r, role)
+			BindToSupabaseRole(&r, role)
 			result.New = append(result.New, r)
 			continue
 		}
@@ -35,7 +35,7 @@ func ExtractRole(roleStates []RoleState, appRoles []raiden.Role, withNativeRole 
 		}
 
 		if !state.IsNative {
-			sr := buildRoleFromState(state, role)
+			sr := BuildRoleFromState(state, role)
 			result.Existing = append(result.Existing, sr)
 		}
 
@@ -49,7 +49,7 @@ func ExtractRole(roleStates []RoleState, appRoles []raiden.Role, withNativeRole 
 	return
 }
 
-func bindToSupabaseRole(r *objects.Role, role raiden.Role) {
+func BindToSupabaseRole(r *objects.Role, role raiden.Role) {
 	name := role.Name()
 	if name == "" {
 		rv := reflect.TypeOf(role)
@@ -70,8 +70,8 @@ func bindToSupabaseRole(r *objects.Role, role raiden.Role) {
 	// r.IsSuperuser = role.IsSuperuser()
 }
 
-func buildRoleFromState(rs RoleState, role raiden.Role) (r objects.Role) {
+func BuildRoleFromState(rs RoleState, role raiden.Role) (r objects.Role) {
 	r = rs.Role
-	bindToSupabaseRole(&r, role)
+	BindToSupabaseRole(&r, role)
 	return
 }

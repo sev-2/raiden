@@ -21,17 +21,18 @@ func ApplyCommand() *cobra.Command {
 	var f ApplyFlags
 
 	cmd := &cobra.Command{
-		Use:     "apply",
-		Short:   "Apply resource to supabase",
-		Long:    "Apply model, role, rpc and rls to supabase",
-		PreRunE: PreRunE(&f.Flags, apply.PreRun),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:    "apply",
+		Short:  "Apply resource to supabase",
+		Long:   "Apply model, role, rpc and rls to supabase",
+		PreRun: PreRun(&f.Flags, apply.PreRun),
+		Run: func(cmd *cobra.Command, args []string) {
 			verbose := f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			// load config
@@ -39,16 +40,20 @@ func ApplyCommand() *cobra.Command {
 			logger.Debug("Load configuration from : ", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 1. generate all resource
 			if err = generate.Run(&f.Generate, config, currentDir, false); err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 2. run import
-			return apply.Run(&f.Apply, currentDir, verbose)
+			if err = apply.Run(&f.Apply, currentDir, verbose); err != nil {
+				logger.Error(err)
+			}
 		},
 	}
 

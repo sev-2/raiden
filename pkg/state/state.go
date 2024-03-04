@@ -87,7 +87,6 @@ func Save(state *State) error {
 	}
 
 	defer file.Close()
-	logger.Debug("Save state file to : ", filePath)
 
 	encoder := gob.NewEncoder(file)
 	if err := encoder.Encode(state); err != nil {

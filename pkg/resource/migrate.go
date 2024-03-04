@@ -31,7 +31,7 @@ type MigrateData struct {
 	Tables   []MigrateItem[objects.Table, objects.UpdateTableParam]
 	Roles    []MigrateItem[objects.Role, objects.UpdateRoleParam]
 	Rpc      []MigrateItem[objects.Function, any]
-	Policies []MigrateItem[objects.Policy, any]
+	Policies []MigrateItem[objects.Policy, objects.UpdatePolicyParam]
 }
 
 type MigrateCreateFunc[T any] func(cfg *raiden.Config, param T) (response T, err error)
@@ -57,11 +57,6 @@ type MigrateTableNode struct {
 }
 
 func MigrateResource(config *raiden.Config, importState *ResourceState, projectPath string, resource *MigrateData) (errors []error) {
-	if err := validateMigrateTableRelations(resource.Tables); err != nil {
-		errors = append(errors, err)
-		return
-	}
-
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan []error), make(chan any)
 	doneListen := ListenApplyResource(projectPath, importState, stateChan)
 
@@ -89,6 +84,7 @@ func MigrateResource(config *raiden.Config, importState *ResourceState, projectP
 		}
 
 		logger.Debug(strings.Repeat("=", 5), " Start Migrate Table")
+		// perform create and update
 		errors = MigrateTableTree(config, stateChan, actions, cuNode)
 		if len(errors) > 0 {
 			close(stateChan)
@@ -96,6 +92,7 @@ func MigrateResource(config *raiden.Config, importState *ResourceState, projectP
 		}
 
 		if dNode != nil {
+			// perform delete table
 			errors = MigrateTableTree(config, stateChan, actions, dNode)
 			if len(errors) > 0 {
 				close(stateChan)
@@ -116,9 +113,20 @@ func MigrateResource(config *raiden.Config, importState *ResourceState, projectP
 	if len(resource.Policies) > 0 {
 		// TODO : handler migrate rls
 		wg.Add(1)
-		go func() {
-			defer wg.Done()
-		}()
+		go func(w *sync.WaitGroup, eChan chan []error) {
+			defer w.Done()
+			actions := MigrateActionFunc[objects.Policy, objects.UpdatePolicyParam]{
+				CreateFunc: supabase.CreatePolicy,
+				UpdateFunc: supabase.UpdatePolicy,
+				DeleteFunc: supabase.DeletePolicy,
+			}
+
+			errors := runMigratePolicy(config, resource.Policies, stateChan, actions)
+			if len(errors) > 0 {
+				eChan <- errors
+				return
+			}
+		}(&wg, errChan)
 	}
 
 	go func() {
@@ -178,6 +186,86 @@ func runMigrateResource[T any, D any](cfg *raiden.Config, resources []MigrateIte
 	return
 }
 
+func runMigratePolicy(cfg *raiden.Config, resources []MigrateItem[objects.Policy, objects.UpdatePolicyParam], stateChan chan any, actionFunc MigrateActionFunc[objects.Policy, objects.UpdatePolicyParam]) (errors []error) {
+	mapPoliciesByTable := make(map[string][]MigrateItem[objects.Policy, objects.UpdatePolicyParam])
+	for i := range resources {
+		p := resources[i]
+
+		var tableName string
+		if p.NewData.Name != "" {
+			tableName = p.NewData.Table
+		} else if p.OldData.Name != "" {
+			tableName = p.OldData.Table
+		}
+
+		policies, exist := mapPoliciesByTable[tableName]
+		if !exist {
+			mapPoliciesByTable[tableName] = []MigrateItem[objects.Policy, objects.UpdatePolicyParam]{
+				p,
+			}
+			continue
+		}
+		policies = append(policies, p)
+		mapPoliciesByTable[tableName] = policies
+	}
+
+	wg, errChan := sync.WaitGroup{}, make(chan error)
+
+	for _, v := range mapPoliciesByTable {
+		wg.Add(1)
+		go func(
+			w *sync.WaitGroup, c *raiden.Config, st chan any,
+			mList []MigrateItem[objects.Policy, objects.UpdatePolicyParam],
+			acf MigrateActionFunc[objects.Policy, objects.UpdatePolicyParam],
+			eChan chan error,
+		) {
+			defer w.Done()
+
+			for i := range mList {
+				m := mList[i]
+
+				switch m.Type {
+				case MigrateTypeCreate:
+					newTable, err := acf.CreateFunc(c, m.NewData)
+					if err != nil {
+						eChan <- err
+						continue
+					}
+					m.NewData = newTable
+					stateChan <- &m
+				case MigrateTypeUpdate:
+					err := acf.UpdateFunc(c, m.NewData, m.MigrationItems)
+					if err != nil {
+						eChan <- err
+						continue
+					}
+					stateChan <- &m
+				case MigrateTypeDelete:
+					err := acf.DeleteFunc(c, m.OldData)
+					if err != nil {
+						eChan <- err
+						continue
+					}
+					stateChan <- &m
+				}
+			}
+		}(&wg, cfg, stateChan, v, actionFunc, errChan)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	for e := range errChan {
+		if e != nil {
+			errors = append(errors, e)
+		}
+	}
+
+	return
+}
+
 func migrateProcess[T, D any](params MigrateFuncParam[T, D]) error {
 	switch params.Data.Type {
 	case MigrateTypeCreate:
@@ -208,70 +296,13 @@ func migrateProcess[T, D any](params MigrateFuncParam[T, D]) error {
 	}
 }
 
-func validateMigrateTableRelations(migratedTables []MigrateItem[objects.Table, objects.UpdateTableParam]) error {
-	// convert array data to map data
-	mapMigratedTableColumns := make(map[string]bool)
-	for i := range migratedTables {
-		m := migratedTables[i]
-
-		if m.Type == MigrateTypeDelete {
-			continue
-		}
-
-		if m.NewData.Name != "" {
-			for ic := range m.NewData.Columns {
-				c := m.NewData.Columns[ic]
-				key := fmt.Sprintf("%s.%s", m.NewData.Name, c.Name)
-				mapMigratedTableColumns[key] = true
-			}
-			continue
-		}
-	}
-
-	for i := range migratedTables {
-		m := migratedTables[i]
-
-		if m.Type == MigrateTypeDelete {
-			continue
-		}
-
-		if m.NewData.Name == "" {
-			return fmt.Errorf("validate relation : invalid table name for create or update")
-		}
-
-		for i := range m.NewData.Relationships {
-			r := m.NewData.Relationships[i]
-			if r.SourceTableName != m.NewData.Name {
-				continue
-			}
-
-			// validate foreign keys
-			fkColumn := fmt.Sprintf("%s.%s", r.SourceTableName, r.SourceColumnName)
-			if _, exist := mapMigratedTableColumns[fkColumn]; !exist {
-				return fmt.Errorf("validate relation table %s : column %s is not exist in table %s", m.NewData.Name, r.SourceColumnName, r.SourceTableName)
-			}
-
-			// validate target column
-			fkTargetColumn := fmt.Sprintf("%s.%s", r.TargetTableName, r.TargetColumnName)
-			if _, exist := mapMigratedTableColumns[fkTargetColumn]; !exist {
-				return fmt.Errorf("validate relation table %s : target column %s is not exist in table %s", m.NewData.Name, r.TargetColumnName, r.TargetTableName)
-			}
-		}
-	}
-
-	return nil
-}
-
 func MigrateTableTree(cfg *raiden.Config, stateChan chan any, actions MigrateActionFunc[objects.Table, objects.UpdateTableParam], node *MigrateTableNode) []error {
-	logger.Debug("start migrate tables level : ", node.Level)
 	errors := runMigrateResource(cfg, node.MigratedItems, stateChan, actions, migrateProcess)
-	logger.Debug("finish migrate tables level : ", node.Level)
 	if len(errors) > 0 {
 		return errors
 	}
 
 	if node.Child == nil {
-		logger.Debug("start migrate child for level : ", node.Level)
 		return errors
 	}
 
@@ -328,14 +359,12 @@ func buildTableTree(mapTable map[string]MigrateItem[objects.Table, objects.Updat
 				}
 			}
 
-			logger.Debugf("table %s isMasterTable : %v", t.NewData.Name, isMasterTable)
 			if !isMasterTable {
-				logger.Debugf("skip processing table %s", t.NewData.Name)
 				continue
 			}
+
 			node.MigratedItems = append(node.MigratedItems, t)
 			key := fmt.Sprintf("%s.%s", t.NewData.Schema, t.NewData.Name)
-			logger.Debugf("add %s to scanned table level %v", key, level)
 			scannedNodeTable[key] = true
 			delete(mapTable, k)
 		}
@@ -357,15 +386,12 @@ func buildTableTree(mapTable map[string]MigrateItem[objects.Table, objects.Updat
 				}
 			}
 
-			logger.Debugf("table %s isAllDependTableScanned : %v", t.NewData.Name, isAllDependTableScanned)
 			if !isAllDependTableScanned {
-				logger.Debugf("skip processing table %s", t.NewData.Name)
 				continue
 			}
 
 			node.MigratedItems = append(node.MigratedItems, t)
 			key := fmt.Sprintf("%s.%s", t.NewData.Schema, t.NewData.Name)
-			logger.Debugf("add %s to scanned table level %v", key, level)
 			scannedNodeTable[key] = true
 			delete(mapTable, k)
 		}

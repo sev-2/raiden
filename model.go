@@ -3,6 +3,8 @@ package raiden
 import (
 	"regexp"
 	"strings"
+
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type (
@@ -36,6 +38,17 @@ type (
 
 		TargetPrimaryKey string
 		TargetForeignKey string
+	}
+
+	Acl struct {
+		Roles []string
+		Check *string
+		Using string
+	}
+
+	AclTag struct {
+		Read  Acl
+		Write Acl
 	}
 
 	RelationType string
@@ -134,4 +147,31 @@ func UnmarshalJoinTag(tag string) JoinTag {
 	}
 
 	return joinTag
+}
+
+func UnmarshalAclTag(tag string) AclTag {
+	var aclTag AclTag
+
+	aclTagMap := utils.ParseTag(tag)
+	if readTag, exist := aclTagMap["read"]; exist && len(readTag) > 0 {
+		aclTag.Read.Roles = strings.Split(readTag, ",")
+	}
+
+	if writeTag, exist := aclTagMap["write"]; exist && len(writeTag) > 0 {
+		aclTag.Write.Roles = strings.Split(writeTag, ",")
+	}
+
+	if readTagUsing, exist := aclTagMap["readUsing"]; exist && len(readTagUsing) > 0 {
+		aclTag.Read.Using = readTagUsing
+	}
+
+	if writeTagCheck, exist := aclTagMap["writeCheck"]; exist && len(writeTagCheck) > 0 {
+		aclTag.Write.Check = &writeTagCheck
+	}
+
+	if writeTagUsing, exist := aclTagMap["writeUsing"]; exist && len(writeTagUsing) > 0 {
+		aclTag.Write.Using = writeTagUsing
+	}
+
+	return aclTag
 }

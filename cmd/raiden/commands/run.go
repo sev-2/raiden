@@ -22,18 +22,19 @@ func RunCommand() *cobra.Command {
 	var f RunFlags
 
 	cmd := &cobra.Command{
-		Use:     "run",
-		Short:   "Run app server",
-		Long:    "Generate app resource, build binary than serve app",
-		PreRunE: PreRunE(&f.Flags, generate.PreRun),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:    "run",
+		Short:  "Run app server",
+		Long:   "Generate app resource, build binary than serve app",
+		PreRun: PreRun(&f.Flags, generate.PreRun),
+		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
 			// Preparation
 			// - get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			// - load config
@@ -41,21 +42,26 @@ func RunCommand() *cobra.Command {
 			logger.Debug("Load configuration from : ", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 1. generate app resource
 			if err := generate.Run(&f.Generate, config, currentDir, false); err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 2. build app binary
 			if err := build.Run(&f.Build, config, currentDir); err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
 			// 3. server application
-			return serve.Run(config, currentDir)
+			if err := serve.Run(config, currentDir); err != nil {
+				logger.Error(err)
+			}
 		},
 	}
 

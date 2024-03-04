@@ -19,17 +19,18 @@ func GenerateCommand() *cobra.Command {
 	f := GenerateFlags{}
 
 	cmd := &cobra.Command{
-		Use:     "generate",
-		Short:   "Generate application resource",
-		Long:    "Generate route and rpc configuration",
-		PreRunE: PreRunE(&f.Flags, generate.PreRun),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:    "generate",
+		Short:  "Generate application resource",
+		Long:   "Generate route and rpc configuration",
+		PreRun: PreRun(&f.Flags, generate.PreRun),
+		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			// load config
@@ -37,10 +38,13 @@ func GenerateCommand() *cobra.Command {
 			logger.Debug("Load configuration from : ", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
-			return generate.Run(&f.Generate, config, currentDir, false)
+			if err = generate.Run(&f.Generate, config, currentDir, false); err != nil {
+				logger.Error(err)
+			}
 		},
 	}
 

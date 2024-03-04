@@ -28,7 +28,7 @@ func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumn bool)
 	return rs, err
 }
 
-func GetTableBy(cfg *raiden.Config, name, schema string, includeColumn bool) (result objects.Table, err error) {
+func GetTableByName(cfg *raiden.Config, name, schema string, includeColumn bool) (result objects.Table, err error) {
 	q, err := query.GenerateTableQuery(name, schema, includeColumn)
 	if err != nil {
 		err = fmt.Errorf("failed generate query get table for project id %s : %v", cfg.ProjectId, err)
@@ -85,7 +85,7 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 		return result, fmt.Errorf("create new table %s error : %s", newTable.Name, err)
 	}
 
-	return GetTableBy(cfg, newTable.Name, schema, true)
+	return GetTableByName(cfg, newTable.Name, schema, true)
 }
 
 func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.UpdateTableParam) error {

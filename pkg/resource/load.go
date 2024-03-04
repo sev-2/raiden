@@ -58,8 +58,9 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 			return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
 		})
 
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Policy, error) {
-			return supabase.GetPolicies(cfg)
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) (objects.Policies, error) {
+			rs, e := supabase.GetPolicies(cfg)
+			return rs, e
 		})
 	}
 

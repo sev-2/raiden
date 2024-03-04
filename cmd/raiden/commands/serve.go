@@ -18,17 +18,18 @@ func ServeCommand() *cobra.Command {
 	var f ServeFlags
 
 	cmd := &cobra.Command{
-		Use:     "serve",
-		Short:   "Serve app binary",
-		Long:    "Serve build app binary file",
-		PreRunE: PreRunE(&f.Flags, serve.PreRun),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:    "serve",
+		Short:  "Serve app binary",
+		Long:   "Serve build app binary file",
+		PreRun: PreRun(&f.Flags, serve.PreRun),
+		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				logger.Error(errCurDir)
+				return
 			}
 
 			// load config
@@ -36,10 +37,13 @@ func ServeCommand() *cobra.Command {
 			logger.Debug("Load configuration from : ", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				return err
+				logger.Error(err)
+				return
 			}
 
-			return serve.Run(config, currentDir)
+			if err = serve.Run(config, currentDir); err != nil {
+				logger.Error(err)
+			}
 		},
 	}
 
