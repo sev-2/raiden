@@ -128,3 +128,16 @@ func GenerateFunctionsQuery(includedSchema []string) string {
 
 	return fmt.Sprintf(filteredSql, strings.Join(filterArg, ","))
 }
+
+func GenerateFunctionByNameQuery(schema, name string) string {
+	if len(schema) == 0 {
+		schema = "public"
+	}
+
+	filteredSql := GetFunctionsQuery + " where n.nspname IN (%s) and f.proname = %s"
+
+	schemaFilter := fmt.Sprintf("'%s'", schema)
+	nameFilter := fmt.Sprintf("'%s'", name)
+
+	return fmt.Sprintf(filteredSql, schemaFilter, nameFilter)
+}

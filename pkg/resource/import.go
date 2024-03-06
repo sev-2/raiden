@@ -74,8 +74,8 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
-	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions) > 0 {
-		if err := runImportCompareRpcFunctions(spResource.Functions, appRpcFunctions); err != nil {
+	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
+		if err := runImportCompareRpcFunctions(spResource.Functions, appRpcFunctions.Existing); err != nil {
 			return err
 		}
 	}

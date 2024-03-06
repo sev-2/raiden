@@ -178,6 +178,14 @@ func (s *ResourceState) DeleteRpc(rpcId int) {
 	s.NeedUpdate = true
 }
 
+func (s *ResourceState) UpdateRpc(index int, state state.RpcState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	s.State.Rpc[index] = state
+	s.NeedUpdate = true
+}
+
 func (s *ResourceState) Persist() error {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
@@ -382,6 +390,37 @@ func ListenApplyResource(projectPath string, resourceState *ResourceState, state
 						resourceState.UpdateTable(fIndex, tState)
 					}
 				}
+			case *MigrateItem[objects.Function, any]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					rpcStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					rpcPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.RpcDir, utils.ToSnakeCase(m.NewData.Name))
+
+					r := state.RpcState{
+						Function:   m.NewData,
+						RpcPath:    rpcPath,
+						RpcStruct:  rpcStruct,
+						LastUpdate: time.Now(),
+					}
+					resourceState.AddRpc(r)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					resourceState.DeleteRpc(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, rState, found := resourceState.FindRpc(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Function = m.NewData
+					rState.LastUpdate = time.Now()
+					resourceState.UpdateRpc(fIndex, rState)
+				}
 			}
 		}
 		done <- resourceState.Persist()
@@ -418,7 +457,7 @@ func loadState() (*state.State, error) {
 	return state.Load()
 }
 
-func extractAppResource(f *Flags, latestState *state.State) (extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult, rpc []objects.Function, err error) {
+func extractAppResource(f *Flags, latestState *state.State) (extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult, extractedRpc state.ExtractRpcResult, err error) {
 	if latestState == nil {
 		return
 	}
@@ -438,7 +477,7 @@ func extractAppResource(f *Flags, latestState *state.State) (extractedTable stat
 	}
 
 	if f.All() || f.RpcOnly {
-		rpc, err = state.ExtractRpc(latestState.Rpc, registeredRpc)
+		extractedRpc, err = state.ExtractRpc(latestState.Rpc, registeredRpc)
 		if err != nil {
 			return
 		}

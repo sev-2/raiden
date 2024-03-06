@@ -7,7 +7,6 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/client"
-	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/query"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/valyala/fasthttp"
 )
@@ -34,18 +33,6 @@ func FindProject(cfg *raiden.Config) (objects.Project, error) {
 	}
 
 	return objects.Project{}, nil
-}
-
-func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
-	rs, err := ExecuteQuery[[]objects.Function](
-		cfg.SupabaseApiUrl, cfg.ProjectId, query.GenerateFunctionsQuery([]string{"public"}),
-		DefaultAuthInterceptor(cfg.AccessToken), nil,
-	)
-	if err != nil {
-		err = fmt.Errorf("get functions error : %s", err)
-	}
-
-	return rs, err
 }
 
 // ----- Execute Query -----

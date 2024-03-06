@@ -50,6 +50,10 @@ func CompareRoles(sourceRole, targetRole []objects.Role, mode CompareMode) (diff
 				return diffResult, err
 			}
 
+			if !diff.IsConflict {
+				continue
+			}
+
 			diffResult = append(diffResult, diff)
 			continue
 		}
@@ -206,57 +210,17 @@ func CompareTables(sourceTable, targetTable []objects.Table, mode CompareMode) (
 			continue
 		}
 
-		if mode == CompareModeImport {
-			// make sure set default to empty array
-			// because default value from response is empty array
-			if tt.Relationships == nil {
-				tt.Relationships = make([]objects.TablesRelationship, 0)
-			}
-
-			diff, err := compareTableImportMode(t, tt)
-			if err != nil {
-				return diffResult, err
-			}
-
-			diffResult = append(diffResult, diff)
+		df := compareTable(t, tt)
+		if !df.IsConflict {
 			continue
 		}
-
-		if mode == CompareModeApply {
-			diffResult = append(diffResult, compareTableApplyMode(t, tt))
-			continue
-		}
+		diffResult = append(diffResult, df)
 	}
 
 	return
 }
 
-func compareTableImportMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableParam], err error) {
-	scByte, err := json.Marshal(source)
-	if err != nil {
-		return diffResult, err
-	}
-	scHash := utils.HashByte(scByte)
-
-	targetByte, err := json.Marshal(target)
-	if err != nil {
-		return diffResult, err
-	}
-
-	targetHash := utils.HashByte(targetByte)
-
-	if scHash != targetHash {
-		diffResult = CompareDiffResult[objects.Table, objects.UpdateTableParam]{
-			Name:           source.Name,
-			SourceResource: source,
-			TargetResource: target,
-		}
-	}
-
-	return
-}
-
-func compareTableApplyMode(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableParam]) {
+func compareTable(source, target objects.Table) (diffResult CompareDiffResult[objects.Table, objects.UpdateTableParam]) {
 	var updateItem objects.UpdateTableParam
 
 	// create map pk for compare target pk with source pk
@@ -337,25 +301,36 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 			updateColumnItems = append(updateColumnItems, objects.UpdateColumnName)
 		}
 
+		var sourceDefault, targetDefault *string
 		switch d := sc.DefaultValue.(type) {
 		case string:
-			if d != tc.DefaultValue {
-				updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
-			}
+			sourceDefault = &d
 		case *string:
 			if d != nil {
-				if *d != tc.DefaultValue {
-					updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
-				}
-			} else if tc.DefaultValue != nil {
-				updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
+				sourceDefault = d
 			}
 		case nil:
-			if tc.DefaultValue != nil {
-				updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
-			}
+			sourceDefault = nil
 		}
 
+		switch d := tc.DefaultValue.(type) {
+		case string:
+			targetDefault = &d
+		case *string:
+			if d != nil {
+				targetDefault = d
+			}
+		case nil:
+			targetDefault = nil
+		}
+
+		if (sourceDefault != nil && targetDefault == nil) ||
+			(sourceDefault == nil && targetDefault != nil) ||
+			(sourceDefault != nil && targetDefault != nil && *sourceDefault != *targetDefault) {
+			updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
+		}
+
+		// updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
 		if sc.DataType != tc.DataType {
 			updateColumnItems = append(updateColumnItems, objects.UpdateColumnDataType)
 		}
@@ -470,25 +445,17 @@ func CompareRpcFunctions(sourceFn []objects.Function, targetFn []objects.Functio
 			continue
 		}
 
-		dFields := strings.Fields(utils.CleanUpString(sFn.CompleteStatement))
-		for i := range dFields {
-			d := dFields[i]
-			if strings.HasSuffix(d, ";") && strings.ToLower(d) != "end;" {
-				dFields[i] = strings.ReplaceAll(d, ";", " ;")
-			}
+		sFn.CompleteStatement = strings.ToLower(utils.CleanUpString(sFn.CompleteStatement))
+		tFn.CompleteStatement = strings.ToLower(utils.CleanUpString(tFn.CompleteStatement))
 
-			if strings.Contains(strings.ToLower(d), "end;$") {
-				dFields[i] = strings.ReplaceAll(d, ";", "; ")
-			}
-
-		}
-		sFn.CompleteStatement = strings.ToLower(strings.Join(dFields, " "))
-
-		if sFn.CompleteStatement != tFn.CompleteStatement {
+		sourceCompare := strings.ReplaceAll(sFn.CompleteStatement, " ", "")
+		targetCompare := strings.ReplaceAll(tFn.CompleteStatement, " ", "")
+		if sourceCompare != targetCompare {
 			diffResult = append(diffResult, CompareDiffResult[objects.Function, any]{
 				Name:           sFn.Name,
 				SourceResource: sFn,
 				TargetResource: tFn,
+				IsConflict:     true,
 			})
 		}
 	}

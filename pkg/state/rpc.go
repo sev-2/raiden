@@ -5,7 +5,13 @@ import (
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
-func ExtractRpc(rpcState []RpcState, appRpc []raiden.Rpc) (listRpc []objects.Function, err error) {
+type ExtractRpcResult struct {
+	Existing []objects.Function
+	New      []objects.Function
+	Delete   []objects.Function
+}
+
+func ExtractRpc(rpcState []RpcState, appRpc []raiden.Rpc) (result ExtractRpcResult, err error) {
 	mapRpcState := map[string]RpcState{}
 	for i := range rpcState {
 		r := rpcState[i]
@@ -13,31 +19,41 @@ func ExtractRpc(rpcState []RpcState, appRpc []raiden.Rpc) (listRpc []objects.Fun
 	}
 
 	for _, r := range appRpc {
-		fn, e := createRpcFunction(mapRpcState, r)
-		if e != nil {
-			err = e
-			return
+		state, isStateExist := mapRpcState[r.GetName()]
+		if !isStateExist {
+			fn := objects.Function{}
+			if err := BindRpcFunction(r, &fn); err != nil {
+				return result, err
+			}
+			result.New = append(result.New, fn)
+			continue
 		}
 
-		if fn.ID > 0 {
-			listRpc = append(listRpc, fn)
+		fn := state.Function
+		if err := BindRpcFunction(r, &fn); err != nil {
+			return result, err
 		}
+
+		if fn.CompleteStatement != "" {
+			result.Existing = append(result.Existing, fn)
+		}
+		delete(mapRpcState, r.GetName())
+	}
+
+	for _, state := range mapRpcState {
+		result.Delete = append(result.Delete, state.Function)
 	}
 
 	return
 }
 
-func createRpcFunction(mapRpcState map[string]RpcState, rpc raiden.Rpc) (fn objects.Function, err error) {
+func BindRpcFunction(rpc raiden.Rpc, fn *objects.Function) (err error) {
 	if err = raiden.BuildRpc(rpc); err != nil {
 		return
 	}
 
-	state, isStateExist := mapRpcState[rpc.GetName()]
-	if !isStateExist {
-		// TODO : handler new rpc
-		return
-	}
-	fn = state.Function
+	fn.Name = rpc.GetName()
+	fn.Schema = rpc.GetSchema()
 	fn.CompleteStatement = rpc.GetCompleteStmt()
 	return
 }

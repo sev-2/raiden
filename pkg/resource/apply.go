@@ -186,9 +186,24 @@ func Apply(flags *Flags, config *raiden.Config) error {
 
 	}
 
-	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions) > 0 {
-		if err := runApplyCompareRpcFunctions(resource.Functions, appRpcFunctions); err != nil {
+	if flags.All() || flags.RpcOnly {
+		if err := bindMigratedFunctions(appRpcFunctions, resource.Functions, &migrateResource); err != nil {
 			return err
+		}
+
+		if flags.Verbose {
+			logger.Debug(strings.Repeat("=", 5), " Rpc to migrate")
+			for i := range migrateResource.Rpc {
+				t := migrateResource.Rpc[i]
+				var name string
+				if t.NewData.Name != "" {
+					name = t.NewData.Name
+				} else if t.OldData.Name != "" {
+					name = t.OldData.Name
+				}
+				logger.Debugf("- MigrateType : %s, Name: %s", t.Type, name)
+			}
+			logger.Debug(strings.Repeat("=", 5))
 		}
 	}
 
@@ -369,6 +384,48 @@ func bindMigratedPolicies(ep state.ExtractedPolicies, spPolicies []objects.Polic
 	return nil
 }
 
+func bindMigratedFunctions(er state.ExtractRpcResult, spFn []objects.Function, mr *MigrateData) error {
+	if rs, err := runApplyCompareRpcFunctions(spFn, er.Existing); err != nil {
+		return err
+	} else {
+		mr.Rpc = append(mr.Rpc, rs...)
+	}
+
+	// bind new table to migrated data
+	if len(er.New) > 0 {
+		for i := range er.New {
+			t := er.New[i]
+			mr.Rpc = append(mr.Rpc, MigrateItem[objects.Function, any]{
+				Type:    MigrateTypeCreate,
+				NewData: t,
+			})
+		}
+	}
+
+	if len(er.Delete) > 0 {
+		for i := range er.Delete {
+			t := er.Delete[i]
+			isExist := false
+			for i := range spFn {
+				tt := spFn[i]
+				if tt.Name == t.Name {
+					isExist = true
+					break
+				}
+			}
+
+			if isExist {
+				mr.Rpc = append(mr.Rpc, MigrateItem[objects.Function, any]{
+					Type:    MigrateTypeDelete,
+					OldData: t,
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
 func runApplyCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) (migratedData []MigrateItem[objects.Role, objects.UpdateRoleParam], err error) {
 	result, e := CompareRoles(appRoles, supabaseRoles, CompareModeApply)
 	if e != nil {
@@ -442,8 +499,29 @@ func runApplyComparePolicies(supabasePolicies []objects.Policy, appPolicies []ob
 	return
 }
 
-func runApplyCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.Function) error {
-	return nil
+func runApplyCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.Function) (migratedData []MigrateItem[objects.Function, any], err error) {
+	result, e := CompareRpcFunctions(appFn, supabaseFn)
+	if e != nil {
+		err = e
+		return
+	}
+	for i := range result {
+		r := result[i]
+
+		migrateType := MigrateTypeIgnore
+		if r.IsConflict {
+			migrateType = MigrateTypeUpdate
+		}
+
+		migratedData = append(migratedData, MigrateItem[objects.Function, any]{
+			Type:           migrateType,
+			NewData:        r.SourceResource,
+			OldData:        r.TargetResource,
+			MigrationItems: r.DiffItems,
+		})
+	}
+
+	return
 }
 
 func validateTableRelations(migratedTables ...objects.Table) error {

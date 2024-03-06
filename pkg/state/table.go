@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -50,7 +49,6 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 
 		tableName := utils.ToSnakeCase(tableType.Name())
 		ts, isExist := mapTableState[tableName]
-		logger.Debug("check table : ", tableName, " is exist : ", isExist)
 		if !isExist {
 			nt := buildTableFromModel(t)
 			result.New = append(result.New, nt)

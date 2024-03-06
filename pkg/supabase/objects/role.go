@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/sev-2/raiden/pkg/logger"
 )
 
 func NewValidUntil(newTime time.Time) *ValidUntil {
@@ -31,7 +29,6 @@ func (mt *ValidUntil) UnmarshalJSON(b []byte) error {
 }
 
 func (mt ValidUntil) MarshalJSON() ([]byte, error) {
-	logger.Debug("marshall error")
 	layout := "2006-01-02 00:00:00+00"
 	return []byte(fmt.Sprintf(`"%s"`, mt.Time.Format(layout))), nil
 }

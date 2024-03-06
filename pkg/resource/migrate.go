@@ -103,15 +103,27 @@ func MigrateResource(config *raiden.Config, importState *ResourceState, projectP
 	}
 
 	if len(resource.Rpc) > 0 {
-		// TODO : handler migrate rpc
 		wg.Add(1)
-		go func() {
+		go func(w *sync.WaitGroup, eChan chan []error) {
 			defer wg.Done()
-		}()
+
+			actions := MigrateActionFunc[objects.Function, any]{
+				CreateFunc: supabase.CreateFunction,
+				UpdateFunc: func(cfg *raiden.Config, param objects.Function, items any) (err error) {
+					return supabase.UpdateFunction(cfg, param)
+				},
+				DeleteFunc: supabase.DeleteFunction,
+			}
+
+			errors := runMigrateResource(config, resource.Rpc, stateChan, actions, migrateProcess)
+			if len(errors) > 0 {
+				eChan <- errors
+				return
+			}
+		}(&wg, errChan)
 	}
 
 	if len(resource.Policies) > 0 {
-		// TODO : handler migrate rls
 		wg.Add(1)
 		go func(w *sync.WaitGroup, eChan chan []error) {
 			defer w.Done()

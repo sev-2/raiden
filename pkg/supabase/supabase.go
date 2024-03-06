@@ -136,3 +136,30 @@ func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
 	logger.Debug("Get all function from supabase pg-meta")
 	return meta.GetFunctions(cfg)
 }
+
+func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		logger.Debug("Create function from supabase cloud with project id : ", cfg.ProjectId)
+		return cloud.CreateFunction(cfg, fn)
+	}
+	logger.Debug("Create function from supabase pg-meta")
+	return objects.Function{}, fmt.Errorf("create function %s in supabase meta is not implemented now, stay update :)", fn.Name)
+}
+
+func UpdateFunction(cfg *raiden.Config, fn objects.Function) (err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		logger.Debugf("Update function %s in supabase cloud for project id : %s", fn.Name, cfg.ProjectId)
+		return cloud.UpdateFunction(cfg, fn)
+	}
+	logger.Debugf("Update function %s in supabase pg-meta", fn.Name)
+	return fmt.Errorf("update function %s in supabase meta is not implemented now, stay update :)", fn.Name)
+}
+
+func DeleteFunction(cfg *raiden.Config, fn objects.Function) (err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		logger.Debugf("Delete function %s in supabase cloud for project id : %s", fn.Name, cfg.ProjectId)
+		return cloud.DeleteFunction(cfg, fn)
+	}
+	logger.Debugf("Delete function %s in supabase pg-meta", fn.Name)
+	return fmt.Errorf("delete function %s in supabase meta is not implemented now, stay update :)", fn.Name)
+}
