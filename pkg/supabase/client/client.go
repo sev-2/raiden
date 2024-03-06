@@ -83,7 +83,7 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 
 	// perform request interceptor when exist
 	if reqInterceptor != nil {
-		if err := reqInterceptor(req); err != nil {
+		if err = reqInterceptor(req); err != nil {
 			return rawBody, err
 		}
 	}

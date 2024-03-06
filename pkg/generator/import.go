@@ -53,6 +53,7 @@ func main() {
 			// register app resource
 			bootstrap.RegisterRpc()
 			bootstrap.RegisterRoles()
+			bootstrap.RegisterModels()
 			
 			if err := resource.Import(&f, config); err != nil {
 				logger.Error(err)
@@ -65,8 +66,8 @@ func main() {
 		},
 	}
 
-	cmd.PersistentFlags().StringVarP(&f.ProjectPath, "project-path", "p", "", "set project path")
-	cmd.Flags().BoolVarP(&f.Verbose, "verbose", "v", false, "verbose mode")
+	cmd.PersistentFlags().BoolVarP(&f.Verbose, "verbose", "v", false, "verbose mode")
+	cmd.Flags().StringVarP(&f.ProjectPath, "project-path", "p", "", "set project path")
 	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "import rpc only")
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")

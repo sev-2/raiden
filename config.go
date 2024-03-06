@@ -80,5 +80,9 @@ func LoadConfig(path *string) (*Config, error) {
 		config.Environment = "development"
 	}
 
+	if len(config.SupabaseApiBasePath) > 0 && config.SupabaseApiBasePath[0] != '/' {
+		config.SupabaseApiBasePath = "/" + config.SupabaseApiBasePath
+	}
+
 	return &config, nil
 }

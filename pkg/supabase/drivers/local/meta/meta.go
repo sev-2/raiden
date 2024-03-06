@@ -12,10 +12,16 @@ import (
 )
 
 func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool) ([]objects.Table, error) {
-	url := fmt.Sprintf("%s/%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	reqInterceptor := func(req *fasthttp.Request) error {
-		req.URI().QueryArgs().Set("included_schemas", strings.Join(includedSchemas, "."))
-		req.URI().QueryArgs().Set("include_columns", strconv.FormatBool(includeColumns))
+		if len(includedSchemas) > 0 {
+			req.URI().QueryArgs().Set("included_schemas", strings.Join(includedSchemas, ","))
+		}
+
+		if includeColumns {
+			req.URI().QueryArgs().Set("include_columns", strconv.FormatBool(includeColumns))
+		}
+
 		return nil
 	}
 
@@ -27,7 +33,7 @@ func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool
 }
 
 func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
-	url := fmt.Sprintf("%s/%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+	url := fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	rs, err := client.Get[[]objects.Role](url, client.DefaultTimeout, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
@@ -36,7 +42,7 @@ func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 }
 
 func GetPolicies(cfg *raiden.Config) ([]objects.Policy, error) {
-	url := fmt.Sprintf("%s/%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+	url := fmt.Sprintf("%s%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	rs, err := client.Get[[]objects.Policy](url, client.DefaultTimeout, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
@@ -45,7 +51,7 @@ func GetPolicies(cfg *raiden.Config) ([]objects.Policy, error) {
 }
 
 func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
-	url := fmt.Sprintf("%s/%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+	url := fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	rs, err := client.Get[[]objects.Function](url, client.DefaultTimeout, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
