@@ -1,29 +1,38 @@
-package cloud
+package meta
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase/client"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/supabase/query"
 	"github.com/sev-2/raiden/pkg/supabase/query/sql"
+	"github.com/valyala/fasthttp"
 )
 
-func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumn bool) ([]objects.Table, error) {
-	q, err := sql.GenerateGetTablesQuery(includedSchemas, includeColumn)
-	if err != nil {
-		err = fmt.Errorf("failed generate query get table for project id %s : %v", cfg.ProjectId, err)
-		return []objects.Table{}, err
+func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool) ([]objects.Table, error) {
+	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+	reqInterceptor := func(req *fasthttp.Request) error {
+		if len(includedSchemas) > 0 {
+			req.URI().QueryArgs().Set("included_schemas", strings.Join(includedSchemas, ","))
+		}
+
+		if includeColumns {
+			req.URI().QueryArgs().Set("include_columns", strconv.FormatBool(includeColumns))
+		}
+
+		return nil
 	}
 
-	rs, err := ExecuteQuery[[]objects.Table](cfg.SupabaseApiUrl, cfg.ProjectId, q, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	rs, err := client.Get[[]objects.Table](url, client.DefaultTimeout, reqInterceptor, nil)
 	if err != nil {
 		err = fmt.Errorf("get tables error : %s", err)
 	}
-
 	return rs, err
 }
 
@@ -34,7 +43,7 @@ func GetTableByName(cfg *raiden.Config, name, schema string, includeColumn bool)
 		return result, err
 	}
 
-	rs, err := ExecuteQuery[[]objects.Table](cfg.SupabaseApiUrl, cfg.ProjectId, q, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	rs, err := ExecuteQuery[[]objects.Table](getBaseUrl(cfg), q, nil, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get tables error : %s", err)
 		return
@@ -61,11 +70,10 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 
 	// execute update
 	logger.Debug("Create Table - execute : ", sql)
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return result, fmt.Errorf("create new table %s error : %s", newTable.Name, err)
 	}
-
 	return GetTableByName(cfg, newTable.Name, schema, true)
 }
 
@@ -73,7 +81,7 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 	sql := query.BuildUpdateTableQuery(newTable, updateItem)
 	// execute update
 	logger.Debug("Update Table - execute : ", sql)
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update tables error : %s", err)
 	}
@@ -109,7 +117,7 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 	sql := query.BuildDeleteTableQuery(table, true)
 	// execute delete
 	logger.Debug("Delete Table - execute : ", sql)
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete table %s error : %s", table.Name, err)
 	}
@@ -212,7 +220,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 
 	// Execute SQL Query
 	logger.Debug("Update Column - execute : ", sql)
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update column %s.%s error : %s", newColumn.Table, newColumn.Name, err)
 	}
@@ -232,7 +240,7 @@ func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) err
 
 	// Execute SQL Query
 	logger.Debug("Create Column - execute : ", sql)
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("create column %s.%s error : %s", column.Table, column.Name, err)
 	}
@@ -243,7 +251,7 @@ func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) err
 func DeleteColumn(cfg *raiden.Config, column objects.Column) error {
 	sql := query.BuildDeleteColumnQuery(column)
 	logger.Debug("Delete Column - execute : ", sql)
-	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete column %s.%s error : %s", column.Table, column.Name, err)
 	}
@@ -329,7 +337,7 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	}
 
 	logger.Debug("Create foreign key - execute : ", sql)
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("create foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -350,7 +358,7 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 
 	sql := deleteSql + createSql
 	logger.Debug("Update foreign key - execute : ", sql)
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -364,7 +372,7 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return err
 	}
 	logger.Debug("Delete foreign key - execute : ", sql)
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}

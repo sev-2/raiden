@@ -26,7 +26,7 @@ import (
 //	[x] update table rls enable
 //	[x] update table rls force
 //	[x] update table with relation - create, update and delete (ordered table by relation)
-//	[x] create table with acl (rls)
+//	[x] create table with acl (rls), for now all rls outside manage from raiden will be delete
 //	[x] update table column add new column
 //	[x] update table column delete column
 //	[x] update table column set default schema
@@ -55,7 +55,7 @@ import (
 //	[x] update can login
 //	[x] update valid until
 //
-// [ ] migrate function (Rpc)
+// [x] migrate function (Rpc)
 func Apply(flags *Flags, config *raiden.Config) error {
 	// declare default variable
 	var migrateResource MigrateData
@@ -369,9 +369,6 @@ func bindMigratedPolicies(ep state.ExtractedPolicies, spPolicies []objects.Polic
 					break
 				}
 			}
-
-			logger.PrintJson(spPolicies, true)
-			logger.Debugf("%s is exist : %v", t.Name, isExist)
 
 			if isExist {
 				mr.Policies = append(mr.Policies, MigrateItem[objects.Policy, objects.UpdatePolicyParam]{

@@ -1,4 +1,4 @@
-package query
+package sql
 
 var GetColumnsQuery = `
 SELECT

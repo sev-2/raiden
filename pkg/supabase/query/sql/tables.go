@@ -1,4 +1,4 @@
-package query
+package sql
 
 import (
 	"strings"
@@ -136,7 +136,7 @@ FROM tables
 where schema {{ .FilterSchemaSQL }} AND name {{ .FilterNameSQL }} LIMIT 1
 `
 
-func GenerateTablesQuery(includeSchemas []string, includeColumn bool) (string, error) {
+func GenerateGetTablesQuery(includeSchemas []string, includeColumn bool) (string, error) {
 	tmpl, err := template.New("enrichedTablesSQL").
 		Funcs(template.FuncMap{
 			"coalesceRowsToArray": coalesceRowsToArray,
@@ -163,7 +163,7 @@ func GenerateTablesQuery(includeSchemas []string, includeColumn bool) (string, e
 	return result.String(), nil
 }
 
-func GenerateTableQuery(tableName string, schema string, includeColumn bool) (string, error) {
+func GenerateGetTableQuery(tableName string, schema string, includeColumn bool) (string, error) {
 	tmpl, err := template.New("enrichedTablesSQL").
 		Funcs(template.FuncMap{
 			"coalesceRowsToArray": coalesceRowsToArray,

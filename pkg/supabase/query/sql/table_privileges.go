@@ -1,4 +1,4 @@
-package query
+package sql
 
 var GetTablePrivelegesQuery = `
 -- Despite the name 'table_privileges', this includes other kinds of relations:

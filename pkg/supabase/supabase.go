@@ -1,9 +1,6 @@
 package supabase
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud"
@@ -35,7 +32,7 @@ func CreateTable(cfg *raiden.Config, table objects.Table) (rs objects.Table, err
 		return cloud.CreateTable(cfg, table)
 	}
 	logger.Debug("Create new table in supabase pg-meta")
-	return rs, errors.New("create new table in supabase meta is not implemented now, stay update :)")
+	return meta.CreateTable(cfg, table)
 }
 
 func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItems objects.UpdateTableParam) (err error) {
@@ -44,7 +41,7 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItems objects
 		return cloud.UpdateTable(cfg, newTable, updateItems)
 	}
 	logger.Debugf("Update table %s in supabase pg-meta", updateItems.OldData.Name)
-	return fmt.Errorf("update table %s in supabase meta is not implemented now, stay update :)", updateItems.OldData.Name)
+	return meta.UpdateTable(cfg, newTable, updateItems)
 }
 
 func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) (err error) {
@@ -53,7 +50,7 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) (err err
 		return cloud.DeleteTable(cfg, table, cascade)
 	}
 	logger.Debugf("Delete table %s in supabase pg-meta", table.Name)
-	return fmt.Errorf("delete table %s in supabase meta is not implemented now, stay update :)", table.Name)
+	return meta.DeleteTable(cfg, table, cascade)
 }
 
 func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
@@ -71,7 +68,7 @@ func CreateRole(cfg *raiden.Config, role objects.Role) (objects.Role, error) {
 		return cloud.CreateRole(cfg, role)
 	}
 	logger.Debug("Create role from supabase pg-meta")
-	return objects.Role{}, fmt.Errorf("create role %s in supabase meta is not implemented now, stay update :)", role.Name)
+	return meta.CreateRole(cfg, role)
 }
 
 func UpdateRole(cfg *raiden.Config, new objects.Role, updateItems objects.UpdateRoleParam) (err error) {
@@ -80,7 +77,7 @@ func UpdateRole(cfg *raiden.Config, new objects.Role, updateItems objects.Update
 		return cloud.UpdateRole(cfg, new, updateItems)
 	}
 	logger.Debugf("Update role %s in supabase pg-meta", updateItems.OldData.Name)
-	return fmt.Errorf("update role %s in supabase meta is not implemented now, stay update :)", updateItems.OldData.Name)
+	return meta.UpdateRole(cfg, new, updateItems)
 }
 
 func DeleteRole(cfg *raiden.Config, old objects.Role) (err error) {
@@ -89,7 +86,7 @@ func DeleteRole(cfg *raiden.Config, old objects.Role) (err error) {
 		return cloud.DeleteRole(cfg, old)
 	}
 	logger.Debugf("Delete role %s in supabase pg-meta", old.Name)
-	return fmt.Errorf("delete role %s in supabase meta is not implemented now, stay update :)", old.Name)
+	return meta.DeleteRole(cfg, old)
 }
 
 func GetPolicies(cfg *raiden.Config) (objects.Policies, error) {
@@ -107,7 +104,7 @@ func CreatePolicy(cfg *raiden.Config, policy objects.Policy) (objects.Policy, er
 		return cloud.CreatePolicy(cfg, policy)
 	}
 	logger.Debug("Create policy from supabase pg-meta")
-	return objects.Policy{}, fmt.Errorf("create policy %s in supabase meta is not implemented now, stay update :)", policy.Name)
+	return meta.CreatePolicy(cfg, policy)
 }
 
 func UpdatePolicy(cfg *raiden.Config, new objects.Policy, updateItems objects.UpdatePolicyParam) (err error) {
@@ -116,7 +113,7 @@ func UpdatePolicy(cfg *raiden.Config, new objects.Policy, updateItems objects.Up
 		return cloud.UpdatePolicy(cfg, new, updateItems)
 	}
 	logger.Debugf("Update policy %s in supabase pg-meta", updateItems.Name)
-	return fmt.Errorf("update policy %s in supabase meta is not implemented now, stay update :)", updateItems.Name)
+	return meta.UpdatePolicy(cfg, new, updateItems)
 }
 
 func DeletePolicy(cfg *raiden.Config, old objects.Policy) (err error) {
@@ -125,7 +122,7 @@ func DeletePolicy(cfg *raiden.Config, old objects.Policy) (err error) {
 		return cloud.DeletePolicy(cfg, old)
 	}
 	logger.Debugf("Delete policy %s in supabase pg-meta", old.Name)
-	return fmt.Errorf("delete policy %s in supabase meta is not implemented now, stay update :)", old.Name)
+	return meta.DeletePolicy(cfg, old)
 }
 
 func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
@@ -143,7 +140,7 @@ func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, 
 		return cloud.CreateFunction(cfg, fn)
 	}
 	logger.Debug("Create function from supabase pg-meta")
-	return objects.Function{}, fmt.Errorf("create function %s in supabase meta is not implemented now, stay update :)", fn.Name)
+	return meta.CreateFunction(cfg, fn)
 }
 
 func UpdateFunction(cfg *raiden.Config, fn objects.Function) (err error) {
@@ -152,7 +149,7 @@ func UpdateFunction(cfg *raiden.Config, fn objects.Function) (err error) {
 		return cloud.UpdateFunction(cfg, fn)
 	}
 	logger.Debugf("Update function %s in supabase pg-meta", fn.Name)
-	return fmt.Errorf("update function %s in supabase meta is not implemented now, stay update :)", fn.Name)
+	return meta.UpdateFunction(cfg, fn)
 }
 
 func DeleteFunction(cfg *raiden.Config, fn objects.Function) (err error) {
@@ -161,5 +158,5 @@ func DeleteFunction(cfg *raiden.Config, fn objects.Function) (err error) {
 		return cloud.DeleteFunction(cfg, fn)
 	}
 	logger.Debugf("Delete function %s in supabase pg-meta", fn.Name)
-	return fmt.Errorf("delete function %s in supabase meta is not implemented now, stay update :)", fn.Name)
+	return meta.DeleteFunction(cfg, fn)
 }

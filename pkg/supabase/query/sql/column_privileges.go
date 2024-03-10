@@ -1,4 +1,4 @@
-package query
+package sql
 
 var GetColumntPrivelegesQuery = `
 -- Lists each column's privileges in the form of:

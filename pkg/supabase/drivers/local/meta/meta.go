@@ -1,60 +1,31 @@
 package meta
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/client"
-	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/valyala/fasthttp"
 )
 
-func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool) ([]objects.Table, error) {
-	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	reqInterceptor := func(req *fasthttp.Request) error {
-		if len(includedSchemas) > 0 {
-			req.URI().QueryArgs().Set("included_schemas", strings.Join(includedSchemas, ","))
-		}
-
-		if includeColumns {
-			req.URI().QueryArgs().Set("include_columns", strconv.FormatBool(includeColumns))
-		}
-
-		return nil
-	}
-
-	rs, err := client.Get[[]objects.Table](url, client.DefaultTimeout, reqInterceptor, nil)
-	if err != nil {
-		err = fmt.Errorf("get tables error : %s", err)
-	}
-	return rs, err
+// ----- Execute Query -----
+type ExecuteQueryParam struct {
+	Query     string `json:"query"`
+	Variables any    `json:"variables"`
 }
 
-func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
-	url := fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := client.Get[[]objects.Role](url, client.DefaultTimeout, nil, nil)
+func ExecuteQuery[T any](baseUrl, query string, variables any, reqInterceptor client.RequestInterceptor, resInterceptor client.ResponseInterceptor) (result T, err error) {
+	url := fmt.Sprintf("%s/query", baseUrl)
+	p := ExecuteQueryParam{Query: query, Variables: variables}
+	pByte, err := json.Marshal(p)
 	if err != nil {
-		err = fmt.Errorf("get roles error : %s", err)
+		logger.Errorf("error execute query : %s", query)
+		return result, err
 	}
-	return rs, err
+	return client.Post[T](url, pByte, client.DefaultTimeout, reqInterceptor, resInterceptor)
 }
 
-func GetPolicies(cfg *raiden.Config) ([]objects.Policy, error) {
-	url := fmt.Sprintf("%s%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := client.Get[[]objects.Policy](url, client.DefaultTimeout, nil, nil)
-	if err != nil {
-		err = fmt.Errorf("get roles error : %s", err)
-	}
-	return rs, err
-}
-
-func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
-	url := fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := client.Get[[]objects.Function](url, client.DefaultTimeout, nil, nil)
-	if err != nil {
-		err = fmt.Errorf("get roles error : %s", err)
-	}
-	return rs, err
+func getBaseUrl(cfg *raiden.Config) string {
+	return fmt.Sprintf("%s%s", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 }

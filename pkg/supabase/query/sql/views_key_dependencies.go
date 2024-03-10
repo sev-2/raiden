@@ -1,4 +1,4 @@
-package query
+package sql
 
 var GetViewKeyDependenciesQuery = `
 -- Adapted from

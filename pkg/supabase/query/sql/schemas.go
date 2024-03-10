@@ -1,4 +1,4 @@
-package query
+package sql
 
 var GetSchemasQuery = `
 -- Adapted from information_schema.schemata
