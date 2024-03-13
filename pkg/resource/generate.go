@@ -26,6 +26,7 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 		tableInputs := buildGenerateModelInputs(resource.Tables, resource.Policies)
 		wg.Add(1)
 		go func() {
+			logger.Info("import : generate models")
 			defer wg.Done()
 
 			captureFunc := ImportDecorateFunc(tableInputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
@@ -49,6 +50,7 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 	if len(resource.Roles) > 0 {
 		wg.Add(1)
 		go func() {
+			logger.Info("import : generate roles")
 			defer wg.Done()
 			captureFunc := ImportDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
@@ -70,6 +72,7 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 	if len(resource.Functions) > 0 {
 		wg.Add(1)
 		go func() {
+			logger.Info("import : generate functions")
 			defer wg.Done()
 
 			captureFunc := ImportDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {

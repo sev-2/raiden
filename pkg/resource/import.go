@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
@@ -18,12 +19,14 @@ import (
 // [ ] delete  unused function
 func Import(flags *Flags, config *raiden.Config) error {
 	// load map native role
+	logger.Info("import : load configuration")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
 	}
 
 	// load supabase resource
+	logger.Info("import : load table, role, function, model and policy from supabase")
 	spResource, err := Load(flags, config)
 	if err != nil {
 		return err
@@ -38,11 +41,13 @@ func Import(flags *Flags, config *raiden.Config) error {
 	spResource.Roles = filterUserRole(spResource.Roles, mapNativeRole)
 
 	// load app resource
+	logger.Info("import : load local state")
 	latestState, err := loadState()
 	if err != nil {
 		return err
 	}
 
+	logger.Info("import : extract load table, role, function, model and policy from local state")
 	appTables, appRoles, appRpcFunctions, err := extractAppResource(flags, latestState)
 	if err != nil {
 		return err
@@ -56,6 +61,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 
 	// compare resource
 	if (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
+		logger.Info("import : compare table")
 		// compare table
 		var compareTables []objects.Table
 		for i := range appTables.Existing {
@@ -69,19 +75,26 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	if (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
+		logger.Info("import : compare roles")
 		if err := runImportCompareRoles(spResource.Roles, appRoles.Existing); err != nil {
 			return err
 		}
 	}
 
 	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
+		logger.Info("import : compare rpc")
 		if err := runImportCompareRpcFunctions(spResource.Functions, appRpcFunctions.Existing); err != nil {
 			return err
 		}
 	}
 
 	// generate resource
-	return generateResource(config, &importState, flags.ProjectPath, spResource)
+	if err := generateResource(config, &importState, flags.ProjectPath, spResource); err != nil {
+		return err
+	}
+
+	logger.Info(`imports result - table : %v roles : %v policy : %v function : %v`, len(spResource.Tables), len(spResource.Roles), len(spResource.Policies), len(spResource.Functions))
+	return nil
 }
 
 func runImportCompareTable(supabaseTable []objects.Table, appTable []objects.Table) error {
