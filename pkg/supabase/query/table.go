@@ -357,7 +357,16 @@ func BuildFkQuery(updateType objects.UpdateRelationType, relation *objects.Table
 	alter := fmt.Sprintf("ALTER TABLE IF EXISTS %s.%s", relation.SourceSchema, relation.SourceTableName)
 	switch updateType {
 	case objects.UpdateRelationCreate:
-		return fmt.Sprintf("%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s (%s);",
+		tmp := `
+		do $$
+		BEGIN
+			IF NOT EXISTS (SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE CONSTRAINT_NAME = '%s' AND TABLE_NAME = '%s') THEN
+				%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s (%s);
+			END IF;
+		END $$;
+		`
+
+		return fmt.Sprintf(tmp, relation.ConstraintName, relation.SourceTableName,
 			alter, relation.ConstraintName, relation.SourceColumnName,
 			relation.TargetTableSchema, relation.TargetTableName, relation.TargetColumnName,
 		), nil
