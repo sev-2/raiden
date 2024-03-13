@@ -96,6 +96,10 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 	metadataField, isExist := modelType.FieldByName("Metadata")
 	if isExist {
 		bindTableMetadata(&metadataField, &ei.Table)
+	} else {
+		ei.Table.Schema = "public"
+		ei.Table.RLSEnabled = true
+		ei.Table.RLSForced = false
 	}
 
 	for i := 0; i < modelType.NumField(); i++ {
@@ -195,6 +199,10 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err 
 	metadataField, isExist := modelType.FieldByName("Metadata")
 	if isExist {
 		bindTableMetadata(&metadataField, &ei.Table)
+	} else {
+		ei.Table.Schema = "public"
+		ei.Table.RLSEnabled = true
+		ei.Table.RLSForced = false
 	}
 
 	// Iterate over the fields of the struct
@@ -337,7 +345,6 @@ func bindTableMetadata(field *reflect.StructField, table *objects.Table) {
 	}
 }
 
-// TODO : implement mapping acl
 func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []objects.Policy) {
 	acl := raiden.UnmarshalAclTag(string(field.Tag))
 	defaultCheck, defaultDefinition := "true", "true"
