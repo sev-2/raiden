@@ -19,7 +19,7 @@ import (
 // [ ] delete  unused function
 func Import(flags *Flags, config *raiden.Config) error {
 	// load map native role
-	logger.Info("import : load configuration")
+	logger.Info("import : load native role")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		return err
 	}
 
-	logger.Info(`imports result - table : %v roles : %v policy : %v function : %v`, len(spResource.Tables), len(spResource.Roles), len(spResource.Policies), len(spResource.Functions))
+	logger.Infof(`imports result - table : %v roles : %v policy : %v function : %v`, len(spResource.Tables), len(spResource.Roles), len(spResource.Policies), len(spResource.Functions))
 	return nil
 }
 

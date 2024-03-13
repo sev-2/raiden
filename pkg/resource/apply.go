@@ -62,12 +62,14 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	var importState ResourceState
 
 	// load map native role
+	logger.Info("apply : load native role")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
 	}
 
 	// load app resource
+	logger.Info("apply : load resource from local state")
 	logger.Debug(strings.Repeat("=", 5), " Load app resource from state")
 	latestState, err := loadState()
 	if err != nil {
@@ -80,6 +82,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 		importState.State = *latestState
 	}
 
+	logger.Info("apply : extract table, role, and rpc from local state")
 	appTables, appRoles, appRpcFunctions, err := extractAppResource(flags, latestState)
 	if err != nil {
 		return err
@@ -91,17 +94,20 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	var validateTable []objects.Table
 	validateTable = append(validateTable, appTables.New.ToFlatTable()...)
 	validateTable = append(validateTable, appTables.Existing.ToFlatTable()...)
+	logger.Info("apply : validate local table relation")
 	if err := validateTableRelations(validateTable...); err != nil {
 		return err
 	}
 
 	// validate role in policies is exist
+	logger.Info("apply : validate local role")
 	if err := validateRoleIsExist(appPolicies, appRoles, mapNativeRole); err != nil {
 		return err
 	}
 
 	// load supabase resource
 	logger.Debug(strings.Repeat("=", 5), " Load supabase resource ")
+	logger.Info("apply : load table, role and rpc from supabase")
 	resource, err := Load(flags, config)
 	if err != nil {
 		return err
@@ -114,6 +120,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)
 
 	if flags.All() || flags.RolesOnly {
+		logger.Info("apply : compare role")
 		if err := bindMigratedRoles(appRoles, resource.Roles, &migrateResource); err != nil {
 			return err
 		}
@@ -136,6 +143,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	if flags.All() || flags.ModelsOnly {
+		logger.Info("apply : compare table")
 		// bind app table to resource
 		if err := bindMigratedTables(appTables, resource.Tables, &migrateResource); err != nil {
 			return err
@@ -187,6 +195,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	if flags.All() || flags.RpcOnly {
+		logger.Info("apply : compare rpc")
 		if err := bindMigratedFunctions(appRpcFunctions, resource.Functions, &migrateResource); err != nil {
 			return err
 		}
