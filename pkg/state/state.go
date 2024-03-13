@@ -141,6 +141,8 @@ func Load() (*State, error) {
 	}
 
 	if !utils.IsFileExists(filePath) {
+		// save empty sta
+		Save(&State{})
 		return nil, nil
 	}
 
