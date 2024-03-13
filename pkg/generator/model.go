@@ -117,9 +117,23 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", input.Table.Name, "go"))
 
 	// build relation tag
-	var relation []state.Relation
+
+	mapRelationName := make(map[string]bool)
+	relation := make([]state.Relation, 0)
+
 	for i := range input.Relations {
 		r := input.Relations[i]
+
+		if r.RelationType == raiden.RelationTypeManyToMany {
+			key := fmt.Sprintf("%s_%s", input.Table.Name, r.Table)
+			_, exist := mapRelationName[key]
+			if exist {
+				r.Table = fmt.Sprintf("%ss", r.Through)
+			} else {
+				mapRelationName[key] = true
+			}
+		}
+
 		r.Tag = buildJoinTag(&r)
 		relation = append(relation, r)
 	}

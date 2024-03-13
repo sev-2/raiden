@@ -98,8 +98,8 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 		}
 	}
 
-	if len(updateItem.ChangeRelationItems) > 0 {
-		errors := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships)
+	if len(updateItem.ChangeRelationItems) > 0 || updateItem.ForceCreateRelation {
+		errors := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships, updateItem.ForceCreateRelation)
 		if len(errors) > 0 {
 			var errMsg []string
 
@@ -261,25 +261,22 @@ func DeleteColumn(cfg *raiden.Config, column objects.Column) error {
 
 // ----- update relation -----
 
-func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, relations []objects.TablesRelationship) []error {
-	relationMap := make(map[string]*objects.TablesRelationship)
-	for i := range relations {
-		r := relations[i]
-		relationMap[r.ConstraintName] = &r
-	}
-
+func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, relations []objects.TablesRelationship, forceCreate bool) []error {
 	wg := sync.WaitGroup{}
 	errors := make([]error, 0)
 	errChan := make(chan error)
-	for _, i := range items {
 
-		switch i.Type {
-		case objects.UpdateRelationCreate:
-			rel, exist := relationMap[i.Data.ConstraintName]
-			if !exist {
-				continue
-			}
+	relationMap := make(map[string]*objects.TablesRelationship)
+	for i := range relations {
+		r := relations[i]
+		if r.ConstraintName == "" {
+			r.ConstraintName = getRelationConstrainName(r.SourceSchema, r.SourceTableName, r.SourceColumnName)
+		}
+		relationMap[r.ConstraintName] = &r
+	}
 
+	if forceCreate {
+		for _, r := range relationMap {
 			wg.Add(1)
 			go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
 				defer w.Done()
@@ -288,35 +285,54 @@ func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, rel
 					return
 				}
 				eChan <- nil
-			}(&wg, cfg, rel, errChan)
-		case objects.UpdateRelationUpdate:
-			rel, exist := relationMap[i.Data.ConstraintName]
-			if !exist {
-				continue
-			}
+			}(&wg, cfg, r, errChan)
+		}
+	} else {
+		for _, i := range items {
+			switch i.Type {
+			case objects.UpdateRelationCreate:
+				rel, exist := relationMap[i.Data.ConstraintName]
+				if !exist {
+					continue
+				}
 
-			wg.Add(1)
-			go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
-				defer w.Done()
-				if err := updateForeignKey(cfg, r); err != nil {
-					eChan <- err
-					return
+				wg.Add(1)
+				go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
+					defer w.Done()
+					if err := createForeignKey(cfg, r); err != nil {
+						eChan <- err
+						return
+					}
+					eChan <- nil
+				}(&wg, cfg, rel, errChan)
+			case objects.UpdateRelationUpdate:
+				rel, exist := relationMap[i.Data.ConstraintName]
+				if !exist {
+					continue
 				}
-				eChan <- nil
-			}(&wg, cfg, rel, errChan)
-		case objects.UpdateRelationDelete:
-			wg.Add(1)
-			go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
-				defer w.Done()
-				if err := deleteForeignKey(cfg, r); err != nil {
-					eChan <- err
-					return
-				}
-				eChan <- nil
-			}(&wg, cfg, &i.Data, errChan)
+
+				wg.Add(1)
+				go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
+					defer w.Done()
+					if err := updateForeignKey(cfg, r); err != nil {
+						eChan <- err
+						return
+					}
+					eChan <- nil
+				}(&wg, cfg, rel, errChan)
+			case objects.UpdateRelationDelete:
+				wg.Add(1)
+				go func(w *sync.WaitGroup, c *raiden.Config, r *objects.TablesRelationship, eChan chan error) {
+					defer w.Done()
+					if err := deleteForeignKey(cfg, r); err != nil {
+						eChan <- err
+						return
+					}
+					eChan <- nil
+				}(&wg, cfg, &i.Data, errChan)
+			}
 		}
 	}
-
 	go func() {
 		wg.Wait()
 		close(errChan)
@@ -377,4 +393,9 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
 	return nil
+}
+
+// get relation table name, base on struct type that defined in relation field
+func getRelationConstrainName(schema, table, foreignKey string) string {
+	return fmt.Sprintf("%s_%s_%s_fkey", schema, table, foreignKey)
 }

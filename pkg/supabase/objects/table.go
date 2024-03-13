@@ -113,4 +113,5 @@ type UpdateTableParam struct {
 	ChangeRelationItems []UpdateRelationItem
 	ChangeColumnItems   []UpdateColumnItem
 	ChangeItems         []UpdateTableType
+	ForceCreateRelation bool
 }

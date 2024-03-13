@@ -136,26 +136,6 @@ func buildCreateTableQuery(schema string, table objects.Table) (q string, err er
 		tableContains = append(tableContains, fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ",")))
 	}
 
-	// append relation
-	for _, rel := range table.Relationships {
-		if table.Name != rel.SourceTableName {
-			continue
-		}
-
-		if rel.ConstraintName == "" {
-			rel.ConstraintName = fmt.Sprintf("%s_%s_%s_fkey", rel.SourceSchema, rel.SourceTableName, rel.SourceColumnName)
-		}
-
-		fkString := fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s(%s)",
-			rel.ConstraintName,
-			rel.SourceColumnName,
-			rel.TargetTableSchema,
-			rel.TargetTableName,
-			rel.TargetColumnName,
-		)
-		tableContains = append(tableContains, fkString)
-	}
-
 	q = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s (%s);", schema, table.Name, strings.Join(tableContains, ","))
 	return
 }

@@ -1,12 +1,9 @@
 package resource
 
 import (
-	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
@@ -74,8 +71,6 @@ func MigrateResource(config *raiden.Config, importState *ResourceState, projectP
 	}
 
 	if len(resource.Tables) > 0 {
-		cuNode, dNode := BuiltTableTree(resource.Tables)
-
 		actions := MigrateActionFunc[objects.Table, objects.UpdateTableParam]{
 			CreateFunc: supabase.CreateTable, UpdateFunc: supabase.UpdateTable,
 			DeleteFunc: func(cfg *raiden.Config, param objects.Table) (err error) {
@@ -83,23 +78,51 @@ func MigrateResource(config *raiden.Config, importState *ResourceState, projectP
 			},
 		}
 
-		logger.Debug(strings.Repeat("=", 5), " Start Migrate Table")
-		// perform create and update
-		errors = MigrateTableTree(config, stateChan, actions, cuNode)
+		var updateTableRelation []MigrateItem[objects.Table, objects.UpdateTableParam]
+		for i := range resource.Tables {
+			t := resource.Tables[i]
+			if len(t.NewData.Relationships) > 0 {
+				if t.Type == MigrateTypeCreate {
+					updateTableRelation = append(updateTableRelation, MigrateItem[objects.Table, objects.UpdateTableParam]{
+						Type:    MigrateTypeUpdate,
+						NewData: t.NewData,
+						MigrationItems: objects.UpdateTableParam{
+							OldData:             t.NewData,
+							ChangeRelationItems: t.MigrationItems.ChangeRelationItems,
+							ForceCreateRelation: true,
+						},
+					})
+					resource.Tables[i].MigrationItems.ChangeRelationItems = make([]objects.UpdateRelationItem, 0)
+				} else {
+					updateTableRelation = append(updateTableRelation, MigrateItem[objects.Table, objects.UpdateTableParam]{
+						Type:    t.Type,
+						NewData: t.NewData,
+						OldData: t.OldData,
+						MigrationItems: objects.UpdateTableParam{
+							OldData:             t.NewData,
+							ChangeRelationItems: t.MigrationItems.ChangeRelationItems,
+						},
+					})
+					resource.Tables[i].MigrationItems.ChangeRelationItems = make([]objects.UpdateRelationItem, 0)
+				}
+			}
+		}
+
+		// run migrate for table manipulation
+		errors = runMigrateResource(config, resource.Tables, stateChan, actions, migrateProcess)
 		if len(errors) > 0 {
 			close(stateChan)
 			return errors
 		}
 
-		if dNode != nil {
-			// perform delete table
-			errors = MigrateTableTree(config, stateChan, actions, dNode)
+		// run migrate for relation manipulation
+		if len(updateTableRelation) > 0 {
+			errors = runMigrateResource(config, updateTableRelation, stateChan, actions, migrateProcess)
 			if len(errors) > 0 {
 				close(stateChan)
 				return errors
 			}
 		}
-		logger.Debug(strings.Repeat("=", 5))
 	}
 
 	if len(resource.Rpc) > 0 {
@@ -306,119 +329,4 @@ func migrateProcess[T, D any](params MigrateFuncParam[T, D]) error {
 	default:
 		return nil
 	}
-}
-
-func MigrateTableTree(cfg *raiden.Config, stateChan chan any, actions MigrateActionFunc[objects.Table, objects.UpdateTableParam], node *MigrateTableNode) []error {
-	errors := runMigrateResource(cfg, node.MigratedItems, stateChan, actions, migrateProcess)
-	if len(errors) > 0 {
-		return errors
-	}
-
-	if node.Child == nil {
-		return errors
-	}
-
-	return MigrateTableTree(cfg, stateChan, actions, node.Child)
-}
-
-// split table base on relation tree and grouping table by level
-//
-// smallest level is indicate table collection is doesn`t have any relation to other table (master table)
-//
-// the next level is a table that has a relationship with the table at the previous level
-func BuiltTableTree(tables []MigrateItem[objects.Table, objects.UpdateTableParam]) (createAndUpdateNode *MigrateTableNode, deletedNode *MigrateTableNode) {
-	logger.Debug(strings.Repeat("=", 5), " BuiltTableTree")
-	mapTables := make(map[string]MigrateItem[objects.Table, objects.UpdateTableParam])
-	for i := range tables {
-		t := tables[i]
-
-		if t.Type == MigrateTypeDelete {
-			if deletedNode == nil {
-				deletedNode = &MigrateTableNode{
-					Level: 1,
-				}
-			}
-			deletedNode.MigratedItems = append(deletedNode.MigratedItems, t)
-			continue
-		}
-
-		mapTables[t.NewData.Name] = t
-	}
-
-	scannedTable := make(map[string]bool)
-
-	createAndUpdateNode = buildTableTree(mapTables, scannedTable, &MigrateTableNode{}, 1)
-	logger.Debug(strings.Repeat("=", 5))
-	return
-}
-
-func buildTableTree(mapTable map[string]MigrateItem[objects.Table, objects.UpdateTableParam], scannedTable map[string]bool, node *MigrateTableNode, level int) (nextNode *MigrateTableNode) {
-	scannedNodeTable := make(map[string]bool)
-
-	node.Level = level
-	if level == 1 {
-		for k, t := range mapTable {
-			isMasterTable := true
-
-			// check is master table and add to node members
-			if len(t.NewData.Relationships) >= 0 {
-				for i := range t.NewData.Relationships {
-					r := t.NewData.Relationships[i]
-					if r.SourceTableName == t.NewData.Name {
-						isMasterTable = false
-						break
-					}
-				}
-			}
-
-			if !isMasterTable {
-				continue
-			}
-
-			node.MigratedItems = append(node.MigratedItems, t)
-			key := fmt.Sprintf("%s.%s", t.NewData.Schema, t.NewData.Name)
-			scannedNodeTable[key] = true
-			delete(mapTable, k)
-		}
-	} else {
-		for k, t := range mapTable {
-			// check if all depend table is scanned and add to node members
-			isAllDependTableScanned := true
-			for i := range t.NewData.Relationships {
-				r := t.NewData.Relationships[i]
-				if r.SourceTableName != t.NewData.Name {
-					continue
-				}
-
-				key := fmt.Sprintf("%s.%s", r.TargetTableSchema, r.TargetTableName)
-				_, isExist := scannedTable[key]
-				if !isExist {
-					isAllDependTableScanned = false
-					break
-				}
-			}
-
-			if !isAllDependTableScanned {
-				continue
-			}
-
-			node.MigratedItems = append(node.MigratedItems, t)
-			key := fmt.Sprintf("%s.%s", t.NewData.Schema, t.NewData.Name)
-			scannedNodeTable[key] = true
-			delete(mapTable, k)
-		}
-	}
-
-	if len(scannedNodeTable) > 0 {
-		for k, v := range scannedNodeTable {
-			scannedTable[k] = v
-		}
-	}
-
-	if len(mapTable) > 0 {
-		child := &MigrateTableNode{}
-		node.Child = buildTableTree(mapTable, scannedTable, child, level+1)
-	}
-
-	return node
 }
