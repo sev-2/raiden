@@ -267,11 +267,14 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	filePath := filepath.Join(routePath, RouterFilename)
 
 	// set imports path
-	routeImportPath := fmt.Sprintf("%s/internal/controllers", utils.ToGoModuleName(projectName))
+
 	imports := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
-		fmt.Sprintf("%q", routeImportPath),
-		fmt.Sprintf("%q", "github.com/valyala/fasthttp"),
+	}
+
+	if len(routes) > 0 {
+		routeImportPath := fmt.Sprintf("%s/internal/controllers", utils.ToGoModuleName(projectName))
+		imports = append(imports, fmt.Sprintf("%q", routeImportPath), fmt.Sprintf("%q", "github.com/valyala/fasthttp"))
 	}
 
 	// set passed parameter
