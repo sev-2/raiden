@@ -112,8 +112,9 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 				ct := raiden.UnmarshalColumnTag(column)
 
 				c := objects.Column{
-					Table:  ei.Table.Name,
-					Schema: ei.Table.Schema,
+					Table:    ei.Table.Name,
+					Schema:   ei.Table.Schema,
+					IsUnique: false,
 				}
 
 				bindColumn(&field, &ct, &c)
@@ -218,6 +219,7 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err 
 			// example tag "name:id;type:bigint;primaryKey;autoIncrement;nullable:false"
 			if columnTag := field.Tag.Get("column"); len(columnTag) > 0 {
 				var c objects.Column
+				c.IsUnique = false
 
 				ct := raiden.UnmarshalColumnTag(columnTag)
 				if found, exist := mapColumn[ct.Name]; exist {
