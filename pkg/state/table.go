@@ -126,6 +126,9 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 						TableName: c.Table,
 						Schema:    c.Schema,
 					})
+
+					// set is unique to false if is primary key
+					c.IsUnique = false
 				}
 			}
 
@@ -244,6 +247,7 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err 
 							TableName: ei.Table.Name,
 						})
 					}
+					c.IsUnique = false
 				}
 
 				columns = append(columns, c)
