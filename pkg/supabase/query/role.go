@@ -41,17 +41,17 @@ func BuildCreateRoleQuery(role objects.Role) string {
 	}
 	createRolClauses = append(createRolClauses, inheritRoleClause)
 
-	isSuperuserClause := "NOSUPERUSER"
-	if role.IsSuperuser {
-		isSuperuserClause = "SUPERUSER"
-	}
-	createRolClauses = append(createRolClauses, isSuperuserClause)
+	// isSuperuserClause := "NOSUPERUSER"
+	// if role.IsSuperuser {
+	// 	isSuperuserClause = "SUPERUSER"
+	// }
+	// createRolClauses = append(createRolClauses, isSuperuserClause)
 
-	isReplicationRoleClause := "NOREPLICATION"
-	if role.IsReplicationRole {
-		isReplicationRoleClause = "REPLICATION"
-	}
-	createRolClauses = append(createRolClauses, isReplicationRoleClause)
+	// isReplicationRoleClause := "NOREPLICATION"
+	// if role.IsReplicationRole {
+	// 	isReplicationRoleClause = "REPLICATION"
+	// }
+	// createRolClauses = append(createRolClauses, isReplicationRoleClause)
 
 	connectionLimitClause := fmt.Sprintf("CONNECTION LIMIT %d", role.ConnectionLimit)
 	createRolClauses = append(createRolClauses, connectionLimitClause)
@@ -81,13 +81,13 @@ func BuildCreateRoleQuery(role objects.Role) string {
 	BEGIN;
 	do $$
 	BEGIN
-		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'vote_manager') THEN
+		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%s') THEN
 			CREATE ROLE %s WITH %s;
 		END IF;
 	END $$;
 	%s
 	COMMIT;`,
-		role.Name, strings.Join(createRolClauses, "\n"),
+		role.Name, role.Name, strings.Join(createRolClauses, "\n"),
 		configClause,
 	)
 }
