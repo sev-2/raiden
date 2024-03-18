@@ -57,6 +57,7 @@ func BuildCreatePolicyQuery(policy objects.Policy) string {
 
 func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.UpdatePolicyParam) string {
 	alter := fmt.Sprintf("ALTER POLICY %q ON %s.%s", updatePolicyParams.Name, policy.Schema, policy.Table)
+	grantAccessTables := []string{}
 
 	var nameSql, definitionSql, checkSql, rolesSql string
 	for _, ut := range updatePolicyParams.ChangeItems {
@@ -79,10 +80,18 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 			if len(policy.Roles) > 0 {
 				rolesSql = fmt.Sprintf("%s TO %s;", alter, strings.Join(policy.Roles, ","))
 			}
+
+			for _, role := range policy.Roles {
+				grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
+					IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
+						GRANT %s ON %s TO %s;
+					END IF;
+				`, role, policy.Table, policy.Command, policy.Command, policy.Table, role))
+			}
 		}
 	}
 
-	return fmt.Sprintf("BEGIN; %s %s %s %s COMMIT;", definitionSql, checkSql, rolesSql, nameSql)
+	return fmt.Sprintf("BEGIN; %s %s %s %s %s COMMIT;", definitionSql, checkSql, rolesSql, nameSql, strings.Join(grantAccessTables, "\n"))
 }
 
 func BuildDeletePolicyQuery(policy objects.Policy) string {
