@@ -91,7 +91,7 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 		}
 	}
 
-	return fmt.Sprintf("BEGIN; %s %s %s %s %s COMMIT;", definitionSql, checkSql, rolesSql, nameSql, strings.Join(grantAccessTables, "\n"))
+	return fmt.Sprintf("DO $$ BEGIN %s %s %s %s %s END $$;", definitionSql, checkSql, rolesSql, nameSql, strings.Join(grantAccessTables, "\n"))
 }
 
 func BuildDeletePolicyQuery(policy objects.Policy) string {
