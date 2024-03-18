@@ -291,7 +291,25 @@ func bindMigratedTables(etr state.ExtractTableResult, spTables []objects.Table, 
 }
 
 func bindMigratedRoles(er state.ExtractRoleResult, spRoles []objects.Role, mr *MigrateData) error {
-	if rs, err := runApplyCompareRoles(spRoles, er.Existing); err != nil {
+	// compare and bind existing table to migrate data
+	mapSpRole := make(map[int]bool)
+	for i := range spRoles {
+		t := spRoles[i]
+		mapSpRole[t.ID] = true
+	}
+
+	// filter existing table need compare or move to create new
+	var compareRoles []objects.Role
+	for i := range er.Existing {
+		et := er.Existing[i]
+		if _, isExist := mapSpRole[et.ID]; isExist {
+			compareRoles = append(compareRoles, et)
+		} else {
+			er.New = append(er.New, et)
+		}
+	}
+
+	if rs, err := runApplyCompareRoles(spRoles, compareRoles); err != nil {
 		return err
 	} else {
 		mr.Roles = append(mr.Roles, rs...)

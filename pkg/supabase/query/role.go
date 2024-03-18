@@ -86,9 +86,10 @@ func BuildCreateRoleQuery(role objects.Role) string {
 		END IF;
 	END $$;
 	%s
+	GRANT %s TO authenticator;
 	COMMIT;`,
 		role.Name, role.Name, strings.Join(createRolClauses, "\n"),
-		configClause,
+		configClause, role.Name,
 	)
 }
 

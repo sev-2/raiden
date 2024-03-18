@@ -21,19 +21,38 @@ func BuildCreatePolicyQuery(policy objects.Policy) string {
 	}
 
 	roleList := ""
+	grantAccessTables := []string{}
 	for i, role := range policy.Roles {
 		if i > 0 {
 			roleList += ", "
 		}
 		roleList += pq.QuoteIdentifier(role)
+
+		grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
+			IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
+				GRANT %s ON %s TO %s;
+			END IF;
+		`, role, policy.Table, policy.Command, policy.Command, policy.Table, role))
 	}
 
-	return fmt.Sprintf(`
+	createQuery := fmt.Sprintf(`
 	CREATE POLICY %s ON %s.%s
 	AS %s
 	FOR %s
 	TO %s
-	%s %s;`, name, policy.Schema, policy.Table, policy.Action, policy.Command, roleList, definitionClause, checkClause)
+	%s %s;
+	`, name, policy.Schema, policy.Table, policy.Action, policy.Command, roleList, definitionClause, checkClause)
+
+	grantAccessQuery := ""
+	grantAccessQuery = fmt.Sprintf(`
+		DO $$
+		BEGIN
+			%s
+			%s
+		END $$;
+	`, createQuery, strings.Join(grantAccessTables, "\n"))
+
+	return grantAccessQuery
 }
 
 func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.UpdatePolicyParam) string {
@@ -67,5 +86,22 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 }
 
 func BuildDeletePolicyQuery(policy objects.Policy) string {
-	return fmt.Sprintf("DROP POLICY %q ON %s.%s;", policy.Name, policy.Schema, policy.Table)
+	revokeAccessTables := []string{}
+	for _, role := range policy.Roles {
+		revokeAccessTables = append(revokeAccessTables, fmt.Sprintf(`
+			IF HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
+				REVOKE %s ON %s TO %s;
+			END IF;
+		`, role, policy.Table, policy.Command, policy.Command, policy.Table, role))
+	}
+
+	revokeAccessQuery := fmt.Sprintf(`
+	DO $$
+	BEGIN
+		DROP POLICY %q ON %s.%s;
+		%s
+	END $$;
+	`, policy.Name, policy.Schema, policy.Table, strings.Join(revokeAccessTables, "\n"))
+
+	return revokeAccessQuery
 }
