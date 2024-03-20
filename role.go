@@ -4,6 +4,7 @@ import (
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
+// TODO : support organizational unit roles
 type (
 	Role interface {
 		// name

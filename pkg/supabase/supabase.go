@@ -1,9 +1,12 @@
 package supabase
 
 import (
+	"errors"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud"
+	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/admin"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/local/meta"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
@@ -159,4 +162,13 @@ func DeleteFunction(cfg *raiden.Config, fn objects.Function) (err error) {
 	}
 	logger.Debugf("Delete function %s in supabase pg-meta", fn.Name)
 	return meta.DeleteFunction(cfg, fn)
+}
+
+func AdminUpdateUserData(cfg *raiden.Config, userId string, data objects.User) (objects.User, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		logger.Debugf("Update user data with id %s in supabase cloud for project id : %s", userId, cfg.ProjectId)
+		return admin.UpdateUser(cfg, userId, data)
+	}
+	logger.Debugf("Update user data with id %s in self hosted", userId)
+	return objects.User{}, errors.New("update user data in self hosted in not implemented, stay update :)")
 }
