@@ -3,6 +3,7 @@ package raiden
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/sev-2/raiden/pkg/utils"
@@ -98,6 +99,12 @@ func (r *router) BuildHandler() {
 		case RouteTypeRest, RouteTypeRealtime, RouteTypeStorage:
 			Panicf("register route type %v is not implemented, wait for update :) ", route.Type)
 		}
+	}
+
+	// Proxy auth url
+	u, err := url.Parse(r.config.SupabasePublicUrl)
+	if err == nil {
+		r.engine.ANY("/auth/v1/{path:*}", ProxyHandler(u, "/auth/v1", nil, nil))
 	}
 }
 

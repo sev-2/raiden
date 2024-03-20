@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/valyala/fasthttp"
@@ -273,15 +274,30 @@ func (c *HealthController) Get(ctx Context) error {
 
 func ProxyHandler(
 	targetURL *url.URL,
+	basePath string,
 	requestInterceptor func(req *fasthttp.Request),
 	responseInterceptor func(resp *fasthttp.Response) error,
 ) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		req, res := &ctx.Request, &ctx.Response
+		// Create a new request object
+		req := fasthttp.AcquireRequest()
+		defer fasthttp.ReleaseRequest(req)
 
-		req.SetRequestURI(targetURL.String())
-		req.URI().SetScheme(targetURL.Scheme)
-		req.URI().SetHost(targetURL.Host)
+		// Copy the original request to the new request object
+		ctx.Request.CopyTo(req)
+
+		paths := strings.Split(req.URI().String(), basePath)
+		if len(paths) < 2 {
+			ctx.Request.Header.SetContentType("application/json")
+			ctx.SetBodyString("{ \"message\" : \"invalid path\"}")
+			return
+		}
+
+		proxyUrl := fmt.Sprintf("%s%s%s", targetURL.String(), basePath, paths[1])
+		req.SetRequestURI(proxyUrl)
+
+		resp := fasthttp.AcquireResponse()
+		defer fasthttp.ReleaseResponse(resp)
 
 		logger.Infof("Proxying to : %s %s\n", req.Header.Method(), req.URI().FullURI())
 
@@ -289,16 +305,23 @@ func ProxyHandler(
 			requestInterceptor(req)
 		}
 
-		if err := fasthttp.Do(req, res); err != nil {
+		if err := fasthttp.Do(req, resp); err != nil {
 			logger.Error(err)
 			return
 		}
 
 		if responseInterceptor != nil {
-			if err := responseInterceptor(res); err != nil {
+			if err := responseInterceptor(resp); err != nil {
 				logger.Error(err)
 				return
 			}
 		}
+		// Copy the response headers and body back to the original request context
+		resp.Header.VisitAll(func(k, v []byte) {
+			ctx.Response.Header.SetBytesKV(k, v)
+		})
+
+		ctx.Response.SetStatusCode(resp.StatusCode())
+		ctx.Response.SetBody(resp.Body())
 	}
 }
