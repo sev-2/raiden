@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel"
@@ -24,6 +26,7 @@ type (
 		Methods    []string
 		Path       string
 		Controller Controller
+		Model      any
 	}
 )
 
@@ -96,7 +99,12 @@ func (r *router) BuildHandler() {
 			r.registerHandler(route)
 		case RouteTypeCustom:
 			r.registerHttpHandler(route)
-		case RouteTypeRest, RouteTypeRealtime, RouteTypeStorage:
+		case RouteTypeRest:
+			if route.Model == nil {
+				logger.Errorf("[Build Route] invalid route %s, model must be define", route.Path)
+			}
+			r.registerRestHandler(route)
+		case RouteTypeRealtime, RouteTypeStorage:
 			Panicf("register route type %v is not implemented, wait for update :) ", route.Type)
 		}
 	}
@@ -133,7 +141,7 @@ func (r *router) findRouteGroup(routeType RouteType) *fs_router.Group {
 
 func (r *router) bindRouteGroup(group *fs_router.Group, chain Chain, route *Route) {
 	for _, m := range route.Methods {
-		handler := chain.Then(m, route.Controller)
+		handler := chain.Then(m, route.Type, route.Controller)
 		switch strings.ToUpper(m) {
 		case fasthttp.MethodGet:
 			group.GET(route.Path, buildHandler(r.config, r.tracer, handler))
@@ -155,7 +163,7 @@ func (r *router) bindRouteGroup(group *fs_router.Group, chain Chain, route *Rout
 
 func (r *router) bindRoute(chain Chain, route *Route) {
 	for _, m := range route.Methods {
-		handler := chain.Then(m, route.Controller)
+		handler := chain.Then(m, route.Type, route.Controller)
 		switch strings.ToUpper(m) {
 		case fasthttp.MethodGet:
 			r.engine.GET(route.Path, buildHandler(r.config, r.tracer, handler))
@@ -194,6 +202,34 @@ func (r *router) registerHttpHandler(route *Route) {
 	}
 
 	r.bindRoute(chain, route)
+}
+
+func (r *router) registerRestHandler(route *Route) {
+	chain := NewChain()
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
+
+		rt := reflect.TypeOf(route.Model)
+		if rt.Kind() == reflect.Ptr {
+			rt = rt.Elem()
+		}
+
+		modelName := rt.Name()
+
+		restController := RestController{
+			Controller: route.Controller,
+			ModelName:  modelName,
+		}
+
+		group.GET(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+	}
 }
 
 func (r *router) GetHandler() fasthttp.RequestHandler {
@@ -246,12 +282,15 @@ func buildHandler(config *Config, tracer trace.Tracer, handler RouteHandlerFn) f
 
 // The `createHandleFunc` function creates a route handler function that handles different HTTP methods
 // by calling corresponding methods on a controller object.
-func createHandleFunc(httpMethod string, c Controller) RouteHandlerFn {
+func createHandleFunc(httpMethod string, routeType RouteType, c Controller) RouteHandlerFn {
 	return func(ctx Context) error {
+
 		// marshall and validate http request data
 		// will return error if `Payload` field is not define in controller
-		if err := MarshallAndValidate(ctx.RequestContext(), c); err != nil {
-			return err
+		if routeType != RouteTypeRest {
+			if err := MarshallAndValidate(ctx.RequestContext(), c); err != nil {
+				return err
+			}
 		}
 
 		if err := c.BeforeAll(ctx); err != nil {

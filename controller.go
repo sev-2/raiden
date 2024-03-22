@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -152,6 +153,161 @@ func (*ControllerBase) AfterHead(ctx Context) error {
 	return nil
 }
 
+// ----- Rest Controller -----
+type RestController struct {
+	Controller
+	ModelName string
+}
+
+// AfterAll implements Controller.
+// Subtle: this method shadows the method (Controller).AfterAll of RestController.Controller.
+func (rc RestController) AfterAll(ctx Context) error {
+	return rc.Controller.AfterAll(ctx)
+}
+
+// AfterDelete implements Controller.
+// Subtle: this method shadows the method (Controller).AfterDelete of RestController.Controller.
+func (rc RestController) AfterDelete(ctx Context) error {
+	return rc.Controller.AfterDelete(ctx)
+}
+
+// AfterGet implements Controller.
+// Subtle: this method shadows the method (Controller).AfterGet of RestController.Controller.
+func (rc RestController) AfterGet(ctx Context) error {
+	return rc.Controller.AfterGet(ctx)
+}
+
+// AfterHead implements Controller.
+// Subtle: this method shadows the method (Controller).AfterHead of RestController.Controller.
+func (rc RestController) AfterHead(ctx Context) error {
+	return rc.Controller.AfterHead(ctx)
+}
+
+// AfterOptions implements Controller.
+// Subtle: this method shadows the method (Controller).AfterOptions of RestController.Controller.
+func (rc RestController) AfterOptions(ctx Context) error {
+	return rc.Controller.AfterOptions(ctx)
+}
+
+// AfterPatch implements Controller.
+// Subtle: this method shadows the method (Controller).AfterPatch of RestController.Controller.
+func (rc RestController) AfterPatch(ctx Context) error {
+	return rc.Controller.AfterPatch(ctx)
+}
+
+// AfterPost implements Controller.
+// Subtle: this method shadows the method (Controller).AfterPost of RestController.Controller.
+func (rc RestController) AfterPost(ctx Context) error {
+	return rc.Controller.AfterPost(ctx)
+}
+
+// AfterPut implements Controller.
+// Subtle: this method shadows the method (Controller).AfterPut of RestController.Controller.
+func (rc RestController) AfterPut(ctx Context) error {
+	return rc.Controller.AfterPut(ctx)
+}
+
+// BeforeAll implements Controller.
+func (rc RestController) BeforeAll(ctx Context) error {
+	// Implement validation
+	queryParam := ctx.RequestContext().QueryArgs().String()
+	decodedStr, err := url.QueryUnescape(queryParam)
+	if err != nil {
+		return ctx.SendError(err.Error())
+	}
+
+	countAsterisk := countCharOccurrences(decodedStr, "*")
+	if countAsterisk > 4 {
+		return ctx.SendErrorWithCode(400, errors.New("asterisk usage exceeds the maximum limit, use a maximum of 4 asterisks for better performance, if you need a complex query use rpc"))
+	}
+
+	countBracket := countBracketPairs(decodedStr)
+	if countBracket > 5 {
+		return ctx.SendErrorWithCode(400, errors.New("table usage exceeds the maximum limit, use a maximum of 5 table for better performance, if you need a complex query use rpc"))
+	}
+
+	return rc.Controller.BeforeAll(ctx)
+}
+
+// BeforeDelete implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeDelete of RestController.Controller.
+func (rc RestController) BeforeDelete(ctx Context) error {
+	return rc.Controller.BeforeDelete(ctx)
+}
+
+// BeforeGet implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeGet of RestController.Controller.
+func (rc RestController) BeforeGet(ctx Context) error {
+	return rc.Controller.BeforeGet(ctx)
+}
+
+// BeforeHead implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeHead of RestController.Controller.
+func (rc RestController) BeforeHead(ctx Context) error {
+	return rc.Controller.BeforeHead(ctx)
+}
+
+// BeforeOptions implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeOptions of RestController.Controller.
+func (rc RestController) BeforeOptions(ctx Context) error {
+	return rc.Controller.BeforeOptions(ctx)
+}
+
+// BeforePatch implements Controller.
+// Subtle: this method shadows the method (Controller).BeforePatch of RestController.Controller.
+func (rc RestController) BeforePatch(ctx Context) error {
+	return rc.Controller.BeforePatch(ctx)
+}
+
+// BeforePost implements Controller.
+// Subtle: this method shadows the method (Controller).BeforePost of RestController.Controller.
+func (rc RestController) BeforePost(ctx Context) error {
+	return rc.Controller.BeforePost(ctx)
+}
+
+// BeforePut implements Controller.
+// Subtle: this method shadows the method (Controller).BeforePut of RestController.Controller.
+func (rc RestController) BeforePut(ctx Context) error {
+	return rc.Controller.BeforePut(ctx)
+}
+
+// Delete implements Controller.
+func (rc RestController) Delete(ctx Context) error {
+	return RestProxy(ctx, rc.ModelName)
+}
+
+// Get implements Controller.
+func (rc RestController) Get(ctx Context) error {
+	return RestProxy(ctx, rc.ModelName)
+}
+
+// Head implements Controller.
+// Subtle: this method shadows the method (Controller).Head of RestController.Controller.
+func (rc RestController) Head(ctx Context) error {
+	return rc.Controller.Head(ctx)
+}
+
+// Options implements Controller.
+// Subtle: this method shadows the method (Controller).Options of RestController.Controller.
+func (rc RestController) Options(ctx Context) error {
+	return rc.Controller.Options(ctx)
+}
+
+// Patch implements Controller.
+func (rc RestController) Patch(ctx Context) error {
+	return RestProxy(ctx, rc.ModelName)
+}
+
+// Post implements Controller.
+func (rc RestController) Post(ctx Context) error {
+	return RestProxy(ctx, rc.ModelName)
+}
+
+// Put implements Controller.
+func (rc RestController) Put(ctx Context) error {
+	return RestProxy(ctx, rc.ModelName)
+}
+
 // ----- Helper Functionality -----
 
 // Marshall request data (path param, query and body data) to Payload data in
@@ -272,6 +428,42 @@ func (c *HealthController) Get(ctx Context) error {
 	return ctx.SendJson(responseData)
 }
 
+// RestHandler
+func RestProxy(appCtx Context, modelName string) error {
+	// Create a new request object
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	// Copy the original request to the new request object
+	appCtx.RequestContext().Request.CopyTo(req)
+
+	proxyUrl := fmt.Sprintf("%s/rest/v1/%s", appCtx.Config().SupabasePublicUrl, strings.ToLower(modelName))
+	queryParam := appCtx.RequestContext().Request.URI().QueryString()
+	if len(queryParam) > 0 {
+		proxyUrl = fmt.Sprintf("%s?%s", proxyUrl, queryParam)
+	}
+
+	req.SetRequestURI(proxyUrl)
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	Infof("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
+	if err := fasthttp.Do(req, resp); err != nil {
+		return err
+	}
+
+	resp.Header.VisitAll(func(k, v []byte) {
+		appCtx.RequestContext().Response.Header.SetBytesKV(k, v)
+	})
+
+	appCtx.RequestContext().Response.SetStatusCode(resp.StatusCode())
+	appCtx.RequestContext().Response.SetBody(resp.Body())
+
+	return nil
+}
+
+// Default Proxy Handler
 func ProxyHandler(
 	targetURL *url.URL,
 	basePath string,
@@ -299,7 +491,7 @@ func ProxyHandler(
 		resp := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(resp)
 
-		logger.Infof("Proxying to : %s %s\n", req.Header.Method(), req.URI().FullURI())
+		Infof("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
 
 		if requestInterceptor != nil {
 			requestInterceptor(req)
@@ -307,12 +499,18 @@ func ProxyHandler(
 
 		if err := fasthttp.Do(req, resp); err != nil {
 			logger.Error(err)
+			ctx.Response.SetStatusCode(fasthttp.StatusInternalServerError)
+			errResponse := fmt.Sprintf("{ \"messages\": %q}", err)
+			ctx.Response.SetBodyString(errResponse)
 			return
 		}
 
 		if responseInterceptor != nil {
 			if err := responseInterceptor(resp); err != nil {
 				logger.Error(err)
+				ctx.Response.SetStatusCode(fasthttp.StatusInternalServerError)
+				errResponse := fmt.Sprintf("{ \"messages\": %q}", err)
+				ctx.Response.SetBodyString(errResponse)
 				return
 			}
 		}
@@ -324,4 +522,28 @@ func ProxyHandler(
 		ctx.Response.SetStatusCode(resp.StatusCode())
 		ctx.Response.SetBody(resp.Body())
 	}
+}
+
+func countCharOccurrences(str string, char string) int {
+	re := regexp.MustCompile(regexp.QuoteMeta(char))
+	return len(re.FindAllStringIndex(str, -1))
+}
+
+func countBracketPairs(str string) int {
+	stack := 0
+	count := 0
+	for _, char := range str {
+		if char == '(' {
+			stack++
+			if stack == 2 {
+				count++
+			}
+		} else if char == ')' {
+			stack--
+			if stack == 0 {
+				count++
+			}
+		}
+	}
+	return count
 }

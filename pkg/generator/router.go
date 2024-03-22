@@ -23,6 +23,7 @@ type (
 		Path       string
 		Methods    string
 		Controller string
+		Model      string
 	}
 
 	GenerateRouterData struct {
@@ -36,6 +37,7 @@ type (
 		Name    string
 		Tag     string
 		Methods []string
+		Model   string
 	}
 )
 
@@ -57,8 +59,9 @@ func RegisterRoute(server *raiden.Server) {
 		{
 			Type:       {{ .Type }},
 			Path:       {{ .Path }},
-			Methods:    {{ .Methods }},
+			{{if gt (len .Methods) 0}}Methods:    {{ .Methods }},{{end}}
 			Controller: &{{ .Controller }},
+			{{if ne .Model "" }}Model:    {{ .Model }},{{end}}
 		},
 		{{- end}}
 	})
@@ -137,19 +140,48 @@ func getRoutes(filePath string) (r []GenerateRouteItem, err error) {
 			if t.Name != nil && t.Type != nil {
 				// Check if it's a struct
 				if st, ok := t.Type.(*ast.StructType); ok {
-					// Check if it has the Http attribute
+					foundRoute := &FoundRoute{}
+					if fr, exist := foundRouteMap[t.Name.Name]; exist {
+						foundRoute = fr
+					}
+
+					// Check if it has the Http / Model attribute
+					foundField := false
 					for _, field := range st.Fields.List {
 						for _, fName := range field.Names {
+
 							if fName != nil && fName.Name == "Http" && field.Tag != nil {
 								tag := strings.Trim(field.Tag.Value, "`")
-								foundRoute := &FoundRoute{
-									Name: t.Name.Name,
-									Tag:  tag,
-								}
+								foundRoute.Name = t.Name.Name
+								foundRoute.Tag = tag
+
 								foundRouteMap[t.Name.Name] = foundRoute
-								return false // Stop the traversal
+								foundField = true
+								continue
+							}
+
+							if fName != nil && fName.Name == "Model" {
+								switch fType := field.Type.(type) {
+								case *ast.StarExpr:
+									if se, ok := fType.X.(*ast.SelectorExpr); ok {
+										foundRoute.Model = fmt.Sprintf("%s.%s{}", se.X, se.Sel.Name)
+									}
+								case *ast.SelectorExpr:
+									foundRoute.Model = fmt.Sprintf("%s.%s{}", fType.X, fType.Sel.Name)
+								case *ast.Ident:
+									foundRoute.Model = fmt.Sprintf("%s{}", fType.Name)
+								}
+
+								foundRouteMap[t.Name.Name] = foundRoute
+								foundField = true
+								continue
 							}
 						}
+					}
+
+					// stop walk
+					if foundField {
+						return foundField
 					}
 				}
 			}
@@ -208,13 +240,10 @@ func getRoutes(filePath string) (r []GenerateRouteItem, err error) {
 func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
 	var r GenerateRouteItem
 
-	if len(foundRoute.Methods) == 0 {
-		return r, fmt.Errorf("controller %s, required to set method handler. available method Get, Post, Put, Patch, Delete, and Option", foundRoute.Name)
-	}
-
 	r.Controller = fmt.Sprintf("%s.%s{}", foundRoute.Package, foundRoute.Name)
-	tagItems := strings.Split(foundRoute.Tag, " ")
+	r.Model = foundRoute.Model
 
+	tagItems := strings.Split(foundRoute.Tag, " ")
 	r.Methods = generateArrayDeclaration(reflect.ValueOf(foundRoute.Methods), true)
 
 	for _, tagItem := range tagItems {
@@ -228,6 +257,14 @@ func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
 		case "path":
 			r.Path = fmt.Sprintf("%q", trimmedItem)
 		case "type":
+			if len(foundRoute.Methods) == 0 && trimmedItem != string(raiden.RouteTypeRest) {
+				return r, fmt.Errorf("controller %s, required to set method handler. available method Get, Post, Put, Patch, Delete, and Option", foundRoute.Name)
+			}
+
+			if trimmedItem == string(raiden.RouteTypeRest) && r.Model == "" {
+				return r, fmt.Errorf("controller %s, required to set model because have rest type", foundRoute.Name)
+			}
+
 			switch trimmedItem {
 			case string(raiden.RouteTypeFunction):
 				r.Type = "raiden.RouteTypeFunction"
@@ -267,7 +304,6 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	filePath := filepath.Join(routePath, RouterFilename)
 
 	// set imports path
-
 	imports := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
 	}
@@ -275,6 +311,21 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	if len(routes) > 0 {
 		routeImportPath := fmt.Sprintf("%s/internal/controllers", utils.ToGoModuleName(projectName))
 		imports = append(imports, fmt.Sprintf("%q", routeImportPath), fmt.Sprintf("%q", "github.com/valyala/fasthttp"))
+	}
+
+	isHaveRpc := false
+	for i := range routes {
+		r := routes[i]
+
+		if r.Model != "" {
+			isHaveRpc = true
+			break
+		}
+	}
+
+	if isHaveRpc {
+		modelImportPath := fmt.Sprintf("%s/internal/models", utils.ToGoModuleName(projectName))
+		imports = append(imports, fmt.Sprintf("%q", modelImportPath))
 	}
 
 	// set passed parameter

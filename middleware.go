@@ -17,7 +17,7 @@ type (
 	Chain interface {
 		Append(middlewares ...MiddlewareFn) Chain
 		Prepend(middlewares ...MiddlewareFn) Chain
-		Then(httpMethod string, fn Controller) RouteHandlerFn
+		Then(httpMethod string, routeType RouteType, fn Controller) RouteHandlerFn
 	}
 
 	// chain acts as a list of application middlewares.
@@ -68,8 +68,8 @@ func (c chain) Prepend(middlewares ...MiddlewareFn) Chain {
 // When the request comes in, it will be passed to m1, then m2, then m3
 // and finally, the given handler
 // (assuming every middleware calls the following one).
-func (c chain) Then(httpMethod string, controller Controller) RouteHandlerFn {
-	handler := createHandleFunc(httpMethod, controller)
+func (c chain) Then(httpMethod string, routeType RouteType, controller Controller) RouteHandlerFn {
+	handler := createHandleFunc(httpMethod, routeType, controller)
 	for i := range c.middlewares {
 		handler = c.middlewares[len(c.middlewares)-1-i](handler)
 	}

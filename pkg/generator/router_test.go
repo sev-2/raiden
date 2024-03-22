@@ -18,7 +18,7 @@ func TestRouter(t *testing.T) {
 	routes, err := generator.WalkScanControllers(testPath)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 2, len(routes))
+	assert.Equal(t, 3, len(routes))
 
 	var barRoute, fooRoute *generator.GenerateRouteItem
 	for i := range routes {
