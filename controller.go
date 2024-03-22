@@ -448,7 +448,7 @@ func RestProxy(appCtx Context, modelName string) error {
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
 
-	Infof("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
+	Debugf("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
 	if err := fasthttp.Do(req, resp); err != nil {
 		return err
 	}
@@ -491,7 +491,7 @@ func ProxyHandler(
 		resp := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(resp)
 
-		Infof("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
+		Debugf("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
 
 		if requestInterceptor != nil {
 			requestInterceptor(req)
