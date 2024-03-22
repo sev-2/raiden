@@ -59,9 +59,9 @@ func RegisterRoute(server *raiden.Server) {
 		{
 			Type:       {{ .Type }},
 			Path:       {{ .Path }},
-			{{if gt (len .Methods) 0}}Methods:    {{ .Methods }},{{end}}
+			{{if ne .Model ""}}Methods:    {{ .Methods }},{{end}}
 			Controller: &{{ .Controller }},
-			{{if ne .Model "" }}Model:    {{ .Model }},{{end}}
+			{{if ne .Model "" }}Model:      {{ .Model }},{{end}}
 		},
 		{{- end}}
 	})
@@ -310,22 +310,30 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 
 	if len(routes) > 0 {
 		routeImportPath := fmt.Sprintf("%s/internal/controllers", utils.ToGoModuleName(projectName))
-		imports = append(imports, fmt.Sprintf("%q", routeImportPath), fmt.Sprintf("%q", "github.com/valyala/fasthttp"))
+		imports = append(imports, fmt.Sprintf("%q", routeImportPath))
 	}
 
 	isHaveRpc := false
+	isHaveMethods := false
 	for i := range routes {
 		r := routes[i]
 
-		if r.Model != "" {
+		if r.Model != "" && !isHaveRpc {
 			isHaveRpc = true
-			break
+		}
+
+		if r.Methods != "[]string{}" && !isHaveMethods {
+			isHaveMethods = true
 		}
 	}
 
 	if isHaveRpc {
 		modelImportPath := fmt.Sprintf("%s/internal/models", utils.ToGoModuleName(projectName))
 		imports = append(imports, fmt.Sprintf("%q", modelImportPath))
+	}
+
+	if isHaveMethods {
+		imports = append(imports, fmt.Sprintf("%q", "github.com/valyala/fasthttp"))
 	}
 
 	// set passed parameter
