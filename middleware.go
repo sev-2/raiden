@@ -1,6 +1,7 @@
 package raiden
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -157,4 +158,138 @@ func BreakerMiddleware(path string) MiddlewareFn {
 			return err
 		}
 	}
+}
+
+// Handle cors
+type CorsOptions struct {
+	AllowedOrigins     []string
+	AllowedMethods     []string
+	AllowedHeaders     []string
+	AllowCredentials   bool
+	OptionsPassthrough bool
+}
+
+func CorsMiddleware(next RouteHandlerFn) RouteHandlerFn {
+	defaultAllowedMathods := []string{
+		fasthttp.MethodGet,
+		fasthttp.MethodPost,
+		fasthttp.MethodPut,
+		fasthttp.MethodPatch,
+		fasthttp.MethodDelete,
+		fasthttp.MethodOptions,
+	}
+
+	corsOptions := CorsOptions{
+		AllowedOrigins:     []string{"*"},
+		AllowedMethods:     defaultAllowedMathods,
+		AllowedHeaders:     []string{},
+		AllowCredentials:   false,
+		OptionsPassthrough: false,
+	}
+
+	return func(ctx Context) error {
+
+		if len(ctx.Config().CorsAllowedOrigins) > 0 {
+			allowedOrigin := strings.Split(ctx.Config().CorsAllowedOrigins, ",")
+			if len(allowedOrigin) > 0 {
+				corsOptions.AllowedOrigins = allowedOrigin
+			}
+		}
+
+		if len(ctx.Config().CorsAllowedMethods) > 0 {
+			allowedMethods := strings.Split(ctx.Config().CorsAllowedMethods, ",")
+			if len(allowedMethods) > 0 {
+				mapAllowedMethod := map[string]bool{}
+				for _, m := range defaultAllowedMathods {
+					mapAllowedMethod[m] = true
+				}
+
+				corsOptions.AllowedMethods = make([]string, 0)
+				for _, m := range allowedMethods {
+					if _, ok := mapAllowedMethod[strings.ToUpper(m)]; ok {
+						corsOptions.AllowedMethods = append(corsOptions.AllowedMethods, strings.ToUpper(m))
+					}
+				}
+			}
+		}
+
+		if len(ctx.Config().CorsAllowedHeaders) > 0 {
+			allowedHeaders := strings.Split(ctx.Config().CorsAllowedHeaders, ",")
+			if len(allowedHeaders) > 0 {
+				for _, h := range allowedHeaders {
+					canonicalHeader := getCanonicalHeaderKey(h)
+					corsOptions.AllowedHeaders = append(corsOptions.AllowedHeaders, canonicalHeader)
+				}
+			}
+		}
+
+		corsOptions.AllowCredentials = ctx.Config().CorsAllowCredentials
+
+		origin := string(ctx.RequestContext().Request.Header.Peek("Origin"))
+		if !isValidOrigin(origin, corsOptions.AllowedOrigins) {
+			return ctx.SendErrorWithCode(fasthttp.StatusForbidden, errors.New("invalid origin"))
+		}
+
+		method := string(ctx.RequestContext().Request.Header.Method())
+		if !isValidMethod(method, corsOptions.AllowedMethods) {
+			return ctx.SendErrorWithCode(fasthttp.StatusForbidden, errors.New("invalid method"))
+		}
+
+		requestHeaders := string(ctx.RequestContext().Request.Header.Peek("Access-Control-Request-Headers"))
+		if !isValidHeaders(requestHeaders, corsOptions.AllowedHeaders) {
+			return ctx.SendErrorWithCode(fasthttp.StatusForbidden, errors.New("invalid headers"))
+		}
+
+		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Origin", origin)
+		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Methods", strings.Join(corsOptions.AllowedMethods, ", "))
+		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Headers", strings.Join(corsOptions.AllowedHeaders, ", "))
+		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Credentials", fmt.Sprintf("%t", corsOptions.AllowCredentials))
+
+		return next(ctx)
+	}
+}
+
+func isValidOrigin(origin string, allowedOrigins []string) bool {
+	for _, allowedOrigin := range allowedOrigins {
+		if origin == allowedOrigin || allowedOrigin == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidMethod(method string, allowedMethods []string) bool {
+	for _, allowedMethod := range allowedMethods {
+		if method == allowedMethod {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidHeaders(requestHeaders string, allowedHeaders []string) bool {
+	if len(allowedHeaders) == 0 {
+		return true
+	}
+
+	headers := strings.Split(requestHeaders, ", ")
+	for _, header := range headers {
+		if !contains(allowedHeaders, header) {
+			return false
+		}
+	}
+	return true
+}
+
+func contains(arr []string, str string) bool {
+	for _, a := range arr {
+		if a == str {
+			return true
+		}
+	}
+	return false
+}
+
+func getCanonicalHeaderKey(input string) string {
+	return strings.ReplaceAll(strings.ToLower(input), " ", "_")
 }

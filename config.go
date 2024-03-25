@@ -19,6 +19,10 @@ type Config struct {
 	AccessToken            string           `mapstructure:"ACCESS_TOKEN"`
 	AnonKey                string           `mapstructure:"ANON_KEY"`
 	BreakerEnable          bool             `mapstructure:"BREAKER_ENABLE"`
+	CorsAllowedOrigins     string           `mapstructure:"CORS_ALLOWED_ORIGINS"`
+	CorsAllowedMethods     string           `mapstructure:"CORS_ALLOWED_METHODS"`
+	CorsAllowedHeaders     string           `mapstructure:"CORS_ALLOWED_HEADERS"`
+	CorsAllowCredentials   bool             `mapstructure:"CORS_ALLOWED_CREDENTIALS"`
 	DeploymentTarget       DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
 	Environment            string           `mapstructure:"ENVIRONMENT"`
 	ProjectId              string           `mapstructure:"PROJECT_ID"`
