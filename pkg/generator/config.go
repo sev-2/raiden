@@ -37,6 +37,10 @@ BREAKER_ENABLE: {{ .BreakerEnable }}
 TRACE_ENABLE: {{ .TraceEnable }}
 TRACE_COLLECTOR: {{ .TraceCollector}}
 TRACE_COLLECTOR_ENDPOINT: {{ .TraceCollectorEndpoint }}
+
+CORS_ALLOWED_ORIGINS:
+CORS_ALLOWED_METHODS:
+CORS_ALLOWED_HEADERS:
 `
 )
 
