@@ -117,8 +117,6 @@ func (r *router) BuildHandler() {
 }
 
 func (r *router) buildNativeMiddleware(route *Route, chain Chain) Chain {
-	chain = chain.Append(CorsMiddleware)
-
 	if r.config.TraceEnable {
 		chain = chain.Append(TraceMiddleware)
 	}
@@ -235,6 +233,8 @@ func (r *router) registerRestHandler(route *Route) {
 }
 
 func (r *router) GetHandler() fasthttp.RequestHandler {
+	r.engine.HandleOPTIONS = true
+	r.engine.GlobalOPTIONS = CorsMiddleware(r.config)
 	return r.engine.Handler
 }
 

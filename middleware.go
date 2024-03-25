@@ -1,7 +1,6 @@
 package raiden
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -169,7 +168,7 @@ type CorsOptions struct {
 	OptionsPassthrough bool
 }
 
-func CorsMiddleware(next RouteHandlerFn) RouteHandlerFn {
+func CorsMiddleware(config *Config) fasthttp.RequestHandler {
 	defaultAllowedMathods := []string{
 		fasthttp.MethodGet,
 		fasthttp.MethodPost,
@@ -187,65 +186,87 @@ func CorsMiddleware(next RouteHandlerFn) RouteHandlerFn {
 		OptionsPassthrough: false,
 	}
 
-	return func(ctx Context) error {
-
-		if len(ctx.Config().CorsAllowedOrigins) > 0 {
-			allowedOrigin := strings.Split(ctx.Config().CorsAllowedOrigins, ",")
-			if len(allowedOrigin) > 0 {
-				corsOptions.AllowedOrigins = allowedOrigin
-			}
+	if len(config.CorsAllowedOrigins) > 0 {
+		allowedOrigin := strings.Split(config.CorsAllowedOrigins, ",")
+		if len(allowedOrigin) > 0 {
+			corsOptions.AllowedOrigins = allowedOrigin
 		}
+	}
 
-		if len(ctx.Config().CorsAllowedMethods) > 0 {
-			allowedMethods := strings.Split(ctx.Config().CorsAllowedMethods, ",")
-			if len(allowedMethods) > 0 {
-				mapAllowedMethod := map[string]bool{}
-				for _, m := range defaultAllowedMathods {
-					mapAllowedMethod[m] = true
-				}
+	if len(config.CorsAllowedMethods) > 0 {
+		allowedMethods := strings.Split(config.CorsAllowedMethods, ",")
+		if len(allowedMethods) > 0 {
+			mapAllowedMethod := map[string]bool{}
+			for _, m := range defaultAllowedMathods {
+				mapAllowedMethod[m] = true
+			}
 
-				corsOptions.AllowedMethods = make([]string, 0)
-				for _, m := range allowedMethods {
-					if _, ok := mapAllowedMethod[strings.ToUpper(m)]; ok {
-						corsOptions.AllowedMethods = append(corsOptions.AllowedMethods, strings.ToUpper(m))
-					}
+			corsOptions.AllowedMethods = make([]string, 0)
+			for _, m := range allowedMethods {
+				if _, ok := mapAllowedMethod[strings.ToUpper(m)]; ok {
+					corsOptions.AllowedMethods = append(corsOptions.AllowedMethods, strings.ToUpper(m))
 				}
 			}
 		}
+	}
 
-		if len(ctx.Config().CorsAllowedHeaders) > 0 {
-			allowedHeaders := strings.Split(ctx.Config().CorsAllowedHeaders, ",")
-			if len(allowedHeaders) > 0 {
-				for _, h := range allowedHeaders {
-					canonicalHeader := getCanonicalHeaderKey(h)
-					corsOptions.AllowedHeaders = append(corsOptions.AllowedHeaders, canonicalHeader)
-				}
+	if len(config.CorsAllowedHeaders) > 0 {
+		allowedHeaders := strings.Split(config.CorsAllowedHeaders, ",")
+		if len(allowedHeaders) > 0 {
+			for _, h := range allowedHeaders {
+				canonicalHeader := getCanonicalHeaderKey(h)
+				corsOptions.AllowedHeaders = append(corsOptions.AllowedHeaders, canonicalHeader)
 			}
 		}
+	}
+	corsOptions.AllowCredentials = config.CorsAllowCredentials
 
-		corsOptions.AllowCredentials = ctx.Config().CorsAllowCredentials
+	return func(ctx *fasthttp.RequestCtx) {
+		Infof("this handler from global options")
 
-		origin := string(ctx.RequestContext().Request.Header.Peek("Origin"))
+		origin := string(ctx.Request.Header.Peek("Origin"))
 		if !isValidOrigin(origin, corsOptions.AllowedOrigins) {
-			return ctx.SendErrorWithCode(fasthttp.StatusForbidden, errors.New("invalid origin"))
+			// Return a custom error response for CORS errors
+			Info("CORS origin not allowed")
+			ctx.Error("CORS origin not allowed", fasthttp.StatusForbidden)
+			return
 		}
 
-		method := string(ctx.RequestContext().Request.Header.Method())
+		method := string(ctx.Request.Header.Method())
 		if !isValidMethod(method, corsOptions.AllowedMethods) {
-			return ctx.SendErrorWithCode(fasthttp.StatusForbidden, errors.New("invalid method"))
+			// Return a custom error response for CORS errors
+			Info("CORS method not allowed")
+			ctx.Error("CORS method not allowed", fasthttp.StatusMethodNotAllowed)
+			return
 		}
 
-		requestHeaders := string(ctx.RequestContext().Request.Header.Peek("Access-Control-Request-Headers"))
+		requestHeaders := string(ctx.Request.Header.Peek("Access-Control-Request-Headers"))
 		if !isValidHeaders(requestHeaders, corsOptions.AllowedHeaders) {
-			return ctx.SendErrorWithCode(fasthttp.StatusForbidden, errors.New("invalid headers"))
+			// Return a custom error response for CORS errors
+			Info("CORS header not allowed")
+			ctx.Error("CORS header not allowed", fasthttp.StatusForbidden)
+			return
 		}
 
-		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Origin", origin)
-		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Methods", strings.Join(corsOptions.AllowedMethods, ", "))
-		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Headers", strings.Join(corsOptions.AllowedHeaders, ", "))
-		ctx.RequestContext().Response.Header.Set("Access-Control-Allow-Credentials", fmt.Sprintf("%t", corsOptions.AllowCredentials))
+		responseAllowedOrigin := "*"
+		responseAllowedHeader := "*"
+		responseAllowedMethod := strings.Join(corsOptions.AllowedMethods, ",")
 
-		return next(ctx)
+		if len(config.CorsAllowedOrigins) > 0 {
+			responseAllowedOrigin = strings.Join(corsOptions.AllowedOrigins, ",")
+		}
+
+		if len(config.CorsAllowedHeaders) > 0 {
+			responseAllowedHeader = strings.Join(corsOptions.AllowedHeaders, ",")
+		}
+
+		ctx.Response.Header.Set("Access-Control-Allow-Origin", responseAllowedOrigin)
+		ctx.Response.Header.Set("Access-Control-Allow-Methods", responseAllowedMethod)
+		ctx.Response.Header.Set("Access-Control-Allow-Headers", responseAllowedHeader)
+		ctx.Response.Header.Set("Access-Control-Allow-Credentials", fmt.Sprintf("%t", corsOptions.AllowCredentials))
+
+		ctx.Response.Header.Set("Access-Control-Max-Age", "86400")
+		ctx.Response.Header.SetStatusCode(fasthttp.StatusNoContent)
 	}
 }
 
