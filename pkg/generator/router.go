@@ -326,7 +326,6 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 			isHaveModel = true
 		}
 
-		logger.Info("r.Method : ", r.Methods)
 		if r.Methods != "" && r.Methods != "[]string{}" && !isHaveMethods {
 			isHaveMethods = true
 		}
