@@ -90,7 +90,7 @@ func (r *router) Register(routes []*Route) *router {
 
 func (r *router) BuildHandler() {
 	for _, route := range r.routes {
-		if len(route.Methods) == 0 {
+		if len(route.Methods) == 0 && route.Type != RouteTypeRest {
 			Panicf("Unknown method in route path %s", route.Path)
 		}
 
