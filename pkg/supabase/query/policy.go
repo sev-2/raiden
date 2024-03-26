@@ -99,7 +99,7 @@ func BuildDeletePolicyQuery(policy objects.Policy) string {
 	for _, role := range policy.Roles {
 		revokeAccessTables = append(revokeAccessTables, fmt.Sprintf(`
 			IF HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
-				REVOKE %s ON %s TO %s;
+				REVOKE %s ON %s FROM %s;
 			END IF;
 		`, role, policy.Table, policy.Command, policy.Command, policy.Table, role))
 	}
@@ -108,7 +108,8 @@ func BuildDeletePolicyQuery(policy objects.Policy) string {
 	DO $$
 	BEGIN
 		DROP POLICY %q ON %s.%s;
-		%s
+	%s
+	
 	END $$;
 	`, policy.Name, policy.Schema, policy.Table, strings.Join(revokeAccessTables, "\n"))
 
