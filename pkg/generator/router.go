@@ -271,6 +271,14 @@ func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
 
 			switch trimmedItem {
 			case string(raiden.RouteTypeFunction):
+				if len(foundRoute.Methods) > 1 {
+					return r, fmt.Errorf("controller %s with type function,only allowed set 1 method and only allowed setup with post method", foundRoute.Name)
+				}
+
+				if len(foundRoute.Methods) == 1 && foundRoute.Methods[0] != "fasthttp.MethodPost" {
+					return r, fmt.Errorf("controller %s with type function,only allowed setup with Post method", foundRoute.Name)
+				}
+
 				r.Type = "raiden.RouteTypeFunction"
 			case string(raiden.RouteTypeCustom):
 				r.Type = "raiden.RouteTypeCustom"

@@ -90,13 +90,17 @@ func (r *router) Register(routes []*Route) *router {
 
 func (r *router) BuildHandler() {
 	for _, route := range r.routes {
+		if len(route.Methods) == 0 {
+			Panicf("Unknown method in route path %s", route.Path)
+		}
+
 		if route == nil {
 			continue
 		}
 
 		switch route.Type {
 		case RouteTypeFunction, RouteTypeRpc:
-			r.registerHandler(route)
+			r.registerRpcAndFunctionHandler(route)
 		case RouteTypeCustom:
 			r.registerHttpHandler(route)
 		case RouteTypeRest:
@@ -191,6 +195,34 @@ func (r *router) registerHandler(route *Route) {
 			chain = r.buildAppMiddleware(chain)
 		}
 		r.bindRouteGroup(group, chain, route)
+	}
+}
+
+func (r *router) registerRpcAndFunctionHandler(route *Route) {
+	var routeType string
+	if route.Type == RouteTypeFunction {
+		routeType = "function "
+	} else {
+		routeType = "rpc"
+	}
+
+	if len(route.Methods) > 1 {
+		Panicf(`route %s with type %s,only allowed set 1 method and only allowed post method`, route.Path, routeType)
+	}
+
+	if route.Methods[0] != fasthttp.MethodPost {
+		Panicf("route %s with type function,only allowed setup with Post method", route.Path)
+	}
+
+	chain := NewChain()
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
+		r.engine.POST(route.Path, buildHandler(
+			r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, route.Controller),
+		))
 	}
 }
 
