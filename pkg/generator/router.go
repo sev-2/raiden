@@ -59,9 +59,13 @@ func RegisterRoute(server *raiden.Server) {
 		{
 			Type:       {{ .Type }},
 			Path:       {{ .Path }},
-			{{if ne .Model ""}}Methods:    {{ .Methods }},{{end}}
+			{{- if ne .Methods ""}}
+			Methods:    {{ .Methods }},
+			{{- end}}
 			Controller: &{{ .Controller }},
-			{{if ne .Model "" }}Model:      {{ .Model }},{{end}}
+			{{- if ne .Model "" }}
+			Model:      {{ .Model }},
+			{{- end}}
 		},
 		{{- end}}
 	})
@@ -313,21 +317,22 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 		imports = append(imports, fmt.Sprintf("%q", routeImportPath))
 	}
 
-	isHaveRpc := false
+	isHaveModel := false
 	isHaveMethods := false
 	for i := range routes {
 		r := routes[i]
 
-		if r.Model != "" && !isHaveRpc {
-			isHaveRpc = true
+		if r.Model != "" && !isHaveModel {
+			isHaveModel = true
 		}
 
-		if r.Methods != "[]string{}" && !isHaveMethods {
+		logger.Info("r.Method : ", r.Methods)
+		if r.Methods != "" && r.Methods != "[]string{}" && !isHaveMethods {
 			isHaveMethods = true
 		}
 	}
 
-	if isHaveRpc {
+	if isHaveModel {
 		modelImportPath := fmt.Sprintf("%s/internal/models", utils.ToGoModuleName(projectName))
 		imports = append(imports, fmt.Sprintf("%q", modelImportPath))
 	}
