@@ -379,13 +379,16 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 	return
 }
 
+// code for detect table in query and return array of object contain table name, table aliases and relation
 func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 	dFields := strings.Fields(utils.CleanUpString(def))
 	mapResult := make(map[string]*RpcScannedTable)
 	mapTableOrAlias := make(map[string]string)
+
 	// extract table name
 	var lastField string
 	var foundTable = &RpcScannedTable{}
+
 	for _, f := range dFields {
 		k := strings.ToUpper(f)
 		switch lastField {
@@ -400,6 +403,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				lastField = k
 				continue
 			}
+
 			if len(foundTable.Name) == 0 {
 				split := strings.Split(f, ".")
 				if len(split) == 2 {
@@ -408,6 +412,9 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				}
 				foundTable.Name = f
 			} else {
+				if postgres.IsReservedSymbol(f) {
+					continue
+				}
 				foundTable.Alias = f
 			}
 		case postgres.Join:
@@ -424,6 +431,9 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				}
 				foundTable.Name = f
 			} else {
+				if postgres.IsReservedSymbol(f) {
+					continue
+				}
 				foundTable.Alias = f
 			}
 		case postgres.On:

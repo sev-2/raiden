@@ -43,6 +43,7 @@ const (
 	Desc      = "DESC"
 	IsNull    = "IS NULL"
 	IsNotNull = "IS NOT NULL"
+	End       = "END"
 )
 
 // ReservedKeywords contains all reserved keywords in PostgreSQL
@@ -89,9 +90,64 @@ var ReservedKeywords = map[string]struct{}{
 	Desc:      {},
 	IsNull:    {},
 	IsNotNull: {},
+	End:       {},
 }
 
 func IsReservedKeyword(str string) bool {
 	_, ok := ReservedKeywords[str]
+	return ok
+}
+
+var symbols = map[string]struct{}{
+	"=":   {},
+	"<>":  {},
+	"!=":  {},
+	">":   {},
+	"<":   {},
+	">=":  {},
+	"<=":  {},
+	"+":   {},
+	"-":   {},
+	"*":   {},
+	"/":   {},
+	"(":   {},
+	")":   {},
+	",":   {},
+	";":   {},
+	".":   {},
+	":":   {},
+	"::":  {},
+	"::=": {},
+	"||":  {},
+	"<=>": {},
+	"&":   {},
+	"|":   {},
+	"^":   {},
+	"<<":  {},
+	">>":  {},
+	"~":   {},
+	"<<=": {},
+	">>=": {},
+	"&=":  {},
+	"|=":  {},
+	"^=":  {},
+	"~=":  {},
+	"%":   {},
+	"@":   {},
+	"#":   {},
+	"$":   {},
+	"`":   {},
+	"[":   {},
+	"]":   {},
+	"{":   {},
+	"}":   {},
+	"!":   {},
+	"?":   {},
+	":=":  {},
+	"=>":  {},
+}
+
+func IsReservedSymbol(str string) bool {
+	_, ok := symbols[str]
 	return ok
 }
