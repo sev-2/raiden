@@ -21,11 +21,11 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan error), make(chan any)
 	doneListen := ListenImportResource(importState, stateChan)
 
-	// generate all model from cloud / pg-meta
-	if len(resource.Tables) > 0 {
-		tableInputs := buildGenerateModelInputs(resource.Tables, resource.Policies)
-		wg.Add(1)
-		go func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if len(resource.Tables) > 0 {
+			tableInputs := buildGenerateModelInputs(resource.Tables, resource.Policies)
 			logger.Info("import : generate models")
 			defer wg.Done()
 
@@ -43,15 +43,13 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 			} else {
 				errChan <- nil
 			}
-		}()
-	}
+		}
 
-	// generate all roles from cloud / pg-meta
-	if len(resource.Roles) > 0 {
-		wg.Add(1)
-		go func() {
+		// generate all roles from cloud / pg-meta
+		if len(resource.Roles) > 0 {
+
 			logger.Info("import : generate roles")
-			defer wg.Done()
+
 			captureFunc := ImportDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
 					if i.Name == item.Name {
@@ -66,14 +64,11 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 			} else {
 				errChan <- nil
 			}
-		}()
-	}
+		}
 
-	if len(resource.Functions) > 0 {
-		wg.Add(1)
-		go func() {
+		if len(resource.Functions) > 0 {
+
 			logger.Info("import : generate functions")
-			defer wg.Done()
 
 			captureFunc := ImportDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
@@ -89,8 +84,8 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 			} else {
 				errChan <- nil
 			}
-		}()
-	}
+		}
+	}()
 
 	go func() {
 		wg.Wait()
