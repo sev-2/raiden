@@ -27,7 +27,6 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 		if len(resource.Tables) > 0 {
 			tableInputs := buildGenerateModelInputs(resource.Tables, resource.Policies)
 			logger.Info("import : generate models")
-			defer wg.Done()
 
 			captureFunc := ImportDecorateFunc(tableInputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateModelData); ok {
