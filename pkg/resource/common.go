@@ -23,6 +23,7 @@ type Flags struct {
 	RpcOnly       bool
 	RolesOnly     bool
 	ModelsOnly    bool
+	StorageOnly   bool
 	AllowedSchema string
 	Verbose       bool
 	Generate      generate.Flags
@@ -30,7 +31,7 @@ type Flags struct {
 
 // LoadAll is function to check is all resource need to import or apply
 func (f *Flags) All() bool {
-	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly
+	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.StorageOnly
 }
 
 func (f Flags) CheckAndActivateDebug(cmd *cobra.Command) bool {
@@ -69,6 +70,13 @@ var registeredModels []any
 
 func RegisterModels(list ...any) {
 	registeredModels = append(registeredModels, list...)
+}
+
+// ----- Handle register storages -----
+var registeredStorages []raiden.Storage
+
+func RegisteredStorages(list ...raiden.Storage) {
+	registeredStorages = append(registeredStorages, list...)
 }
 
 // ----- Filter function -----

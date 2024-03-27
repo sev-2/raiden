@@ -1,38 +1,5 @@
 package objects
 
-import (
-	"fmt"
-	"strings"
-	"time"
-)
-
-func NewValidUntil(newTime time.Time) *ValidUntil {
-	return &ValidUntil{
-		Time: newTime,
-	}
-}
-
-type ValidUntil struct {
-	time.Time
-}
-
-func (mt *ValidUntil) UnmarshalJSON(b []byte) error {
-	layout := "2006-01-02 00:00:00+00"
-	dateString := string(b)
-	dateString = strings.ReplaceAll(dateString, "\"", "")
-	t, err := time.Parse(layout, dateString)
-	if err != nil {
-		return err
-	}
-	mt.Time = t
-	return nil
-}
-
-func (mt ValidUntil) MarshalJSON() ([]byte, error) {
-	layout := "2006-01-02 00:00:00+00"
-	return []byte(fmt.Sprintf(`"%s"`, mt.Time.Format(layout))), nil
-}
-
 type Role struct {
 	ActiveConnections int            `json:"active_connections"`
 	CanBypassRLS      bool           `json:"can_bypass_rls"`
@@ -47,7 +14,7 @@ type Role struct {
 	IsSuperuser       bool           `json:"is_superuser"`
 	Name              string         `json:"name"`
 	Password          string         `json:"password"`
-	ValidUntil        *ValidUntil    `json:"valid_until"`
+	ValidUntil        *SupabaseTime  `json:"valid_until"`
 }
 
 type UpdateRoleType string

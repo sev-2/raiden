@@ -12,11 +12,9 @@ import (
 
 // List of import resource
 // [x] import table, relation, column specification and acl
-// [ ] delete unused models
 // [x] import role
-// [ ] delete unused role
 // [x] import function
-// [ ] delete  unused function
+// [ ] import storage
 func Import(flags *Flags, config *raiden.Config) error {
 	// load map native role
 	logger.Info("import : load native role")
@@ -26,7 +24,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	// load supabase resource
-	logger.Info("import : load table, role, function, model and policy from supabase")
+	logger.Info("import : load table, role, function, model, policy and storage from supabase")
 	spResource, err := Load(flags, config)
 	if err != nil {
 		return err
@@ -48,7 +46,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	logger.Info("import : extract load table, role, function, model and policy from local state")
-	appTables, appRoles, appRpcFunctions, err := extractAppResource(flags, latestState)
+	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestState)
 	if err != nil {
 		return err
 	}
@@ -84,6 +82,13 @@ func Import(flags *Flags, config *raiden.Config) error {
 	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
 		logger.Info("import : compare rpc")
 		if err := runImportCompareRpcFunctions(spResource.Functions, appRpcFunctions.Existing); err != nil {
+			return err
+		}
+	}
+
+	if (flags.All() || flags.StorageOnly) && len(appStorage.Existing) > 0 {
+		logger.Info("import : compare storage")
+		if err := runImportCompareStorage(spResource.Storages, appStorage.Existing); err != nil {
 			return err
 		}
 	}
@@ -143,6 +148,23 @@ func runImportCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects
 			PrintDiff("rpc function", d.SourceResource, d.TargetResource, d.Name)
 		}
 		return errors.New("import rpc function is canceled, you have conflict rpc function. please fix it first")
+	}
+
+	return nil
+}
+
+func runImportCompareStorage(supabaseStorage []objects.Storage, appStorages []objects.Storage) error {
+	diffResult, err := CompareStorage(supabaseStorage, appStorages)
+	if err != nil {
+		return err
+	}
+
+	if len(diffResult) > 0 {
+		for i := range diffResult {
+			d := diffResult[i]
+			PrintDiff("storage ", d.SourceResource, d.TargetResource, d.Name)
+		}
+		return errors.New("import storage is canceled, you have conflict rpc function. please fix it first")
 	}
 
 	return nil

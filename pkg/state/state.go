@@ -15,9 +15,10 @@ import (
 
 type (
 	State struct {
-		Tables []TableState
-		Roles  []RoleState
-		Rpc    []RpcState
+		Tables  []TableState
+		Roles   []RoleState
+		Rpc     []RpcState
+		Storage []StorageState
 	}
 
 	TableState struct {
@@ -41,6 +42,11 @@ type (
 		Function   objects.Function
 		RpcPath    string
 		RpcStruct  string
+		LastUpdate time.Time
+	}
+
+	StorageState struct {
+		Storage    objects.Storage
 		LastUpdate time.Time
 	}
 

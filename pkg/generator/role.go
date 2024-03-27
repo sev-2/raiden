@@ -98,13 +98,13 @@ func (r *{{ .Name | ToGoIdentifier }}) CanLogin() bool {
 {{- end }}
 {{- if ne .ValidUntil ""}}
 
-func (r *{{ .Name | ToGoIdentifier }}) ValidUntil() *objects.ValidUntil {
+func (r *{{ .Name | ToGoIdentifier }}) ValidUntil() *objects.SupabaseTime {
 	t, err := time.Parse(raiden.DefaultRoleValidUntilLayout, "{{ .ValidUntil }}")
 	if err != nil {
 		raiden.Error(err)
 		return nil
 	}
-	return objects.NewValidUntil(t)
+	return objects.NewSupabaseTime(t)
 }
 {{- end }}
 

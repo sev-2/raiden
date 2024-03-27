@@ -39,8 +39,6 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 
 			if err := generator.GenerateModels(projectPath, tableInputs, captureFunc); err != nil {
 				errChan <- err
-			} else {
-				errChan <- nil
 			}
 		}
 
@@ -60,15 +58,11 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 
 			if err := generator.GenerateRoles(projectPath, resource.Roles, captureFunc); err != nil {
 				errChan <- err
-			} else {
-				errChan <- nil
 			}
 		}
 
 		if len(resource.Functions) > 0 {
-
 			logger.Info("import : generate functions")
-
 			captureFunc := ImportDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
 					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
@@ -80,8 +74,22 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, captureFunc); errGenRpc != nil {
 				logger.Error(errGenRpc)
 				errChan <- errGenRpc
-			} else {
-				errChan <- nil
+			}
+		}
+
+		if len(resource.Storages) > 0 {
+			logger.Info("import : generate storage")
+			captureFunc := ImportDecorateFunc(resource.Storages, func(item objects.Storage, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GenerateStoragesData); ok {
+					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+			if errGenStorage := generator.GenerateStorages(projectPath, resource.Storages, captureFunc); errGenStorage != nil {
+				logger.Error(errGenStorage)
+				errChan <- errGenStorage
 			}
 		}
 	}()

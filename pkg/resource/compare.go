@@ -527,3 +527,69 @@ func comparePolicy(source, target objects.Policy) (diffResult CompareDiffResult[
 	diffResult.DiffItems = updateItem
 	return
 }
+
+// Compare Storage
+
+func CompareStorage(sourceStorage, targetStorage []objects.Storage) (diffResult []CompareDiffResult[objects.Storage, objects.UpdateStorageParam], err error) {
+	mapTargetStorage := make(map[string]objects.Storage)
+	for i := range targetStorage {
+		s := targetStorage[i]
+		mapTargetStorage[s.ID] = s
+	}
+
+	for i := range sourceStorage {
+		s := sourceStorage[i]
+
+		ts, isExist := mapTargetStorage[s.ID]
+		if !isExist {
+			continue
+		}
+		diffResult = append(diffResult, compareStorage(s, ts))
+	}
+
+	return
+}
+
+func compareStorage(source, target objects.Storage) (diffResult CompareDiffResult[objects.Storage, objects.UpdateStorageParam]) {
+	var updateItem objects.UpdateStorageParam
+
+	// assign diff result object
+	diffResult.SourceResource = source
+	diffResult.TargetResource = target
+
+	if source.Name != target.Name {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageName)
+	}
+
+	if source.Public != target.Public {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageIsPublic)
+	}
+
+	if len(source.AllowedMimeTypes) != len(target.AllowedMimeTypes) {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageAllowedMimeTypes)
+	} else {
+		mapAllowed := make(map[string]bool)
+		for _, amt := range target.AllowedMimeTypes {
+			mapAllowed[amt] = true
+		}
+
+		for _, samt := range source.AllowedMimeTypes {
+			if _, exist := mapAllowed[samt]; !exist {
+				updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageAllowedMimeTypes)
+				break
+			}
+		}
+	}
+
+	if source.FileSizeLimit != target.FileSizeLimit {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageFileSizeLimit)
+	}
+
+	if source.AvifAutoDetection != target.AvifAutoDetection {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageAvifAutoDetection)
+	}
+
+	diffResult.IsConflict = len(updateItem.ChangeItems) > 0
+	diffResult.DiffItems = updateItem
+	return
+}

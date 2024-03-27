@@ -186,6 +186,13 @@ func (s *ResourceState) UpdateRpc(index int, state state.RpcState) {
 	s.NeedUpdate = true
 }
 
+func (s *ResourceState) AddStorage(storage state.StorageState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+	s.State.Storage = append(s.State.Storage, storage)
+	s.NeedUpdate = true
+}
+
 func (s *ResourceState) Persist() error {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
@@ -246,6 +253,12 @@ func ListenImportResource(resourceState *ResourceState, stateChan chan any) (don
 					}
 
 					resourceState.AddRpc(rpcState)
+				case objects.Storage:
+					storageState := state.StorageState{
+						Storage:    parseItem,
+						LastUpdate: time.Now(),
+					}
+					resourceState.AddStorage(storageState)
 				}
 			}
 		}
@@ -457,7 +470,11 @@ func loadState() (*state.State, error) {
 	return state.Load()
 }
 
-func extractAppResource(f *Flags, latestState *state.State) (extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult, extractedRpc state.ExtractRpcResult, err error) {
+func extractAppResource(f *Flags, latestState *state.State) (
+	extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult,
+	extractedRpc state.ExtractRpcResult, extractedStorage state.ExtractStorageResult,
+	err error,
+) {
 	if latestState == nil {
 		return
 	}
@@ -478,6 +495,13 @@ func extractAppResource(f *Flags, latestState *state.State) (extractedTable stat
 
 	if f.All() || f.RpcOnly {
 		extractedRpc, err = state.ExtractRpc(latestState.Rpc, registeredRpc)
+		if err != nil {
+			return
+		}
+	}
+
+	if f.All() || f.StorageOnly {
+		extractedStorage, err = state.ExtractStorage(latestState.Storage, registeredStorages)
 		if err != nil {
 			return
 		}

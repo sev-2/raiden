@@ -35,7 +35,7 @@ type (
 		CanLogin() bool
 
 		// default nil
-		ValidUntil() *objects.ValidUntil
+		ValidUntil() *objects.SupabaseTime
 	}
 
 	RoleBase struct {
@@ -80,6 +80,6 @@ func (r *RoleBase) CanLogin() bool {
 	return false
 }
 
-func (r *RoleBase) ValidUntil() *objects.ValidUntil {
+func (r *RoleBase) ValidUntil() *objects.SupabaseTime {
 	return nil
 }

@@ -83,7 +83,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	logger.Info("apply : extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, err := extractAppResource(flags, latestState)
+	appTables, appRoles, appRpcFunctions, _, err := extractAppResource(flags, latestState)
 	if err != nil {
 		return err
 	}

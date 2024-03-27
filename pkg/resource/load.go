@@ -14,6 +14,7 @@ type Resource struct {
 	Policies  objects.Policies
 	Roles     []objects.Role
 	Functions []objects.Function
+	Storages  []objects.Storage
 }
 
 // The Load function loads resources based on the provided flags and project ID, and returns a resource
@@ -34,6 +35,8 @@ func Load(flags *Flags, cfg *raiden.Config) (*Resource, error) {
 			resource.Policies = rs
 		case []objects.Function:
 			resource.Functions = rs
+		case []objects.Storage:
+			resource.Storages = rs
 		case error:
 			return nil, rs
 		}
@@ -75,6 +78,13 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 		wg.Add(1)
 		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
 			return supabase.GetFunctions(cfg)
+		})
+	}
+
+	if flags.All() || flags.RpcOnly {
+		wg.Add(1)
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Storage, error) {
+			return supabase.GetStorages(cfg)
 		})
 	}
 

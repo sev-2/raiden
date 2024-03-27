@@ -29,12 +29,12 @@ func GetPolicyByName(cfg *raiden.Config, name string) (result objects.Policy, er
 	// logger.Debug("Get Policy by name - execute : ", sql)
 	rs, err := ExecuteQuery[[]objects.Policy](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
-		err = fmt.Errorf("get role error : %s", err)
+		err = fmt.Errorf("get policy error : %s", err)
 		return
 	}
 
 	if len(rs) == 0 {
-		err = fmt.Errorf("get role %s is not found", name)
+		err = fmt.Errorf("get policy %s is not found", name)
 		return
 	}
 
