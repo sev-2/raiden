@@ -215,12 +215,13 @@ func (r *router) registerRpcAndFunctionHandler(route *Route) {
 	}
 
 	chain := NewChain()
+
 	if group := r.findRouteGroup(route.Type); group != nil {
 		chain = r.buildNativeMiddleware(route, chain)
 		if len(r.middlewares) > 0 {
 			chain = r.buildAppMiddleware(chain)
 		}
-		r.engine.POST(route.Path, buildHandler(
+		group.POST(route.Path, buildHandler(
 			r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, route.Controller),
 		))
 	}
