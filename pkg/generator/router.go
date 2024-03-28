@@ -24,6 +24,7 @@ type (
 		Methods    string
 		Controller string
 		Model      string
+		Storage    string
 	}
 
 	GenerateRouterData struct {
@@ -38,6 +39,7 @@ type (
 		Tag     string
 		Methods []string
 		Model   string
+		Storage string
 	}
 )
 
@@ -65,6 +67,9 @@ func RegisterRoute(server *raiden.Server) {
 			Controller: &{{ .Controller }},
 			{{- if ne .Model "" }}
 			Model:      {{ .Model }},
+			{{- end}}
+			{{- if ne .Storage "" }}
+			Storage:      &{{ .Storage }},
 			{{- end}}
 		},
 		{{- end}}
@@ -180,6 +185,23 @@ func getRoutes(filePath string) (r []GenerateRouteItem, err error) {
 								foundField = true
 								continue
 							}
+
+							if fName != nil && fName.Name == "Storage" {
+								switch fType := field.Type.(type) {
+								case *ast.StarExpr:
+									if se, ok := fType.X.(*ast.SelectorExpr); ok {
+										foundRoute.Storage = fmt.Sprintf("%s.%s{}", se.X, se.Sel.Name)
+									}
+								case *ast.SelectorExpr:
+									foundRoute.Storage = fmt.Sprintf("%s.%s{}", fType.X, fType.Sel.Name)
+								case *ast.Ident:
+									foundRoute.Storage = fmt.Sprintf("%s{}", fType.Name)
+								}
+
+								foundRouteMap[t.Name.Name] = foundRoute
+								foundField = true
+								continue
+							}
 						}
 					}
 
@@ -246,6 +268,7 @@ func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
 
 	r.Controller = fmt.Sprintf("%s.%s{}", foundRoute.Package, foundRoute.Name)
 	r.Model = foundRoute.Model
+	r.Storage = foundRoute.Storage
 
 	tagItems := strings.Split(foundRoute.Tag, " ")
 	r.Methods = generateArrayDeclaration(reflect.ValueOf(foundRoute.Methods), true)
@@ -261,7 +284,11 @@ func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
 		case "path":
 			r.Path = fmt.Sprintf("%q", trimmedItem)
 		case "type":
-			if len(foundRoute.Methods) == 0 && trimmedItem != string(raiden.RouteTypeRest) {
+
+			// validate method
+			// exclude for rest and storage controller
+			// because automatically register by route
+			if len(foundRoute.Methods) == 0 && trimmedItem != string(raiden.RouteTypeRest) && trimmedItem != string(raiden.RouteTypeStorage) {
 				return r, fmt.Errorf("controller %s, required to set method handler. available method Get, Post, Put, Patch, Delete, and Option", foundRoute.Name)
 			}
 
@@ -327,6 +354,7 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 
 	isHaveModel := false
 	isHaveMethods := false
+	isHaveStorage := false
 	for i := range routes {
 		r := routes[i]
 
@@ -337,6 +365,10 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 		if r.Methods != "" && r.Methods != "[]string{}" && !isHaveMethods {
 			isHaveMethods = true
 		}
+
+		if r.Storage != "" && !isHaveStorage {
+			isHaveStorage = true
+		}
 	}
 
 	if isHaveModel {
@@ -346,6 +378,11 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 
 	if isHaveMethods {
 		imports = append(imports, fmt.Sprintf("%q", "github.com/valyala/fasthttp"))
+	}
+
+	if isHaveStorage {
+		storageImportPath := fmt.Sprintf("%s/internal/storages", utils.ToGoModuleName(projectName))
+		imports = append(imports, fmt.Sprintf("%q", storageImportPath))
 	}
 
 	// set passed parameter

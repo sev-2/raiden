@@ -113,6 +113,8 @@ func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) 
 	}
 	h = hostname
 
+	s.HttpServer.DisablePreParseMultipartForm = true
+
 	// Error handling
 	errChan = make(chan error, 1)
 	return

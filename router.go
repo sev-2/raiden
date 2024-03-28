@@ -27,6 +27,7 @@ type (
 		Path       string
 		Controller Controller
 		Model      any
+		Storage    Bucket
 	}
 )
 
@@ -90,7 +91,7 @@ func (r *router) Register(routes []*Route) *router {
 
 func (r *router) BuildHandler() {
 	for _, route := range r.routes {
-		if len(route.Methods) == 0 && route.Type != RouteTypeRest {
+		if len(route.Methods) == 0 && route.Type != RouteTypeRest && route.Type != RouteTypeStorage {
 			Panicf("Unknown method in route path %s", route.Path)
 		}
 
@@ -108,7 +109,12 @@ func (r *router) BuildHandler() {
 				logger.Errorf("[Build Route] invalid route %s, model must be define", route.Path)
 			}
 			r.registerRestHandler(route)
-		case RouteTypeRealtime, RouteTypeStorage:
+		case RouteTypeStorage:
+			if route.Storage == nil {
+				logger.Errorf("[Build Route] invalid route %s, storage must be define", route.Path)
+			}
+			r.registerStorageHandler(route)
+		case RouteTypeRealtime:
 			Panicf("register route type %v is not implemented, wait for update :) ", route.Type)
 		}
 	}
@@ -265,6 +271,28 @@ func (r *router) registerRestHandler(route *Route) {
 	}
 }
 
+func (r *router) registerStorageHandler(route *Route) {
+	chain := NewChain()
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
+
+		restController := StorageController{
+			Controller: route.Controller,
+			BucketName: route.Storage.Name(),
+			RoutePath:  route.Path,
+		}
+
+		group.GET(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+	}
+}
+
 func (r *router) GetHandler() fasthttp.RequestHandler {
 	r.engine.HandleOPTIONS = true
 	r.engine.GlobalOPTIONS = CorsMiddleware(r.config)
@@ -290,11 +318,11 @@ func (r *router) PrintRegisteredRoute() {
 // The function creates and returns a map of route groups based on different route types.
 func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group {
 	return map[RouteType]*fs_router.Group{ // available type custom
-		RouteTypeFunction: engine.Group("/functions/v1"), // type function
-		RouteTypeRest:     engine.Group("/rest/v1"),      // type rest
-		RouteTypeRpc:      engine.Group("/rest/v1/rpc"),  // type rpc
-		RouteTypeRealtime: engine.Group("/realtime/v1"),  // type realtime
-		RouteTypeStorage:  engine.Group("/storage/v1"),   // type storage
+		RouteTypeFunction: engine.Group("/functions/v1"),      // type function
+		RouteTypeRest:     engine.Group("/rest/v1"),           // type rest
+		RouteTypeRpc:      engine.Group("/rest/v1/rpc"),       // type rpc
+		RouteTypeRealtime: engine.Group("/realtime/v1"),       // type realtime
+		RouteTypeStorage:  engine.Group("/storage/v1/object"), // type storage
 	}
 }
 
@@ -322,7 +350,7 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 
 		// marshall and validate http request data
 		// will return error if `Payload` field is not define in controller
-		if routeType != RouteTypeRest {
+		if routeType != RouteTypeRest && routeType != RouteTypeStorage {
 			if err := MarshallAndValidate(ctx.RequestContext(), c); err != nil {
 				return err
 			}

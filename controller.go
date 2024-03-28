@@ -308,6 +308,145 @@ func (rc RestController) Put(ctx Context) error {
 	return RestProxy(ctx, rc.ModelName)
 }
 
+// ----- Rest Controller -----
+type StorageController struct {
+	Controller
+	BucketName string
+	RoutePath  string
+}
+
+// AfterAll implements Controller.
+// Subtle: this method shadows the method (Controller).AfterAll of RestController.Controller.
+func (rc StorageController) AfterAll(ctx Context) error {
+	return rc.Controller.AfterAll(ctx)
+}
+
+// AfterDelete implements Controller.
+// Subtle: this method shadows the method (Controller).AfterDelete of StorageController.Controller.
+func (rc StorageController) AfterDelete(ctx Context) error {
+	return rc.Controller.AfterDelete(ctx)
+}
+
+// AfterGet implements Controller.
+// Subtle: this method shadows the method (Controller).AfterGet of StorageController.Controller.
+func (rc StorageController) AfterGet(ctx Context) error {
+	return rc.Controller.AfterGet(ctx)
+}
+
+// AfterHead implements Controller.
+// Subtle: this method shadows the method (Controller).AfterHead of StorageController.Controller.
+func (rc StorageController) AfterHead(ctx Context) error {
+	return rc.Controller.AfterHead(ctx)
+}
+
+// AfterOptions implements Controller.
+// Subtle: this method shadows the method (Controller).AfterOptions of StorageController.Controller.
+func (rc StorageController) AfterOptions(ctx Context) error {
+	return rc.Controller.AfterOptions(ctx)
+}
+
+// AfterPatch implements Controller.
+// Subtle: this method shadows the method (Controller).AfterPatch of StorageController.Controller.
+func (rc StorageController) AfterPatch(ctx Context) error {
+	return rc.Controller.AfterPatch(ctx)
+}
+
+// AfterPost implements Controller.
+// Subtle: this method shadows the method (Controller).AfterPost of StorageController.Controller.
+func (rc StorageController) AfterPost(ctx Context) error {
+	return rc.Controller.AfterPost(ctx)
+}
+
+// AfterPut implements Controller.
+// Subtle: this method shadows the method (Controller).AfterPut of StorageController.Controller.
+func (rc StorageController) AfterPut(ctx Context) error {
+	return rc.Controller.AfterPut(ctx)
+}
+
+// BeforeAll implements Controller.
+func (rc StorageController) BeforeAll(ctx Context) error {
+	return rc.Controller.BeforeAll(ctx)
+}
+
+// BeforeDelete implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeDelete of StorageController.Controller.
+func (rc StorageController) BeforeDelete(ctx Context) error {
+	return rc.Controller.BeforeDelete(ctx)
+}
+
+// BeforeGet implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeGet of StorageController.Controller.
+func (rc StorageController) BeforeGet(ctx Context) error {
+	return rc.Controller.BeforeGet(ctx)
+}
+
+// BeforeHead implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeHead of StorageController.Controller.
+func (rc StorageController) BeforeHead(ctx Context) error {
+	return rc.Controller.BeforeHead(ctx)
+}
+
+// BeforeOptions implements Controller.
+// Subtle: this method shadows the method (Controller).BeforeOptions of StorageController.Controller.
+func (rc StorageController) BeforeOptions(ctx Context) error {
+	return rc.Controller.BeforeOptions(ctx)
+}
+
+// BeforePatch implements Controller.
+// Subtle: this method shadows the method (Controller).BeforePatch of StorageController.Controller.
+func (rc StorageController) BeforePatch(ctx Context) error {
+	return rc.Controller.BeforePatch(ctx)
+}
+
+// BeforePost implements Controller.
+// Subtle: this method shadows the method (Controller).BeforePost of StorageController.Controller.
+func (rc StorageController) BeforePost(ctx Context) error {
+	return rc.Controller.BeforePost(ctx)
+}
+
+// BeforePut implements Controller.
+// Subtle: this method shadows the method (Controller).BeforePut of StorageController.Controller.
+func (rc StorageController) BeforePut(ctx Context) error {
+	return rc.Controller.BeforePut(ctx)
+}
+
+// Head implements Controller.
+// Subtle: this method shadows the method (Controller).Head of StorageController.Controller.
+func (rc StorageController) Head(ctx Context) error {
+	return rc.Controller.Head(ctx)
+}
+
+// Options implements Controller.
+// Subtle: this method shadows the method (Controller).Options of StorageController.Controller.
+func (rc StorageController) Options(ctx Context) error {
+	return rc.Controller.Options(ctx)
+}
+
+// Delete implements Controller.
+func (rc StorageController) Delete(ctx Context) error {
+	return StorageProxy(ctx, rc.BucketName, rc.RoutePath)
+}
+
+// Get implements Controller.
+func (rc StorageController) Get(ctx Context) error {
+	return StorageProxy(ctx, rc.BucketName, rc.RoutePath)
+}
+
+// Patch implements Controller.
+func (rc StorageController) Patch(ctx Context) error {
+	return StorageProxy(ctx, rc.BucketName, rc.RoutePath)
+}
+
+// Post implements Controller.
+func (rc StorageController) Post(ctx Context) error {
+	return StorageProxy(ctx, rc.BucketName, rc.RoutePath)
+}
+
+// Put implements Controller.
+func (rc StorageController) Put(ctx Context) error {
+	return StorageProxy(ctx, rc.BucketName, rc.RoutePath)
+}
+
 // ----- Helper Functionality -----
 
 // Marshall request data (path param, query and body data) to Payload data in
@@ -443,6 +582,43 @@ func RestProxy(appCtx Context, modelName string) error {
 		proxyUrl = fmt.Sprintf("%s?%s", proxyUrl, queryParam)
 	}
 
+	req.SetRequestURI(proxyUrl)
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	if err := fasthttp.Do(req, resp); err != nil {
+		return err
+	}
+
+	resp.Header.VisitAll(func(k, v []byte) {
+		appCtx.RequestContext().Response.Header.SetBytesKV(k, v)
+	})
+
+	appCtx.RequestContext().Response.SetStatusCode(resp.StatusCode())
+	appCtx.RequestContext().Response.SetBody(resp.Body())
+
+	return nil
+}
+
+func StorageProxy(appCtx Context, bucketName string, routePath string) error {
+	// Create a new request object
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	// Copy the original request to the new request object
+	appCtx.RequestContext().Request.CopyTo(req)
+
+	splitUrl := strings.Split(appCtx.RequestContext().URI().String(), "/storage/v1/object"+routePath)
+	if len(splitUrl) == 1 {
+		return appCtx.SendError("invalid url")
+	}
+
+	proxyUrl := fmt.Sprintf("%s/storage/v1/object/%s/%s", appCtx.Config().SupabasePublicUrl, strings.ToLower(bucketName), splitUrl[1])
+	queryParam := appCtx.RequestContext().Request.URI().QueryString()
+	if len(queryParam) > 0 {
+		proxyUrl = fmt.Sprintf("%s?%s", proxyUrl, queryParam)
+	}
 	req.SetRequestURI(proxyUrl)
 
 	resp := fasthttp.AcquireResponse()
