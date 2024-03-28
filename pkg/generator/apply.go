@@ -59,6 +59,7 @@ func main() {
 			bootstrap.RegisterRpc()
 			bootstrap.RegisterRoles()
 			bootstrap.RegisterModels()
+			bootstrap.RegisterStorages()
 			
 			if err = resource.Apply(&f, config); err != nil {
 				logger.Error(err)

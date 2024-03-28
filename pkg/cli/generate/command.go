@@ -134,8 +134,13 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			errChan <- err
 		}
 
-		// generate role register
+		// generate model register
 		if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+			errChan <- err
+		}
+
+		// generate storage register
+		if err := generator.GenerateStoragesRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
 			errChan <- err
 		}
 

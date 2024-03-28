@@ -58,7 +58,7 @@ func GenerateRoleRegister(basePath string, projectName string, generateFn Genera
 		}
 	}
 
-	// scan all controller
+	// scan all role
 	roleList, err := WalkScanRole(roleDir)
 	if err != nil {
 		return err

@@ -79,9 +79,9 @@ func generateResource(config *raiden.Config, importState *ResourceState, project
 
 		if len(resource.Storages) > 0 {
 			logger.Info("import : generate storage")
-			captureFunc := ImportDecorateFunc(resource.Storages, func(item objects.Storage, input generator.GenerateInput) bool {
+			captureFunc := ImportDecorateFunc(resource.Storages, func(item objects.Bucket, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateStoragesData); ok {
-					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
+					if utils.ToSnakeCase(i.Name) == utils.ToSnakeCase(item.Name) {
 						return true
 					}
 				}

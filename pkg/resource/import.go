@@ -14,7 +14,7 @@ import (
 // [x] import table, relation, column specification and acl
 // [x] import role
 // [x] import function
-// [ ] import storage
+// [x] import storage
 func Import(flags *Flags, config *raiden.Config) error {
 	// load map native role
 	logger.Info("import : load native role")
@@ -153,7 +153,7 @@ func runImportCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects
 	return nil
 }
 
-func runImportCompareStorage(supabaseStorage []objects.Storage, appStorages []objects.Storage) error {
+func runImportCompareStorage(supabaseStorage []objects.Bucket, appStorages []objects.Bucket) error {
 	diffResult, err := CompareStorage(supabaseStorage, appStorages)
 	if err != nil {
 		return err

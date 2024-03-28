@@ -530,8 +530,8 @@ func comparePolicy(source, target objects.Policy) (diffResult CompareDiffResult[
 
 // Compare Storage
 
-func CompareStorage(sourceStorage, targetStorage []objects.Storage) (diffResult []CompareDiffResult[objects.Storage, objects.UpdateStorageParam], err error) {
-	mapTargetStorage := make(map[string]objects.Storage)
+func CompareStorage(sourceStorage, targetStorage []objects.Bucket) (diffResult []CompareDiffResult[objects.Bucket, objects.UpdateBucketParam], err error) {
+	mapTargetStorage := make(map[string]objects.Bucket)
 	for i := range targetStorage {
 		s := targetStorage[i]
 		mapTargetStorage[s.ID] = s
@@ -550,23 +550,19 @@ func CompareStorage(sourceStorage, targetStorage []objects.Storage) (diffResult 
 	return
 }
 
-func compareStorage(source, target objects.Storage) (diffResult CompareDiffResult[objects.Storage, objects.UpdateStorageParam]) {
-	var updateItem objects.UpdateStorageParam
+func compareStorage(source, target objects.Bucket) (diffResult CompareDiffResult[objects.Bucket, objects.UpdateBucketParam]) {
+	var updateItem objects.UpdateBucketParam
 
 	// assign diff result object
 	diffResult.SourceResource = source
 	diffResult.TargetResource = target
 
-	if source.Name != target.Name {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageName)
-	}
-
 	if source.Public != target.Public {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageIsPublic)
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateBucketIsPublic)
 	}
 
 	if len(source.AllowedMimeTypes) != len(target.AllowedMimeTypes) {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageAllowedMimeTypes)
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateBucketAllowedMimeTypes)
 	} else {
 		mapAllowed := make(map[string]bool)
 		for _, amt := range target.AllowedMimeTypes {
@@ -575,18 +571,16 @@ func compareStorage(source, target objects.Storage) (diffResult CompareDiffResul
 
 		for _, samt := range source.AllowedMimeTypes {
 			if _, exist := mapAllowed[samt]; !exist {
-				updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageAllowedMimeTypes)
+				updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateBucketAllowedMimeTypes)
 				break
 			}
 		}
 	}
 
-	if source.FileSizeLimit != target.FileSizeLimit {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageFileSizeLimit)
-	}
-
-	if source.AvifAutoDetection != target.AvifAutoDetection {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateStorageAvifAutoDetection)
+	if (source.FileSizeLimit != nil && target.FileSizeLimit == nil) ||
+		(source.FileSizeLimit == nil && target.FileSizeLimit != nil) ||
+		(source.FileSizeLimit != nil && target.FileSizeLimit != nil && *source.FileSizeLimit != *target.FileSizeLimit) {
+		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateBucketFileSizeLimit)
 	}
 
 	diffResult.IsConflict = len(updateItem.ChangeItems) > 0

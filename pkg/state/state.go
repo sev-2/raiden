@@ -46,7 +46,7 @@ type (
 	}
 
 	StorageState struct {
-		Storage    objects.Storage
+		Bucket     objects.Bucket
 		LastUpdate time.Time
 	}
 

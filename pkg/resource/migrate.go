@@ -29,6 +29,7 @@ type MigrateData struct {
 	Roles    []MigrateItem[objects.Role, objects.UpdateRoleParam]
 	Rpc      []MigrateItem[objects.Function, any]
 	Policies []MigrateItem[objects.Policy, objects.UpdatePolicyParam]
+	Storages []MigrateItem[objects.Bucket, objects.UpdateBucketParam]
 }
 
 type MigrateCreateFunc[T any] func(cfg *raiden.Config, param T) (response T, err error)
@@ -157,6 +158,24 @@ func MigrateResource(config *raiden.Config, importState *ResourceState, projectP
 			}
 
 			errors := runMigratePolicy(config, resource.Policies, stateChan, actions)
+			if len(errors) > 0 {
+				eChan <- errors
+				return
+			}
+		}(&wg, errChan)
+	}
+
+	if len(resource.Storages) > 0 {
+		wg.Add(1)
+		go func(w *sync.WaitGroup, eChan chan []error) {
+			defer w.Done()
+			actions := MigrateActionFunc[objects.Bucket, objects.UpdateBucketParam]{
+				CreateFunc: supabase.CreateBucket,
+				UpdateFunc: supabase.UpdateBucket,
+				DeleteFunc: supabase.DeleteBucket,
+			}
+
+			errors := runMigrateResource(config, resource.Storages, stateChan, actions, migrateProcess)
 			if len(errors) > 0 {
 				eChan <- errors
 				return

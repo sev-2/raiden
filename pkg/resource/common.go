@@ -73,9 +73,9 @@ func RegisterModels(list ...any) {
 }
 
 // ----- Handle register storages -----
-var registeredStorages []raiden.Storage
+var registeredStorages []raiden.Bucket
 
-func RegisteredStorages(list ...raiden.Storage) {
+func RegisterStorages(list ...raiden.Bucket) {
 	registeredStorages = append(registeredStorages, list...)
 }
 

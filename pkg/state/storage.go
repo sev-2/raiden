@@ -9,22 +9,22 @@ import (
 )
 
 type ExtractStorageResult struct {
-	Existing []objects.Storage
-	New      []objects.Storage
-	Delete   []objects.Storage
+	Existing []objects.Bucket
+	New      []objects.Bucket
+	Delete   []objects.Bucket
 }
 
-func ExtractStorage(storageStates []StorageState, appStorages []raiden.Storage) (result ExtractStorageResult, err error) {
+func ExtractStorage(storageStates []StorageState, appStorages []raiden.Bucket) (result ExtractStorageResult, err error) {
 	mapStorageState := map[string]StorageState{}
 	for i := range storageStates {
 		s := storageStates[i]
-		mapStorageState[s.Storage.Name] = s
+		mapStorageState[s.Bucket.Name] = s
 	}
 
 	for _, storage := range appStorages {
 		state, isStateExist := mapStorageState[storage.Name()]
 		if !isStateExist {
-			s := objects.Storage{}
+			s := objects.Bucket{}
 			BindToSupabaseStorage(&s, storage)
 			result.New = append(result.New, s)
 			continue
@@ -37,13 +37,13 @@ func ExtractStorage(storageStates []StorageState, appStorages []raiden.Storage) 
 	}
 
 	for _, state := range mapStorageState {
-		result.Delete = append(result.Delete, state.Storage)
+		result.Delete = append(result.Delete, state.Bucket)
 	}
 
 	return
 }
 
-func BindToSupabaseStorage(s *objects.Storage, storage raiden.Storage) {
+func BindToSupabaseStorage(s *objects.Bucket, storage raiden.Bucket) {
 	name := storage.Name()
 	if name == "" {
 		rv := reflect.TypeOf(storage)
@@ -54,11 +54,16 @@ func BindToSupabaseStorage(s *objects.Storage, storage raiden.Storage) {
 	s.Public = storage.Public()
 	s.AllowedMimeTypes = storage.AllowedMimeTypes()
 	s.AvifAutoDetection = storage.AvifAutoDetection()
-	s.FileSizeLimit = storage.FileSizeLimit()
+	if storage.FileSizeLimit() > 0 {
+		limit := storage.FileSizeLimit()
+		s.FileSizeLimit = &limit
+	} else {
+		s.FileSizeLimit = nil
+	}
 }
 
-func BuildStorageFromState(ss StorageState, storage raiden.Storage) (s objects.Storage) {
-	s = ss.Storage
+func BuildStorageFromState(ss StorageState, storage raiden.Bucket) (s objects.Bucket) {
+	s = ss.Bucket
 	BindToSupabaseStorage(&s, storage)
 	return
 }

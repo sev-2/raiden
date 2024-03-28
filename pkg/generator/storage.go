@@ -34,41 +34,35 @@ const (
 	)
 	{{- end }}
 	
-	type {{ .StruckName | ToGoIdentifier }} struct {
-		raiden.StorageBase
+	type {{ .StructName | ToGoIdentifier }} struct {
+		raiden.BucketBase
 	}
 	
-	func (r *{{ .StruckName | ToGoIdentifier }}) Name() string {
+	func (r *{{ .StructName | ToGoIdentifier }}) Name() string {
 		return "{{ .Name }}"
 	}
 
-	{{- if not .Public }}
-	func (r *{{ .StruckName | ToGoIdentifier }}) Public() bool {
+	{{- if .Public }}
+	func (r *{{ .StructName | ToGoIdentifier }}) Public() bool {
 		return {{ .Public }}
 	}
 	{{- end }}
 	{{- if ne .FileSizeLimit 0}}
 	
-	func (r *{{ .StruckName | ToGoIdentifier }}) FileSizeLimit() int {
+	func (r *{{ .StructName | ToGoIdentifier }}) FileSizeLimit() int {
 		return {{ .FileSizeLimit }} // bytes
 	}
 	{{- end }}
-	{{- if .AvifAutoDetection }}
-	func (r *{{ .StruckName | ToGoIdentifier }}) AvifAutoDetection() bool {
-		return {{ .AvifAutoDetection }} 
-	}
-	
-	{{- end }}
 	{{- if ne .AllowedMimeTypes "" }}
 
-	func (r *{{ .StruckName | ToGoIdentifier }}) AllowedMimeTypes() []string {
+	func (r *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
 		return {{ .AllowedMimeTypes }}
 	}
 	{{- end }}
 	`
 )
 
-func GenerateStorages(basePath string, storages []objects.Storage, generateFn GenerateFn) (err error) {
+func GenerateStorages(basePath string, storages []objects.Bucket, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, StorageDir)
 	logger.Debugf("GenerateStorages - create %s folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -86,14 +80,14 @@ func GenerateStorages(basePath string, storages []objects.Storage, generateFn Ge
 	return nil
 }
 
-func GenerateStorage(folderPath string, storage objects.Storage, generateFn GenerateFn) error {
+func GenerateStorage(folderPath string, storage objects.Bucket, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
 	}
 
 	// define file path
-	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", storage.Name, "go"))
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(storage.Name), "go"))
 
 	// set imports path
 	var imports []string
@@ -111,16 +105,16 @@ func GenerateStorage(folderPath string, storage objects.Storage, generateFn Gene
 	}
 
 	structName := utils.ToSnakeCase(storage.Name)
+
 	// execute the template and write to the file
 	data := GenerateStoragesData{
-		Package:           "storages",
-		Imports:           imports,
-		Name:              storage.Name,
-		StructName:        structName,
-		Public:            storage.Public,
-		FileSizeLimit:     fileSizeLimit,
-		AvifAutoDetection: storage.AvifAutoDetection,
-		AllowedMimeTypes:  allowedMimeTypes,
+		Package:          "storages",
+		Imports:          imports,
+		Name:             storage.Name,
+		StructName:       structName,
+		Public:           storage.Public,
+		FileSizeLimit:    fileSizeLimit,
+		AllowedMimeTypes: allowedMimeTypes,
 	}
 
 	// set input

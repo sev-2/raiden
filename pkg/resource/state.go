@@ -193,6 +193,54 @@ func (s *ResourceState) AddStorage(storage state.StorageState) {
 	s.NeedUpdate = true
 }
 
+func (s *ResourceState) FindStorage(storageId string) (index int, storageState state.StorageState, found bool) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	found = false
+
+	for i := range s.State.Storage {
+		r := s.State.Storage[i]
+
+		if r.Bucket.ID == storageId {
+			found = true
+			storageState = r
+			index = i
+			return
+		}
+	}
+	return
+}
+
+func (s *ResourceState) UpdateStorage(index int, state state.StorageState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	s.State.Storage[index] = state
+	s.NeedUpdate = true
+}
+
+func (s *ResourceState) DeleteStorage(storageId string) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	index := -1
+	for i := range s.State.Storage {
+		r := s.State.Storage[i]
+
+		if r.Bucket.ID == storageId {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return
+	}
+	s.State.Roles = append(s.State.Roles[:index], s.State.Roles[index+1:]...)
+	s.NeedUpdate = true
+}
+
 func (s *ResourceState) Persist() error {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
@@ -253,9 +301,9 @@ func ListenImportResource(resourceState *ResourceState, stateChan chan any) (don
 					}
 
 					resourceState.AddRpc(rpcState)
-				case objects.Storage:
+				case objects.Bucket:
 					storageState := state.StorageState{
-						Storage:    parseItem,
+						Bucket:     parseItem,
 						LastUpdate: time.Now(),
 					}
 					resourceState.AddStorage(storageState)
@@ -433,6 +481,34 @@ func ListenApplyResource(projectPath string, resourceState *ResourceState, state
 					rState.Function = m.NewData
 					rState.LastUpdate = time.Now()
 					resourceState.UpdateRpc(fIndex, rState)
+				}
+			case *MigrateItem[objects.Bucket, objects.UpdateBucketParam]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+
+					r := state.StorageState{
+						Bucket:     m.NewData,
+						LastUpdate: time.Now(),
+					}
+
+					resourceState.AddStorage(r)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					resourceState.DeleteStorage(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, rState, found := resourceState.FindStorage(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Bucket = m.NewData
+					rState.LastUpdate = time.Now()
+					resourceState.UpdateStorage(fIndex, rState)
 				}
 			}
 		}

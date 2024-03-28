@@ -38,6 +38,10 @@ func (s ReqError) Error() string {
 	return s.Message
 }
 
+type DefaultResponse struct {
+	Message string `json:"message"`
+}
+
 func initClient() Client {
 	if httpClientInstance == nil {
 		readTimeout, _ := time.ParseDuration("4s")
@@ -163,7 +167,7 @@ func Put[T any](url string, rawBody []byte, timeout time.Duration, reqIntercepto
 }
 
 func Delete[T any](url string, rawBody []byte, timeout time.Duration, reqInterceptor RequestInterceptor, resInterceptor ResponseInterceptor) (res T, err error) {
-	byteData, err := SendRequest(fasthttp.MethodPut, url, rawBody, timeout, reqInterceptor, resInterceptor)
+	byteData, err := SendRequest(fasthttp.MethodDelete, url, rawBody, timeout, reqInterceptor, resInterceptor)
 	if err != nil {
 		return res, err
 	}

@@ -172,21 +172,3 @@ func AdminUpdateUserData(cfg *raiden.Config, userId string, data objects.User) (
 	logger.Debugf("Update user data with id %s in self hosted", userId)
 	return objects.User{}, errors.New("update user data in self hosted in not implemented, stay update :)")
 }
-
-func GetStorages(cfg *raiden.Config) ([]objects.Storage, error) {
-	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
-		logger.Debug("Get all storages from supabase cloud with project id : ", cfg.ProjectId)
-		return cloud.GetStorages(cfg)
-	}
-	logger.Debugf("Get all storages data with in self hosted")
-	return []objects.Storage{}, errors.New("get all storage data in self hosted in not implemented, stay update :)")
-}
-
-func CreateStorage(cfg *raiden.Config, role objects.Storage) (objects.Storage, error) {
-	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
-		logger.Debug("Create storage from supabase cloud with project id : ", cfg.ProjectId)
-		return cloud.CreateStorage(cfg, role)
-	}
-	logger.Debug("Create role from supabase pg-meta")
-	return objects.Storage{}, errors.New("create storage in self hosted in not implemented, stay update :)")
-}

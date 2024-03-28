@@ -56,6 +56,14 @@ import (
 //	[x] update valid until
 //
 // [x] migrate function (Rpc)
+//
+// [x] migrate storage
+//
+//	[ ] create new storage
+//	[ ] update storage
+//	[ ] delete storage
+//	[ ] add storage acl
+//	[ ] update storage acl
 func Apply(flags *Flags, config *raiden.Config) error {
 	// declare default variable
 	var migrateResource MigrateData
@@ -83,7 +91,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	logger.Info("apply : extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, _, err := extractAppResource(flags, latestState)
+	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestState)
 	if err != nil {
 		return err
 	}
@@ -211,6 +219,29 @@ func Apply(flags *Flags, config *raiden.Config) error {
 					name = t.OldData.Name
 				}
 				logger.Debugf("- MigrateType : %s, Name: %s", t.Type, name)
+			}
+			logger.Debug(strings.Repeat("=", 5))
+		}
+	}
+
+	if flags.All() || flags.StorageOnly {
+		logger.Info("apply : compare storage")
+		if err := bindMigratedStorage(appStorage, resource.Storages, &migrateResource); err != nil {
+			return err
+		}
+
+		if flags.Verbose {
+			logger.Debug(strings.Repeat("=", 5), " Storage to migrate")
+			for i := range migrateResource.Storages {
+				t := migrateResource.Storages[i]
+				var name string
+				if t.NewData.Name != "" {
+					name = t.NewData.Name
+				} else if t.OldData.Name != "" {
+					name = t.OldData.Name
+				}
+				logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
+				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
 			}
 			logger.Debug(strings.Repeat("=", 5))
 		}
@@ -450,6 +481,66 @@ func bindMigratedFunctions(er state.ExtractRpcResult, spFn []objects.Function, m
 	return nil
 }
 
+func bindMigratedStorage(es state.ExtractStorageResult, spStorages []objects.Bucket, mr *MigrateData) error {
+	// compare and bind existing table to migrate data
+	mapSpStorages := make(map[string]bool)
+	for i := range spStorages {
+		s := spStorages[i]
+		mapSpStorages[s.ID] = true
+	}
+
+	// filter existing table need compare or move to create new
+	var compareStorages []objects.Bucket
+	for i := range es.Existing {
+		et := es.Existing[i]
+		if _, isExist := mapSpStorages[et.ID]; isExist {
+			compareStorages = append(compareStorages, et)
+		} else {
+			es.New = append(es.New, et)
+		}
+	}
+
+	if rs, err := runApplyCompareStorages(spStorages, compareStorages); err != nil {
+		return err
+	} else {
+		mr.Storages = append(mr.Storages, rs...)
+	}
+
+	// bind new table to migrated data
+	if len(es.New) > 0 {
+		for i := range es.New {
+			t := es.New[i]
+			mr.Storages = append(mr.Storages, MigrateItem[objects.Bucket, objects.UpdateBucketParam]{
+				Type:    MigrateTypeCreate,
+				NewData: t,
+			})
+		}
+	}
+
+	if len(es.Delete) > 0 {
+		for i := range es.Delete {
+			t := es.Delete[i]
+			isExist := false
+			for i := range spStorages {
+				tt := spStorages[i]
+				if tt.Name == t.Name {
+					isExist = true
+					break
+				}
+			}
+
+			if isExist {
+				mr.Storages = append(mr.Storages, MigrateItem[objects.Bucket, objects.UpdateBucketParam]{
+					Type:    MigrateTypeDelete,
+					OldData: t,
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
 func runApplyCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) (migratedData []MigrateItem[objects.Role, objects.UpdateRoleParam], err error) {
 	result, e := CompareRoles(appRoles, supabaseRoles, CompareModeApply)
 	if e != nil {
@@ -538,6 +629,33 @@ func runApplyCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.
 		}
 
 		migratedData = append(migratedData, MigrateItem[objects.Function, any]{
+			Type:           migrateType,
+			NewData:        r.SourceResource,
+			OldData:        r.TargetResource,
+			MigrationItems: r.DiffItems,
+		})
+	}
+
+	return
+}
+
+func runApplyCompareStorages(supabaseStorage []objects.Bucket, appStorages []objects.Bucket) (migratedData []MigrateItem[objects.Bucket, objects.UpdateBucketParam], err error) {
+	result, e := CompareStorage(appStorages, supabaseStorage)
+	if e != nil {
+		err = e
+		return
+	}
+
+	for i := range result {
+		r := result[i]
+
+		migrateType := MigrateTypeIgnore
+		if r.IsConflict {
+			migrateType = MigrateTypeUpdate
+		}
+
+		r.DiffItems.OldData = r.TargetResource
+		migratedData = append(migratedData, MigrateItem[objects.Bucket, objects.UpdateBucketParam]{
 			Type:           migrateType,
 			NewData:        r.SourceResource,
 			OldData:        r.TargetResource,
