@@ -32,9 +32,9 @@ jobs:
           GOOS=$GOOS GOARCH=$GOARCH go build -trimpath -o build/raiden ./cmd/raiden/main.go
           cd build
           if [[ $GOOS == 'darwin' ]]; then
-            tar cvf raiden-macos-"$GOARCH".tar.gz raiden
+            cp raiden raiden-macos-"$GOARCH"
           else
-            tar cvf raiden-"$GOOS"-"$GOARCH".tar.gz raiden
+            cp cvf raiden-"$GOOS"-"$GOARCH"
           fi
 
       - name: Release
