@@ -34,7 +34,7 @@ jobs:
           if [[ $GOOS == 'darwin' ]]; then
             cp raiden raiden-macos-"$GOARCH"
           else
-            cp cvf raiden-linux-"$GOARCH"
+            cp raiden raiden-"$GOOS"-"$GOARCH"
           fi
 
       - name: Release
