@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - hotfix/workflow-adjustment
     tags:
       - v*
 
