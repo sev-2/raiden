@@ -6,102 +6,180 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var modelDir = "models"
-var modelTemplate = `package models
-{{ if gt (len .Imports) 0 }}
-import(
+// ----- Define type, variable and constant -----
+type (
+	Rls struct {
+		CanWrite []string
+		CanRead  []string
+	}
+
+	GenerateModelColumn struct {
+		Name string
+		Type string
+		Tag  string
+	}
+
+	GenerateModelData struct {
+		Columns    []GenerateModelColumn
+		Imports    []string
+		Package    string
+		Relations  []state.Relation
+		RlsTag     string
+		RlsEnable  bool
+		RlsForced  bool
+		StructName string
+		Schema     string
+	}
+
+	GenerateModelInput struct {
+		Table     objects.Table
+		Relations []state.Relation
+		Policies  objects.Policies
+	}
+)
+
+const (
+	ModelDir      = "internal/models"
+	ModelTemplate = `package {{ .Package }}
+{{- if gt (len .Imports) 0 }}
+
+import (
 {{- range .Imports}}
 	"{{.}}"
 {{- end}}
 )
-{{ end }}
-type {{ .StructName }} struct {
-{{- range .Columns }}
-	{{ .Name | ToGoIdentifier }} {{ .GoType }} ` + "`json:\"{{ .Name | ToSnakeCase }},omitempty\" column:\"{{ .Name | ToSnakeCase }}\"`" + `
 {{- end }}
 
-	Metadata string ` + "`schema:\"{{ .Schema}}\"`" + `
-	Acl string ` + "`{{ .RlsTag }}`" + `
+type {{ .StructName }} struct {
+	raiden.ModelBase
+{{- range .Columns }}
+	{{ .Name | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
+{{- end }}
+
+	// Table information
+	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
+
+	// Access control
+	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
+	
+{{- if gt (len .Relations) 0 }}
+
+	// Relations
+{{- end }}
+{{- range .Relations }}
+	{{ .Table | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
+{{- end }}
 }
 `
+)
 
-type Rls struct {
-	CanWrite []string
-	CanRead  []string
-}
-
-func GenerateModels(projectName string, tables []supabase.Table, rlsList supabase.Policies) (err error) {
-	folderPath := filepath.Join(projectName, modelDir)
-	err = utils.CreateFolder(folderPath)
-	if err != nil {
-		return err
+func GenerateModels(basePath string, tables []*GenerateModelInput, generateFn GenerateFn) (err error) {
+	folderPath := filepath.Join(basePath, ModelDir)
+	logger.Debugf("GenerateModels - create %s folder if not exist", folderPath)
+	if exist := utils.IsFolderExists(folderPath); !exist {
+		if err := utils.CreateFolder(folderPath); err != nil {
+			return err
+		}
 	}
 
-	for i, v := range tables {
-		searchTable := tables[i].Name
-		GenerateModel(projectName, v, rlsList.FilterByTable(searchTable))
-	}
-
-	return nil
-}
-
-func GenerateModel(projectName string, table supabase.Table, rlsList supabase.Policies) error {
-	tmpl, err := template.New("modelTemplate").
-		Funcs(template.FuncMap{"ToGoIdentifier": utils.SnakeCaseToPascalCase}).
-		Funcs(template.FuncMap{"ToGoType": postgres.ToGoType}).
-		Funcs(template.FuncMap{"ToSnakeCase": utils.ToSnakeCase}).
-		Parse(modelTemplate)
-	if err != nil {
-		return fmt.Errorf("error parsing template : %v", err)
-	}
-
-	// Map column data
-	columns, importsPath := mapTableToColumn(table)
-	rlsTag := generateRlsTag(rlsList)
-
-	// Create or open the output file
-	folderPath := fmt.Sprintf("%s/%s", projectName, modelDir)
-	file, err := createFile(getAbsolutePath(folderPath), table.Name, "go")
-	if err != nil {
-		return fmt.Errorf("failed create file %s : %v", table.Name, err)
-	}
-	defer file.Close()
-
-	// Execute the template and write to the file
-	err = tmpl.Execute(file, map[string]any{
-		"Imports":    importsPath,
-		"StructName": utils.SnakeCaseToPascalCase(table.Name),
-		"Columns":    columns,
-		"Schema":     table.Schema,
-		"RlsTag":     rlsTag,
-	})
-
-	if err != nil {
-		return fmt.Errorf("error executing template: %v", err)
+	for i := range tables {
+		t := tables[i]
+		if err := GenerateModel(folderPath, t, generateFn); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func GenerateModel(folderPath string, input *GenerateModelInput, generateFn GenerateFn) error {
+	// define binding func
+	funcMaps := []template.FuncMap{
+		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
+		{"ToSnakeCase": utils.ToSnakeCase},
+	}
+
+	// map column data
+	columns, importsPath := mapTableAttributes(input.Table)
+	rlsTag := buildRlsTag(input.Policies)
+	raidenPath := "github.com/sev-2/raiden"
+	importsPath = append(importsPath, raidenPath)
+
+	// define file path
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", input.Table.Name, "go"))
+
+	// build relation tag
+
+	mapRelationName := make(map[string]bool)
+	relation := make([]state.Relation, 0)
+
+	for i := range input.Relations {
+		r := input.Relations[i]
+
+		if r.RelationType == raiden.RelationTypeManyToMany {
+			key := fmt.Sprintf("%s_%s", input.Table.Name, r.Table)
+			_, exist := mapRelationName[key]
+			if exist {
+				r.Table = fmt.Sprintf("%ss", r.Through)
+			} else {
+				mapRelationName[key] = true
+			}
+		}
+
+		r.Tag = buildJoinTag(&r)
+		relation = append(relation, r)
+	}
+
+	// set data
+	data := GenerateModelData{
+		Package:    "models",
+		Imports:    importsPath,
+		StructName: utils.SnakeCaseToPascalCase(input.Table.Name),
+		Columns:    columns,
+		Schema:     input.Table.Schema,
+		RlsTag:     rlsTag,
+		RlsEnable:  input.Table.RLSEnabled,
+		RlsForced:  input.Table.RLSForced,
+		Relations:  relation,
+	}
+
+	// setup generate input param
+	generateInput := GenerateInput{
+		BindData:     data,
+		FuncMap:      funcMaps,
+		Template:     ModelTemplate,
+		TemplateName: "modelTemplate",
+		OutputPath:   filePath,
+	}
+
+	logger.Debugf("GenerateModels - generate model to %s", generateInput.OutputPath)
+	return generateFn(generateInput, nil)
 }
 
 // map table to column, map pg type to go type and get dependency import path
-func mapTableToColumn(table supabase.Table) (columns []map[string]any, importsPath []string) {
+func mapTableAttributes(table objects.Table) (columns []GenerateModelColumn, importsPath []string) {
 	importsMap := make(map[string]any)
-	columns = make([]map[string]any, 0)
+	mapPrimaryKey := map[string]bool{}
+	for _, k := range table.PrimaryKeys {
+		mapPrimaryKey[k.Name] = true
+	}
 
 	for _, c := range table.Columns {
-		column := map[string]any{
-			"Name": c.Name,
+		column := GenerateModelColumn{
+			Name: c.Name,
+			Tag:  buildColumnTag(c, mapPrimaryKey),
+			Type: postgres.ToGoType(postgres.DataType(c.DataType), c.IsNullable),
 		}
 
-		goType := postgres.ToGoType(c.DataType, c.IsNullable)
-		column["GoType"] = goType
-
-		splitType := strings.Split(goType, ".")
+		splitType := strings.Split(column.Type, ".")
 		if len(splitType) > 1 {
 			importPackage := splitType[0]
 			if c.IsNullable {
@@ -130,18 +208,174 @@ func mapTableToColumn(table supabase.Table) (columns []map[string]any, importsPa
 	return
 }
 
-func generateRlsTag(rlsList supabase.Policies) string {
+func buildColumnTag(c objects.Column, mapPk map[string]bool) string {
+	var tags []string
+
+	// append json tag
+	jsonTag := fmt.Sprintf("json:%q", utils.ToSnakeCase(c.Name)+",omitempty")
+	tags = append(tags, jsonTag)
+
+	// append column tag
+	columnTags := []string{
+		fmt.Sprintf("name:%s", c.Name),
+	}
+
+	if postgres.IsValidDataType(c.DataType) {
+		pdType := postgres.GetPgDataTypeName(postgres.DataType(c.DataType), true)
+		columnTags = append(columnTags, "type:"+string(pdType))
+	}
+
+	_, exist := mapPk[c.Name]
+	if exist {
+		columnTags = append(columnTags, "primaryKey")
+	}
+
+	if c.IdentityGeneration != nil {
+		if identityStr, isString := c.IdentityGeneration.(string); isString && len(identityStr) > 0 {
+			columnTags = append(columnTags, "autoIncrement")
+		}
+	}
+
+	if c.IsNullable {
+		columnTags = append(columnTags, "nullable")
+	} else {
+		columnTags = append(columnTags, "nullable:false")
+	}
+
+	if c.DefaultValue != "" {
+		defaultStr, isString := c.DefaultValue.(string)
+		if isString {
+			columnTags = append(columnTags, "default:"+defaultStr)
+		}
+	}
+
+	if c.IsUnique {
+		columnTags = append(columnTags, "unique")
+	}
+
+	tags = append(tags, fmt.Sprintf("column:%q", strings.Join(columnTags, ";")))
+
+	return strings.Join(tags, " ")
+}
+
+func buildRlsTag(rlsList objects.Policies) string {
 	var rls Rls
 
+	var readUsingTag, writeCheckTag, writeUsingTag string
 	for _, v := range rlsList {
 		switch v.Command {
-		case supabase.PolicyCommandSelect:
-			rls.CanWrite = append(rls.CanWrite, v.Roles...)
-		case supabase.PolicyCommandInsert, supabase.PolicyCommandUpdate, supabase.PolicyCommandDelete:
-			rls.CanWrite = append(rls.CanWrite, v.Roles...)
+		case objects.PolicyCommandSelect:
+			if v.Name == getPolicyName(objects.PolicyCommandSelect, v.Table) {
+				rls.CanRead = append(rls.CanRead, v.Roles...)
+				if v.Definition != "" {
+					readUsingTag = v.Definition
+				}
+			}
+		case objects.PolicyCommandInsert, objects.PolicyCommandUpdate, objects.PolicyCommandDelete:
+			if v.Name == getPolicyName(objects.PolicyCommandInsert, v.Table) {
+				if len(rls.CanWrite) == 0 {
+					rls.CanWrite = append(rls.CanWrite, v.Roles...)
+				}
+
+				if len(writeCheckTag) == 0 && v.Check != nil {
+					writeCheckTag = *v.Check
+				}
+			}
+
+			if v.Name == getPolicyName(objects.PolicyCommandUpdate, v.Table) && len(rls.CanWrite) == 0 {
+				if len(rls.CanWrite) == 0 {
+					rls.CanWrite = append(rls.CanWrite, v.Roles...)
+				}
+
+				if len(writeCheckTag) == 0 && v.Check != nil {
+					writeCheckTag = *v.Check
+				}
+
+				if len(writeUsingTag) == 0 && v.Definition != "" {
+					writeUsingTag = v.Definition
+				}
+			}
+
+			if v.Name == getPolicyName(objects.PolicyCommandDelete, v.Table) && len(rls.CanWrite) == 0 {
+				if len(rls.CanWrite) == 0 {
+					rls.CanWrite = append(rls.CanWrite, v.Roles...)
+				}
+
+				if len(writeUsingTag) == 0 && v.Definition != "" {
+					writeUsingTag = v.Definition
+				}
+			}
 		}
 	}
 
 	rlsTag := fmt.Sprintf("read:%q write:%q", strings.Join(rls.CanRead, ","), strings.Join(rls.CanWrite, ","))
+	if len(readUsingTag) > 0 {
+		cleanTag := strings.TrimLeft(strings.TrimRight(readUsingTag, ")"), "(")
+		rlsTag = fmt.Sprintf("%s readUsing:%q", rlsTag, cleanTag)
+	}
+
+	if len(writeCheckTag) > 0 {
+		cleanTag := strings.TrimLeft(strings.TrimRight(writeCheckTag, ")"), "(")
+		rlsTag = fmt.Sprintf("%s writeCheck:%q", rlsTag, cleanTag)
+	}
+
+	if len(writeUsingTag) > 0 {
+		cleanTag := strings.TrimLeft(strings.TrimRight(writeUsingTag, ")"), "(")
+		rlsTag = fmt.Sprintf("%s writeUsing:%q", rlsTag, cleanTag)
+	}
+
 	return rlsTag
+}
+
+func buildJoinTag(r *state.Relation) string {
+	var tags []string
+	var joinTags []string
+
+	// append json tag
+	jsonTag := fmt.Sprintf("json:%q", utils.ToSnakeCase(r.Table)+",omitempty")
+	tags = append(tags, jsonTag)
+
+	// append relation type tag
+	relTypeTag := fmt.Sprintf("joinType:%s", r.RelationType)
+	joinTags = append(joinTags, relTypeTag)
+
+	// append PK tag
+	if r.PrimaryKey != "" {
+		pk := fmt.Sprintf("primaryKey:%s", r.PrimaryKey)
+		joinTags = append(joinTags, pk)
+	}
+
+	// append FK tag
+	if r.PrimaryKey != "" {
+		fk := fmt.Sprintf("foreignKey:%s", r.ForeignKey)
+		joinTags = append(joinTags, fk)
+	}
+
+	if r.RelationType == raiden.RelationTypeManyToMany && r.JoinRelation != nil {
+		th := fmt.Sprintf("through:%s", r.Through)
+		joinTags = append(joinTags, th)
+
+		// append source primary key
+		spk := fmt.Sprintf("sourcePrimaryKey:%s", r.SourcePrimaryKey)
+		joinTags = append(joinTags, spk)
+
+		// append join source foreign key
+		jspk := fmt.Sprintf("sourceForeignKey:%s", r.JoinsSourceForeignKey)
+		joinTags = append(joinTags, jspk)
+
+		// append target primary key
+		tpk := fmt.Sprintf("targetPrimaryKey:%s", r.TargetPrimaryKey)
+		joinTags = append(joinTags, tpk)
+
+		// append join target foreign key
+		jtpk := fmt.Sprintf("targetForeign:%s", r.JoinsSourceForeignKey)
+		joinTags = append(joinTags, jtpk)
+	}
+	tags = append(tags, fmt.Sprintf("join:%q", strings.Join(joinTags, ";")))
+
+	return strings.Join(tags, " ")
+}
+
+func getPolicyName(command objects.PolicyCommand, tableName string) string {
+	return strings.ToLower(fmt.Sprintf("enable %s access for table %s", command, tableName))
 }

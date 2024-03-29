@@ -26,39 +26,23 @@ func GetCurrentDirectory() (string, error) {
 	return dir, nil
 }
 
-func CreateFolder(folderName string) error {
-	currentDir, err := GetCurrentDirectory()
-	if err != nil {
-		return err
-	}
-
-	folderPath := filepath.Join(currentDir, folderName)
-	if IsFolderExists(folderPath) {
-		return nil
-	}
-
-	err = os.Mkdir(folderPath, os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func CreateFolder(folder string) error {
+	return os.Mkdir(folder, os.ModePerm)
 }
 
-func DeleteFolder(folderName string) error {
-	currentDir, err := GetCurrentDirectory()
-	if err != nil {
-		return err
-	}
-
-	folderPath := filepath.Join(currentDir, folderName)
+func DeleteFolder(folderPath string) error {
 	if !IsFolderExists(folderPath) {
 		return nil
 	}
 
-	err = os.RemoveAll(folderPath)
+	return os.RemoveAll(folderPath)
+}
+
+func GetAbsolutePath(path string) (string, error) {
+	currDir, err := GetCurrentDirectory()
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+
+	return filepath.Join(currDir, path), nil
 }

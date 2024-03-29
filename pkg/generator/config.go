@@ -3,44 +3,58 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
-	"text/template"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var configDir = "configs"
-var configFile = "app"
-var configTemplate = `PROJECT_NAME: {{ .ProjectName }}
+// ----- Define type, var and constant -----
+
+const (
+	ConfigDir      = "configs"
+	ConfigFile     = "app"
+	ConfigTemplate = `PROJECT_NAME: {{ .ProjectName }}
+PROJECT_ID: {{ .ProjectId }}
 DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
-CLOUD_ACCESS_TOKEN: {{ .CloudAccessToken }}
+
+ACCESS_TOKEN: {{ .AccessToken }}
+ANON_KEY: {{ .AnonKey }}
+SERVICE_KEY: {{ .ServiceKey }}
 
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
-SUPABASE_API_BASE_PATH: {{ .SupabaseApiBaseUrl }}
-SUPABASE_REST_URL: {{ .SupabaseRestUrl }}
+SUPABASE_API_BASE_PATH: {{ .SupabaseApiBasePath }}
+SUPABASE_PUBLIC_URL: {{ .SupabasePublicUrl }}
 
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
+
+ENVIRONMENT: development
+VERSION: 1.0.0
+
+BREAKER_ENABLE: {{ .BreakerEnable }}
+
+TRACE_ENABLE: {{ .TraceEnable }}
+TRACE_COLLECTOR: {{ .TraceCollector}}
+TRACE_COLLECTOR_ENDPOINT: {{ .TraceCollectorEndpoint }}
+
+CORS_ALLOWED_ORIGINS:
+CORS_ALLOWED_METHODS:
+CORS_ALLOWED_HEADERS:
 `
+)
 
-func GenerateConfig(config raiden.Config) error {
-	folderPath := filepath.Join(config.ProjectName, configDir)
-	err := utils.CreateFolder(folderPath)
-	if err != nil {
-		return err
+func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateFn) error {
+	// create config folder if not exist
+	configPath := filepath.Join(basePath, ConfigDir)
+	if exist := utils.IsFolderExists(configPath); !exist {
+		if err := utils.CreateFolder(configPath); err != nil {
+			return err
+		}
 	}
 
-	tmpl, err := template.New("configTemplate").Parse(configTemplate)
-	if err != nil {
-		return fmt.Errorf("error parsing template : %v", err)
-	}
-
-	// Create or open the output file
-	file, err := createFile(getAbsolutePath(folderPath), configFile, "yaml")
-	if err != nil {
-		return fmt.Errorf("failed create file %s : %v", configFile, err)
-	}
-	defer file.Close()
+	// define file path
+	filePath := filepath.Join(configPath, fmt.Sprintf("%s.%s", ConfigFile, "yaml"))
 
 	if config.ServerHost == "" {
 		config.ServerHost = "127.0.01"
@@ -50,11 +64,13 @@ func GenerateConfig(config raiden.Config) error {
 		config.ServerPort = "8002"
 	}
 
-	// Execute the template and write to the file
-	err = tmpl.Execute(file, config)
-	if err != nil {
-		return fmt.Errorf("error executing template: %v", err)
+	input := GenerateInput{
+		BindData:     config,
+		Template:     ConfigTemplate,
+		TemplateName: "configTemplate",
+		OutputPath:   filePath,
 	}
 
-	return nil
+	logger.Debugf("GenerateConfig - generate config to %s", input.OutputPath)
+	return generateFn(input, nil)
 }

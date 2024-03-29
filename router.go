@@ -1,89 +1,456 @@
 package raiden
 
 import (
-	"net/http"
+	"context"
+	"fmt"
+	"net/url"
+	"reflect"
 	"strings"
 
-	"github.com/fatih/color"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
+	"github.com/valyala/fasthttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+
+	fs_router "github.com/fasthttp/router"
 )
 
-// Build router
+// ----- define route type, constant and variable -----
+type (
+	RouteHandlerFn func(ctx Context) error
+	RouteType      string
+
+	Route struct {
+		Type       RouteType
+		Methods    []string
+		Path       string
+		Controller Controller
+		Model      any
+		Storage    Bucket
+	}
+)
+
+const (
+	RouteTypeCustom   RouteType = "custom"
+	RouteTypeFunction RouteType = "function"
+	RouteTypeRest     RouteType = "rest"
+	RouteTypeRpc      RouteType = "rpc"
+	RouteTypeRealtime RouteType = "realtime"
+	RouteTypeStorage  RouteType = "storage"
+)
+
+// ----- Route functionality -----
+
 func NewRouter(config *Config) *router {
-	Info("Setup New Router")
-	r := &router{}
-	r.echo = echo.New()
-	r.config = config
+	engine := fs_router.New()
+	groups := createRouteGroups(engine)
 
-	// Setup App Context
-	applyAppContext(r.echo, config)
-	applyDefaultMiddleware(r.echo)
+	var tracer trace.Tracer
+	if config.TraceEnable {
+		tracer = otel.Tracer(fmt.Sprintf("%s tracer", config.ProjectName))
+	}
 
-	// register health check
-	r.echo.GET("/health", HealthHandler())
+	// register native controller
+	defaultRoutes := []*Route{
+		{
+			Type:       RouteTypeCustom,
+			Methods:    []string{fasthttp.MethodGet},
+			Path:       "/health",
+			Controller: &HealthController{},
+		},
+	}
 
-	// set reserved group
-	r.functionRoute = r.echo.Group("/functions/v1")
-	r.modelRoute = r.echo.Group("/rest/v1")
-	r.rpcRoute = r.echo.Group("/rest/v1/rpc")
-	r.realtimeRoute = r.echo.Group("/realtime/v1")
-	r.storageRoute = r.echo.Group("/storage/v1")
-
-	return r
+	return &router{
+		engine: engine,
+		config: config,
+		groups: groups,
+		tracer: tracer,
+		routes: defaultRoutes,
+	}
 }
 
 type router struct {
-	echo   *echo.Echo
-	config *Config
-
-	functionRoute *echo.Group
-	rpcRoute      *echo.Group
-	modelRoute    *echo.Group
-	realtimeRoute *echo.Group
-	storageRoute  *echo.Group
+	config      *Config
+	engine      *fs_router.Router
+	groups      map[RouteType]*fs_router.Group
+	middlewares []MiddlewareFn
+	routes      []*Route
+	tracer      trace.Tracer
 }
 
-func (r *router) GetHandler() http.Handler {
-	return r.echo
+func (r *router) RegisterMiddlewares(middlewares []MiddlewareFn) *router {
+	r.middlewares = append(r.middlewares, middlewares...)
+	return r
+}
+
+func (r *router) Register(routes []*Route) *router {
+	r.routes = append(r.routes, routes...)
+	return r
+}
+
+func (r *router) BuildHandler() {
+	for _, route := range r.routes {
+		if len(route.Methods) == 0 && route.Type != RouteTypeRest && route.Type != RouteTypeStorage {
+			Panicf("Unknown method in route path %s", route.Path)
+		}
+
+		if route == nil {
+			continue
+		}
+
+		switch route.Type {
+		case RouteTypeFunction, RouteTypeRpc:
+			r.registerRpcAndFunctionHandler(route)
+		case RouteTypeCustom:
+			r.registerHttpHandler(route)
+		case RouteTypeRest:
+			if route.Model == nil {
+				logger.Errorf("[Build Route] invalid route %s, model must be define", route.Path)
+			}
+			r.registerRestHandler(route)
+		case RouteTypeStorage:
+			if route.Storage == nil {
+				logger.Errorf("[Build Route] invalid route %s, storage must be define", route.Path)
+			}
+			r.registerStorageHandler(route)
+		case RouteTypeRealtime:
+			Panicf("register route type %v is not implemented, wait for update :) ", route.Type)
+		}
+	}
+
+	// Proxy auth url
+	u, err := url.Parse(r.config.SupabasePublicUrl)
+	if err == nil {
+		r.engine.ANY("/auth/v1/{path:*}", ProxyHandler(u, "/auth/v1", nil, nil))
+	}
+}
+
+func (r *router) buildNativeMiddleware(route *Route, chain Chain) Chain {
+	if r.config.TraceEnable {
+		chain = chain.Append(TraceMiddleware)
+	}
+
+	if r.config.BreakerEnable {
+		chain = chain.Append(BreakerMiddleware(route.Path))
+	}
+
+	return chain
+}
+
+func (r *router) buildAppMiddleware(chain Chain) Chain {
+	for _, m := range r.middlewares {
+		chain.Append(m)
+	}
+	return chain
+}
+
+func (r *router) findRouteGroup(routeType RouteType) *fs_router.Group {
+	return r.groups[routeType]
+}
+
+func (r *router) bindRouteGroup(group *fs_router.Group, chain Chain, route *Route) {
+	for _, m := range route.Methods {
+		handler := chain.Then(m, route.Type, route.Controller)
+		switch strings.ToUpper(m) {
+		case fasthttp.MethodGet:
+			group.GET(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPost:
+			group.POST(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPut:
+			group.PUT(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPatch:
+			group.PATCH(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodDelete:
+			group.DELETE(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodOptions:
+			group.OPTIONS(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodHead:
+			group.HEAD(route.Path, buildHandler(r.config, r.tracer, handler))
+		}
+	}
+}
+
+func (r *router) bindRoute(chain Chain, route *Route) {
+	for _, m := range route.Methods {
+		handler := chain.Then(m, route.Type, route.Controller)
+		switch strings.ToUpper(m) {
+		case fasthttp.MethodGet:
+			r.engine.GET(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPost:
+			r.engine.POST(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPut:
+			r.engine.PUT(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodPatch:
+			r.engine.PATCH(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodDelete:
+			r.engine.DELETE(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodOptions:
+			r.engine.OPTIONS(route.Path, buildHandler(r.config, r.tracer, handler))
+		case fasthttp.MethodHead:
+			r.engine.HEAD(route.Path, buildHandler(r.config, r.tracer, handler))
+		}
+	}
+}
+
+func (r *router) registerHandler(route *Route) {
+	chain := NewChain()
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
+		r.bindRouteGroup(group, chain, route)
+	}
+}
+
+func (r *router) registerRpcAndFunctionHandler(route *Route) {
+	var routeType string
+	if route.Type == RouteTypeFunction {
+		routeType = "function "
+	} else {
+		routeType = "rpc"
+	}
+
+	if len(route.Methods) > 1 {
+		Panicf(`route %s with type %s,only allowed set 1 method and only allowed post method`, route.Path, routeType)
+	}
+
+	if route.Methods[0] != fasthttp.MethodPost {
+		Panicf("route %s with type function,only allowed setup with Post method", route.Path)
+	}
+
+	chain := NewChain()
+
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
+		group.POST(route.Path, buildHandler(
+			r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, route.Controller),
+		))
+	}
+}
+
+func (r *router) registerHttpHandler(route *Route) {
+	chain := NewChain()
+	chain = r.buildNativeMiddleware(route, chain)
+	if len(r.middlewares) > 0 {
+		chain = r.buildAppMiddleware(chain)
+	}
+
+	r.bindRoute(chain, route)
+}
+
+func (r *router) registerRestHandler(route *Route) {
+	chain := NewChain()
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
+
+		rt := reflect.TypeOf(route.Model)
+		if rt.Kind() == reflect.Ptr {
+			rt = rt.Elem()
+		}
+
+		modelName := rt.Name()
+
+		restController := RestController{
+			Controller: route.Controller,
+			ModelName:  modelName,
+		}
+
+		group.GET(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+	}
+}
+
+func (r *router) registerStorageHandler(route *Route) {
+	chain := NewChain()
+	if group := r.findRouteGroup(route.Type); group != nil {
+		chain = r.buildNativeMiddleware(route, chain)
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
+
+		restController := StorageController{
+			Controller: route.Controller,
+			BucketName: route.Storage.Name(),
+			RoutePath:  route.Path,
+		}
+
+		group.GET(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+	}
+}
+
+func (r *router) GetHandler() fasthttp.RequestHandler {
+	r.engine.HandleOPTIONS = true
+	r.engine.GlobalOPTIONS = CorsMiddleware(r.config)
+	return r.engine.Handler
+}
+
+func (r *router) GetRegisteredRoutes() map[string][]string {
+	return r.engine.List()
 }
 
 func (r *router) PrintRegisteredRoute() {
-	registeredRoutes := r.echo.Routes()
+	registeredRoutes := r.engine.List()
 	Infof("%s Registered Route %s ", strings.Repeat("=", 11), strings.Repeat("=", 11))
-	for _, route := range registeredRoutes {
-		Infof(" %s - %s", strings.ToUpper(route.Method), route.Path)
+	for method, routes := range registeredRoutes {
+		Infof("%s", utils.GetColoredHttpMethod(method))
+		for _, route := range routes {
+			Infof("- %s", route)
+		}
 	}
 	Info(strings.Repeat("=", 40))
 }
 
-func applyDefaultMiddleware(e *echo.Echo) {
-	// apply log middleware
-	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogStatus: true,
-		LogURI:    true,
-		BeforeNextFunc: func(c echo.Context) {
-		},
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			requestInformation := color.HiBlackString("host : %v - uri : %v - status : %v ", c.Request().RemoteAddr, v.URI, v.Status)
-			Infof("%s %s", utils.GetColoredHttpMethod(c.Request().Method), requestInformation)
-			return nil
-		},
-	}))
-
-	// apply recover middleware
-	e.Use(middleware.Recover())
+// The function creates and returns a map of route groups based on different route types.
+func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group {
+	return map[RouteType]*fs_router.Group{ // available type custom
+		RouteTypeFunction: engine.Group("/functions/v1"),      // type function
+		RouteTypeRest:     engine.Group("/rest/v1"),           // type rest
+		RouteTypeRpc:      engine.Group("/rest/v1/rpc"),       // type rpc
+		RouteTypeRealtime: engine.Group("/realtime/v1"),       // type realtime
+		RouteTypeStorage:  engine.Group("/storage/v1/object"), // type storage
+	}
 }
 
-func applyAppContext(e *echo.Echo, config *Config) {
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			context := &Context{
-				Context: c,
-				config:  config,
-			}
-			return next(context)
+// The function "buildHandler" creates a fasthttp.RequestHandler that executes a given RouteHandlerFn
+// with a provided Config and trace.Tracer.
+func buildHandler(config *Config, tracer trace.Tracer, handler RouteHandlerFn) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		appContext := &Ctx{
+			RequestCtx: ctx,
+			config:     config,
+			tracer:     tracer,
+			Context:    context.Background(),
 		}
-	})
+		// execute actual handler from controller
+		if err := handler(appContext); err != nil {
+			appContext.WriteError(err)
+		}
+	}
+}
+
+// The `createHandleFunc` function creates a route handler function that handles different HTTP methods
+// by calling corresponding methods on a controller object.
+func createHandleFunc(httpMethod string, routeType RouteType, c Controller) RouteHandlerFn {
+	return func(ctx Context) error {
+
+		// marshall and validate http request data
+		// will return error if `Payload` field is not define in controller
+		if routeType != RouteTypeRest && routeType != RouteTypeStorage {
+			if err := MarshallAndValidate(ctx.RequestContext(), c); err != nil {
+				return err
+			}
+		}
+
+		if err := c.BeforeAll(ctx); err != nil {
+			return err
+		}
+
+		switch httpMethod {
+		case fasthttp.MethodGet:
+			if err := c.BeforeGet(ctx); err != nil {
+				return err
+			}
+
+			if err := c.Get(ctx); err != nil {
+				return err
+			}
+
+			if err := c.AfterGet(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodPost:
+			if err := c.BeforePost(ctx); err != nil {
+				return err
+			}
+
+			if err := c.Post(ctx); err != nil {
+				return err
+			}
+
+			if err := c.AfterPost(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodPut:
+			if err := c.BeforePut(ctx); err != nil {
+				return err
+			}
+
+			if err := c.Put(ctx); err != nil {
+				return err
+			}
+
+			if err := c.AfterPut(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodPatch:
+			if err := c.BeforePatch(ctx); err != nil {
+				return err
+			}
+
+			if err := c.Patch(ctx); err != nil {
+				return err
+			}
+
+			if err := c.AfterPatch(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodDelete:
+			if err := c.BeforeDelete(ctx); err != nil {
+				return err
+			}
+
+			if err := c.Delete(ctx); err != nil {
+				return err
+			}
+
+			if err := c.AfterDelete(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodOptions:
+			if err := c.BeforeOptions(ctx); err != nil {
+				return err
+			}
+
+			if err := c.Options(ctx); err != nil {
+				return err
+			}
+
+			if err := c.AfterOptions(ctx); err != nil {
+				Error(err)
+			}
+		case fasthttp.MethodHead:
+			if err := c.BeforeHead(ctx); err != nil {
+				return err
+			}
+
+			if err := c.Head(ctx); err != nil {
+				return err
+			}
+
+			if err := c.AfterHead(ctx); err != nil {
+				Error(err)
+			}
+		}
+
+		if err := c.AfterAll(ctx); err != nil {
+			Error(err)
+		}
+
+		return nil
+	}
 }

@@ -3,36 +3,125 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
-	"reflect"
 	"text/template"
 
-	"github.com/sev-2/raiden/pkg/supabase"
+	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var roleDir = "roles"
-var roleInstanceTemplate = `
-package roles
+// ----- Define type, variable and constant -----
+type GenerateRoleData struct {
+	Imports                []string
+	Package                string
+	Name                   string
+	DefaultLimitConnection int
+	ConnectionLimit        int
+	InheritRole            bool
+	IsReplicationRole      bool
+	IsSuperuser            bool
+	CanBypassRls           bool
+	CanCreateDB            bool
+	CanCreateRole          bool
+	CanLogin               bool
+	ValidUntil             string
+}
+
+const (
+	RoleDir      = "internal/roles"
+	RoleTemplate = `package {{ .Package }}
+{{- if gt (len .Imports) 0 }}
 
 import (
-	"github.com/sev-2/raiden/pkg/postgres"
+{{- range .Imports}}
+	{{.}}
+{{- end}}
+)
+{{- end }}
+
+type {{ .Name | ToGoIdentifier }} struct {
+	raiden.RoleBase
+}
+
+func (r *{{ .Name | ToGoIdentifier }}) Name() string {
+	return "{{ .Name }}"
+}
+
+{{- if ne .ConnectionLimit .DefaultLimitConnection }}
+
+func (r *{{ .Name | ToGoIdentifier }}) ConnectionLimit() int {
+	return {{ .ConnectionLimit }}
+}
+{{- end }}
+{{- if not .InheritRole }}
+
+func (r *{{ .Name | ToGoIdentifier }}) InheritRole() bool {
+	return {{ .InheritRole }}
+}
+{{- end }}
+{{- if .IsReplicationRole }}
+
+func (r *{{ .Name | ToGoIdentifier }}) IsReplicationRole() bool {
+	return {{ .IsReplicationRole }}
+}
+{{- end }}
+{{- if .IsSuperuser }}
+func (r *{{ .Name | ToGoIdentifier }}) IsSuperuser() bool {
+	return {{ .IsSuperuser }}
+}
+
+{{- end }}
+{{- if .CanBypassRls }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanBypassRls() bool {
+	return {{ .CanBypassRls }}
+}
+{{- end }}
+{{- if .CanCreateDB }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanCreateDB() bool {
+	return {{ .CanCreateDB }}
+}
+{{- end }}
+{{- if .CanCreateRole }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanCreateRole() bool {
+	return {{ .CanCreateRole }}
+}
+{{- end }}
+{{- if .CanLogin }}
+
+func (r *{{ .Name | ToGoIdentifier }}) CanLogin() bool {
+	return {{ .CanLogin }}
+}
+{{- end }}
+{{- if ne .ValidUntil ""}}
+
+func (r *{{ .Name | ToGoIdentifier }}) ValidUntil() *objects.SupabaseTime {
+	t, err := time.Parse(raiden.DefaultRoleValidUntilLayout, "{{ .ValidUntil }}")
+	if err != nil {
+		raiden.Error(err)
+		return nil
+	}
+	return objects.NewSupabaseTime(t)
+}
+{{- end }}
+
+`
 )
 
-var {{ .RoleName | ToGoIdentifier }} = &postgres.Role{
-{{- range $i, $field := .Fields }}
-	{{ .Name }} : {{ .Value }},
-{{- end }}
-}
-`
-
-func GenerateRoles(projectName string, roles []supabase.Role) (err error) {
-	err = utils.CreateFolder(filepath.Join(projectName, roleDir))
-	if err != nil {
-		return err
+func GenerateRoles(basePath string, roles []objects.Role, generateFn GenerateFn) (err error) {
+	folderPath := filepath.Join(basePath, RoleDir)
+	logger.Debugf("GenerateRoles - create %s folder if not exist", folderPath)
+	if exist := utils.IsFolderExists(folderPath); !exist {
+		if err := utils.CreateFolder(folderPath); err != nil {
+			return err
+		}
 	}
 
 	for _, v := range roles {
-		if err := GenerateRole(projectName, v); err != nil {
+		if err := GenerateRole(folderPath, v, generateFn); err != nil {
 			return err
 		}
 	}
@@ -40,95 +129,56 @@ func GenerateRoles(projectName string, roles []supabase.Role) (err error) {
 	return nil
 }
 
-func GenerateRole(projectName string, role supabase.Role) error {
-	tmpl, err := template.New("roleInstanceTemplate").
-		Funcs(template.FuncMap{"ToGoIdentifier": utils.SnakeCaseToPascalCase}).
-		Parse(roleInstanceTemplate)
-	if err != nil {
-		return fmt.Errorf("error parsing template : %v", err)
+func GenerateRole(folderPath string, role objects.Role, generateFn GenerateFn) error {
+	// define binding func
+	funcMaps := []template.FuncMap{
+		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
 	}
 
-	fields := make([]map[string]any, 0)
-	instanceType := reflect.TypeOf(role)
+	// define file path
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", role.Name, "go"))
 
-	// Todo : convert build to recursive
-	for i := 0; i < instanceType.NumField(); i++ {
-		newField := make(map[string]any)
-		field := instanceType.Field(i)
-		if field.Name == "Password" {
-			continue
-		}
-		fieldValue := reflect.ValueOf(role).Field(i)
+	// set imports path
+	var imports []string
+	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
+	imports = append(imports, raidenPath)
 
-		newField["Name"] = field.Name
-		newField["Value"] = getRoleValue(field, fieldValue)
-		fields = append(fields, newField)
-	}
-	// Create or open the output file
-	folderPath := fmt.Sprintf("%s/%s", projectName, roleDir)
-	file, err := createFile(getAbsolutePath(folderPath), role.Name, "go")
-	if err != nil {
-		return fmt.Errorf("failed create file %s : %v", role.Name, err)
-	}
-	defer file.Close()
-
-	// Execute the template and write to the file
-	err = tmpl.Execute(file, map[string]any{
-		"RoleName":   role.Name,
-		"Fields":     fields,
-		"TotalField": len(fields),
-	})
-
-	if err != nil {
-		return fmt.Errorf("error executing template: %v", err)
+	var validUntil string
+	if role.ValidUntil != nil {
+		imports = append(
+			imports,
+			fmt.Sprintf("%q", "time"),
+			fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/supabase/objects"),
+		)
+		validUntil = role.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
 	}
 
-	return nil
-}
-
-func getRoleValue(field reflect.StructField, value reflect.Value) string {
-	switch field.Type.Kind() {
-	case reflect.String:
-		return fmt.Sprintf("%q", value.String())
-	case reflect.Ptr:
-		if !value.IsNil() {
-			return value.Elem().String()
-		} else {
-			return "nil"
-		}
-	case reflect.Slice:
-		if field.Type.Elem().Kind() == reflect.String {
-			return generateArrayDeclaration(value)
-		}
-	case reflect.Map:
-		if len(value.MapKeys()) == 0 {
-			return "map[string]any{}"
-		}
-		if mapValues, ok := value.Interface().(map[string]any); ok {
-			mapValueStr := generateMapDeclaration(mapValues)
-			return mapValueStr
-		} else {
-			return "map[string]any{}"
-		}
-	case reflect.Struct:
-		return formatCustomStructDataType(value)
-	case reflect.Interface:
-		rv := reflect.ValueOf(value.Interface())
-		if rv.Kind() == reflect.Map {
-			if len(rv.MapKeys()) == 0 {
-				return "map[string]any{}"
-			} else {
-				return generateMapDeclarationFromValue(rv)
-			}
-
-		} else if rv.Kind() == reflect.Slice {
-			return generateArrayDeclaration(rv)
-		} else if !value.IsNil() {
-			return fmt.Sprintf("%v", value.Interface())
-		} else {
-			return "nil"
-		}
+	// execute the template and write to the file
+	data := GenerateRoleData{
+		Package:                "roles",
+		Imports:                imports,
+		Name:                   role.Name,
+		ConnectionLimit:        role.ConnectionLimit,
+		DefaultLimitConnection: raiden.DefaultRoleConnectionLimit,
+		InheritRole:            role.InheritRole,
+		IsReplicationRole:      role.IsReplicationRole,
+		IsSuperuser:            role.IsSuperuser,
+		CanBypassRls:           role.CanBypassRLS,
+		CanCreateDB:            role.CanCreateDB,
+		CanCreateRole:          role.CanCreateRole,
+		CanLogin:               role.CanLogin,
+		ValidUntil:             validUntil,
 	}
 
-	return fmt.Sprintf("%v", value.Interface())
+	// set input
+	input := GenerateInput{
+		BindData:     data,
+		Template:     RoleTemplate,
+		TemplateName: "roleTemplate",
+		OutputPath:   filePath,
+		FuncMap:      funcMaps,
+	}
+
+	logger.Debugf("GenerateRoles - generate role to %s", input.OutputPath)
+	return generateFn(input, nil)
 }
