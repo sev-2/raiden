@@ -29,8 +29,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          ls -la
-          GOOS=$GOOS GOARCH=$GOARCH go build -trimpath -o build/ ./cmd/cli/raiden.go
+          GOOS=$GOOS GOARCH=$GOARCH go build -trimpath -o build/raiden ./cmd/raiden/main.go
           cd build
           if [[ $GOOS == 'darwin' ]]; then
             tar cvf raiden-macos-"$GOARCH".tar.gz raiden
