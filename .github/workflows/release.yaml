@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/*
     tags:
       - v*
 
@@ -13,7 +14,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        goos: [linux, darwin]
+        goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +34,10 @@ jobs:
           cd build
           if [[ $GOOS == 'darwin' ]]; then
             cp raiden raiden-macos-"$GOARCH"
+          elif [[ $GOOS == 'windows' ]]; then
+            mv raiden raiden.exe
+            sudo apt-get install -y nsis
+            makensis -NOCD -DARCH="$GOARCH" ${GITHUB_WORKSPACE}/scripts/windows.nsi
           else
             cp raiden raiden-"$GOOS"-"$GOARCH"
           fi
