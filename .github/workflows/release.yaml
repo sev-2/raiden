@@ -30,6 +30,10 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
+          VERSION=$([[ ! -z $GITHUB_REF_NAME ]] && echo $GITHUB_REF_NAME || echo $GITHUB_HEAD_NAME)
+          echo "Raiden version: $VERSION"
+          sed -i "s,.*appVersion = \".*\"$,\tappVersion = \"$VERSION\"," 'cmd/raiden/commands/version.go'
+
           go build -ldflags="-s -w" -trimpath -o build/raiden ./cmd/raiden/main.go
           cd build
           if [[ $GOOS == 'darwin' ]]; then
