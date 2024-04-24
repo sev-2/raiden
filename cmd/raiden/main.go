@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	f := cli.Flags{}
+	f := cli.LogFlags{}
 
 	rootCmd := &cobra.Command{Use: "raiden"}
 

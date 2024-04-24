@@ -4,23 +4,25 @@ import (
 	"fmt"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/supabase/query"
 	"github.com/sev-2/raiden/pkg/supabase/query/sql"
 )
 
 func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
+	MetaLogger.Trace("Start - fetching functions from meta")
 	url := fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := client.Get[[]objects.Function](url, client.DefaultTimeout, nil, nil)
+	rs, err := net.Get[[]objects.Function](url, net.DefaultTimeout, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
 	}
+	MetaLogger.Trace("Finish - fetching functions from meta")
 	return rs, err
 }
 
 func GetFunctionByName(cfg *raiden.Config, schema, name string) (result objects.Function, err error) {
+	MetaLogger.Trace("Start - fetching function by name from meta")
 	sql := sql.GenerateFunctionByNameQuery(schema, name) + " limit 1"
 	rs, err := ExecuteQuery[[]objects.Function](cfg.SupabaseApiUrl, sql, nil, nil, nil)
 	if err != nil {
@@ -32,42 +34,45 @@ func GetFunctionByName(cfg *raiden.Config, schema, name string) (result objects.
 		err = fmt.Errorf("get function %s is not found", name)
 		return
 	}
-
+	MetaLogger.Trace("Finish - fetching function by name from meta")
 	return rs[0], nil
 }
 
 func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, error) {
+	MetaLogger.Trace("Start - create function", "name", fn.Name)
 	// Execute SQL Query
 	sql, err := query.BuildFunctionQuery(query.FunctionActionCreate, &fn)
 	if err != nil {
 		return objects.Function{}, nil
 	}
 
-	logger.Debug("Create Function - execute : ", sql)
 	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
 	if err != nil {
 		return objects.Function{}, fmt.Errorf("create new function %s error : %s", fn.Name, err)
 	}
 
+	MetaLogger.Trace("Finish - create function", "name", fn.Name)
 	return GetFunctionByName(cfg, fn.Schema, fn.Name)
 }
 
 func DeleteFunction(cfg *raiden.Config, fn objects.Function) error {
-	logger.Debug("Create Function - execute : ", fn.CompleteStatement)
+	MetaLogger.Trace("Start - delete function", "name", fn.Name)
 	sql, err := query.BuildFunctionQuery(query.FunctionActionDelete, &fn)
 	if err != nil {
 		return err
 	}
 
-	logger.Debug("Delete Function - execute : ", sql)
 	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete Function %s error : %s", fn.Name, err)
 	}
+
+	MetaLogger.Trace("Delete - delete function", "name", fn.Name)
 	return nil
 }
 
 func UpdateFunction(cfg *raiden.Config, fn objects.Function) error {
+	MetaLogger.Trace("Start - update function", "name", fn.Name)
 	updateSql, err := query.BuildFunctionQuery(query.FunctionActionUpdate, &fn)
 	if err != nil {
 		return err
@@ -76,6 +81,6 @@ func UpdateFunction(cfg *raiden.Config, fn objects.Function) error {
 	if err != nil {
 		return fmt.Errorf("update function %s error : %s", fn.Name, err)
 	}
-
+	MetaLogger.Trace("Finish - update function", "name", fn.Name)
 	return nil
 }

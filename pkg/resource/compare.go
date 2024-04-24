@@ -6,11 +6,14 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var CompareLogger hclog.Logger = logger.HcLog().Named("import.compare")
 
 type (
 	CompareMode string
@@ -24,12 +27,7 @@ type (
 	}
 )
 
-const (
-	CompareModeImport CompareMode = "import"
-	CompareModeApply  CompareMode = "apply"
-)
-
-func CompareRoles(sourceRole, targetRole []objects.Role, mode CompareMode) (diffResult []CompareDiffResult[objects.Role, objects.UpdateRoleParam], err error) {
+func CompareRoles(sourceRole, targetRole []objects.Role) (diffResult []CompareDiffResult[objects.Role, objects.UpdateRoleParam], err error) {
 	mapTargetRoles := make(map[int]objects.Role)
 	for i := range targetRole {
 		r := targetRole[i]
@@ -43,26 +41,19 @@ func CompareRoles(sourceRole, targetRole []objects.Role, mode CompareMode) (diff
 		if !isExist {
 			continue
 		}
+		// diff, err := CompareRoleImportMode(r, tr)
+		// if err != nil {
+		// 	return diffResult, err
+		// }
 
-		if mode == CompareModeImport {
-			diff, err := CompareRoleImportMode(r, tr)
-			if err != nil {
-				return diffResult, err
-			}
+		// if !diff.IsConflict {
+		// 	continue
+		// }
 
-			if !diff.IsConflict {
-				continue
-			}
-
-			diffResult = append(diffResult, diff)
-			continue
-		}
-
-		if mode == CompareModeApply {
-			diffResult = append(diffResult, compareRoleApplyMode(r, tr))
-			continue
-		}
-
+		// diffResult = append(diffResult, diff)
+		// continue
+		diffResult = append(diffResult, compareRoleApplyMode(r, tr))
+		continue
 	}
 
 	return
@@ -195,7 +186,7 @@ func compareRoleApplyMode(source, target objects.Role) (diffResult CompareDiffRe
 //
 // for CompareModeImport source table is supabase table and target table is app table
 // for CompareModeApply source table is app table and target table is supabase table
-func CompareTables(sourceTable, targetTable []objects.Table, mode CompareMode) (diffResult []CompareDiffResult[objects.Table, objects.UpdateTableParam], err error) {
+func CompareTables(sourceTable, targetTable []objects.Table) (diffResult []CompareDiffResult[objects.Table, objects.UpdateTableParam], err error) {
 	mapTargetTable := make(map[int]objects.Table)
 	for i := range targetTable {
 		t := targetTable[i]
@@ -400,7 +391,7 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 				Data: sc,
 				Type: objects.UpdateRelationUpdate,
 			})
-			logger.Debugf("update %s relation, source not match", sc.ConstraintName)
+			CompareLogger.Debug("update relation, source not match", "constrain-name", sc.ConstraintName)
 			continue
 		}
 
@@ -409,7 +400,7 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 				Data: sc,
 				Type: objects.UpdateRelationUpdate,
 			})
-			logger.Debug("update %s relation, target not match", sc.ConstraintName)
+			CompareLogger.Debug("update relation, target not match", "constrain-name", sc.ConstraintName)
 			continue
 		}
 	}
@@ -529,7 +520,6 @@ func comparePolicy(source, target objects.Policy) (diffResult CompareDiffResult[
 }
 
 // Compare Storage
-
 func CompareStorage(sourceStorage, targetStorage []objects.Bucket) (diffResult []CompareDiffResult[objects.Bucket, objects.UpdateBucketParam], err error) {
 	mapTargetStorage := make(map[string]objects.Bucket)
 	for i := range targetStorage {

@@ -3,14 +3,16 @@ package supabase
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/valyala/fasthttp"
 )
+
+var StorageLogger = logger.HcLog().Named("supabase.storage")
 
 type CreateBucketSuccessResponse struct {
 	Name string `json:"name"`
@@ -20,8 +22,8 @@ type DefaultBucketSuccessResponse struct {
 	Message string `json:"message"`
 }
 
-func DefaultAuthInterceptor(apiKey string, accessToken string) func(req *fasthttp.Request) error {
-	return func(req *fasthttp.Request) error {
+func DefaultAuthInterceptor(apiKey string, accessToken string) func(req *http.Request) error {
+	return func(req *http.Request) error {
 		req.Header.Set("apiKey", apiKey)
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 		return nil
@@ -34,39 +36,36 @@ func getBucketUrl(cfg *raiden.Config) string {
 }
 
 func GetBuckets(cfg *raiden.Config) (buckets []objects.Bucket, err error) {
-	logger.Debug("get all bucket from storage")
-	return client.Get[[]objects.Bucket](
-		getBucketUrl(cfg), client.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
-	)
+	StorageLogger.Debug("fetch all bucket from cloud")
+	return net.Get[[]objects.Bucket](getBucketUrl(cfg), net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil)
 }
 
 func GetBucket(cfg *raiden.Config, bucketId string) (buckets objects.Bucket, err error) {
-	logger.Debug("get bucket from storage")
+	StorageLogger.Debug("fetch bucket by name from cloud")
 	url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), bucketId)
-	return client.Get[objects.Bucket](url, client.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil)
+	return net.Get[objects.Bucket](url, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil)
 }
 
 func CreateBucket(cfg *raiden.Config, param objects.Bucket) (bucket objects.Bucket, err error) {
-	logger.Debug("create new bucket")
+	StorageLogger.Debug("Start - create storage", "name", param.Name)
 	byteData, err := json.Marshal(param)
 	if err != nil {
 		return bucket, err
 	}
 
-	logger.PrintJson(param, true)
-	res, err := client.Post[CreateBucketSuccessResponse](
-		getBucketUrl(cfg), byteData, client.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
+	res, err := net.Post[CreateBucketSuccessResponse](
+		getBucketUrl(cfg), byteData, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
 	)
 
 	if err != nil {
 		return bucket, err
 	}
-
+	StorageLogger.Debug("Finish - create storage", "name", param.Name)
 	return GetBucket(cfg, res.Name)
 }
 
 func UpdateBucket(cfg *raiden.Config, param objects.Bucket, updateItem objects.UpdateBucketParam) error {
-	logger.Debug("update bucket")
+	StorageLogger.Debug("Start - update storage", "name", param.Name)
 
 	// just return, nothing to be processed
 	if len(updateItem.ChangeItems) == 0 {
@@ -94,25 +93,28 @@ func UpdateBucket(cfg *raiden.Config, param objects.Bucket, updateItem objects.U
 	}
 
 	url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), param.ID)
-	_, err = client.Put[DefaultBucketSuccessResponse](
-		url, byteData, client.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
+	_, err = net.Put[DefaultBucketSuccessResponse](
+		url, byteData, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
 	)
+	StorageLogger.Debug("Finish - update storage", "name", param.Name)
 	return err
 }
 
 func DeleteBucket(cfg *raiden.Config, param objects.Bucket) (err error) {
-	logger.Debug("delete bucket")
+	StorageLogger.Debug("Start - delete storage", "name", param.Name)
 
-	deleteReqInterceptor := func(req *fasthttp.Request) error {
+	deleteReqInterceptor := func(req *http.Request) error {
 		req.Header.Set("apiKey", cfg.ServiceKey)
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.ServiceKey))
-		req.Header.SetContentType("")
+		req.Header.Set("Content-Type", "")
 		return nil
 	}
 
 	url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), param.ID)
-	_, err = client.Delete[DefaultBucketSuccessResponse](
-		url, nil, client.DefaultTimeout, deleteReqInterceptor, nil,
+	_, err = net.Delete[DefaultBucketSuccessResponse](
+		url, nil, net.DefaultTimeout, deleteReqInterceptor, nil,
 	)
+
+	StorageLogger.Debug("Finish - delete storage", "name", param.Name)
 	return err
 }

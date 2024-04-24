@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	init_command "github.com/sev-2/raiden/pkg/cli/init"
@@ -15,6 +16,8 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
+
+var BuildLogger hclog.Logger = logger.HcLog().Named("build")
 
 // The `type Flags struct` is defining a struct called `Flags`. This struct is used to store the values
 // of command-line flags related to the target operating system and processor architecture.
@@ -74,7 +77,8 @@ func Run(f *Flags, config *raiden.Config, projectPath string) error {
 	output := GetBuildFilePath(projectPath, config.ProjectName, targetOs)
 
 	// Run the "go build" command
-	logger.Debugf("Execute command : go build -o %s %s", output, mainFilePath)
+	BuildLogger.Info("start build binary")
+	BuildLogger.Debug("execute command", "cmd", fmt.Sprintf("go build -o %s %s", output, mainFilePath))
 	cmd := exec.Command("go", "build", "-o", output, mainFilePath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -84,7 +88,7 @@ func Run(f *Flags, config *raiden.Config, projectPath string) error {
 		return fmt.Errorf("error building binary: %v", err)
 	}
 
-	logger.Debug("Saved binary to ", output)
+	BuildLogger.Info("Saved binary to ", output)
 	return nil
 }
 

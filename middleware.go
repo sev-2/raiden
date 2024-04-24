@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/tracer"
 	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/breaker"
 	"go.opentelemetry.io/otel/codes"
 )
+
+var MiddlewareLogger = logger.HcLog().Named("raiden.middleware")
 
 // --- define type and constant ----
 type (
@@ -112,7 +115,7 @@ func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
 		}
 
 		if resStatusCode == fasthttp.StatusServiceUnavailable {
-			Error(err)
+			MiddlewareLogger.Error("status code", "msg", err)
 		}
 
 		return err
@@ -122,6 +125,8 @@ func TraceMiddleware(next RouteHandlerFn) RouteHandlerFn {
 // this middleware is modified version from go-zero (https://github.com/zeromicro/go-zero)
 const breakerSeparator = "://"
 
+var breakerMiddleware = logger.HcLog().Named("raiden.middleware.breaker")
+
 // Handler open / close circuit breaker base on request error throttle
 func BreakerMiddleware(path string) MiddlewareFn {
 	brk := breaker.NewBreaker(breaker.WithName(strings.Join([]string{path}, breakerSeparator)))
@@ -129,11 +134,12 @@ func BreakerMiddleware(path string) MiddlewareFn {
 		return func(ctx Context) error {
 			promise, err := brk.Allow()
 			if err != nil {
-				Errorf("[http] dropped, %s - %s - %s",
-					string(ctx.RequestContext().RequestURI()),
-					ctx.RequestContext().RemoteAddr().String(),
-					string(ctx.RequestContext().UserAgent()),
-				)
+				breakerMiddleware.
+					With("uri", string(ctx.RequestContext().RequestURI())).
+					With("addr", ctx.RequestContext().RemoteAddr().String()).
+					With("user-agent", string(ctx.RequestContext().UserAgent())).
+					Error("dropped request")
+
 				err := ErrorResponse{
 					StatusCode: fasthttp.StatusServiceUnavailable,
 					Code:       "Server Unhealthy",
@@ -222,8 +228,6 @@ func CorsMiddleware(config *Config) fasthttp.RequestHandler {
 	corsOptions.AllowCredentials = config.CorsAllowCredentials
 
 	return func(ctx *fasthttp.RequestCtx) {
-		Infof("this handler from global options")
-
 		origin := string(ctx.Request.Header.Peek("Origin"))
 		if !isValidOrigin(origin, corsOptions.AllowedOrigins) {
 			// Return a custom error response for CORS errors

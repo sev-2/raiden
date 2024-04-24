@@ -6,6 +6,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
@@ -13,6 +14,8 @@ import (
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ModelLogger hclog.Logger = logger.HcLog().Named("generator.model")
 
 // ----- Define type, variable and constant -----
 type (
@@ -83,7 +86,7 @@ type {{ .StructName }} struct {
 
 func GenerateModels(basePath string, tables []*GenerateModelInput, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, ModelDir)
-	logger.Debugf("GenerateModels - create %s folder if not exist", folderPath)
+	ModelLogger.Trace("create models folder if not exist", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
 		if err := utils.CreateFolder(folderPath); err != nil {
 			return err
@@ -160,7 +163,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateModels - generate model to %s", generateInput.OutputPath)
+	ModelLogger.Debug("generate model", "path", generateInput.OutputPath)
 	return generateFn(generateInput, nil)
 }
 

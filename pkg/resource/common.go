@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/cli/generate"
@@ -23,24 +24,31 @@ type Flags struct {
 	RpcOnly       bool
 	RolesOnly     bool
 	ModelsOnly    bool
-	StorageOnly   bool
+	StoragesOnly  bool
 	AllowedSchema string
-	Verbose       bool
+	DebugMode     bool
+	TraceMode     bool
 	Generate      generate.Flags
 }
 
 // LoadAll is function to check is all resource need to import or apply
 func (f *Flags) All() bool {
-	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.StorageOnly
+	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.StoragesOnly
 }
 
-func (f Flags) CheckAndActivateDebug(cmd *cobra.Command) bool {
-	verbose, _ := cmd.Root().PersistentFlags().GetBool("verbose")
-	if verbose {
-		logger.Info("set logger to debug mode")
-		logger.SetDebug()
+func (f *Flags) BindLog(cmd *cobra.Command) {
+	cmd.PersistentFlags().BoolVar(&f.DebugMode, "debug", false, "enable log with debug mode")
+	cmd.PersistentFlags().BoolVar(&f.TraceMode, "trace", false, "enable log with trace mode")
+}
+
+func (f Flags) CheckAndActivateDebug(cmd *cobra.Command) {
+	if f.DebugMode {
+		logger.HcLog().SetLevel(hclog.Debug)
 	}
-	return verbose
+
+	if f.TraceMode {
+		logger.HcLog().SetLevel(hclog.Trace)
+	}
 }
 
 func PreRun(projectPath string) error {

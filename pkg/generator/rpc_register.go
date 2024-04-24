@@ -6,9 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var RpcRegisterLogger hclog.Logger = logger.HcLog().Named("generator.rpc_register")
 
 // ----- Define type, variable and constant -----
 type (
@@ -43,7 +46,7 @@ func RegisterRpc() {
 
 func GenerateRpcRegister(basePath string, projectName string, generateFn GenerateFn) error {
 	rpcRegisterDir := filepath.Join(basePath, RpcRegisterDir)
-	logger.Debugf("GenerateRpcRegister - create %s folder if not exist", rpcRegisterDir)
+	RpcRegisterLogger.Trace("create bootstrap folder if not exist", "path", rpcRegisterDir)
 	if exist := utils.IsFolderExists(rpcRegisterDir); !exist {
 		if err := utils.CreateFolder(rpcRegisterDir); err != nil {
 			return err
@@ -51,7 +54,7 @@ func GenerateRpcRegister(basePath string, projectName string, generateFn Generat
 	}
 
 	rpcDir := filepath.Join(basePath, RpcDir)
-	logger.Debugf("GenerateRpcRegister - create %s folder if not exist", rpcDir)
+	RpcRegisterLogger.Trace("create rpc folder if not exist", "path", rpcDir)
 	if exist := utils.IsFolderExists(rpcDir); !exist {
 		if err := utils.CreateFolder(rpcDir); err != nil {
 			return err
@@ -69,7 +72,7 @@ func GenerateRpcRegister(basePath string, projectName string, generateFn Generat
 		return err
 	}
 
-	logger.Debugf("GenerateRpcRegister - generate rpc to %s", input.OutputPath)
+	RpcRegisterLogger.Debug("generate rpc", "path", input.OutputPath)
 	return generateFn(input, nil)
 }
 
@@ -105,12 +108,12 @@ func createRegisterRpcInput(projectName string, rpcRegisterDir string, rpcList [
 }
 
 func WalkScanRpc(rpcDir string) ([]string, error) {
-	logger.Debugf("GenerateRpcRegister - scan %s for register all rpc", rpcDir)
+	RpcRegisterLogger.Trace("scan all rpc", "path", rpcDir)
 
 	rpc := make([]string, 0)
 	err := filepath.Walk(rpcDir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
-			logger.Debugf("GenerateRpcRegister - collect rpc from %s", path)
+			RpcRegisterLogger.Trace("collect rpc", "path", path)
 			rs, e := getStructByBaseName(path, "RpcBase")
 			if e != nil {
 				return e

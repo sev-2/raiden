@@ -6,13 +6,12 @@ import (
 	"github.com/sev-2/raiden/pkg/cli/apply"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/cli/generate"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
 type ApplyFlags struct {
-	cli.Flags
+	cli.LogFlags
 	Apply    apply.Flags
 	Generate generate.Flags
 }
@@ -24,35 +23,36 @@ func ApplyCommand() *cobra.Command {
 		Use:    "apply",
 		Short:  "Apply resource to supabase",
 		Long:   "Apply model, role, rpc and rls to supabase",
-		PreRun: PreRun(&f.Flags, apply.PreRun),
+		PreRun: PreRun(&f.LogFlags, apply.PreRun),
 		Run: func(cmd *cobra.Command, args []string) {
-			verbose := f.CheckAndActivateDebug(cmd)
+			f.CheckAndActivateDebug(cmd)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				logger.Error(errCurDir)
+				apply.ApplyLogger.Error(errCurDir.Error())
 				return
 			}
 
 			// load config
+			apply.ApplyLogger.Info("load configuration")
 			configFilePath := configure.GetConfigFilePath(currentDir)
-			logger.Debug("Load configuration from : ", configFilePath)
+			apply.ApplyLogger.Debug("config file information", "path", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				logger.Error(err)
+				apply.ApplyLogger.Error(err.Error())
 				return
 			}
 
 			// 1. generate all resource
 			if err = generate.Run(&f.Generate, config, currentDir, false); err != nil {
-				logger.Error(err)
+				apply.ApplyLogger.Error(err.Error())
 				return
 			}
 
 			// 2. run import
-			if err = apply.Run(&f.Apply, currentDir, verbose); err != nil {
-				logger.Error(err)
+			if err = apply.Run(&f.LogFlags, &f.Apply, currentDir); err != nil {
+				apply.ApplyLogger.Error(err.Error())
 			}
 		},
 	}

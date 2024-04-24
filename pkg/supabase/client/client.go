@@ -16,7 +16,8 @@ import (
 var (
 	headerContentTypeJson = []byte("application/json")
 	httpClientInstance    Client
-	DefaultTimeout        = time.Duration(4000) * time.Millisecond
+	DefaultTimeout        = time.Duration(20000) * time.Millisecond
+	Logger                = logger.HcLog().Named("supabase.client")
 )
 
 type Client interface {
@@ -42,25 +43,38 @@ type DefaultResponse struct {
 	Message string `json:"message"`
 }
 
-func initClient() Client {
-	if httpClientInstance == nil {
-		readTimeout, _ := time.ParseDuration("4s")
-		writeTimeout, _ := time.ParseDuration("4s")
-		maxIdleConnDuration, _ := time.ParseDuration("1h")
-		httpClientInstance = &fasthttp.Client{
-			ReadTimeout:                   readTimeout,
-			WriteTimeout:                  writeTimeout,
-			MaxIdleConnDuration:           maxIdleConnDuration,
-			NoDefaultUserAgentHeader:      true,
-			DisableHeaderNamesNormalizing: true,
-			DisablePathNormalizing:        true,
-			Dial: (&fasthttp.TCPDialer{
-				Concurrency:      4096,
-				DNSCacheDuration: time.Hour,
-			}).Dial,
-		}
+// func initClient() Client {
+// 	if httpClientInstance == nil {
+// 		maxIdleConnDuration, _ := time.ParseDuration("1h")
+// 		httpClientInstance = &fasthttp.Client{
+// 			MaxIdleConnDuration:           maxIdleConnDuration,
+// 			NoDefaultUserAgentHeader:      true,
+// 			DisableHeaderNamesNormalizing: true,
+// 			DisablePathNormalizing:        true,
+// 			Dial: (&fasthttp.TCPDialer{
+// 				Concurrency:      4096,
+// 				DNSCacheDuration: time.Hour,
+// 			}).Dial,
+// 		}
+// 	}
+// 	return httpClientInstance
+// }
+
+func getClient() Client {
+	maxIdleConnDuration := time.Hour * 1
+	return &fasthttp.Client{
+		ReadTimeout:                   DefaultTimeout,
+		WriteTimeout:                  DefaultTimeout,
+		MaxIdleConnDuration:           maxIdleConnDuration,
+		NoDefaultUserAgentHeader:      true,
+		DisableHeaderNamesNormalizing: true,
+		DisablePathNormalizing:        true,
+		MaxConnWaitTimeout:            DefaultTimeout,
+		Dial: (&fasthttp.TCPDialer{
+			Concurrency:      4096,
+			DNSCacheDuration: time.Hour,
+		}).Dial,
 	}
-	return httpClientInstance
 }
 
 func SetClient(c Client) {
@@ -68,9 +82,7 @@ func SetClient(c Client) {
 }
 
 func SendRequest(method string, url string, body []byte, timeout time.Duration, reqInterceptor RequestInterceptor, resInterceptor ResponseInterceptor) (rawBody []byte, err error) {
-	initClient()
-
-	reqTimeout := time.Duration(4000) * time.Millisecond
+	reqTimeout := DefaultTimeout
 	if timeout != 0 {
 		reqTimeout = timeout
 	}
@@ -92,8 +104,13 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 		}
 	}
 
-	err = httpClientInstance.DoTimeout(req, resp, reqTimeout)
+	Logger.Trace("request", "timeout", reqTimeout)
+	Logger.Trace("request", "headers", string(req.Header.Header()))
+	Logger.Trace("request", "body", string(req.Body()))
+
+	err = getClient().DoTimeout(req, resp, reqTimeout)
 	if err != nil {
+		logger.HcLog().Error("[SendRequest][DoTimeout]", "err-type", reflect.TypeOf(err).String(), "err-msg", err.Error())
 		return
 	}
 
@@ -115,7 +132,7 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 	if !strings.HasPrefix(strconv.Itoa(statusCode), "2") {
 		err = fmt.Errorf("invalid HTTP response code: %d", statusCode)
 		if resp.Body() != nil && len(resp.Body()) > 0 {
-			logger.Error(string(resp.Body()))
+			Logger.Error(string(resp.Body()))
 			sendErr := ReqError{
 				Message: err.Error(),
 				Body:    resp.Body(),
@@ -188,6 +205,7 @@ func extractResponseErr(err error) (string, bool) {
 	case errors.Is(err, fasthttp.ErrConnectionClosed):
 		errName = "conn_close"
 	case reflect.TypeOf(err).String() == "*net.OpError":
+		logger.HcLog().Error("[extractResponseErr][timeout]", "msg-err", reflect.TypeOf(err).String())
 		errName = "timeout"
 	default:
 		known = false

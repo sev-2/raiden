@@ -1,6 +1,7 @@
 package init
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -8,11 +9,14 @@ import (
 	"path/filepath"
 
 	"github.com/erikgeiser/promptkit/confirmation"
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
+
+var InitLogger hclog.Logger = logger.HcLog().Named("init")
 
 // The `Flags` type represents a set of command line flags, with a `Version` field for specifying the
 // version of a raiden.
@@ -39,13 +43,13 @@ func PreRun(projectPath string) error {
 // mod init` with the specified module name,for gets the raiden library from a repository, and finally runs
 // `go mod tidy` to install dependencies.
 func Run(flags *Flags, projectPath string, moduleName string) error {
-	logger.Debug("Change directory to : ", projectPath)
+	InitLogger.Debug("change directory", projectPath)
 	if err := os.Chdir(projectPath); err != nil {
 		return err
 	}
 
 	// check go.mod exist
-	logger.Debug("check is module initialize")
+	InitLogger.Debug("check is module initialize")
 	goModFile := filepath.Join(projectPath, "go.mod")
 	if IsModFileExist(projectPath) {
 		input := confirmation.New("Found go.mod file, do you want to re init module ?", confirmation.No)
@@ -65,10 +69,11 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 	}
 
 	// running go mod init
-	logger.Debug("Execute command : go mod init ", moduleName)
-
+	InitLogger.Info("init repository")
+	InitLogger.Debug("execute command", "cmd", fmt.Sprint("go mod init ", moduleName))
+	var stdout bytes.Buffer
 	cmdModInit := exec.Command("go", "mod", "init", moduleName)
-	cmdModInit.Stdout = os.Stdout
+	cmdModInit.Stdout = &stdout
 	cmdModInit.Stderr = os.Stderr
 
 	if err := cmdModInit.Run(); err != nil {
@@ -76,13 +81,14 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 	}
 
 	// get raiden app
+	InitLogger.Info("install raiden app")
 	repoName := "github.com/sev-2/raiden"
 	if flags.Version != "" {
 		repoName += "@" + flags.Version
 	}
-	logger.Debugf("Execute command : go get %s ", repoName)
+	InitLogger.Debug("execute command", "cmd", fmt.Sprintf("go get %s ", repoName))
 	cmdRaidenInit := exec.Command("go", "get", "-u", repoName)
-	cmdRaidenInit.Stdout = os.Stdout
+	cmdModInit.Stdout = &stdout
 	cmdRaidenInit.Stderr = os.Stderr
 
 	if err := cmdRaidenInit.Run(); err != nil {
@@ -90,9 +96,10 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 	}
 
 	// mod tidy
-	logger.Debug("Execute command : go mod tidy")
+	InitLogger.Info("init all dependency")
+	InitLogger.Debug("execute command", "cmd", "go mod tidy")
 	cmdModTidy := exec.Command("go", "mod", "tidy")
-	cmdModTidy.Stdout = os.Stdout
+	cmdModInit.Stdout = &stdout
 	cmdModTidy.Stderr = os.Stderr
 
 	if err := cmdModTidy.Run(); err != nil {

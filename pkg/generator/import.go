@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ImportLogger hclog.Logger = logger.HcLog().Named("generator.import")
 
 // ----- Define type, variable and constant -----
 type GenerateImportMainFunctionData struct {
@@ -38,7 +41,7 @@ func main() {
 			if f.ProjectPath == "" {
 				curDir, err := utils.GetCurrentDirectory()
 				if err != nil {
-					logger.Error(err)
+					imports.ImportLogger.Error(err.Error())
 					return
 				}
 				f.ProjectPath = curDir
@@ -46,7 +49,7 @@ func main() {
 
 			config, err := raiden.LoadConfig(nil)
 			if err != nil {
-				logger.Error(err)
+				imports.ImportLogger.Error(err.Error())
 				return
 			}
 
@@ -55,23 +58,23 @@ func main() {
 			bootstrap.RegisterRoles()
 			bootstrap.RegisterModels()
 			bootstrap.RegisterStorages()
-			
+
 			if err := resource.Import(&f, config); err != nil {
-				logger.Error(err)
-				return
+				imports.ImportLogger.Error(err.Error())
 			}
 
 			if err = generate.Run(&f.Generate, config, f.ProjectPath, false); err != nil {
-				logger.Error(err)
+				imports.ImportLogger.Error(err.Error())
 			}
 		},
 	}
 
-	cmd.PersistentFlags().BoolVarP(&f.Verbose, "verbose", "v", false, "verbose mode")
+	f.BindLog(cmd)
 	cmd.Flags().StringVarP(&f.ProjectPath, "project-path", "p", "", "set project path")
 	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "import rpc only")
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
+	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storages only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
 
 	f.Generate.Bind(cmd)
@@ -86,7 +89,7 @@ func main() {
 func GenerateImportMainFunction(basePath string, config *raiden.Config, generateFn GenerateFn) error {
 	// make sure all folder exist
 	cmdFolderPath := filepath.Join(basePath, "cmd")
-	logger.Debugf("GenerateImportMainFunction - create %s folder if not exist", cmdFolderPath)
+	ImportLogger.Trace("create cmd folder if not exist", "path", cmdFolderPath)
 	if exist := utils.IsFolderExists(cmdFolderPath); !exist {
 		if err := utils.CreateFolder(cmdFolderPath); err != nil {
 			return err
@@ -94,7 +97,7 @@ func GenerateImportMainFunction(basePath string, config *raiden.Config, generate
 	}
 
 	importMainFunctionPath := filepath.Join(basePath, ImportMainFunctionDirTemplate)
-	logger.Debugf("GenerateImportMainFunction - create %s folder if not exist", importMainFunctionPath)
+	ImportLogger.Trace("create import folder folder if not exist", "path", importMainFunctionPath)
 	if exist := utils.IsFolderExists(importMainFunctionPath); !exist {
 		if err := utils.CreateFolder(importMainFunctionPath); err != nil {
 			return err
@@ -108,7 +111,7 @@ func GenerateImportMainFunction(basePath string, config *raiden.Config, generate
 	importPaths := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/cli/generate"),
-		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/logger"),
+		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/cli/imports"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/resource"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/utils"),
 		fmt.Sprintf("%q", "github.com/spf13/cobra"),
@@ -128,6 +131,6 @@ func GenerateImportMainFunction(basePath string, config *raiden.Config, generate
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateImportMainFunction - generate import main function to %s", input.OutputPath)
+	ImportLogger.Debug("generate import main function", "path", input.OutputPath)
 	return generateFn(input, nil)
 }

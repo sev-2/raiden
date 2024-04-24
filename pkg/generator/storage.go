@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var StorageLogger hclog.Logger = logger.HcLog().Named("generator.storage")
 
 type GenerateStoragesData struct {
 	Imports           []string
@@ -64,7 +67,7 @@ const (
 
 func GenerateStorages(basePath string, storages []objects.Bucket, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, StorageDir)
-	logger.Debugf("GenerateStorages - create %s folder if not exist", folderPath)
+	StorageLogger.Trace("create storages folder", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
 		if err := utils.CreateFolder(folderPath); err != nil {
 			return err
@@ -101,7 +104,7 @@ func GenerateStorage(folderPath string, storage objects.Bucket, generateFn Gener
 
 	var allowedMimeTypes = ""
 	if storage.AllowedMimeTypes != nil && len(storage.AllowedMimeTypes) > 0 {
-		allowedMimeTypes = generateArrayDeclaration(reflect.ValueOf(storage.AllowedMimeTypes), false)
+		allowedMimeTypes = GenerateArrayDeclaration(reflect.ValueOf(storage.AllowedMimeTypes), false)
 	}
 
 	structName := utils.ToSnakeCase(storage.Name)
@@ -126,6 +129,6 @@ func GenerateStorage(folderPath string, storage objects.Bucket, generateFn Gener
 		FuncMap:      funcMaps,
 	}
 
-	logger.Debugf("GenerateStorages - generate storages to %s", input.OutputPath)
+	StorageLogger.Debug("generate storages", "path", input.OutputPath)
 	return generateFn(input, nil)
 }

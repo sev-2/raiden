@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ApplyLogger hclog.Logger = logger.HcLog().Named("generator.apply")
 
 // ----- Define type, variable and constant -----
 type GenerateApplyMainFunctionData struct {
@@ -38,7 +41,7 @@ func main() {
 			if f.ProjectPath == "" {
 				curDir, err := utils.GetCurrentDirectory()
 				if err != nil {
-					logger.Error(err)
+					apply.ApplyLogger.Error(err.Error())
 					return
 				}
 				f.ProjectPath = curDir
@@ -46,12 +49,12 @@ func main() {
 
 			config, err := raiden.LoadConfig(nil)
 			if err != nil {
-				logger.Error(err)
+				apply.ApplyLogger.Error(err.Error())
 				return
 			}
 
 			if err := generate.Run(&f.Generate, config, f.ProjectPath, false); err != nil {
-				logger.Error(err)
+				apply.ApplyLogger.Error(err.Error())
 				return
 			}
 
@@ -62,7 +65,7 @@ func main() {
 			bootstrap.RegisterStorages()
 			
 			if err = resource.Apply(&f, config); err != nil {
-				logger.Error(err)
+				apply.ApplyLogger.Error(err.Error())
 			}
 		},
 	}
@@ -72,6 +75,7 @@ func main() {
 	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "import rpc only")
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
+	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storages only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
 
 	f.Generate.Bind(cmd)
@@ -86,7 +90,7 @@ func main() {
 func GenerateApplyMainFunction(basePath string, config *raiden.Config, generateFn GenerateFn) error {
 	// make sure all folder exist
 	cmdFolderPath := filepath.Join(basePath, "cmd")
-	logger.Debugf("GenerateApplyMainFunction - create %s folder if not exist", cmdFolderPath)
+	ApplyLogger.Trace("create cmd folder if not exist", "path", cmdFolderPath)
 	if exist := utils.IsFolderExists(cmdFolderPath); !exist {
 		if err := utils.CreateFolder(cmdFolderPath); err != nil {
 			return err
@@ -94,7 +98,7 @@ func GenerateApplyMainFunction(basePath string, config *raiden.Config, generateF
 	}
 
 	applyMainFunctionPath := filepath.Join(basePath, ApplyMainFunctionDirTemplate)
-	logger.Debugf("GenerateApplyMainFunction - create %s folder if not exist", applyMainFunctionPath)
+	ApplyLogger.Trace("create main folder if not exist", "path", applyMainFunctionPath)
 	if exist := utils.IsFolderExists(applyMainFunctionPath); !exist {
 		if err := utils.CreateFolder(applyMainFunctionPath); err != nil {
 			return err
@@ -108,7 +112,7 @@ func GenerateApplyMainFunction(basePath string, config *raiden.Config, generateF
 	importPaths := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/cli/generate"),
-		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/logger"),
+		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/cli/apply"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/resource"),
 		fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/utils"),
 		fmt.Sprintf("%q", "github.com/spf13/cobra"),
@@ -128,6 +132,6 @@ func GenerateApplyMainFunction(basePath string, config *raiden.Config, generateF
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateApplyMainFunction - generate apply main function to %s", input.OutputPath)
+	ApplyLogger.Debug("generate apply main function", "path", input.OutputPath)
 	return generateFn(input, nil)
 }

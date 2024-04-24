@@ -6,9 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var RoleRegisterLogger hclog.Logger = logger.HcLog().Named("generator.role_register")
 
 // ----- Define type, variable and constant -----
 type (
@@ -43,7 +46,7 @@ func RegisterRoles() {
 
 func GenerateRoleRegister(basePath string, projectName string, generateFn GenerateFn) error {
 	roleRegisterDir := filepath.Join(basePath, RoleRegisterDir)
-	logger.Debugf("GenerateRoleRegister - create %s folder if not exist", roleRegisterDir)
+	RoleRegisterLogger.Trace("create bootstrap folder if not exist", roleRegisterDir)
 	if exist := utils.IsFolderExists(roleRegisterDir); !exist {
 		if err := utils.CreateFolder(roleRegisterDir); err != nil {
 			return err
@@ -51,7 +54,7 @@ func GenerateRoleRegister(basePath string, projectName string, generateFn Genera
 	}
 
 	roleDir := filepath.Join(basePath, RoleDir)
-	logger.Debugf("GenerateRoleRegister - create %s folder if not exist", roleDir)
+	RoleRegisterLogger.Trace("create roles folder if not exist", roleDir)
 	if exist := utils.IsFolderExists(roleDir); !exist {
 		if err := utils.CreateFolder(roleDir); err != nil {
 			return err
@@ -69,7 +72,7 @@ func GenerateRoleRegister(basePath string, projectName string, generateFn Genera
 		return err
 	}
 
-	logger.Debugf("GenerateRoleRegister - generate role register to %s", input.OutputPath)
+	RoleRegisterLogger.Debug("generate role register", "path", input.OutputPath)
 	return generateFn(input, nil)
 }
 
@@ -105,12 +108,12 @@ func createRoleRegisterInput(projectName string, roleRegisterDir string, roleLis
 }
 
 func WalkScanRole(roleDir string) ([]string, error) {
-	logger.Debugf("GenerateRoleRegister - scan %s for register all roles", roleDir)
+	ModelRegisterLogger.Trace("scan registered all roles", "path", roleDir)
 
 	roles := make([]string, 0)
 	err := filepath.Walk(roleDir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
-			logger.Debugf("GenerateRoleRegister - collect roles from %s", path)
+			ModelRegisterLogger.Trace("collect roles", "file-path", path)
 			rs, e := getStructByBaseName(path, "RoleBase")
 			if e != nil {
 				return e

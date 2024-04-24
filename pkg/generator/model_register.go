@@ -6,9 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ModelRegisterLogger hclog.Logger = logger.HcLog().Named("generator.model_register")
 
 // ----- Define type, variable and constant -----
 type (
@@ -43,7 +46,7 @@ func RegisterModels() {
 
 func GenerateModelRegister(basePath string, projectName string, generateFn GenerateFn) error {
 	modelRegisterDir := filepath.Join(basePath, ModelRegisterDir)
-	logger.Debugf("GenerateModelRegister - create %s folder if not exist", modelRegisterDir)
+	ModelRegisterLogger.Trace("create bootstrap folder if not exist", "path", modelRegisterDir)
 	if exist := utils.IsFolderExists(modelRegisterDir); !exist {
 		if err := utils.CreateFolder(modelRegisterDir); err != nil {
 			return err
@@ -51,7 +54,7 @@ func GenerateModelRegister(basePath string, projectName string, generateFn Gener
 	}
 
 	modelDir := filepath.Join(basePath, ModelDir)
-	logger.Debugf("GenerateModelRegister - create %s folder if not exist", modelDir)
+	ModelRegisterLogger.Trace("create models folder if not exist", modelDir)
 	if exist := utils.IsFolderExists(modelDir); !exist {
 		if err := utils.CreateFolder(modelDir); err != nil {
 			return err
@@ -69,7 +72,7 @@ func GenerateModelRegister(basePath string, projectName string, generateFn Gener
 		return err
 	}
 
-	logger.Debugf("GenerateModelRegister - generate model register to %s", input.OutputPath)
+	ModelRegisterLogger.Debug("generate model register", "path", input.OutputPath)
 	return generateFn(input, nil)
 }
 
@@ -104,13 +107,13 @@ func createModelRegisterInput(projectName string, modelRegisterDir string, model
 	return
 }
 
-func WalkScanModel(roleDir string) ([]string, error) {
-	logger.Debugf("GenerateModelRegister - scan %s for register all models", roleDir)
+func WalkScanModel(modelDir string) ([]string, error) {
+	ModelRegisterLogger.Trace("scan registered all models", "path", modelDir)
 
 	roles := make([]string, 0)
-	err := filepath.Walk(roleDir, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(modelDir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
-			logger.Debugf("GenerateModelRegister - collect model from %s", path)
+			ModelRegisterLogger.Trace("collect model", "file-path", path)
 			rs, e := getStructByBaseName(path, "ModelBase")
 			if e != nil {
 				return e

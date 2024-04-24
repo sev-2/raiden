@@ -3,7 +3,6 @@ package commands
 import (
 	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/configure"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +13,7 @@ import (
 // `Configure` of type `configure.Flags`, which holds the specific flags and options for the
 // `configure` command.
 type ConfigureFlags struct {
-	cli.Flags
+	cli.LogFlags
 	Configure configure.Flags
 }
 
@@ -31,18 +30,18 @@ func ConfigureCommand() *cobra.Command {
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				logger.Error(errCurDir)
+				configure.ConfigureLogger.Error(errCurDir.Error())
 				return
 			}
 
 			config, err := configure.Run(&f.Configure, currentDir)
 			if err != nil {
-				logger.Error(err)
+				configure.ConfigureLogger.Error(err.Error())
 				return
 			}
 
 			if err = configure.Generate(&config.Config, currentDir); err != nil {
-				logger.Error(err)
+				configure.ConfigureLogger.Error(err.Error())
 			}
 		},
 	}

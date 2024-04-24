@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var MainLogger hclog.Logger = logger.HcLog().Named("generator.main")
 
 // ----- Define type, variable and constant -----
 type GenerateMainFunctionData struct {
@@ -51,7 +54,7 @@ func main() {
 func GenerateMainFunction(basePath string, config *raiden.Config, generateFn GenerateFn) error {
 	// make sure all folder exist
 	cmdFolderPath := filepath.Join(basePath, "cmd")
-	logger.Debugf("GenerateMainFunction - create %s folder if not exist", cmdFolderPath)
+	MainLogger.Trace("create cmd folder if not exist", "path", cmdFolderPath)
 	if exist := utils.IsFolderExists(cmdFolderPath); !exist {
 		if err := utils.CreateFolder(cmdFolderPath); err != nil {
 			return err
@@ -60,7 +63,7 @@ func GenerateMainFunction(basePath string, config *raiden.Config, generateFn Gen
 
 	mainFunctionDir := fmt.Sprintf(MainFunctionDirTemplate, config.ProjectName)
 	mainFunctionPath := filepath.Join(basePath, mainFunctionDir)
-	logger.Debugf("GenerateMainFunction - create %s folder if not exist", mainFunctionPath)
+	MainLogger.Trace("create main folder if not exist", "path", mainFunctionPath)
 	if exist := utils.IsFolderExists(mainFunctionPath); !exist {
 		if err := utils.CreateFolder(mainFunctionPath); err != nil {
 			return err
@@ -89,6 +92,6 @@ func GenerateMainFunction(basePath string, config *raiden.Config, generateFn Gen
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateMainFunction - generate main function to %s", input.OutputPath)
+	MainLogger.Debug("generate main function", "path", input.OutputPath)
 	return generateFn(input, nil)
 }

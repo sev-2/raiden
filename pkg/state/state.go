@@ -13,6 +13,8 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
+var StateLogger = logger.HcLog().Named("supabase.state")
+
 type (
 	State struct {
 		Tables  []TableState
@@ -94,7 +96,7 @@ func Save(state *State) error {
 
 	defer file.Close()
 
-	logger.Debug("State : Generate local state to : ", filePath)
+	StateLogger.Debug("generate local state", "path", filePath)
 	encoder := gob.NewEncoder(file)
 	if err := encoder.Encode(state); err != nil {
 		RestoreFromTmp(tmpFilePath)
@@ -137,7 +139,7 @@ func RestoreFromTmp(tmpFile string) {
 		return
 	}
 
-	logger.Error("file is not exist : ", tmpFile)
+	StateLogger.Debug("file is not exist", "path", tmpFile)
 }
 
 func Load() (*State, error) {

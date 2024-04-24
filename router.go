@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 
@@ -15,6 +16,8 @@ import (
 
 	fs_router "github.com/fasthttp/router"
 )
+
+var RouterLogger = logger.HcLog().Named("raiden.router")
 
 // ----- define route type, constant and variable -----
 type (
@@ -92,7 +95,8 @@ func (r *router) Register(routes []*Route) *router {
 func (r *router) BuildHandler() {
 	for _, route := range r.routes {
 		if len(route.Methods) == 0 && route.Type != RouteTypeRest && route.Type != RouteTypeStorage {
-			Panicf("Unknown method in route path %s", route.Path)
+			RouterLogger.Error("unknown method in route path", "path", route.Path)
+			os.Exit(1)
 		}
 
 		if route == nil {
@@ -106,16 +110,16 @@ func (r *router) BuildHandler() {
 			r.registerHttpHandler(route)
 		case RouteTypeRest:
 			if route.Model == nil {
-				logger.Errorf("[Build Route] invalid route %s, model must be define", route.Path)
+				RouterLogger.Error("invalid route, model must be define", "route", route.Path)
 			}
 			r.registerRestHandler(route)
 		case RouteTypeStorage:
 			if route.Storage == nil {
-				logger.Errorf("[Build Route] invalid route %s, storage must be define", route.Path)
+				RouterLogger.Error("invalid route,  storage must be define", "route", route.Path)
 			}
 			r.registerStorageHandler(route)
 		case RouteTypeRealtime:
-			Panicf("register route type %v is not implemented, wait for update :) ", route.Type)
+			RouterLogger.Error(fmt.Sprintf("register route type %v is not implemented, wait for update :) ", route.Type))
 		}
 	}
 
@@ -213,15 +217,16 @@ func (r *router) registerRpcAndFunctionHandler(route *Route) {
 	}
 
 	if len(route.Methods) > 1 {
-		Panicf(`route %s with type %s,only allowed set 1 method and only allowed post method`, route.Path, routeType)
+		RouterLogger.Error(`only allowed set 1 method and only allowed post method`, "type", routeType, "path", route.Path)
+		os.Exit(1)
 	}
 
 	if route.Methods[0] != fasthttp.MethodPost {
-		Panicf("route %s with type function,only allowed setup with Post method", route.Path)
+		RouterLogger.Error("only allowed setup with Post method", "type", routeType, "path", route.Path)
+		os.Exit(1)
 	}
 
 	chain := NewChain()
-
 	if group := r.findRouteGroup(route.Type); group != nil {
 		chain = r.buildNativeMiddleware(route, chain)
 		if len(r.middlewares) > 0 {
@@ -305,11 +310,11 @@ func (r *router) GetRegisteredRoutes() map[string][]string {
 
 func (r *router) PrintRegisteredRoute() {
 	registeredRoutes := r.engine.List()
-	Infof("%s Registered Route %s ", strings.Repeat("=", 11), strings.Repeat("=", 11))
+	RouterLogger.Info(fmt.Sprintf("%s Registered Route %s ", strings.Repeat("=", 11), strings.Repeat("=", 11)))
 	for method, routes := range registeredRoutes {
-		Infof("%s", utils.GetColoredHttpMethod(method))
+		RouterLogger.Info(utils.GetColoredHttpMethod(method))
 		for _, route := range routes {
-			Infof("- %s", route)
+			RouterLogger.Info(fmt.Sprintf("- %s", route))
 		}
 	}
 	Info(strings.Repeat("=", 40))
@@ -371,7 +376,7 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 			}
 
 			if err := c.AfterGet(ctx); err != nil {
-				Error(err)
+				logger.HcLog().Error("middleware.after.get", "msg", err.Error())
 			}
 		case fasthttp.MethodPost:
 			if err := c.BeforePost(ctx); err != nil {
@@ -383,7 +388,7 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 			}
 
 			if err := c.AfterPost(ctx); err != nil {
-				Error(err)
+				logger.HcLog().Error("middleware.after.post", "msg", err.Error())
 			}
 		case fasthttp.MethodPut:
 			if err := c.BeforePut(ctx); err != nil {
@@ -395,7 +400,7 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 			}
 
 			if err := c.AfterPut(ctx); err != nil {
-				Error(err)
+				logger.HcLog().Error("middleware.after.put", "msg", err.Error())
 			}
 		case fasthttp.MethodPatch:
 			if err := c.BeforePatch(ctx); err != nil {
@@ -407,7 +412,7 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 			}
 
 			if err := c.AfterPatch(ctx); err != nil {
-				Error(err)
+				logger.HcLog().Error("middleware.after.patch", "msg", err.Error())
 			}
 		case fasthttp.MethodDelete:
 			if err := c.BeforeDelete(ctx); err != nil {
@@ -419,7 +424,7 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 			}
 
 			if err := c.AfterDelete(ctx); err != nil {
-				Error(err)
+				logger.HcLog().Error("middleware.after.delete", "msg", err.Error())
 			}
 		case fasthttp.MethodOptions:
 			if err := c.BeforeOptions(ctx); err != nil {
@@ -431,7 +436,7 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 			}
 
 			if err := c.AfterOptions(ctx); err != nil {
-				Error(err)
+				logger.HcLog().Error("middleware.after.options", "msg", err.Error())
 			}
 		case fasthttp.MethodHead:
 			if err := c.BeforeHead(ctx); err != nil {
@@ -443,12 +448,12 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 			}
 
 			if err := c.AfterHead(ctx); err != nil {
-				Error(err)
+				logger.HcLog().Error("middleware.after.head", "msg", err.Error())
 			}
 		}
 
 		if err := c.AfterAll(ctx); err != nil {
-			Error(err)
+			logger.HcLog().Error("middleware.after.all", "msg", err.Error())
 		}
 
 		return nil

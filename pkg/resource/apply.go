@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
+
+var ApplyLogger hclog.Logger = logger.HcLog().Named("apply")
 
 // Migrate resource :
 //
@@ -59,9 +62,9 @@ import (
 //
 // [x] migrate storage
 //
-//	[ ] create new storage
-//	[ ] update storage
-//	[ ] delete storage
+//	[x] create new storage
+//	[x] update storage
+//	[x] delete storage
 //	[ ] add storage acl
 //	[ ] update storage acl
 func Apply(flags *Flags, config *raiden.Config) error {
@@ -70,19 +73,19 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	var importState ResourceState
 
 	// load map native role
-	logger.Info("apply : load native role")
+	ApplyLogger.Info("Load Native log")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
 	}
 
 	// load app resource
-	logger.Info("apply : load resource from local state")
-	logger.Debug(strings.Repeat("=", 5), " Load app resource from state")
+	ApplyLogger.Info("start - load resource from local state")
 	latestState, err := loadState()
 	if err != nil {
 		return err
 	}
+	ApplyLogger.Info("finish - load resource from local state")
 
 	if latestState == nil {
 		return errors.New("state file is not found, please run raiden imports first")
@@ -90,68 +93,74 @@ func Apply(flags *Flags, config *raiden.Config) error {
 		importState.State = *latestState
 	}
 
-	logger.Info("apply : extract table, role, and rpc from local state")
+	ApplyLogger.Info("start - extract table, role, and rpc from local state")
 	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestState)
 	if err != nil {
 		return err
 	}
 	appPolicies := mergeAllPolicy(appTables)
-	logger.Debug(strings.Repeat("=", 5))
+	ApplyLogger.Info("finish - extract table, role, and rpc from local state")
 
 	// validate table relation
 	var validateTable []objects.Table
 	validateTable = append(validateTable, appTables.New.ToFlatTable()...)
 	validateTable = append(validateTable, appTables.Existing.ToFlatTable()...)
-	logger.Info("apply : validate local table relation")
+	ApplyLogger.Info("validate local table relation")
 	if err := validateTableRelations(validateTable...); err != nil {
 		return err
 	}
 
 	// validate role in policies is exist
-	logger.Info("apply : validate local role")
+	ApplyLogger.Info("validate local role")
 	if err := validateRoleIsExist(appPolicies, appRoles, mapNativeRole); err != nil {
 		return err
 	}
 
 	// load supabase resource
-	logger.Debug(strings.Repeat("=", 5), " Load supabase resource ")
-	logger.Info("apply : load table, role and rpc from supabase")
+	ApplyLogger.Info("start - load resource from supabase")
 	resource, err := Load(flags, config)
 	if err != nil {
 		return err
 	}
-	logger.Debug(strings.Repeat("=", 5))
+	ApplyLogger.Info("finish - load resource from supabase")
 
 	// filter table for with allowed schema
+	ApplyLogger.Debug("start - filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	ApplyLogger.Trace("filter table by schema")
 	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	ApplyLogger.Trace("filter function by schema")
 	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
+	ApplyLogger.Debug("finish - filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+
+	ApplyLogger.Trace("remove native role for supabase list role")
 	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)
 
+	ApplyLogger.Info("start - compare supabase resource and local resource")
 	if flags.All() || flags.RolesOnly {
-		logger.Info("apply : compare role")
+		// logger.Info("apply : compare role")
 		if err := bindMigratedRoles(appRoles, resource.Roles, &migrateResource); err != nil {
 			return err
 		}
 
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Role to migrate")
-			for i := range migrateResource.Roles {
-				t := migrateResource.Roles[i]
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
-				logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
-				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
-			}
-			logger.Debug(strings.Repeat("=", 5))
-		}
+		// if flags.TraceMode {
+		// 	logger.Debug(strings.Repeat("=", 5), " Role to migrate")
+		// 	for i := range migrateResource.Roles {
+		// 		t := migrateResource.Roles[i]
+		// 		var name string
+		// 		if t.NewData.Name != "" {
+		// 			name = t.NewData.Name
+		// 		} else if t.OldData.Name != "" {
+		// 			name = t.OldData.Name
+		// 		}
+		// 		logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
+		// 		logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
+		// 	}
+		// 	logger.Debug(strings.Repeat("=", 5))
+		// }
 	}
 
 	if flags.All() || flags.ModelsOnly {
-		logger.Info("apply : compare table")
+		// logger.Info("apply : compare table")
 		// bind app table to resource
 		if err := bindMigratedTables(appTables, resource.Tables, &migrateResource); err != nil {
 			return err
@@ -162,90 +171,91 @@ func Apply(flags *Flags, config *raiden.Config) error {
 			return err
 		}
 
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Table to migrate")
-			for i := range migrateResource.Tables {
-				t := migrateResource.Tables[i]
+		if flags.TraceMode {
+			// logger.Debug(strings.Repeat("=", 5), " Table to migrate")
+			// for i := range migrateResource.Tables {
+			// 	t := migrateResource.Tables[i]
 
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
+			// 	var name string
+			// 	if t.NewData.Name != "" {
+			// 		name = t.NewData.Name
+			// 	} else if t.OldData.Name != "" {
+			// 		name = t.OldData.Name
+			// 	}
 
-				logger.Debugf("- MigrateType : %s, Table : %s", t.Type, name)
-				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
-				logger.Debugf(" update column  : %+v", t.MigrationItems.ChangeColumnItems)
-				logger.Debugf(" update relations  : %+v", t.MigrationItems.ChangeRelationItems)
+			// 	logger.Debugf("- MigrateType : %s, Table : %s", t.Type, name)
+			// 	logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
+			// 	logger.Debugf(" update column  : %+v", t.MigrationItems.ChangeColumnItems)
+			// 	logger.Debugf(" update relations  : %+v", t.MigrationItems.ChangeRelationItems)
 
-			}
-			logger.Debug(strings.Repeat("=", 5))
+			// }
+			// logger.Debug(strings.Repeat("=", 5))
 
-			logger.Debug(strings.Repeat("=", 5), " Table to policies")
-			for i := range migrateResource.Policies {
-				p := migrateResource.Policies[i]
+			// logger.Debug(strings.Repeat("=", 5), " Table to policies")
+			// for i := range migrateResource.Policies {
+			// 	p := migrateResource.Policies[i]
 
-				var name string
-				if p.NewData.Name != "" {
-					name = p.NewData.Name
-				} else if p.OldData.Name != "" {
-					name = p.OldData.Name
-				}
+			// 	var name string
+			// 	if p.NewData.Name != "" {
+			// 		name = p.NewData.Name
+			// 	} else if p.OldData.Name != "" {
+			// 		name = p.OldData.Name
+			// 	}
 
-				logger.Debugf("- MigrateType : %s, Policy : %s", p.Type, name)
-				logger.Debugf(" update items : %+v", p.MigrationItems.ChangeItems)
+			// 	logger.Debugf("- MigrateType : %s, Policy : %s", p.Type, name)
+			// 	logger.Debugf(" update items : %+v", p.MigrationItems.ChangeItems)
 
-			}
-			logger.Debug(strings.Repeat("=", 5))
+			// }
+			// logger.Debug(strings.Repeat("=", 5))
 		}
 
 	}
 
 	if flags.All() || flags.RpcOnly {
-		logger.Info("apply : compare rpc")
+		// logger.Info("apply : compare rpc")
 		if err := bindMigratedFunctions(appRpcFunctions, resource.Functions, &migrateResource); err != nil {
 			return err
 		}
 
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Rpc to migrate")
-			for i := range migrateResource.Rpc {
-				t := migrateResource.Rpc[i]
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
-				logger.Debugf("- MigrateType : %s, Name: %s", t.Type, name)
-			}
-			logger.Debug(strings.Repeat("=", 5))
-		}
+		// if flags.TraceMode {
+		// 	logger.Debug(strings.Repeat("=", 5), " Rpc to migrate")
+		// 	for i := range migrateResource.Rpc {
+		// 		t := migrateResource.Rpc[i]
+		// 		var name string
+		// 		if t.NewData.Name != "" {
+		// 			name = t.NewData.Name
+		// 		} else if t.OldData.Name != "" {
+		// 			name = t.OldData.Name
+		// 		}
+		// 		logger.Debugf("- MigrateType : %s, Name: %s", t.Type, name)
+		// 	}
+		// 	logger.Debug(strings.Repeat("=", 5))
+		// }
 	}
 
-	if flags.All() || flags.StorageOnly {
-		logger.Info("apply : compare storage")
+	if flags.All() || flags.StoragesOnly {
+		// logger.Info("apply : compare storage")
 		if err := bindMigratedStorage(appStorage, resource.Storages, &migrateResource); err != nil {
 			return err
 		}
 
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Storage to migrate")
-			for i := range migrateResource.Storages {
-				t := migrateResource.Storages[i]
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
-				logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
-				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
-			}
-			logger.Debug(strings.Repeat("=", 5))
-		}
+		// if flags.TraceMode {
+		// 	logger.Debug(strings.Repeat("=", 5), " Storage to migrate")
+		// 	for i := range migrateResource.Storages {
+		// 		t := migrateResource.Storages[i]
+		// 		var name string
+		// 		if t.NewData.Name != "" {
+		// 			name = t.NewData.Name
+		// 		} else if t.OldData.Name != "" {
+		// 			name = t.OldData.Name
+		// 		}
+		// 		logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
+		// 		logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
+		// 	}
+		// 	logger.Debug(strings.Repeat("=", 5))
+		// }
 	}
+	ApplyLogger.Info("finish - compare supabase resource and local resource")
 
 	migrateErr := MigrateResource(config, &importState, flags.ProjectPath, &migrateResource)
 	if len(migrateErr) > 0 {
@@ -542,7 +552,7 @@ func bindMigratedStorage(es state.ExtractStorageResult, spStorages []objects.Buc
 }
 
 func runApplyCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) (migratedData []MigrateItem[objects.Role, objects.UpdateRoleParam], err error) {
-	result, e := CompareRoles(appRoles, supabaseRoles, CompareModeApply)
+	result, e := CompareRoles(appRoles, supabaseRoles)
 	if e != nil {
 		err = e
 		return
@@ -569,7 +579,7 @@ func runApplyCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role)
 }
 
 func runApplyCompareTable(supabaseTable []objects.Table, appTable []objects.Table) (migratedData []MigrateItem[objects.Table, objects.UpdateTableParam], err error) {
-	result, e := CompareTables(appTable, supabaseTable, CompareModeApply)
+	result, e := CompareTables(appTable, supabaseTable)
 	if e != nil {
 		err = e
 		return

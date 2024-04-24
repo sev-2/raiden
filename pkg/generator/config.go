@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ConfigLogger hclog.Logger = logger.HcLog().Named("generator.config")
 
 // ----- Define type, var and constant -----
 
@@ -71,6 +74,6 @@ func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateF
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateConfig - generate config to %s", input.OutputPath)
+	ConfigLogger.Debug("generate config", "path", input.OutputPath)
 	return generateFn(input, nil)
 }

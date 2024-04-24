@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ControllerLogger hclog.Logger = logger.HcLog().Named("generator.controller")
 
 // ----- Define type, variable and constant -----
 type ControllerFieldAttribute struct {
@@ -75,14 +78,14 @@ func GenerateController(file string, data GenerateControllerData, generateFn Gen
 		TemplateName: "controllerName",
 		OutputPath:   file,
 	}
-	logger.Debugf("GenerateController - generate controller to %s", input.OutputPath)
+	ControllerLogger.Debug("generate controller", "path", input.OutputPath)
 	return generateFn(input, nil)
 }
 
 // ----- Generate hello word -----
 func GenerateHelloWordController(basePath string, generateFn GenerateFn) (err error) {
 	controllerPath := filepath.Join(basePath, ControllerDir)
-	logger.Debugf("GenerateHelloWordController - create %s folder if not exist", controllerPath)
+	ControllerLogger.Trace("create controller folder if not exist", "path", controllerPath)
 	if exist := utils.IsFolderExists(controllerPath); !exist {
 		if err := utils.CreateFolder(controllerPath); err != nil {
 			return err

@@ -1,16 +1,23 @@
 package raiden
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
 
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/valyala/fasthttp"
 )
+
+var RpcLogger = logger.HcLog().Named("raiden.rpc")
 
 // ---- Define rpc data type -----
 type RpcParamDataType string
@@ -426,7 +433,7 @@ func (r *RpcBase) UseParamPrefix() bool {
 }
 
 func (r *RpcBase) GetReturnType() (rt RpcReturnDataType) {
-	Panicf("Rpc return type is not implemented, use GetReturnType for set it")
+	RpcLogger.Error("Rpc return type is not implemented, use GetReturnType for set it")
 	return
 }
 
@@ -463,7 +470,7 @@ func (r *RpcBase) SetRawDefinition(definition string) {
 }
 
 func (r *RpcBase) GetRawDefinition() (d string) {
-	Panicf("Rpc definition type is not implemented, use GetRawDefinition for set it")
+	RpcLogger.Error("Rpc definition type is not implemented, use GetRawDefinition for set it")
 	return
 }
 
@@ -785,7 +792,12 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 	}
 
 	apiUrl := fmt.Sprintf("%s/%s/%s", ctx.Config().SupabasePublicUrl, "rest/v1/rpc", rpc.GetName())
-	resData, err := rpcSendRequest(apiUrl, pByte, rpcAttachAuthHeader(&ctx.RequestContext().Request))
+	httpReq, err := ConvertRequestCtxToHTTPRequest(ctx.RequestContext())
+	if err != nil {
+		return nil, err
+	}
+
+	resData, err := rpcSendRequest(apiUrl, pByte, rpcAttachAuthHeader(httpReq))
 	if err != nil {
 		return nil, err
 	}
@@ -811,22 +823,22 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 	return returnValue.Interface(), nil
 }
 
-func rpcAttachAuthHeader(inReq *fasthttp.Request) client.RequestInterceptor {
-	return func(outReq *fasthttp.Request) error {
-		if authHeader := inReq.Header.Peek("Authorization"); len(authHeader) > 0 {
-			outReq.Header.AddBytesV("Authorization", authHeader)
+func rpcAttachAuthHeader(inReq *http.Request) net.RequestInterceptor {
+	return func(outReq *http.Request) error {
+		if authHeader := inReq.Header.Get("Authorization"); len(authHeader) > 0 {
+			outReq.Header.Set("Authorization", authHeader)
 		}
 
-		if apiKey := inReq.Header.Peek("apiKey"); len(apiKey) > 0 {
-			outReq.Header.AddBytesV("apiKey", apiKey)
+		if apiKey := inReq.Header.Get("apiKey"); len(apiKey) > 0 {
+			outReq.Header.Set("apiKey", apiKey)
 		}
 
 		return nil
 	}
 }
 
-func rpcSendRequest(apiUrl string, body []byte, reqInterceptor client.RequestInterceptor) ([]byte, error) {
-	resData, err := client.SendRequest(fasthttp.MethodPost, apiUrl, body, client.DefaultTimeout, reqInterceptor, nil)
+func rpcSendRequest(apiUrl string, body []byte, reqInterceptor net.RequestInterceptor) ([]byte, error) {
+	resData, err := net.SendRequest(fasthttp.MethodPost, apiUrl, body, net.DefaultTimeout, reqInterceptor, nil)
 	if err != nil {
 		sendErr, isHaveData := err.(utils.SendRequestError)
 		if isHaveData {
@@ -843,4 +855,30 @@ func rpcSendRequest(apiUrl string, body []byte, reqInterceptor client.RequestInt
 		}
 	}
 	return resData, nil
+}
+
+func ConvertRequestCtxToHTTPRequest(ctx *fasthttp.RequestCtx) (*http.Request, error) {
+	url, err := url.ParseRequestURI(string(ctx.RequestURI()))
+	if err != nil {
+		return nil, err
+	}
+	// Create a new http.Request based on the data in RequestCtx
+	req := &http.Request{
+		Method:     string(ctx.Method()),
+		URL:        url,
+		Proto:      "HTTP/1.1", // You may need to adjust this based on your requirements
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     make(http.Header),
+	}
+
+	// Copy headers from RequestCtx to http.Request
+	ctx.Request.Header.VisitAll(func(key, value []byte) {
+		req.Header.Add(string(key), string(value))
+	})
+
+	// Copy body from RequestCtx to http.Request
+	req.Body = io.NopCloser(bytes.NewReader(ctx.Request.Body()))
+
+	return req, nil
 }

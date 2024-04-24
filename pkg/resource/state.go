@@ -556,31 +556,39 @@ func extractAppResource(f *Flags, latestState *state.State) (
 	}
 
 	if f.All() || f.ModelsOnly {
+		ImportLogger.Debug("Start extract table")
 		extractedTable, err = state.ExtractTable(latestState.Tables, registeredModels)
 		if err != nil {
 			return
 		}
+		ImportLogger.Debug("Finish extract table")
 	}
 
 	if f.All() || f.RolesOnly {
+		ImportLogger.Debug("Start extract role")
 		extractedRole, err = state.ExtractRole(latestState.Roles, registeredRoles, false)
 		if err != nil {
 			return
 		}
+		ImportLogger.Debug("Finish extract role")
 	}
 
 	if f.All() || f.RpcOnly {
+		ImportLogger.Debug("Start extract rpc")
 		extractedRpc, err = state.ExtractRpc(latestState.Rpc, registeredRpc)
 		if err != nil {
 			return
 		}
+		ImportLogger.Debug("FInish extract rpc")
 	}
 
-	if f.All() || f.StorageOnly {
+	if f.All() || f.StoragesOnly {
+		ImportLogger.Debug("Start extract storage")
 		extractedStorage, err = state.ExtractStorage(latestState.Storage, registeredStorages)
 		if err != nil {
 			return
 		}
+		ImportLogger.Debug("Finish extract storage")
 	}
 
 	return
