@@ -317,7 +317,7 @@ func (r *router) PrintRegisteredRoute() {
 			RouterLogger.Info(fmt.Sprintf("- %s", route))
 		}
 	}
-	Info(strings.Repeat("=", 40))
+	RouterLogger.Info(strings.Repeat("=", 40))
 }
 
 // The function creates and returns a map of route groups based on different route types.

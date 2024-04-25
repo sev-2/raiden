@@ -53,6 +53,7 @@ func PreRun(projectPath string) error {
 
 // The Run function builds a Go binary based on the provided flags, configuration, and project path.
 func Run(f *Flags, config *raiden.Config, projectPath string) error {
+	BuildLogger.Info("start build binary")
 	// determine the target operating system and processor architecture for thebuild process.
 	targetOs, targetArch := runtime.GOOS, runtime.GOARCH
 	if f.OS != "" {
@@ -77,7 +78,6 @@ func Run(f *Flags, config *raiden.Config, projectPath string) error {
 	output := GetBuildFilePath(projectPath, config.ProjectName, targetOs)
 
 	// Run the "go build" command
-	BuildLogger.Info("start build binary")
 	BuildLogger.Debug("execute command", "cmd", fmt.Sprintf("go build -o %s %s", output, mainFilePath))
 	cmd := exec.Command("go", "build", "-o", output, mainFilePath)
 	cmd.Stdout = os.Stdout
@@ -88,7 +88,7 @@ func Run(f *Flags, config *raiden.Config, projectPath string) error {
 		return fmt.Errorf("error building binary: %v", err)
 	}
 
-	BuildLogger.Info("Saved binary to ", output)
+	BuildLogger.Debug("saved binary to ", "path", output)
 	return nil
 }
 
