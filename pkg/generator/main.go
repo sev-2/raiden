@@ -34,7 +34,7 @@ func main() {
 	// load configuration
 	config, err := raiden.LoadConfig(nil)
 	if err != nil {
-		raiden.Panic(err)
+		raiden.Error("load configuration",err.Error())
 	}
 
 	// Setup server

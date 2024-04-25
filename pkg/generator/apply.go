@@ -70,7 +70,7 @@ func main() {
 		},
 	}
 
-	cmd.PersistentFlags().BoolVarP(&f.Verbose, "verbose", "v", false, "verbose mode")
+	f.BindLog(cmd)
 	cmd.Flags().StringVarP(&f.ProjectPath, "project-path", "p", "", "set project path")
 	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "import rpc only")
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
