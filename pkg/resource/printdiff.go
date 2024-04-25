@@ -328,35 +328,29 @@ func PrintDiffStorage(diffData CompareDiffResult[objects.Bucket, objects.UpdateB
 			}
 
 			symbol := printUpdate("~")
-			changeDetail := []string{printLabel("// diff is public before : ")}
-
-			changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("func (r *%s) Public() bool {", structName)))
-			changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("  return %s", tgIsPublic)))
-			changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("}")))
-
-			changeDetail = append(changeDetail, printLabel("// diff is public after : "))
-			changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("func (r *%s) Public() bool {", structName)))
-			changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("  return %s", scIsPublic)))
-			changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("}")))
+			changeDetail := []string{}
+			changeDetail = append(changeDetail, print("  func (r *%s) Public() bool {", structName))
+			changeDetail = append(changeDetail, fmt.Sprintf("    %s %s %s %s", symbol, print("return %s", tgIsPublic), printLabel(">>>"), print(scIsPublic)))
+			changeDetail = append(changeDetail, print("  }"))
 
 			changes = append(changes, strings.Join(changeDetail, "\n"))
 		case objects.UpdateBucketAllowedMimeTypes:
 			if len(diffData.TargetResource.AllowedMimeTypes) == 0 && len(diffData.SourceResource.AllowedMimeTypes) > 0 {
 				symbol := printAdd("+")
 				changeDetail := []string{}
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("func (r *%s) AllowedMimeTypes() []string {", structName)))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("  return %s", generator.GenerateArrayDeclaration(reflect.ValueOf(diffData.SourceResource.AllowedMimeTypes), false))))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("}")))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("func (r *%s) AllowedMimeTypes() []string {", structName)))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("  return %s", generator.GenerateArrayDeclaration(reflect.ValueOf(diffData.SourceResource.AllowedMimeTypes), false))))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("}")))
 
 				changes = append(changes, strings.Join(changeDetail, "\n"))
 			}
 
 			if len(diffData.TargetResource.AllowedMimeTypes) > 0 && len(diffData.SourceResource.AllowedMimeTypes) == 0 {
-				symbol := printAdd("+")
+				symbol := printRemove("-")
 				changeDetail := []string{}
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("func (r *%s) AllowedMimeTypes() []string {", structName)))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("  return %s", generator.GenerateArrayDeclaration(reflect.ValueOf(diffData.TargetResource.AllowedMimeTypes), false))))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("}")))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("func (r *%s) AllowedMimeTypes() []string {", structName)))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("  return %s", generator.GenerateArrayDeclaration(reflect.ValueOf(diffData.TargetResource.AllowedMimeTypes), false))))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("}")))
 
 				changes = append(changes, strings.Join(changeDetail, "\n"))
 			}
@@ -365,9 +359,9 @@ func PrintDiffStorage(diffData CompareDiffResult[objects.Bucket, objects.UpdateB
 			if diffData.TargetResource.FileSizeLimit == nil && diffData.SourceResource.FileSizeLimit != nil && *diffData.SourceResource.FileSizeLimit > 0 {
 				symbol := printAdd("+")
 				changeDetail := []string{}
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("func (r *%s) FileSizeLimit() int {", structName)))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("  return %s", strconv.Itoa(*diffData.SourceResource.FileSizeLimit))))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("}")))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("func (r *%s) FileSizeLimit() int {", structName)))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("  return %s", strconv.Itoa(*diffData.SourceResource.FileSizeLimit))))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("}")))
 
 				changes = append(changes, strings.Join(changeDetail, "\n"))
 			}
@@ -375,9 +369,9 @@ func PrintDiffStorage(diffData CompareDiffResult[objects.Bucket, objects.UpdateB
 			if diffData.TargetResource.FileSizeLimit != nil && *diffData.TargetResource.FileSizeLimit > 0 && diffData.SourceResource.FileSizeLimit == nil {
 				symbol := printRemove("-")
 				changeDetail := []string{}
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("func (r *%s) FileSizeLimit() int {", structName)))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("  return %s", strconv.Itoa(*diffData.TargetResource.FileSizeLimit))))
-				changeDetail = append(changeDetail, fmt.Sprintf("%s %s", symbol, print("}")))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("func (r *%s) FileSizeLimit() int {", structName)))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("  return %s", strconv.Itoa(*diffData.TargetResource.FileSizeLimit))))
+				changeDetail = append(changeDetail, fmt.Sprintf("  %s %s", symbol, print("}")))
 
 				changes = append(changes, strings.Join(changeDetail, "\n"))
 

@@ -28,41 +28,40 @@ type GenerateStoragesData struct {
 const (
 	StorageDir      = "internal/storages"
 	StorageTemplate = `package {{ .Package }}
-	{{- if gt (len .Imports) 0 }}
-	
-	import (
-	{{- range .Imports}}
-		{{.}}
-	{{- end}}
-	)
-	{{- end }}
-	
-	type {{ .StructName | ToGoIdentifier }} struct {
-		raiden.BucketBase
-	}
-	
-	func (r *{{ .StructName | ToGoIdentifier }}) Name() string {
-		return "{{ .Name }}"
-	}
+{{- if gt (len .Imports) 0 }}
 
-	{{- if .Public }}
-	func (r *{{ .StructName | ToGoIdentifier }}) Public() bool {
-		return {{ .Public }}
-	}
-	{{- end }}
-	{{- if ne .FileSizeLimit 0}}
-	
-	func (r *{{ .StructName | ToGoIdentifier }}) FileSizeLimit() int {
-		return {{ .FileSizeLimit }} // bytes
-	}
-	{{- end }}
-	{{- if ne .AllowedMimeTypes "" }}
+import (
+{{- range .Imports}}
+	{{.}}
+{{- end}}
+)
+{{- end }}
 
-	func (r *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
-		return {{ .AllowedMimeTypes }}
-	}
-	{{- end }}
-	`
+type {{ .StructName | ToGoIdentifier }} struct {
+	raiden.BucketBase
+}
+
+func (r *{{ .StructName | ToGoIdentifier }}) Name() string {
+	return "{{ .Name }}"
+}
+
+{{- if .Public }}
+func (r *{{ .StructName | ToGoIdentifier }}) Public() bool {
+	return {{ .Public }}
+}
+{{- end }}
+{{- if ne .FileSizeLimit 0}}
+
+func (r *{{ .StructName | ToGoIdentifier }}) FileSizeLimit() int {
+	return {{ .FileSizeLimit }} // bytes
+}
+{{- end }}
+{{- if ne .AllowedMimeTypes "" }}
+func (r *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
+	return {{ .AllowedMimeTypes }}
+}
+{{- end }}
+`
 )
 
 func GenerateStorages(basePath string, storages []objects.Bucket, generateFn GenerateFn) (err error) {
