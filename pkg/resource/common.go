@@ -2,12 +2,8 @@ package resource
 
 import (
 	"errors"
-	"fmt"
-	"reflect"
-	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli/configure"
@@ -160,87 +156,51 @@ func filterIsNativeRole(mapNativeRole map[string]raiden.Role, supabaseRole []obj
 	return
 }
 
-// --- Print diff -----
-func PrintDiff(resource string, supabaseResource, appResource interface{}, prefix string) {
-	spValue := reflect.ValueOf(supabaseResource)
-	appValue := reflect.ValueOf(appResource)
-
-	for i := 0; i < spValue.NumField(); i++ {
-		fieldSupabase := spValue.Field(i)
-		fieldApp := appValue.Field(i)
-
-		if fieldSupabase.Kind() == reflect.Struct {
-			PrintDiff(resource, fieldSupabase.Interface(), fieldApp.Interface(), fmt.Sprintf("%s.%s", prefix, fieldSupabase.Type().Field(i).Name))
-			continue
-		}
-
-		if fieldSupabase.Kind() == reflect.Slice || fieldSupabase.Kind() == reflect.Array {
-			for j := 0; j < fieldSupabase.Len(); j++ {
-				fieldIdentifier := fmt.Sprintf("%v", j)
-				spField := fieldSupabase.Index(j)
-				spFieldValue := spField.Interface()
-				if spColum, isSpColumn := spFieldValue.(objects.Column); isSpColumn {
-					fieldIdentifier = spColum.Name
-				}
-
-				if j >= fieldApp.Len() {
-					var diffStringArr []string
-					for i := 0; i < spField.NumField(); i++ {
-						field, fieldValue := spField.Type().Field(i), spField.Field(i)
-						diffStringArr = append(diffStringArr, fmt.Sprintf("%s=%v", field.Name, fieldValue.Interface()))
-					}
-					diffString := strings.Join(diffStringArr, " ")
-					PrintDiffDetail(resource, prefix, spValue.Type().Field(i).Name, diffString, "not configure in app")
-					continue
-				}
-
-				appFieldValue := fieldApp.Index(j).Interface()
-				PrintDiff(resource, spFieldValue, appFieldValue, fmt.Sprintf("%s.%s[%s]", prefix, spValue.Type().Field(i).Name, fieldIdentifier))
-			}
-			continue
-		}
-
-		fieldSupabaseValue := reflect.ValueOf(fieldSupabase.Interface())
-		if fieldSupabaseValue.Kind() == reflect.Pointer {
-			fieldSupabaseValue = fieldSupabaseValue.Elem()
-		}
-
-		fieldAppValue := reflect.ValueOf(fieldApp.Interface())
-		if fieldAppValue.Kind() == reflect.Pointer {
-			fieldAppValue = fieldAppValue.Elem()
-		}
-
-		spCompareStr, appCompateStr := fmt.Sprintf("%v", fieldSupabaseValue), fmt.Sprintf("%v", fieldAppValue)
-		if spCompareStr != appCompateStr {
-			PrintDiffDetail(resource, prefix, spValue.Type().Field(i).Name, spCompareStr, appCompateStr)
-		}
+// ---- extract resource
+func extractAppResource(f *Flags, latestState *state.State) (
+	extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult,
+	extractedRpc state.ExtractRpcResult, extractedStorage state.ExtractStorageResult,
+	err error,
+) {
+	if latestState == nil {
+		return
 	}
-}
 
-func PrintDiffDetail(resource, prefix string, attribute string, spValue, appValue string) {
-	print := color.New(color.FgHiBlack).PrintfFunc()
-	print("*** Found diff %s in %s.%s \n", resource, prefix, attribute)
-	print = color.New(color.FgGreen).PrintfFunc()
-	print("// Supabase : %s = %s\n", attribute, spValue)
-	print = color.New(color.FgRed).PrintfFunc()
-	print("// App : %s = %s \n", attribute, appValue)
-	print = color.New(color.FgHiBlack).PrintfFunc()
-	print("*** End found diff \n")
-}
-
-// ----- Convert array of table to map table -----
-type MapTable map[string]*objects.Table
-
-func tableToMap(tables []objects.Table) MapTable {
-	mapTable := make(MapTable)
-	for i := range tables {
-		t := tables[i]
-		key := getMapTableKey(t.Schema, t.Name)
-		mapTable[key] = &t
+	if f.All() || f.ModelsOnly {
+		ImportLogger.Debug("Start extract table")
+		extractedTable, err = state.ExtractTable(latestState.Tables, registeredModels)
+		if err != nil {
+			return
+		}
+		ImportLogger.Debug("Finish extract table")
 	}
-	return mapTable
-}
 
-func getMapTableKey(schema, name string) string {
-	return fmt.Sprintf("%s.%s", schema, name)
+	if f.All() || f.RolesOnly {
+		ImportLogger.Debug("Start extract role")
+		extractedRole, err = state.ExtractRole(latestState.Roles, registeredRoles, false)
+		if err != nil {
+			return
+		}
+		ImportLogger.Debug("Finish extract role")
+	}
+
+	if f.All() || f.RpcOnly {
+		ImportLogger.Debug("Start extract rpc")
+		extractedRpc, err = state.ExtractRpc(latestState.Rpc, registeredRpc)
+		if err != nil {
+			return
+		}
+		ImportLogger.Debug("FInish extract rpc")
+	}
+
+	if f.All() || f.StoragesOnly {
+		ImportLogger.Debug("Start extract storage")
+		extractedStorage, err = state.ExtractStorage(latestState.Storage, registeredStorages)
+		if err != nil {
+			return
+		}
+		ImportLogger.Debug("Finish extract storage")
+	}
+
+	return
 }

@@ -111,8 +111,8 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 	}
 
 	// map column data
-	columns, importsPath := mapTableAttributes(input.Table)
-	rlsTag := buildRlsTag(input.Policies)
+	columns, importsPath := MapTableAttributes(input.Table)
+	rlsTag := BuildRlsTag(input.Policies)
 	raidenPath := "github.com/sev-2/raiden"
 	importsPath = append(importsPath, raidenPath)
 
@@ -137,7 +137,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 			}
 		}
 
-		r.Tag = buildJoinTag(&r)
+		r.Tag = BuildJoinTag(&r)
 		relation = append(relation, r)
 	}
 
@@ -168,7 +168,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 }
 
 // map table to column, map pg type to go type and get dependency import path
-func mapTableAttributes(table objects.Table) (columns []GenerateModelColumn, importsPath []string) {
+func MapTableAttributes(table objects.Table) (columns []GenerateModelColumn, importsPath []string) {
 	importsMap := make(map[string]any)
 	mapPrimaryKey := map[string]bool{}
 	for _, k := range table.PrimaryKeys {
@@ -261,7 +261,7 @@ func buildColumnTag(c objects.Column, mapPk map[string]bool) string {
 	return strings.Join(tags, " ")
 }
 
-func buildRlsTag(rlsList objects.Policies) string {
+func BuildRlsTag(rlsList objects.Policies) string {
 	var rls Rls
 
 	var readUsingTag, writeCheckTag, writeUsingTag string
@@ -330,7 +330,7 @@ func buildRlsTag(rlsList objects.Policies) string {
 	return rlsTag
 }
 
-func buildJoinTag(r *state.Relation) string {
+func BuildJoinTag(r *state.Relation) string {
 	var tags []string
 	var joinTags []string
 

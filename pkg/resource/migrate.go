@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
@@ -54,9 +55,9 @@ type MigrateTableNode struct {
 	Child         *MigrateTableNode
 }
 
-func MigrateResource(config *raiden.Config, importState *ResourceState, projectPath string, resource *MigrateData) (errors []error) {
+func MigrateResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *MigrateData) (errors []error) {
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan []error), make(chan any)
-	doneListen := ListenApplyResource(projectPath, importState, stateChan)
+	doneListen := UpdateLocalStateFromApply(projectPath, importState, stateChan)
 
 	// role must be run first because will be use when create/update rls
 	// and role must be already exist in database

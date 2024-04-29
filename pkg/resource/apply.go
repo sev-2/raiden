@@ -4,12 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/resource/policies"
+	"github.com/sev-2/raiden/pkg/resource/roles"
+	"github.com/sev-2/raiden/pkg/resource/rpc"
+	"github.com/sev-2/raiden/pkg/resource/storages"
+	"github.com/sev-2/raiden/pkg/resource/tables"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 var ApplyLogger hclog.Logger = logger.HcLog().Named("apply")
@@ -70,7 +78,7 @@ var ApplyLogger hclog.Logger = logger.HcLog().Named("apply")
 func Apply(flags *Flags, config *raiden.Config) error {
 	// declare default variable
 	var migrateResource MigrateData
-	var importState ResourceState
+	var localState state.LocalState
 
 	// load map native role
 	ApplyLogger.Info("Load Native log")
@@ -81,20 +89,20 @@ func Apply(flags *Flags, config *raiden.Config) error {
 
 	// load app resource
 	ApplyLogger.Info("start - load resource from local state")
-	latestState, err := loadState()
+	latestLocalState, err := state.Load()
 	if err != nil {
 		return err
 	}
 	ApplyLogger.Info("finish - load resource from local state")
 
-	if latestState == nil {
+	if latestLocalState == nil {
 		return errors.New("state file is not found, please run raiden imports first")
 	} else {
-		importState.State = *latestState
+		localState.State = *latestLocalState
 	}
 
 	ApplyLogger.Info("start - extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestState)
+	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestLocalState)
 	if err != nil {
 		return err
 	}
@@ -257,7 +265,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 	ApplyLogger.Info("finish - compare supabase resource and local resource")
 
-	migrateErr := MigrateResource(config, &importState, flags.ProjectPath, &migrateResource)
+	migrateErr := MigrateResource(config, &localState, flags.ProjectPath, &migrateResource)
 	if len(migrateErr) > 0 {
 		var errMessages []string
 		for _, e := range migrateErr {
@@ -552,7 +560,7 @@ func bindMigratedStorage(es state.ExtractStorageResult, spStorages []objects.Buc
 }
 
 func runApplyCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) (migratedData []MigrateItem[objects.Role, objects.UpdateRoleParam], err error) {
-	result, e := CompareRoles(appRoles, supabaseRoles)
+	result, e := roles.CompareList(appRoles, supabaseRoles)
 	if e != nil {
 		err = e
 		return
@@ -579,7 +587,7 @@ func runApplyCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role)
 }
 
 func runApplyCompareTable(supabaseTable []objects.Table, appTable []objects.Table) (migratedData []MigrateItem[objects.Table, objects.UpdateTableParam], err error) {
-	result, e := CompareTables(appTable, supabaseTable)
+	result, e := tables.CompareList(appTable, supabaseTable)
 	if e != nil {
 		err = e
 		return
@@ -606,7 +614,7 @@ func runApplyCompareTable(supabaseTable []objects.Table, appTable []objects.Tabl
 }
 
 func runApplyComparePolicies(supabasePolicies []objects.Policy, appPolicies []objects.Policy) (migratedData []MigrateItem[objects.Policy, objects.UpdatePolicyParam], err error) {
-	result := ComparePolicies(appPolicies, supabasePolicies)
+	result := policies.CompareList(appPolicies, supabasePolicies)
 	for i := range result {
 		r := result[i]
 		migrateType := MigrateTypeIgnore
@@ -625,7 +633,7 @@ func runApplyComparePolicies(supabasePolicies []objects.Policy, appPolicies []ob
 }
 
 func runApplyCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.Function) (migratedData []MigrateItem[objects.Function, any], err error) {
-	result, e := CompareRpcFunctions(appFn, supabaseFn)
+	result, e := rpc.CompareList(appFn, supabaseFn)
 	if e != nil {
 		err = e
 		return
@@ -639,10 +647,9 @@ func runApplyCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.
 		}
 
 		migratedData = append(migratedData, MigrateItem[objects.Function, any]{
-			Type:           migrateType,
-			NewData:        r.SourceResource,
-			OldData:        r.TargetResource,
-			MigrationItems: r.DiffItems,
+			Type:    migrateType,
+			NewData: r.SourceResource,
+			OldData: r.TargetResource,
 		})
 	}
 
@@ -650,7 +657,7 @@ func runApplyCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.
 }
 
 func runApplyCompareStorages(supabaseStorage []objects.Bucket, appStorages []objects.Bucket) (migratedData []MigrateItem[objects.Bucket, objects.UpdateBucketParam], err error) {
-	result, e := CompareStorage(appStorages, supabaseStorage)
+	result, e := storages.CompareList(appStorages, supabaseStorage)
 	if e != nil {
 		err = e
 		return
@@ -787,4 +794,206 @@ func validateRoleIsExist(appPolicies state.ExtractedPolicies, appRoles state.Ext
 	}
 
 	return nil
+}
+
+func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState, stateChan chan any) (done chan error) {
+	done = make(chan error)
+	go func() {
+		for rs := range stateChan {
+			if rs == nil {
+				continue
+			}
+
+			switch m := rs.(type) {
+			case *MigrateItem[objects.Table, objects.UpdateTableParam]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					modelStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					modelPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.ModelDir, utils.ToSnakeCase(m.NewData.Name))
+
+					ts := state.TableState{
+						Table:       m.NewData,
+						ModelPath:   modelPath,
+						ModelStruct: modelStruct,
+						LastUpdate:  time.Now(),
+					}
+
+					localState.AddTable(ts)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+
+					localState.DeleteTable(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, tState, found := localState.FindTable(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					tState.Table = m.NewData
+					tState.LastUpdate = time.Now()
+					localState.UpdateTable(fIndex, tState)
+				}
+			case *MigrateItem[objects.Role, objects.UpdateRoleParam]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					roleStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					rolePath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.RoleDir, utils.ToSnakeCase(m.NewData.Name))
+
+					r := state.RoleState{
+						Role:       m.NewData,
+						RolePath:   rolePath,
+						RoleStruct: roleStruct,
+						LastUpdate: time.Now(),
+					}
+
+					localState.AddRole(r)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					localState.DeleteRole(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, rState, found := localState.FindRole(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Role = m.NewData
+					rState.LastUpdate = time.Now()
+					localState.UpdateRole(fIndex, rState)
+				}
+			case *MigrateItem[objects.Policy, objects.UpdatePolicyParam]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+
+					fIndex, tState, found := localState.FindTable(m.NewData.TableID)
+					if !found {
+						continue
+					}
+					tState.Policies = append(tState.Policies, m.NewData)
+					tState.LastUpdate = time.Now()
+					localState.UpdateTable(fIndex, tState)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					fIndex, tState, found := localState.FindTable(m.OldData.TableID)
+					if !found {
+						continue
+					}
+
+					// find policy index
+					pi := -1
+					for i := range tState.Policies {
+						p := tState.Policies[i]
+						if p.ID == m.OldData.ID {
+							pi = i
+							break
+						}
+					}
+
+					if pi > -1 {
+						tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+						tState.LastUpdate = time.Now()
+						localState.UpdateTable(fIndex, tState)
+					}
+				case MigrateTypeUpdate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					fIndex, tState, found := localState.FindTable(m.NewData.TableID)
+					if !found {
+						continue
+					}
+
+					// find policy index
+					pi := -1
+					for i := range tState.Policies {
+						p := tState.Policies[i]
+						if p.ID == m.OldData.ID {
+							pi = i
+							break
+						}
+					}
+					if pi > -1 {
+						tState.Policies[pi] = m.NewData
+						tState.LastUpdate = time.Now()
+						localState.UpdateTable(fIndex, tState)
+					}
+				}
+			case *MigrateItem[objects.Function, any]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					rpcStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					rpcPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.RpcDir, utils.ToSnakeCase(m.NewData.Name))
+
+					r := state.RpcState{
+						Function:   m.NewData,
+						RpcPath:    rpcPath,
+						RpcStruct:  rpcStruct,
+						LastUpdate: time.Now(),
+					}
+					localState.AddRpc(r)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					localState.DeleteRpc(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, rState, found := localState.FindRpc(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Function = m.NewData
+					rState.LastUpdate = time.Now()
+					localState.UpdateRpc(fIndex, rState)
+				}
+			case *MigrateItem[objects.Bucket, objects.UpdateBucketParam]:
+				switch m.Type {
+				case MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+
+					r := state.StorageState{
+						Bucket:     m.NewData,
+						LastUpdate: time.Now(),
+					}
+
+					localState.AddStorage(r)
+				case MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					localState.DeleteStorage(m.OldData.ID)
+				case MigrateTypeUpdate:
+					fIndex, rState, found := localState.FindStorage(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Bucket = m.NewData
+					rState.LastUpdate = time.Now()
+					localState.UpdateStorage(fIndex, rState)
+				}
+			}
+		}
+		done <- localState.Persist()
+	}()
+	return done
 }
