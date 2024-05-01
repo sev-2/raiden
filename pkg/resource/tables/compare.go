@@ -22,6 +22,7 @@ func Compare(source []objects.Table, target []objects.Table) error {
 
 	sMapRelation := buildGenerateMapRelations(tableToMap(source))
 	tMapRelation := buildGenerateMapRelations(tableToMap(target))
+
 	return PrintDiffResult(diffResult, sMapRelation, tMapRelation)
 }
 

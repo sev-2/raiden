@@ -8,9 +8,12 @@ import (
 	"text/template"
 
 	"github.com/fatih/color"
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
+	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -39,13 +42,56 @@ func PrintDiff(diffData CompareDiffResult, sRelation MapRelations, tRelation Map
 
 	diffMessage, err := GenerateDiffMessage(diffData, sRelation, tRelation)
 	if err != nil {
-		Logger.Error("print diff rpc error", "msg", err.Error())
+		Logger.Error("print diff table error", "msg", err.Error())
 		return
 	}
 
 	printScope("*** Found diff in %s/%s.go ***\n", "/internal/models", fileName)
 	fmt.Println(diffMessage)
 	printScope("*** End found diff ***\n")
+}
+
+func PrintMigratesDiff(items []MigrateItem) {
+	newTable := []string{}
+	deleteTable := []string{}
+	updateTable := []string{}
+
+	for i := range items {
+		item := items[i]
+
+		var name string
+		if item.NewData.Name != "" {
+			name = item.NewData.Name
+		} else if item.OldData.Name != "" {
+			name = item.OldData.Name
+		}
+
+		switch item.Type {
+		case migrator.MigrateTypeCreate:
+			newTable = append(newTable, fmt.Sprintf("- %s", name))
+		case migrator.MigrateTypeUpdate:
+			if Logger.GetLevel() == hclog.Trace {
+				diffMessage := GenerateDiffChangeMessage(name, item)
+				updateTable = append(updateTable, diffMessage)
+			} else {
+				updateTable = append(updateTable, fmt.Sprintf("- %s", name))
+			}
+		case migrator.MigrateTypeDelete:
+			deleteTable = append(deleteTable, fmt.Sprintf("- %s", name))
+		}
+	}
+
+	if len(newTable) > 0 {
+		Logger.Debug("List New Table", "table", fmt.Sprintf("\n %s", strings.Join(newTable, "\n")))
+	}
+
+	if len(updateTable) > 0 {
+		Logger.Debug("List Updated Table", "table", fmt.Sprintf("\n%s", strings.Join(updateTable, "\n")))
+	}
+
+	if len(deleteTable) > 0 {
+		Logger.Debug("List Delete Table", "table", fmt.Sprintf("\n %s", strings.Join(deleteTable, "\n")))
+	}
 }
 
 // ----- generate message section ------
@@ -140,7 +186,7 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 
 	if len(diffData.DiffItems.ChangeRelationItems) > 0 {
 		var sFoundRelations, tFoundRelations []*state.Relation
-		var sRelationStr, tRelationStr string
+		var sRelationArr, tRelationArr []string
 
 		sKey := fmt.Sprintf("%s.%s", diffData.SourceResource.Schema, diffData.SourceResource.Name)
 		if r, exist := sRelation[sKey]; exist {
@@ -152,11 +198,22 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 			tFoundRelations = r
 		}
 
-		if len(sFoundRelations) == 0 || sFoundRelations == nil {
-			sRelationStr = "not implemented"
-		} else {
+		mapChangedByTargetTable := map[string][]objects.UpdateRelationItem{}
+		for i := range diffData.DiffItems.ChangeRelationItems {
+			dItem := diffData.DiffItems.ChangeRelationItems[i]
+			changeTables, exist := mapChangedByTargetTable[dItem.Data.TargetTableName]
+			if exist {
+				changeTables = append(changeTables, dItem)
+				mapChangedByTargetTable[dItem.Data.TargetTableName] = changeTables
+			} else {
+				mapChangedByTargetTable[dItem.Data.TargetTableName] = []objects.UpdateRelationItem{dItem}
+			}
+		}
+
+		// normalize sRelations
+		if len(sFoundRelations) > 0 {
 			mapRelationName := make(map[string]bool)
-			relations := make([]state.Relation, 0)
+			relations := make([]*state.Relation, 0)
 			for i := range sFoundRelations {
 				r := sFoundRelations[i]
 				if r == nil {
@@ -174,26 +231,15 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 				}
 
 				r.Tag = generator.BuildJoinTag(r)
-				relations = append(relations, *r)
+				relations = append(relations, r)
 			}
-
-			if len(relations) > 0 {
-				for i := range relations {
-					r := relations[i]
-					sRelationStr += fmt.Sprintf(
-						"%s *%s `json:\"%s,omitempty\" %s\n",
-						symbol, utils.SnakeCaseToPascalCase(r.Table),
-						r.Type, r.Tag,
-					)
-				}
-			}
+			sFoundRelations = relations
 		}
 
-		if len(tFoundRelations) == 0 || tFoundRelations == nil {
-			sRelationStr = "not implemented"
-		} else {
+		// normalize tRelations
+		if len(tFoundRelations) > 0 {
 			mapRelationName := make(map[string]bool)
-			relations := make([]state.Relation, 0)
+			relations := make([]*state.Relation, 0)
 			for i := range tFoundRelations {
 				r := tFoundRelations[i]
 				if r == nil {
@@ -201,7 +247,7 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 				}
 
 				if r.RelationType == raiden.RelationTypeManyToMany {
-					key := fmt.Sprintf("%s_%s", diffData.TargetResource.Name, r.Table)
+					key := fmt.Sprintf("%s_%s", diffData.SourceResource.Name, r.Table)
 					_, exist := mapRelationName[key]
 					if exist {
 						r.Table = fmt.Sprintf("%ss", r.Through)
@@ -211,22 +257,92 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 				}
 
 				r.Tag = generator.BuildJoinTag(r)
-				relations = append(relations, *r)
+				relations = append(relations, r)
+			}
+			tFoundRelations = relations
+		}
+
+		for k, diffItems := range mapChangedByTargetTable {
+			var fSource, fTarget *state.Relation
+
+			// find source
+			for i := range diffItems {
+				di := diffItems[i]
+				findKey := fmt.Sprintf("%s_%s_%s", k, di.Data.SourceColumnName, di.Data.TargetColumnName)
+
+				for si := range sFoundRelations {
+					if fSource != nil {
+						break
+					}
+
+					sRelation := sFoundRelations[si]
+					if sRelation == nil {
+						continue
+					}
+
+					sKey := fmt.Sprintf(
+						"%s_%s_%s",
+						sRelation.Table,
+						sRelation.ForeignKey,
+						sRelation.PrimaryKey,
+					)
+
+					if findKey == sKey {
+						fSource = sRelation
+					}
+				}
+
+				for ti := range tFoundRelations {
+					if fTarget != nil {
+						break
+					}
+
+					tRelation := tFoundRelations[ti]
+					if tRelation == nil {
+						continue
+					}
+					tKey := fmt.Sprintf("%s_%s_%s", tRelation.Table, tRelation.ForeignKey, tRelation.PrimaryKey)
+
+					if findKey == tKey {
+						fTarget = tRelation
+					}
+				}
 			}
 
-			if len(relations) > 0 {
-				for i := range relations {
-					r := relations[i]
-					tRelationStr += fmt.Sprintf(
-						"%s *%s `json:\"%s,omitempty\" %s\n",
-						symbol, utils.SnakeCaseToPascalCase(r.Table),
-						r.Type, r.Tag,
-					)
-				}
+			if fSource == nil && fTarget == nil {
+				continue
+			}
+
+			if fSource != nil {
+				sRelationArr = append(sRelationArr, fmt.Sprintf(
+					"%s *%s `json:\"%s,omitempty\" %s",
+					symbol, utils.SnakeCaseToPascalCase(fSource.Table),
+					fSource.Type, fSource.Tag,
+				))
+			} else {
+				sRelationArr = append(sRelationArr, fmt.Sprintf(
+					"%s not implemented", symbol,
+				))
+			}
+
+			if fTarget != nil {
+				tRelationArr = append(tRelationArr, fmt.Sprintf(
+					"%s *%s `json:\"%s,omitempty\" %s",
+					symbol, utils.SnakeCaseToPascalCase(fTarget.Table),
+					fTarget.Type, fTarget.Tag,
+				))
+			} else {
+				tRelationArr = append(tRelationArr, fmt.Sprintf(
+					"%s not implemented", symbol,
+				))
 			}
 		}
 
-		diffRelationStr = fmt.Sprintf("%s %s \n%s\n%s %s \n%s", symbol, fromIndent, tRelationStr, symbol, toIndent, sRelationStr)
+		diffRelationStr = fmt.Sprintf(
+			"\n%s %s \n%s\n%s %s \n%s",
+			symbol, fromIndent, strings.Join(tRelationArr, "\n"),
+			symbol, toIndent, strings.Join(sRelationArr, "\n"),
+		)
 	}
 
 	param := map[string]any{
@@ -249,4 +365,44 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 	}
 
 	return buff.String(), nil
+}
+
+const DiffChangeTemplate = ` 
+Update Table {{ .Name }}
+  {{- if gt (len .ChangeItems) 0 }}
+  Change Configuration
+  {{- range .ChangeItems}}
+  {{.}}
+  {{- end}}
+  {{- end }}
+  {{- if gt (len .ChangeColumns) 0 }}
+  Change Columns
+  {{- range .ChangeColumns}}
+  {{.}}
+  {{- end}}
+  {{- end }}
+  {{- if gt (len .ChangeRelations) 0 }}
+  Change Relations
+  {{- range .ChangeRelations}}
+  {{.}}
+  {{- end}}
+  {{- end }}
+  `
+
+func GenerateDiffChangeMessage(name string, item MigrateItem) string {
+	// diffItems := item.MigrationItems
+
+	// var changeMsgArr, changeColumnMsgArr, changeRelationArr []string
+	// for i := range item.MigrationItems.ChangeItems {
+	// 	c := item.MigrationItems.ChangeItems[i]
+	// 	switch c {
+	// 	case objects.UpdateTableSchema:
+	// 	case objects.UpdateTableName:
+	// 	case objects.UpdateTableRlsEnable:
+	// 	case objects.UpdateTableRlsForced:
+	// 	case objects.UpdateTableReplicaIdentity:
+	// 	}
+	// }
+
+	return ""
 }

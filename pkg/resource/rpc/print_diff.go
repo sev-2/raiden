@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/fatih/color"
+	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
@@ -44,6 +45,44 @@ func PrintDiff(diffData CompareDiffResult) {
 	printScope("*** Found diff in %s/%s.go ***\n", "/internal/rpc", fileName)
 	fmt.Println(diffMessage)
 	printScope("*** End found diff ***\n")
+}
+
+func PrintMigratesDiff(items []MigrateItem) {
+	newData := []string{}
+	deleteData := []string{}
+	updateData := []string{}
+
+	for i := range items {
+		item := items[i]
+
+		var name string
+		if item.NewData.Name != "" {
+			name = item.NewData.Name
+		} else if item.OldData.Name != "" {
+			name = item.OldData.Name
+		}
+
+		switch item.Type {
+		case migrator.MigrateTypeCreate:
+			newData = append(newData, fmt.Sprintf("- %s", name))
+		case migrator.MigrateTypeUpdate:
+			updateData = append(updateData, fmt.Sprintf("- %s", name))
+		case migrator.MigrateTypeDelete:
+			deleteData = append(deleteData, fmt.Sprintf("- %s", name))
+		}
+	}
+
+	if len(newData) > 0 {
+		Logger.Debug("List New Rpc", "function", fmt.Sprintf("\n %s", strings.Join(newData, "\n")))
+	}
+
+	if len(updateData) > 0 {
+		Logger.Debug("List Updated Rpc", "function", fmt.Sprintf("\n%s", strings.Join(updateData, "\n")))
+	}
+
+	if len(deleteData) > 0 {
+		Logger.Debug("List Delete Rpc", "function", fmt.Sprintf("\n %s", strings.Join(deleteData, "\n")))
+	}
 }
 
 // ----- generate message section ------

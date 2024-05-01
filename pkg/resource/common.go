@@ -156,7 +156,7 @@ func filterIsNativeRole(mapNativeRole map[string]raiden.Role, supabaseRole []obj
 	return
 }
 
-// ---- extract resource
+// ---- extract resource -----
 func extractAppResource(f *Flags, latestState *state.State) (
 	extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult,
 	extractedRpc state.ExtractRpcResult, extractedStorage state.ExtractStorageResult,

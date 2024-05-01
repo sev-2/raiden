@@ -17,11 +17,13 @@ func (f *LogFlags) Bind(cmd *cobra.Command) {
 }
 
 func (f LogFlags) CheckAndActivateDebug(cmd *cobra.Command) {
-	if f.DebugMode {
+	debugFlag := cmd.Root().PersistentFlags().Lookup("debug").Value
+	if debugFlag.String() == "true" {
 		logger.HcLog().SetLevel(hclog.Debug)
 	}
 
-	if f.TraceMode {
+	traceFlag := cmd.Root().PersistentFlags().Lookup("trace").Value
+	if traceFlag.String() == "true" {
 		logger.HcLog().SetLevel(hclog.Trace)
 	}
 }

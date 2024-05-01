@@ -27,7 +27,6 @@ var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 // [x] import function
 // [x] import storage
 func Import(flags *Flags, config *raiden.Config) error {
-
 	// load map native role
 	ImportLogger.Info("load Native log")
 	mapNativeRole, err := loadMapNativeRole()
@@ -36,12 +35,11 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	// load supabase resource
-	ImportLogger.Info("start - load resource from supabase")
+	ImportLogger.Info("load resource from supabase")
 	spResource, err := Load(flags, config)
 	if err != nil {
 		return err
 	}
-	ImportLogger.Info("finish - load resource from supabase")
 
 	// create import state
 	ImportLogger.Debug("get native roles")
@@ -60,19 +58,17 @@ func Import(flags *Flags, config *raiden.Config) error {
 	spResource.Roles = filterUserRole(spResource.Roles, mapNativeRole)
 
 	// load app resource
-	ImportLogger.Info("start - load resource from local state")
+	ImportLogger.Info("load resource from local state")
 	localState, err := state.Load()
 	if err != nil {
 		return err
 	}
-	ImportLogger.Info("finish - load resource from local state")
 
-	ImportLogger.Info("start - extract data from local state")
+	ImportLogger.Info("extract data from local state")
 	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, localState)
 	if err != nil {
 		return err
 	}
-	ImportLogger.Info("finish - extract data from local state")
 
 	importState := state.LocalState{
 		State: state.State{
@@ -81,9 +77,9 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	// compare resource
-	ImportLogger.Info("start - compare supabase resource and local resource")
+	ImportLogger.Info("compare supabase resource and local resource")
 	if (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
-		ImportLogger.Debug("start - compare table")
+		ImportLogger.Debug("start compare table")
 		// compare table
 		var compareTables []objects.Table
 		for i := range appTables.Existing {
@@ -94,42 +90,50 @@ func Import(flags *Flags, config *raiden.Config) error {
 		if err := tables.Compare(spResource.Tables, compareTables); err != nil {
 			return err
 		}
-		ImportLogger.Debug("finish - compare table")
+		ImportLogger.Debug("finish compare table")
 	}
 
 	if (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
-		ImportLogger.Debug("start - compare role")
+		ImportLogger.Debug("start compare role")
 		if err := roles.Compare(spResource.Roles, appRoles.Existing); err != nil {
 			return err
 		}
-		ImportLogger.Debug("finish - compare role")
+		ImportLogger.Debug("finish compare role")
 	}
 
 	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
-		ImportLogger.Debug("start - compare rpc")
+		ImportLogger.Debug("start compare rpc")
 		if err := rpc.Compare(spResource.Functions, appRpcFunctions.Existing); err != nil {
 			return err
 		}
-		ImportLogger.Debug("finish - compare rpc")
+		ImportLogger.Debug("finish compare rpc")
 	}
 
 	if (flags.All() || flags.StoragesOnly) && len(appStorage.Existing) > 0 {
-		ImportLogger.Debug("start - compare storage")
+		ImportLogger.Debug("start compare storage")
 		if err := storages.Compare(spResource.Storages, appStorage.Existing); err != nil {
 			return err
 		}
-		ImportLogger.Debug("finish - compare storage")
+		ImportLogger.Debug("finish compare storage")
 	}
-	ImportLogger.Info("finish - compare supabase resource and local resource")
 
 	// generate resource
 	if err := generateImportResource(config, &importState, flags.ProjectPath, spResource); err != nil {
 		return err
 	}
 
+	// Print Report
+	importReport := ImportReport{
+		Role:    roles.GetNewCountData(spResource.Roles, appRoles),
+		Table:   tables.GetNewCountData(spResource.Tables, appTables),
+		Storage: storages.GetNewCountData(spResource.Storages, appStorage),
+		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
+	}
+	PrintImportReport(importReport)
 	return nil
 }
 
+// ----- Generate import data -----
 func generateImportResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *Resource) error {
 	if err := generator.CreateInternalFolder(projectPath); err != nil {
 		return err
@@ -228,6 +232,32 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 	}
 }
 
+func ImportDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
+	return func(input generator.GenerateInput, writer io.Writer) error {
+		if err := generator.Generate(input, nil); err != nil {
+			return err
+		}
+		if rs, found := FindImportResource(data, input, findFunc); found {
+			stateChan <- map[string]any{
+				"item":  rs,
+				"input": input,
+			}
+		}
+		return nil
+	}
+}
+
+func FindImportResource[T any](data []T, input generator.GenerateInput, findFunc func(item T, inputData generator.GenerateInput) bool) (item T, found bool) {
+	for i := range data {
+		t := data[i]
+		if findFunc(t, input) {
+			return t, true
+		}
+	}
+	return
+}
+
+// ----- Update imported data in local state -----
 func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any) (done chan error) {
 	done = make(chan error)
 	go func() {
@@ -274,7 +304,6 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 						RpcStruct:  utils.SnakeCaseToPascalCase(parseItem.Name),
 						LastUpdate: time.Now(),
 					}
-
 					localState.AddRpc(rpcState)
 				case objects.Bucket:
 					storageState := state.StorageState{
@@ -290,27 +319,19 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 	return done
 }
 
-func ImportDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
-	return func(input generator.GenerateInput, writer io.Writer) error {
-		if err := generator.Generate(input, nil); err != nil {
-			return err
-		}
-		if rs, found := FindImportResource(data, input, findFunc); found {
-			stateChan <- map[string]any{
-				"item":  rs,
-				"input": input,
-			}
-		}
-		return nil
-	}
+// ----- Print import report -----
+type ImportReport struct {
+	Table   int
+	Role    int
+	Rpc     int
+	Storage int
 }
 
-func FindImportResource[T any](data []T, input generator.GenerateInput, findFunc func(item T, inputData generator.GenerateInput) bool) (item T, found bool) {
-	for i := range data {
-		t := data[i]
-		if findFunc(t, input) {
-			return t, true
-		}
+func PrintImportReport(report ImportReport) {
+	message := "import process is complete, your code will be up to date"
+	if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
+		message = "import process is complete, adding several new resources to the codebase"
 	}
-	return
+
+	ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
 }

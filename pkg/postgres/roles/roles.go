@@ -29,6 +29,7 @@ var NativeRoles = []raiden.Role{
 	&SupabaseAuthAdmin{},
 	&SupabaseFunctionsAdmin{},
 	&SupabaseReadOnlyUser{},
+	&SupabaseRealtimeAdmin{},
 	&SupabaseReplicationAdmin{},
 	&SupabaseStorageAdmin{},
 }

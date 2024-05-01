@@ -57,3 +57,16 @@ func BindRpcFunction(rpc raiden.Rpc, fn *objects.Function) (err error) {
 	fn.CompleteStatement = rpc.GetCompleteStmt()
 	return
 }
+
+func (er ExtractRpcResult) ToDeleteFlatMap() map[string]*objects.Function {
+	mapData := make(map[string]*objects.Function)
+
+	if len(er.Delete) > 0 {
+		for i := range er.Delete {
+			r := er.Delete[i]
+			mapData[r.Name] = &r
+		}
+	}
+
+	return mapData
+}

@@ -59,6 +59,10 @@ func main() {
 			bootstrap.RegisterModels()
 			bootstrap.RegisterStorages()
 
+			if err = generate.Run(&f.Generate, config, f.ProjectPath, false); err != nil {
+				imports.ImportLogger.Error(err.Error())
+			}
+
 			if err := resource.Import(&f, config); err != nil {
 				imports.ImportLogger.Error(err.Error())
 			}

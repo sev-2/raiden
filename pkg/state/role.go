@@ -43,6 +43,9 @@ func ExtractRole(roleStates []RoleState, appRoles []raiden.Role, withNativeRole 
 	}
 
 	for _, state := range mapRoleState {
+		if state.IsNative && !withNativeRole {
+			continue
+		}
 		result.Delete = append(result.Delete, state.Role)
 	}
 
@@ -74,4 +77,17 @@ func BuildRoleFromState(rs RoleState, role raiden.Role) (r objects.Role) {
 	r = rs.Role
 	BindToSupabaseRole(&r, role)
 	return
+}
+
+func (er ExtractRoleResult) ToDeleteFlatMap() map[string]*objects.Role {
+	mapData := make(map[string]*objects.Role)
+
+	if len(er.Delete) > 0 {
+		for i := range er.Delete {
+			r := er.Delete[i]
+			mapData[r.Name] = &r
+		}
+	}
+
+	return mapData
 }
