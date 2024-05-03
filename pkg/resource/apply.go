@@ -87,7 +87,7 @@ type MigrateData struct {
 //	[ ] update storage acl
 func Apply(flags *Flags, config *raiden.Config) error {
 	// declare default variable
-	var migrateResource MigrateData
+	var migrateData MigrateData
 	var localState state.LocalState
 
 	// load map native role
@@ -152,50 +152,46 @@ func Apply(flags *Flags, config *raiden.Config) error {
 
 	ApplyLogger.Info("start build migrate data")
 	if flags.All() || flags.RolesOnly {
-		if migrateData, err := roles.BuildMigrateData(appRoles, resource.Roles); err != nil {
+		if data, err := roles.BuildMigrateData(appRoles, resource.Roles); err != nil {
 			return err
 		} else {
-			migrateResource.Roles = migrateData
+			migrateData.Roles = data
 		}
 	}
 
 	if flags.All() || flags.ModelsOnly {
-		// logger.Info("apply : compare table")
-		if migrateData, err := tables.BuildMigrateData(appTables, resource.Tables); err != nil {
+		if data, err := tables.BuildMigrateData(appTables, resource.Tables); err != nil {
 			return err
 		} else {
-			migrateResource.Tables = migrateData
+			migrateData.Tables = data
 		}
 
 		// bind app policies to resource
-		if migrateData, err := policies.BuildMigrateData(appPolicies, resource.Policies); err != nil {
+		if data, err := policies.BuildMigrateData(appPolicies, resource.Policies); err != nil {
 			return err
 		} else {
-			migrateResource.Policies = migrateData
+			migrateData.Policies = data
 		}
 	}
 
 	if flags.All() || flags.RpcOnly {
-		if migrateData, err := rpc.BuildMigrateData(appRpcFunctions, resource.Functions); err != nil {
+		if data, err := rpc.BuildMigrateData(appRpcFunctions, resource.Functions); err != nil {
 			return err
 		} else {
-			migrateResource.Rpc = migrateData
+			migrateData.Rpc = data
 		}
 	}
 
 	if flags.All() || flags.StoragesOnly {
-		if migrateData, err := storages.BuildMigrateData(appStorage, resource.Storages); err != nil {
+		if data, err := storages.BuildMigrateData(appStorage, resource.Storages); err != nil {
 			return err
 		} else {
-			migrateResource.Storages = migrateData
+			migrateData.Storages = data
 		}
 	}
 	ApplyLogger.Info("finish build migrate data")
 
-	// Print diff
-	tables.PrintMigratesDiff(migrateResource.Tables)
-
-	migrateErr := MigrateResource(config, &localState, flags.ProjectPath, &migrateResource)
+	migrateErr := Migrate(config, &localState, flags.ProjectPath, &migrateData)
 	if len(migrateErr) > 0 {
 		var errMessages []string
 		for _, e := range migrateErr {
@@ -204,13 +200,13 @@ func Apply(flags *Flags, config *raiden.Config) error {
 
 		return errors.New(strings.Join(errMessages, ","))
 	}
-
-	ApplyLogger.Info("finish migrate all resource")
+	ApplyLogger.Info("finish migrate resource")
+	PrintApplyChangeReport(migrateData)
 
 	return nil
 }
 
-func MigrateResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *MigrateData) (errors []error) {
+func Migrate(config *raiden.Config, importState *state.LocalState, projectPath string, resource *MigrateData) (errors []error) {
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan []error), make(chan any)
 	doneListen := UpdateLocalStateFromApply(projectPath, importState, stateChan)
 
@@ -644,4 +640,16 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 		done <- localState.Persist()
 	}()
 	return done
+}
+
+func PrintApplyChangeReport(migrateData MigrateData) {
+	diffTable := tables.GetDiffChangeMessage(migrateData.Tables)
+	diffPolicy := policies.GetDiffChangeMessage(migrateData.Policies)
+	diffRole := roles.GetDiffChangeMessage(migrateData.Roles)
+	diffRpc := rpc.GetDiffChangeMessage(migrateData.Rpc)
+	diffStorage := storages.GetDiffChangeMessage(migrateData.Storages)
+	diffMessage := []string{
+		diffTable, diffPolicy, diffRole, diffRpc, diffStorage,
+	}
+	ApplyLogger.Info("report", "list", strings.Join(diffMessage, "\n"))
 }

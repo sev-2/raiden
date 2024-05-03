@@ -1,13 +1,16 @@
 package policies
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
+	"html/template"
 
 	"github.com/sev-2/raiden/pkg/resource/migrator"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
-func PrintMigratesDiff(items []MigrateItem) {
+func GetDiffChangeMessage(items []MigrateItem) string {
 	newData := []string{}
 	deleteData := []string{}
 	updateData := []string{}
@@ -26,21 +29,110 @@ func PrintMigratesDiff(items []MigrateItem) {
 		case migrator.MigrateTypeCreate:
 			newData = append(newData, fmt.Sprintf("- %s", name))
 		case migrator.MigrateTypeUpdate:
-			updateData = append(updateData, fmt.Sprintf("- %s", name))
+			diffMessage, err := GenerateDiffChangeUpdateMessage(name, item)
+			if err != nil {
+				Logger.Error("print change policy error", "msg", err.Error())
+				continue
+			}
+			updateData = append(updateData, diffMessage)
 		case migrator.MigrateTypeDelete:
 			deleteData = append(deleteData, fmt.Sprintf("- %s", name))
 		}
 	}
 
-	if len(newData) > 0 {
-		Logger.Debug("List New Policy", "policy", fmt.Sprintf("\n %s", strings.Join(newData, "\n")))
+	changeMsg, err := GenerateDiffChangeMessage(newData, updateData, deleteData)
+	if err != nil {
+		Logger.Error("print change policy error", "msg", err.Error())
+		return ""
+	}
+	return changeMsg
+}
+
+// ----- diff change -----
+const DiffChangeTemplate = `
+  {{- if gt (len .NewData) 0}}
+  New Policy
+  {{- range .NewData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .UpdateData) 0}}
+  Update Policy
+  {{- range .UpdateData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .DeleteData) 0}}
+  Delete Policy
+  {{- range .DeleteData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  `
+
+func GenerateDiffChangeMessage(newData []string, updateData []string, deleteData []string) (string, error) {
+	param := map[string]any{
+		"NewData":    newData,
+		"UpdateData": updateData,
+		"DeleteData": deleteData,
 	}
 
-	if len(updateData) > 0 {
-		Logger.Debug("List Updated Policy", "policy", fmt.Sprintf("\n%s", strings.Join(updateData, "\n")))
+	tmplInstance := template.New("generate diff change policy")
+	tmpl, err := tmplInstance.Parse(DiffChangeTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
 	}
 
-	if len(deleteData) > 0 {
-		Logger.Debug("List Delete Policy", "policy", fmt.Sprintf("\n %s", strings.Join(deleteData, "\n")))
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
 	}
+
+	return buff.String(), nil
+}
+
+const DiffChangeUpdateTemplate = `  - Update Policy {{ .Name }}
+  {{- if gt (len .ChangeItems) 0}}
+      Change Configuration
+      {{- range .ChangeItems}}
+      {{.}}
+      {{- end }}
+  {{- end -}}
+  `
+
+func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, error) {
+	diffItems := item.MigrationItems
+
+	var changeMsgArr []string
+	for i := range diffItems.ChangeItems {
+		c := diffItems.ChangeItems[i]
+		switch c {
+		case objects.UpdatePolicyName:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "name", item.OldData.Name, item.NewData.Name))
+		case objects.UpdatePolicyDefinition:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "definition", item.OldData.Definition, item.NewData.Definition))
+		case objects.UpdatePolicyCheck:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "check", utils.ConvertAllToString(item.OldData.Check), utils.ConvertAllToString(item.NewData.Check)))
+		case objects.UpdatePolicyRoles:
+
+		}
+	}
+
+	param := map[string]any{
+		"Name":        name,
+		"ChangeItems": changeMsgArr,
+	}
+
+	tmplInstance := template.New("generate diff change update")
+	tmpl, err := tmplInstance.Parse(DiffChangeUpdateTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
 }

@@ -223,7 +223,7 @@ func PrintDiff(diffData CompareDiffResult) {
 	printScope("*** End found diff ***\n")
 }
 
-func PrintMigratesDiff(items []MigrateItem) {
+func GetDiffChangeMessage(items []MigrateItem) string {
 	newData := []string{}
 	deleteData := []string{}
 	updateData := []string{}
@@ -242,23 +242,23 @@ func PrintMigratesDiff(items []MigrateItem) {
 		case migrator.MigrateTypeCreate:
 			newData = append(newData, fmt.Sprintf("- %s", name))
 		case migrator.MigrateTypeUpdate:
-			updateData = append(updateData, fmt.Sprintf("- %s", name))
+			diffMessage, err := GenerateDiffChangeUpdateMessage(name, item)
+			if err != nil {
+				Logger.Error("print change role error", "msg", err.Error())
+				continue
+			}
+			updateData = append(updateData, diffMessage)
 		case migrator.MigrateTypeDelete:
 			deleteData = append(deleteData, fmt.Sprintf("- %s", name))
 		}
 	}
 
-	if len(newData) > 0 {
-		Logger.Debug("List New Role", "role", fmt.Sprintf("\n %s", strings.Join(newData, "\n")))
+	changeMsg, err := GenerateDiffChangeMessage(newData, updateData, deleteData)
+	if err != nil {
+		Logger.Error("print change role error", "msg", err.Error())
+		return ""
 	}
-
-	if len(updateData) > 0 {
-		Logger.Debug("List Updated Role", "role", fmt.Sprintf("\n%s", strings.Join(updateData, "\n")))
-	}
-
-	if len(deleteData) > 0 {
-		Logger.Debug("List Delete Role", "role", fmt.Sprintf("\n %s", strings.Join(deleteData, "\n")))
-	}
+	return changeMsg
 }
 
 // ----- generate message section ------
@@ -368,6 +368,117 @@ func GenerateDiffMessage(name string, diffType DiffType, updateType objects.Upda
 	}
 
 	tmpl, err := tmplInstance.Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
+}
+
+// ----- diff change -----
+const DiffChangeTemplate = `
+  {{- if gt (len .NewData) 0}}
+  New Role
+  {{- range .NewData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .UpdateData) 0}}
+  Update Role
+  {{- range .UpdateData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .DeleteData) 0}}
+  Delete Role
+  {{- range .DeleteData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  `
+
+func GenerateDiffChangeMessage(newData []string, updateData []string, deleteData []string) (string, error) {
+	param := map[string]any{
+		"NewData":    newData,
+		"UpdateData": updateData,
+		"DeleteData": deleteData,
+	}
+
+	tmplInstance := template.New("generate diff change role")
+	tmpl, err := tmplInstance.Parse(DiffChangeTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
+}
+
+const DiffChangeUpdateTemplate = `  - Update Role {{ .Name }}
+  {{- if gt (len .ChangeItems) 0}}
+      Change Configuration
+      {{- range .ChangeItems}}
+      {{.}}
+      {{- end }}
+  {{- end -}}
+  `
+
+func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, error) {
+	diffItems := item.MigrationItems
+
+	var changeMsgArr []string
+	for i := range diffItems.ChangeItems {
+		c := diffItems.ChangeItems[i]
+		switch c {
+		case objects.UpdateConnectionLimit:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "connection limit", item.OldData.ConnectionLimit, item.NewData.ConnectionLimit))
+		case objects.UpdateRoleName:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "name", item.OldData.Name, item.NewData.Name))
+		case objects.UpdateRoleIsReplication:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "is replicate role", item.OldData.IsReplicationRole, item.NewData.IsReplicationRole))
+		case objects.UpdateRoleIsSuperUser:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "is super user", item.OldData.IsSuperuser, item.NewData.IsSuperuser))
+		case objects.UpdateRoleInheritRole:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "inherit role", item.OldData.InheritRole, item.NewData.InheritRole))
+		case objects.UpdateRoleCanCreateDb:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "can create db", item.OldData.CanCreateDB, item.NewData.CanCreateDB))
+		case objects.UpdateRoleCanCreateRole:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "can create role", item.OldData.CanCreateRole, item.NewData.CanCreateRole))
+		case objects.UpdateRoleCanLogin:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "can login", item.OldData.CanLogin, item.NewData.CanLogin))
+		case objects.UpdateRoleCanBypassRls:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "can bypass url", item.OldData.CanBypassRLS, item.NewData.CanBypassRLS))
+		case objects.UpdateRoleConfig:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %+v >>> %+v", "can bypass url", item.OldData.Config, item.NewData.Config))
+		case objects.UpdateRoleValidUntil:
+			var oldValue, newValue = "nil", "nil"
+			if item.OldData.ValidUntil != nil {
+				oldValue = item.OldData.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
+			}
+
+			if item.NewData.ValidUntil != nil {
+				newValue = item.NewData.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
+			}
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "valid until", oldValue, newValue))
+		}
+	}
+
+	param := map[string]any{
+		"Name":        name,
+		"ChangeItems": changeMsgArr,
+	}
+
+	tmplInstance := template.New("generate diff change update")
+	tmpl, err := tmplInstance.Parse(DiffChangeUpdateTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing : %v", err)
 	}

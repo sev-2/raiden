@@ -47,7 +47,7 @@ func PrintDiff(diffData CompareDiffResult) {
 	printScope("*** End found diff ***\n")
 }
 
-func PrintMigratesDiff(items []MigrateItem) {
+func GetDiffChangeMessage(items []MigrateItem) string {
 	newData := []string{}
 	deleteData := []string{}
 	updateData := []string{}
@@ -72,17 +72,12 @@ func PrintMigratesDiff(items []MigrateItem) {
 		}
 	}
 
-	if len(newData) > 0 {
-		Logger.Debug("List New Rpc", "function", fmt.Sprintf("\n %s", strings.Join(newData, "\n")))
+	changeMsg, err := GenerateDiffChangeMessage(newData, updateData, deleteData)
+	if err != nil {
+		Logger.Error("print change policy error", "msg", err.Error())
+		return ""
 	}
-
-	if len(updateData) > 0 {
-		Logger.Debug("List Updated Rpc", "function", fmt.Sprintf("\n%s", strings.Join(updateData, "\n")))
-	}
-
-	if len(deleteData) > 0 {
-		Logger.Debug("List Delete Rpc", "function", fmt.Sprintf("\n %s", strings.Join(deleteData, "\n")))
-	}
+	return changeMsg
 }
 
 // ----- generate message section ------
@@ -162,4 +157,47 @@ func splitFunction(query string) (head, body, end string) {
 	}
 
 	return head, body, end
+}
+
+// ----- diff change -----
+const DiffChangeTemplate = `
+  {{- if gt (len .NewData) 0}}
+  New Rpc
+  {{- range .NewData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .UpdateData) 0}}
+  Update Rpc
+  {{- range .UpdateData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .DeleteData) 0}}
+  Delete Rpc
+  {{- range .DeleteData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  `
+
+func GenerateDiffChangeMessage(newData []string, updateData []string, deleteData []string) (string, error) {
+	param := map[string]any{
+		"NewData":    newData,
+		"UpdateData": updateData,
+		"DeleteData": deleteData,
+	}
+
+	tmplInstance := template.New("generate diff change rpc")
+	tmpl, err := tmplInstance.Parse(DiffChangeTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
 }

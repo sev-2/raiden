@@ -8,7 +8,6 @@ import (
 	"text/template"
 
 	"github.com/fatih/color"
-	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
@@ -51,7 +50,7 @@ func PrintDiff(diffData CompareDiffResult, sRelation MapRelations, tRelation Map
 	printScope("*** End found diff ***\n")
 }
 
-func PrintMigratesDiff(items []MigrateItem) {
+func GetDiffChangeMessage(items []MigrateItem) string {
 	newTable := []string{}
 	deleteTable := []string{}
 	updateTable := []string{}
@@ -70,28 +69,27 @@ func PrintMigratesDiff(items []MigrateItem) {
 		case migrator.MigrateTypeCreate:
 			newTable = append(newTable, fmt.Sprintf("- %s", name))
 		case migrator.MigrateTypeUpdate:
-			if Logger.GetLevel() == hclog.Trace {
-				diffMessage := GenerateDiffChangeMessage(name, item)
-				updateTable = append(updateTable, diffMessage)
-			} else {
-				updateTable = append(updateTable, fmt.Sprintf("- %s", name))
+			// if Logger.GetLevel() == hclog.Trace {
+			diffMessage, err := GenerateDiffChangeUpdateMessage(name, item)
+			if err != nil {
+				Logger.Error("print change table error", "msg", err.Error())
+				continue
 			}
+			updateTable = append(updateTable, diffMessage)
+			// } else {
+			// 	updateTable = append(updateTable, fmt.Sprintf("- %s", name))
+			// }
 		case migrator.MigrateTypeDelete:
 			deleteTable = append(deleteTable, fmt.Sprintf("- %s", name))
 		}
 	}
 
-	if len(newTable) > 0 {
-		Logger.Debug("List New Table", "table", fmt.Sprintf("\n %s", strings.Join(newTable, "\n")))
+	changeMsg, err := GenerateDiffChangeMessage(newTable, updateTable, deleteTable)
+	if err != nil {
+		Logger.Error("print change table error", "msg", err.Error())
+		return ""
 	}
-
-	if len(updateTable) > 0 {
-		Logger.Debug("List Updated Table", "table", fmt.Sprintf("\n%s", strings.Join(updateTable, "\n")))
-	}
-
-	if len(deleteTable) > 0 {
-		Logger.Debug("List Delete Table", "table", fmt.Sprintf("\n %s", strings.Join(deleteTable, "\n")))
-	}
+	return changeMsg
 }
 
 // ----- generate message section ------
@@ -367,42 +365,180 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 	return buff.String(), nil
 }
 
-const DiffChangeTemplate = ` 
-Update Table {{ .Name }}
-  {{- if gt (len .ChangeItems) 0 }}
-  Change Configuration
-  {{- range .ChangeItems}}
+const DiffChangeTemplate = `
+  {{- if gt (len .NewTable) 0}}
+  New Table
+  {{- range .NewTable}}
   {{.}}
-  {{- end}}
   {{- end }}
-  {{- if gt (len .ChangeColumns) 0 }}
-  Change Columns
-  {{- range .ChangeColumns}}
+  {{- end -}}
+  {{- if gt (len .UpdateTable) 0}}
+  Update Table
+  {{- range .UpdateTable}}
   {{.}}
-  {{- end}}
   {{- end }}
-  {{- if gt (len .ChangeRelations) 0 }}
-  Change Relations
-  {{- range .ChangeRelations}}
+  {{- end -}}
+  {{- if gt (len .DeleteTable) 0}}
+  Delete Table
+  {{- range .DeleteTable}}
   {{.}}
-  {{- end}}
   {{- end }}
+  {{- end -}}
   `
 
-func GenerateDiffChangeMessage(name string, item MigrateItem) string {
-	// diffItems := item.MigrationItems
+const DiffChangeUpdateTemplate = `  - Update Table {{ .Name }}
+  {{- if gt (len .ChangeItems) 0}}
+      Change Configuration
+      {{- range .ChangeItems}}
+      {{.}}
+      {{- end }}
+  {{- end -}}
+  {{- if gt (len .ChangeColumns) 0}}
+      Change Columns
+      {{- range .ChangeColumns}}
+      {{.}}
+      {{- end }}
+  {{- end -}}
+  {{- if gt (len .ChangeRelations) 0}}
+      Change Relations
+      {{- range .ChangeRelations}}
+      {{.}}
+      {{- end }}
+  {{- end -}}
+  `
 
-	// var changeMsgArr, changeColumnMsgArr, changeRelationArr []string
-	// for i := range item.MigrationItems.ChangeItems {
-	// 	c := item.MigrationItems.ChangeItems[i]
-	// 	switch c {
-	// 	case objects.UpdateTableSchema:
-	// 	case objects.UpdateTableName:
-	// 	case objects.UpdateTableRlsEnable:
-	// 	case objects.UpdateTableRlsForced:
-	// 	case objects.UpdateTableReplicaIdentity:
-	// 	}
-	// }
+func GenerateDiffChangeMessage(newTable []string, updateTable []string, deleteTable []string) (string, error) {
+	param := map[string]any{
+		"NewTable":    newTable,
+		"UpdateTable": updateTable,
+		"DeleteTable": deleteTable,
+	}
 
-	return ""
+	tmplInstance := template.New("generate diff change")
+	tmpl, err := tmplInstance.Parse(DiffChangeTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
+}
+
+func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, error) {
+	diffItems := item.MigrationItems
+
+	var changeMsgArr, changeColumnMsgArr, changeRelationArr []string
+	for i := range diffItems.ChangeItems {
+		c := diffItems.ChangeItems[i]
+		switch c {
+		case objects.UpdateTableSchema:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "schema", item.OldData.Schema, item.NewData.Schema))
+		case objects.UpdateTableName:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "name", item.OldData.Name, item.NewData.Name))
+		case objects.UpdateTableRlsEnable:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "rls enable", item.OldData.RLSEnabled, item.NewData.RLSEnabled))
+		case objects.UpdateTableRlsForced:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "rls forced", item.OldData.RLSEnabled, item.NewData.RLSEnabled))
+		case objects.UpdateTableReplicaIdentity:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "replica identity", item.OldData.ReplicaIdentity, item.NewData.ReplicaIdentity))
+		}
+	}
+
+	for i := range diffItems.ChangeColumnItems {
+		c := diffItems.ChangeColumnItems[i]
+
+		var oldColumn, newColum objects.Column
+
+		// find old column detail
+		for ii := range item.OldData.Columns {
+			oc := item.OldData.Columns[ii]
+			if oc.Name == c.Name {
+				oldColumn = oc
+			}
+		}
+
+		// find new column detail
+		for ii := range item.NewData.Columns {
+			nc := item.NewData.Columns[ii]
+			if nc.Name == c.Name {
+				newColum = nc
+			}
+		}
+
+		var updateItemArr []string
+		for ic := range c.UpdateItems {
+			cType := c.UpdateItems[ic]
+			switch cType {
+			case objects.UpdateColumnNew:
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %s", "create new column", newColum.Name))
+			case objects.UpdateColumnDelete:
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %s", "delete column", oldColumn.Name))
+			case objects.UpdateColumnName:
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %s >>> %s", "name", oldColumn.Name, newColum.Name))
+			case objects.UpdateColumnDefaultValue:
+				var oldValue, newValue = "nil", "nil"
+				if oldColumn.DefaultValue != nil {
+					oldValue = utils.ConvertAllToString(oldColumn.DefaultValue)
+				}
+
+				if newColum.DefaultValue != nil {
+					newValue = utils.ConvertAllToString(newColum.DefaultValue)
+				}
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %v >>> %v", "default value", oldValue, newValue))
+			case objects.UpdateColumnDataType:
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %v >>> %v", "data type", oldColumn.DataType, newColum.DataType))
+			case objects.UpdateColumnUnique:
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %t >>> %t", "is unique", oldColumn.IsUnique, newColum.IsUnique))
+			case objects.UpdateColumnNullable:
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %t >>> %t", "is nullable", oldColumn.IsNullable, newColum.IsNullable))
+			case objects.UpdateColumnIdentity:
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %t >>> %t", "is identity", oldColumn.IsIdentity, newColum.IsIdentity))
+			}
+		}
+
+		var name = oldColumn.Name
+		if name == "" {
+			name = newColum.Name
+		}
+
+		updateMessageStr := fmt.Sprintf("- update column %q\n        %s", name, strings.Join(updateItemArr, "\n        "))
+		changeColumnMsgArr = append(changeColumnMsgArr, updateMessageStr)
+	}
+
+	for i := range diffItems.ChangeRelationItems {
+		c := diffItems.ChangeRelationItems[i]
+
+		switch c.Type {
+		case objects.UpdateRelationCreate:
+			changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s : %s", "create new relation", c.Data.ConstraintName))
+		case objects.UpdateRelationUpdate:
+			changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s : %s", "update relation", c.Data.ConstraintName))
+		case objects.UpdateRelationDelete:
+			changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s : %s", "delete relation", c.Data.ConstraintName))
+		}
+	}
+
+	param := map[string]any{
+		"Name":            name,
+		"ChangeItems":     changeMsgArr,
+		"ChangeColumns":   changeColumnMsgArr,
+		"ChangeRelations": changeRelationArr,
+	}
+
+	tmplInstance := template.New("generate diff change update")
+	tmpl, err := tmplInstance.Parse(DiffChangeUpdateTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
 }

@@ -132,7 +132,7 @@ func PrintDiff(diffData CompareDiffResult) {
 	printScope("*** End found diff ***\n")
 }
 
-func PrintMigratesDiff(items []MigrateItem) {
+func GetDiffChangeMessage(items []MigrateItem) string {
 	newData := []string{}
 	deleteData := []string{}
 	updateData := []string{}
@@ -151,23 +151,23 @@ func PrintMigratesDiff(items []MigrateItem) {
 		case migrator.MigrateTypeCreate:
 			newData = append(newData, fmt.Sprintf("- %s", name))
 		case migrator.MigrateTypeUpdate:
-			updateData = append(updateData, fmt.Sprintf("- %s", name))
+			diffMessage, err := GenerateDiffChangeUpdateMessage(name, item)
+			if err != nil {
+				Logger.Error("print change storage error", "msg", err.Error())
+				continue
+			}
+			updateData = append(updateData, diffMessage)
 		case migrator.MigrateTypeDelete:
 			deleteData = append(deleteData, fmt.Sprintf("- %s", name))
 		}
 	}
 
-	if len(newData) > 0 {
-		Logger.Debug("List New Storage", "bucket", fmt.Sprintf("\n %s", strings.Join(newData, "\n")))
+	changeMsg, err := GenerateDiffChangeMessage(newData, updateData, deleteData)
+	if err != nil {
+		Logger.Error("print change storage error", "msg", err.Error())
+		return ""
 	}
-
-	if len(updateData) > 0 {
-		Logger.Debug("List Updated Storage", "bucket", fmt.Sprintf("\n%s", strings.Join(updateData, "\n")))
-	}
-
-	if len(deleteData) > 0 {
-		Logger.Debug("List Delete Storage", "bucket", fmt.Sprintf("\n %s", strings.Join(deleteData, "\n")))
-	}
+	return changeMsg
 }
 
 // ----- generate message section -----
@@ -247,6 +247,93 @@ func GenerateDiffMessage(storageName string, diffType DiffType, updateType objec
 	}
 
 	tmpl, err := tmplInstance.Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
+}
+
+// ----- diff change -----
+const DiffChangeTemplate = `
+  {{- if gt (len .NewData) 0}}
+  New Storage
+  {{- range .NewData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .UpdateData) 0}}
+  Update Storage
+  {{- range .UpdateData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  {{- if gt (len .DeleteData) 0}}
+  Delete Storage
+  {{- range .DeleteData}}
+  {{.}}
+  {{- end }}
+  {{- end -}}
+  `
+
+func GenerateDiffChangeMessage(newData []string, updateData []string, deleteData []string) (string, error) {
+	param := map[string]any{
+		"NewData":    newData,
+		"UpdateData": updateData,
+		"DeleteData": deleteData,
+	}
+
+	tmplInstance := template.New("generate diff change storage")
+	tmpl, err := tmplInstance.Parse(DiffChangeTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
+}
+
+const DiffChangeUpdateTemplate = `  - Update Storage {{ .Name }}
+  {{- if gt (len .ChangeItems) 0}}
+      Change Configuration
+      {{- range .ChangeItems}}
+      {{.}}
+      {{- end }}
+  {{- end -}}
+  `
+
+func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, error) {
+	diffItems := item.MigrationItems
+
+	var changeMsgArr []string
+	for i := range diffItems.ChangeItems {
+		c := diffItems.ChangeItems[i]
+		switch c {
+		case objects.UpdateBucketIsPublic:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "is public", item.OldData.Public, item.NewData.Public))
+		case objects.UpdateBucketFileSizeLimit:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "file size limit", item.OldData.FileSizeLimit, item.NewData.FileSizeLimit))
+		case objects.UpdateBucketAllowedMimeTypes:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "allowed mime type", strings.Join(item.OldData.AllowedMimeTypes, ","), strings.Join(item.NewData.AllowedMimeTypes, ",")))
+		}
+	}
+
+	param := map[string]any{
+		"Name":        name,
+		"ChangeItems": changeMsgArr,
+	}
+
+	tmplInstance := template.New("generate diff change update")
+	tmpl, err := tmplInstance.Parse(DiffChangeUpdateTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing : %v", err)
 	}

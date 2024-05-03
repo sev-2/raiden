@@ -3,6 +3,8 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -155,4 +157,37 @@ func ParseTag(rawTag string) map[string]string {
 func ParseBool(str string) bool {
 	val, _ := strconv.ParseBool(str)
 	return val
+}
+
+func ConvertAllToString(value interface{}) string {
+	v := reflect.ValueOf(value)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	switch v.Kind() {
+	case reflect.Int:
+		return strconv.Itoa(int(v.Int()))
+	case reflect.Int64:
+		return strconv.FormatInt(v.Int(), 10)
+	case reflect.Float64:
+		return strconv.FormatFloat(v.Float(), 'f', -1, 64)
+	case reflect.String:
+		return v.String()
+	case reflect.Bool:
+		return strconv.FormatBool(v.Bool())
+	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.Int {
+			return fmt.Sprint(v.Interface())
+		} else if v.Type().Elem().Kind() == reflect.String {
+			return fmt.Sprint(v.Interface())
+		}
+	case reflect.Map:
+		return fmt.Sprintf("%v", v.Interface())
+	case reflect.Invalid:
+		return "nil"
+	default:
+		return "unknown type"
+	}
+	return "unknown type"
 }
