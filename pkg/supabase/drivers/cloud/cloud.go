@@ -21,7 +21,7 @@ func DefaultAuthInterceptor(accessToken string) func(req *http.Request) error {
 }
 
 func FindProject(cfg *raiden.Config) (objects.Project, error) {
-	CloudLogger.Trace("Start - find project from supabase")
+	CloudLogger.Trace("start find project from supabase")
 	url := fmt.Sprintf("%s/v1/projects", cfg.SupabaseApiUrl)
 	projects, err := net.Get[[]objects.Project](url, net.DefaultTimeout, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
@@ -34,7 +34,7 @@ func FindProject(cfg *raiden.Config) (objects.Project, error) {
 			return p, nil
 		}
 	}
-	CloudLogger.Trace("Finish - find project from supabase")
+	CloudLogger.Trace("finish find project from supabase")
 	return objects.Project{}, nil
 }
 

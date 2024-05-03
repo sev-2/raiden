@@ -47,7 +47,7 @@ func GetBucket(cfg *raiden.Config, bucketId string) (buckets objects.Bucket, err
 }
 
 func CreateBucket(cfg *raiden.Config, param objects.Bucket) (bucket objects.Bucket, err error) {
-	StorageLogger.Debug("Start - create storage", "name", param.Name)
+	StorageLogger.Debug("start create storage", "name", param.Name)
 	byteData, err := json.Marshal(param)
 	if err != nil {
 		return bucket, err
@@ -60,12 +60,12 @@ func CreateBucket(cfg *raiden.Config, param objects.Bucket) (bucket objects.Buck
 	if err != nil {
 		return bucket, err
 	}
-	StorageLogger.Debug("Finish - create storage", "name", param.Name)
+	StorageLogger.Debug("finish create storage", "name", param.Name)
 	return GetBucket(cfg, res.Name)
 }
 
 func UpdateBucket(cfg *raiden.Config, param objects.Bucket, updateItem objects.UpdateBucketParam) error {
-	StorageLogger.Debug("Start - update storage", "name", param.Name)
+	StorageLogger.Debug("start update storage", "name", param.Name)
 
 	// just return, nothing to be processed
 	if len(updateItem.ChangeItems) == 0 {
@@ -96,12 +96,12 @@ func UpdateBucket(cfg *raiden.Config, param objects.Bucket, updateItem objects.U
 	_, err = net.Put[DefaultBucketSuccessResponse](
 		url, byteData, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
 	)
-	StorageLogger.Debug("Finish - update storage", "name", param.Name)
+	StorageLogger.Debug("finish update storage", "name", param.Name)
 	return err
 }
 
 func DeleteBucket(cfg *raiden.Config, param objects.Bucket) (err error) {
-	StorageLogger.Debug("Start - delete storage", "name", param.Name)
+	StorageLogger.Debug("start delete storage", "name", param.Name)
 
 	deleteReqInterceptor := func(req *http.Request) error {
 		req.Header.Set("apiKey", cfg.ServiceKey)
@@ -115,6 +115,6 @@ func DeleteBucket(cfg *raiden.Config, param objects.Bucket) (err error) {
 		url, nil, net.DefaultTimeout, deleteReqInterceptor, nil,
 	)
 
-	StorageLogger.Debug("Finish - delete storage", "name", param.Name)
+	StorageLogger.Debug("finish delete storage", "name", param.Name)
 	return err
 }

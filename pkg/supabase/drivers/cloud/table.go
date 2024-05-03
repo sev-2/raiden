@@ -12,7 +12,7 @@ import (
 )
 
 func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumn bool) ([]objects.Table, error) {
-	CloudLogger.Trace("Start - fetching table from supabase")
+	CloudLogger.Trace("start fetching table from supabase")
 	q, err := sql.GenerateGetTablesQuery(includedSchemas, includeColumn)
 	if err != nil {
 		err = fmt.Errorf("failed generate query get table for project id %s : %v", cfg.ProjectId, err)
@@ -23,12 +23,12 @@ func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumn bool)
 	if err != nil {
 		err = fmt.Errorf("get tables error : %s", err)
 	}
-	CloudLogger.Trace("Finish - fetching table from supabase")
+	CloudLogger.Trace("finish fetching table from supabase")
 	return rs, err
 }
 
 func GetTableByName(cfg *raiden.Config, name, schema string, includeColumn bool) (result objects.Table, err error) {
-	CloudLogger.Trace("Start - fetching single table by role from supabase")
+	CloudLogger.Trace("start fetching single table by role from supabase")
 	q, err := sql.GenerateGetTableQuery(name, schema, includeColumn)
 	if err != nil {
 		err = fmt.Errorf("failed generate query get table for project id %s : %v", cfg.ProjectId, err)
@@ -45,12 +45,12 @@ func GetTableByName(cfg *raiden.Config, name, schema string, includeColumn bool)
 		err = fmt.Errorf("get table %s in schema %s is not found", name, schema)
 		return
 	}
-	CloudLogger.Trace("Finish - fetching single table by role from supabase")
+	CloudLogger.Trace("finish fetching single table by role from supabase")
 	return rs[0], nil
 }
 
 func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Table, err error) {
-	CloudLogger.Trace("Start - create table", "name", newTable.Name)
+	CloudLogger.Trace("start create table", "name", newTable.Name)
 	schema := "public"
 	if newTable.Schema != "" {
 		schema = newTable.Schema
@@ -67,12 +67,12 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 		return result, fmt.Errorf("create new table %s error : %s", newTable.Name, err)
 	}
 
-	CloudLogger.Trace("Finish - create table", "name", newTable.Name)
+	CloudLogger.Trace("finish create table", "name", newTable.Name)
 	return GetTableByName(cfg, newTable.Name, schema, true)
 }
 
 func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.UpdateTableParam) error {
-	CloudLogger.Trace("Start - update table", "name", newTable.Name)
+	CloudLogger.Trace("start update table", "name", newTable.Name)
 	sql := query.BuildUpdateTableQuery(newTable, updateItem)
 	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
@@ -102,18 +102,18 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 			return fmt.Errorf(strings.Join(errMsg, ";"))
 		}
 	}
-	CloudLogger.Trace("Finish - update table", "name", newTable.Name)
+	CloudLogger.Trace("finish update table", "name", newTable.Name)
 	return nil
 }
 
 func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
-	CloudLogger.Trace("Start - delete table", "name", table.Name)
+	CloudLogger.Trace("start delete table", "name", table.Name)
 	sql := query.BuildDeleteTableQuery(table, true)
 	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("delete table %s error : %s", table.Name, err)
 	}
-	CloudLogger.Trace("Finish - delete table", "name", table.Name)
+	CloudLogger.Trace("finish delete table", "name", table.Name)
 	return nil
 }
 
@@ -207,7 +207,7 @@ func updateColumnFromTable(
 }
 
 func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) error {
-	CloudLogger.Trace("Start - create column", "table", column.Table, "name", column.Name)
+	CloudLogger.Trace("start create column", "table", column.Table, "name", column.Name)
 	if column.Schema == "" {
 		column.Schema = "public"
 	}
@@ -221,12 +221,12 @@ func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) err
 	if err != nil {
 		return fmt.Errorf("create column %s.%s error : %s", column.Table, column.Name, err)
 	}
-	CloudLogger.Trace("Finish - create column", "table", column.Table, "name", column.Name)
+	CloudLogger.Trace("finish create column", "table", column.Table, "name", column.Name)
 	return nil
 }
 
 func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updateItem objects.UpdateColumnItem) error {
-	CloudLogger.Trace("Start - update column", "table", oldColumn.Table, "name", newColumn.Name)
+	CloudLogger.Trace("start update column", "table", oldColumn.Table, "name", newColumn.Name)
 
 	sql := query.BuildUpdateColumnQuery(oldColumn, newColumn, updateItem)
 	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
@@ -234,18 +234,18 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 		return fmt.Errorf("update column %s.%s error : %s", newColumn.Table, newColumn.Name, err)
 	}
 
-	CloudLogger.Trace("Finish - update column", "table", oldColumn.Table, "name", newColumn.Name)
+	CloudLogger.Trace("finish update column", "table", oldColumn.Table, "name", newColumn.Name)
 	return nil
 }
 
 func DeleteColumn(cfg *raiden.Config, column objects.Column) error {
-	CloudLogger.Trace("Start - delete column", "table", column.Table, "name", column.Name)
+	CloudLogger.Trace("start delete column", "table", column.Table, "name", column.Name)
 	sql := query.BuildDeleteColumnQuery(column)
 	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("delete column %s.%s error : %s", column.Table, column.Name, err)
 	}
-	CloudLogger.Trace("Finish - delete column", "table", column.Table, "name", column.Name)
+	CloudLogger.Trace("finish delete column", "table", column.Table, "name", column.Name)
 	return nil
 }
 
@@ -338,7 +338,7 @@ func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, rel
 }
 
 func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) error {
-	CloudLogger.Trace("Start - create foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
+	CloudLogger.Trace("start create foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
 
 	sql, err := query.BuildFkQuery(objects.UpdateRelationCreate, relation)
 	if err != nil {
@@ -350,12 +350,12 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return fmt.Errorf("create foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
 
-	CloudLogger.Trace("Finish - create foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
+	CloudLogger.Trace("finish create foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
 	return nil
 }
 
 func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) error {
-	CloudLogger.Trace("Start - update foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
+	CloudLogger.Trace("start update foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
 
 	deleteSql, err := query.BuildFkQuery(objects.UpdateRelationDelete, relation)
 	if err != nil {
@@ -373,12 +373,12 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
 
-	CloudLogger.Trace("FInish - update foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
+	CloudLogger.Trace("finish update foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
 	return nil
 }
 
 func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) error {
-	CloudLogger.Trace("Start - delete foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
+	CloudLogger.Trace("start delete foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
 
 	sql, err := query.BuildFkQuery(objects.UpdateRelationDelete, relation)
 	if err != nil {
@@ -390,7 +390,7 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
 
-	CloudLogger.Trace("Finish - delete foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
+	CloudLogger.Trace("finish delete foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
 	return nil
 }
 

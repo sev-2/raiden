@@ -46,13 +46,13 @@ func Import(flags *Flags, config *raiden.Config) error {
 	nativeStateRoles := filterIsNativeRole(mapNativeRole, spResource.Roles)
 
 	// filter table for with allowed schema
-	ImportLogger.Debug("start - filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	ImportLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
 	ImportLogger.Trace("filter table by schema")
 	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
 
 	ImportLogger.Trace("filter function by schema")
 	spResource.Functions = filterFunctionBySchema(spResource.Functions, strings.Split(flags.AllowedSchema, ",")...)
-	ImportLogger.Debug("finish - filter table and function by allowed schema")
+	ImportLogger.Debug("finish filter table and function by allowed schema")
 
 	ImportLogger.Trace("remove native role for supabase list role")
 	spResource.Roles = filterUserRole(spResource.Roles, mapNativeRole)
@@ -147,7 +147,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 		defer wg.Done()
 		if len(resource.Tables) > 0 {
 			tableInputs := tables.BuildGenerateModelInputs(resource.Tables, resource.Policies)
-			ImportLogger.Info("start - generate tables")
+			ImportLogger.Info("start generate tables")
 			captureFunc := ImportDecorateFunc(tableInputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateModelData); ok {
 					if i.StructName == utils.SnakeCaseToPascalCase(item.Table.Name) {
@@ -160,12 +160,12 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 			if err := generator.GenerateModels(projectPath, tableInputs, captureFunc); err != nil {
 				errChan <- err
 			}
-			ImportLogger.Info("finish - generate tables")
+			ImportLogger.Info("finish generate tables")
 		}
 
 		// generate all roles from cloud / pg-meta
 		if len(resource.Roles) > 0 {
-			ImportLogger.Info("start - generate roles")
+			ImportLogger.Info("start generate roles")
 			captureFunc := ImportDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
 					if i.Name == item.Name {
@@ -178,11 +178,11 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 			if err := generator.GenerateRoles(projectPath, resource.Roles, captureFunc); err != nil {
 				errChan <- err
 			}
-			ImportLogger.Info("finish - generate roles")
+			ImportLogger.Info("finish generate roles")
 		}
 
 		if len(resource.Functions) > 0 {
-			ImportLogger.Info("start - generate functions")
+			ImportLogger.Info("start generate functions")
 			captureFunc := ImportDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
 					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
@@ -194,11 +194,11 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, captureFunc); errGenRpc != nil {
 				errChan <- errGenRpc
 			}
-			ImportLogger.Info("finish - generate roles")
+			ImportLogger.Info("finish generate roles")
 		}
 
 		if len(resource.Storages) > 0 {
-			ImportLogger.Info("start - generate storages")
+			ImportLogger.Info("start generate storages")
 			captureFunc := ImportDecorateFunc(resource.Storages, func(item objects.Bucket, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateStoragesData); ok {
 					if utils.ToSnakeCase(i.Name) == utils.ToSnakeCase(item.Name) {
@@ -210,7 +210,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 			if errGenStorage := generator.GenerateStorages(projectPath, resource.Storages, captureFunc); errGenStorage != nil {
 				errChan <- errGenStorage
 			}
-			ImportLogger.Info("finish - generate storages")
+			ImportLogger.Info("finish generate storages")
 		}
 	}()
 

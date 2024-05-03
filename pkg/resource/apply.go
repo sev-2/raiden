@@ -140,12 +140,12 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	// filter table for with allowed schema
-	ApplyLogger.Debug("start - filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	ApplyLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
 	ApplyLogger.Trace("filter table by schema")
 	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
 	ApplyLogger.Trace("filter function by schema")
 	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
-	ApplyLogger.Debug("finish - filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	ApplyLogger.Debug("finish filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
 
 	ApplyLogger.Trace("remove native role for supabase list role")
 	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)

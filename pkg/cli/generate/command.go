@@ -108,15 +108,15 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			GenerateLogger.Debug("start - generate routes")
+			GenerateLogger.Debug("start generate routes")
 			if initialize {
 				// generate example controller
-				GenerateLogger.Info("start - generate hello word controller")
+				GenerateLogger.Info("start generate hello word controller")
 				if err := generator.GenerateHelloWordController(projectPath, generator.Generate); err != nil {
 					errChan <- err
 					return
 				}
-				GenerateLogger.Info("finish - generate hello word controller")
+				GenerateLogger.Info("finish generate hello word controller")
 			}
 
 			// generate route base on controllers
@@ -125,7 +125,7 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 				return
 			}
 			errChan <- nil
-			GenerateLogger.Info("finish - generate routes")
+			GenerateLogger.Info("finish generate routes")
 		}()
 	}
 
@@ -135,13 +135,13 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			defer wg.Done()
 
 			// generate main function
-			GenerateLogger.Info("start - generate main function")
+			GenerateLogger.Info("start generate main function")
 			if err := generator.GenerateMainFunction(projectPath, config, generator.Generate); err != nil {
 				errChan <- err
 			} else {
 				errChan <- nil
 			}
-			GenerateLogger.Info("finish - generate main function")
+			GenerateLogger.Info("finish generate main function")
 		}()
 	}
 
@@ -150,49 +150,49 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 		defer wg.Done()
 
 		// generate rpc register
-		GenerateLogger.Debug("start - generate rpc register file")
+		GenerateLogger.Debug("start generate rpc register file")
 		if err := generator.GenerateRpcRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
 			errChan <- err
 		}
-		GenerateLogger.Debug("finish - generate rpc register file")
+		GenerateLogger.Debug("finish generate rpc register file")
 
 		// generate role register
-		GenerateLogger.Debug("start - generate role register file")
+		GenerateLogger.Debug("start generate role register file")
 		if err := generator.GenerateRoleRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
 			errChan <- err
 		}
-		GenerateLogger.Debug("finish - generate role register file")
+		GenerateLogger.Debug("finish generate role register file")
 
 		// generate model register
-		GenerateLogger.Debug("start - generate model register file")
+		GenerateLogger.Debug("start generate model register file")
 		if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
 			errChan <- err
 		}
-		GenerateLogger.Debug("finish - generate role register file")
+		GenerateLogger.Debug("finish generate role register file")
 
 		// generate storage register
-		GenerateLogger.Debug("start - generate storages register file")
+		GenerateLogger.Debug("start generate storages register file")
 		if err := generator.GenerateStoragesRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
 			errChan <- err
 		}
-		GenerateLogger.Debug("finish - generate storages register file")
+		GenerateLogger.Debug("finish generate storages register file")
 
 		if initialize {
 			// generate import main function
-			GenerateLogger.Debug("start - generate import main function file")
+			GenerateLogger.Debug("start generate import main function file")
 			if err := generator.GenerateImportMainFunction(projectPath, config, generator.Generate); err != nil {
 				errChan <- err
 			}
-			GenerateLogger.Debug("finish - generate import main function file")
+			GenerateLogger.Debug("finish generate import main function file")
 
 			// generate import main function
-			GenerateLogger.Debug("start - generate apply main function file")
+			GenerateLogger.Debug("start generate apply main function file")
 			if err := generator.GenerateApplyMainFunction(projectPath, config, generator.Generate); err != nil {
 				errChan <- err
 			} else {
 				errChan <- nil
 			}
-			GenerateLogger.Debug("finish - generate import main function file")
+			GenerateLogger.Debug("finish generate import main function file")
 		} else {
 			errChan <- nil
 		}

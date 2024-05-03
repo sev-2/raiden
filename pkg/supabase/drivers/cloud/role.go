@@ -79,17 +79,17 @@ var getRoleResponseInterceptor = func(resp *http.Response) error {
 }
 
 func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
-	CloudLogger.Trace("Start - fetching role from supabase")
+	CloudLogger.Trace("start fetching role from supabase")
 	rs, err := ExecuteQuery[[]objects.Role](cfg.SupabaseApiUrl, cfg.ProjectId, sql.GetRolesQuery, DefaultAuthInterceptor(cfg.AccessToken), getRoleResponseInterceptor)
 	if err != nil {
 		err = fmt.Errorf("get role error : %s", err)
 	}
-	CloudLogger.Trace("Finish - fetching role from supabase")
+	CloudLogger.Trace("finish fetching role from supabase")
 	return rs, err
 }
 
 func GetRoleByName(cfg *raiden.Config, name string) (result objects.Role, err error) {
-	CloudLogger.Trace("Start - fetch get singe role by name")
+	CloudLogger.Trace("start fetch get singe role by name")
 	qTemplate := sql.GetRolesQuery + " where rolname = %s limit 1"
 	q := fmt.Sprintf(qTemplate, pq.QuoteLiteral(name))
 
@@ -103,35 +103,35 @@ func GetRoleByName(cfg *raiden.Config, name string) (result objects.Role, err er
 		err = fmt.Errorf("get role %s is not found", name)
 		return
 	}
-	CloudLogger.Trace("Finish - fetch get singe role by name")
+	CloudLogger.Trace("finish fetch get singe role by name")
 	return rs[0], nil
 }
 
 func CreateRole(cfg *raiden.Config, role objects.Role) (objects.Role, error) {
-	CloudLogger.Trace("Start - create role", "name", role.Name)
+	CloudLogger.Trace("start create role", "name", role.Name)
 	sql := query.BuildCreateRoleQuery(role)
 	// Execute SQL Query
 	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return objects.Role{}, fmt.Errorf("create new role %s error : %s", role.Name, err)
 	}
-	CloudLogger.Trace("Finish - create role", "name", role.Name)
+	CloudLogger.Trace("finish create role", "name", role.Name)
 	return GetRoleByName(cfg, role.Name)
 }
 
 func UpdateRole(cfg *raiden.Config, newRole objects.Role, updateRoleParam objects.UpdateRoleParam) error {
-	CloudLogger.Trace("Start - update role", "name", newRole.Name)
+	CloudLogger.Trace("start update role", "name", newRole.Name)
 	sql := query.BuildUpdateRoleQuery(newRole, updateRoleParam)
 	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("update new role %s error : %s", updateRoleParam.OldData.Name, err)
 	}
-	CloudLogger.Trace("Finish - update role", "name", newRole.Name)
+	CloudLogger.Trace("finish update role", "name", newRole.Name)
 	return nil
 }
 
 func DeleteRole(cfg *raiden.Config, role objects.Role) error {
-	CloudLogger.Trace("Start - delete role", "name", role.Name)
+	CloudLogger.Trace("start delete role", "name", role.Name)
 	sql := query.BuildDeleteRoleQuery(role)
 
 	// execute delete
@@ -139,6 +139,6 @@ func DeleteRole(cfg *raiden.Config, role objects.Role) error {
 	if err != nil {
 		return fmt.Errorf("delete role %s error : %s", role.Name, err)
 	}
-	CloudLogger.Trace("Finish - delete role", "name", role.Name)
+	CloudLogger.Trace("finish delete role", "name", role.Name)
 	return nil
 }

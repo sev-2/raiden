@@ -11,18 +11,18 @@ import (
 )
 
 func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
-	MetaLogger.Trace("Start - fetching functions from meta")
+	MetaLogger.Trace("start fetching functions from meta")
 	url := fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	rs, err := net.Get[[]objects.Function](url, net.DefaultTimeout, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
 	}
-	MetaLogger.Trace("Finish - fetching functions from meta")
+	MetaLogger.Trace("finish fetching functions from meta")
 	return rs, err
 }
 
 func GetFunctionByName(cfg *raiden.Config, schema, name string) (result objects.Function, err error) {
-	MetaLogger.Trace("Start - fetching function by name from meta")
+	MetaLogger.Trace("start fetching function by name from meta")
 	sql := sql.GenerateFunctionByNameQuery(schema, name) + " limit 1"
 	rs, err := ExecuteQuery[[]objects.Function](cfg.SupabaseApiUrl, sql, nil, nil, nil)
 	if err != nil {
@@ -34,12 +34,12 @@ func GetFunctionByName(cfg *raiden.Config, schema, name string) (result objects.
 		err = fmt.Errorf("get function %s is not found", name)
 		return
 	}
-	MetaLogger.Trace("Finish - fetching function by name from meta")
+	MetaLogger.Trace("finish fetching function by name from meta")
 	return rs[0], nil
 }
 
 func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, error) {
-	MetaLogger.Trace("Start - create function", "name", fn.Name)
+	MetaLogger.Trace("start create function", "name", fn.Name)
 	// Execute SQL Query
 	sql, err := query.BuildFunctionQuery(query.FunctionActionCreate, &fn)
 	if err != nil {
@@ -51,12 +51,12 @@ func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, 
 		return objects.Function{}, fmt.Errorf("create new function %s error : %s", fn.Name, err)
 	}
 
-	MetaLogger.Trace("Finish - create function", "name", fn.Name)
+	MetaLogger.Trace("finish create function", "name", fn.Name)
 	return GetFunctionByName(cfg, fn.Schema, fn.Name)
 }
 
 func DeleteFunction(cfg *raiden.Config, fn objects.Function) error {
-	MetaLogger.Trace("Start - delete function", "name", fn.Name)
+	MetaLogger.Trace("start delete function", "name", fn.Name)
 	sql, err := query.BuildFunctionQuery(query.FunctionActionDelete, &fn)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func DeleteFunction(cfg *raiden.Config, fn objects.Function) error {
 }
 
 func UpdateFunction(cfg *raiden.Config, fn objects.Function) error {
-	MetaLogger.Trace("Start - update function", "name", fn.Name)
+	MetaLogger.Trace("start update function", "name", fn.Name)
 	updateSql, err := query.BuildFunctionQuery(query.FunctionActionUpdate, &fn)
 	if err != nil {
 		return err
@@ -81,6 +81,6 @@ func UpdateFunction(cfg *raiden.Config, fn objects.Function) error {
 	if err != nil {
 		return fmt.Errorf("update function %s error : %s", fn.Name, err)
 	}
-	MetaLogger.Trace("Finish - update function", "name", fn.Name)
+	MetaLogger.Trace("finish update function", "name", fn.Name)
 	return nil
 }
