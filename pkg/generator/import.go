@@ -67,8 +67,13 @@ func main() {
 				imports.ImportLogger.Error(err.Error())
 			}
 
-			if err = generate.Run(&f.Generate, config, f.ProjectPath, false); err != nil {
-				imports.ImportLogger.Error(err.Error())
+			if !f.DryRun {
+				imports.ImportLogger.Info("regenerate bootstrap file")
+				if err = generate.Run(&f.Generate, config, f.ProjectPath, false); err != nil {
+					imports.ImportLogger.Error(err.Error())
+					return
+				}
+				imports.ImportLogger.Info("finish import process")
 			}
 		},
 	}
