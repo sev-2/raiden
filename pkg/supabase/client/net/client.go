@@ -81,7 +81,7 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 		} else {
 			err = fmt.Errorf("conn failure: %v %v", errName, err)
 		}
-		Logger.Error("net.request", "err-type", reflect.TypeOf(err).String(), "err-msg", err.Error())
+		Logger.Trace("net.request", "err-type", reflect.TypeOf(err).String(), "err-msg", err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()

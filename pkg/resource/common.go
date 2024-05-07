@@ -25,6 +25,7 @@ type Flags struct {
 	DebugMode     bool
 	TraceMode     bool
 	Generate      generate.Flags
+	DryRun        bool
 }
 
 // LoadAll is function to check is all resource need to import or apply

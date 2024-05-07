@@ -90,8 +90,12 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	var migrateData MigrateData
 	var localState state.LocalState
 
+	if flags.DryRun {
+		ApplyLogger.Info("running apply in dry run mode")
+	}
+
 	// load map native role
-	ApplyLogger.Info("Load Native log")
+	ApplyLogger.Info("load Native log")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
@@ -191,18 +195,19 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 	ApplyLogger.Info("finish build migrate data")
 
-	migrateErr := Migrate(config, &localState, flags.ProjectPath, &migrateData)
-	if len(migrateErr) > 0 {
-		var errMessages []string
-		for _, e := range migrateErr {
-			errMessages = append(errMessages, e.Error())
+	if !flags.DryRun {
+		migrateErr := Migrate(config, &localState, flags.ProjectPath, &migrateData)
+		if len(migrateErr) > 0 {
+			var errMessages []string
+			for _, e := range migrateErr {
+				errMessages = append(errMessages, e.Error())
+			}
+
+			return errors.New(strings.Join(errMessages, ","))
 		}
-
-		return errors.New(strings.Join(errMessages, ","))
+		ApplyLogger.Info("finish migrate resource")
 	}
-	ApplyLogger.Info("finish migrate resource")
 	PrintApplyChangeReport(migrateData)
-
 	return nil
 }
 

@@ -72,11 +72,12 @@ func main() {
 
 	f.BindLog(cmd)
 	cmd.Flags().StringVarP(&f.ProjectPath, "project-path", "p", "", "set project path")
-	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "import rpc only")
-	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
-	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
-	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storages only")
-	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
+	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "apply rpc only")
+	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "apply roles only")
+	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "apply models only")
+	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "apply storages only")
+	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to apply, use coma separator for multiple schema")
+	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run apply in simulate mode without actual running apply change")
 
 	f.Generate.Bind(cmd)
 

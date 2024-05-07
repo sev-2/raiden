@@ -80,6 +80,7 @@ func main() {
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storages only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
+	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run import in simulate mode without actual import resource as code")
 
 	f.Generate.Bind(cmd)
 

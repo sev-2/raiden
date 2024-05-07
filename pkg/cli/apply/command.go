@@ -27,6 +27,7 @@ type Flags struct {
 	ModelsOnly    bool
 	StoragesOnly  bool
 	AllowedSchema string
+	DryRun        bool
 }
 
 func (f *Flags) Bind(cmd *cobra.Command) {
@@ -35,6 +36,7 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storage only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
+	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run apply in simulate mode without actual running apply change")
 }
 
 func (f *Flags) LoadAll() bool {
@@ -115,6 +117,10 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 
 	if flags.AllowedSchema != "" {
 		args = append(args, "--schema "+flags.AllowedSchema)
+	}
+
+	if flags.DryRun {
+		args = append(args, "--dry-run")
 	}
 
 	if logFlags.DebugMode {

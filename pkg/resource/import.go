@@ -27,8 +27,12 @@ var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 // [x] import function
 // [x] import storage
 func Import(flags *Flags, config *raiden.Config) error {
+	if flags.DryRun {
+		ImportLogger.Info("running import in dry run mode")
+	}
+
 	// load map native role
-	ImportLogger.Info("load Native log")
+	ImportLogger.Info("load native role")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
@@ -76,10 +80,15 @@ func Import(flags *Flags, config *raiden.Config) error {
 		},
 	}
 
+	// dry run import errors
+	dryRunError := []string{}
+
 	// compare resource
 	ImportLogger.Info("compare supabase resource and local resource")
 	if (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
-		ImportLogger.Debug("start compare table")
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare table")
+		}
 		// compare table
 		var compareTables []objects.Table
 		for i := range appTables.Existing {
@@ -88,48 +97,87 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 
 		if err := tables.Compare(spResource.Tables, compareTables); err != nil {
-			return err
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
 		}
-		ImportLogger.Debug("finish compare table")
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare table")
+		}
 	}
 
 	if (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
-		ImportLogger.Debug("start compare role")
-		if err := roles.Compare(spResource.Roles, appRoles.Existing); err != nil {
-			return err
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare role")
 		}
-		ImportLogger.Debug("finish compare role")
+		if err := roles.Compare(spResource.Roles, appRoles.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare role")
+		}
 	}
 
 	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
-		ImportLogger.Debug("start compare rpc")
-		if err := rpc.Compare(spResource.Functions, appRpcFunctions.Existing); err != nil {
-			return err
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare rpc")
 		}
-		ImportLogger.Debug("finish compare rpc")
+		if err := rpc.Compare(spResource.Functions, appRpcFunctions.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare rpc")
+		}
 	}
 
 	if (flags.All() || flags.StoragesOnly) && len(appStorage.Existing) > 0 {
-		ImportLogger.Debug("start compare storage")
-		if err := storages.Compare(spResource.Storages, appStorage.Existing); err != nil {
-			return err
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare storage")
 		}
-		ImportLogger.Debug("finish compare storage")
+		if err := storages.Compare(spResource.Storages, appStorage.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare storage")
+		}
 	}
 
-	// generate resource
-	if err := generateImportResource(config, &importState, flags.ProjectPath, spResource); err != nil {
-		return err
-	}
-
-	// Print Report
+	// import report
 	importReport := ImportReport{
 		Role:    roles.GetNewCountData(spResource.Roles, appRoles),
 		Table:   tables.GetNewCountData(spResource.Tables, appTables),
 		Storage: storages.GetNewCountData(spResource.Storages, appStorage),
 		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
 	}
-	PrintImportReport(importReport)
+	if !flags.DryRun {
+		// generate resource
+		if err := generateImportResource(config, &importState, flags.ProjectPath, spResource); err != nil {
+			return err
+		}
+		PrintImportReport(importReport, false)
+	} else {
+		if len(dryRunError) > 0 {
+			errMessage := strings.Join(dryRunError, "\n")
+			ImportLogger.Error("got error", "err-msg", errMessage)
+			return nil
+		}
+		PrintImportReport(importReport, true)
+	}
+
 	return nil
 }
 
@@ -327,11 +375,23 @@ type ImportReport struct {
 	Storage int
 }
 
-func PrintImportReport(report ImportReport) {
-	message := "import process is complete, your code will be up to date"
-	if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
-		message = "import process is complete, adding several new resources to the codebase"
+func PrintImportReport(report ImportReport, dryRun bool) {
+	var message string
+	if !dryRun {
+		message = "import process is complete, your code is up to date"
+		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
+			message = "import process is complete, adding several new resources to the codebase"
+			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
+			return
+		}
+		ImportLogger.Info(message)
+	} else {
+		message = "finish running import in dry run mode, your code is up to date"
+		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
+			message = "finish running import in dry run mode and add several resource"
+			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
+			return
+		}
+		ImportLogger.Info(message)
 	}
-
-	ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
 }
