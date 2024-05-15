@@ -123,6 +123,14 @@ func (r *router) BuildHandler() {
 	u, err := url.Parse(r.config.SupabasePublicUrl)
 	if err == nil {
 		r.engine.ANY("/auth/v1/{path:*}", ProxyHandler(u, "/auth/v1", nil, nil))
+
+		r.engine.GET("/realtime/v1/websocket", func(ctx *fasthttp.RequestCtx) {
+			WebSocketHandler(ctx, u)
+		})
+
+		r.engine.POST("/realtime/v1/api/broadcast", func(ctx *fasthttp.RequestCtx) {
+			RealtimeBroadcastHandler(ctx, u)
+		})
 	}
 }
 
