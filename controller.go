@@ -628,7 +628,7 @@ func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
 
-	storageProxyLogger.Trace("Forward request", "method", req.Header.Method(), "uri", req.URI().FullURI())
+	storageProxyLogger.Debug("Forward request", "method", string(req.Header.Method()), "uri", string(req.URI().FullURI()))
 	if err := fasthttp.Do(req, resp); err != nil {
 		return err
 	}
@@ -673,7 +673,7 @@ func ProxyHandler(
 		resp := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(resp)
 
-		storageProxyLogger.Trace("Forward request", "method", req.Header.Method(), "uri", req.URI().FullURI())
+		proxyLogger.Debug("Forward request", "method", req.Header.Method(), "uri", req.URI().FullURI())
 		if requestInterceptor != nil {
 			requestInterceptor(req)
 		}

@@ -648,13 +648,31 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 }
 
 func PrintApplyChangeReport(migrateData MigrateData) {
+	diffMessage := []string{}
 	diffTable := tables.GetDiffChangeMessage(migrateData.Tables)
-	diffPolicy := policies.GetDiffChangeMessage(migrateData.Policies)
-	diffRole := roles.GetDiffChangeMessage(migrateData.Roles)
-	diffRpc := rpc.GetDiffChangeMessage(migrateData.Rpc)
-	diffStorage := storages.GetDiffChangeMessage(migrateData.Storages)
-	diffMessage := []string{
-		diffTable, diffPolicy, diffRole, diffRpc, diffStorage,
+	if len(diffTable) > 0 {
+		diffMessage = append(diffMessage, diffTable)
 	}
-	ApplyLogger.Info("report", "list", strings.Join(diffMessage, "\n"))
+	diffPolicy := policies.GetDiffChangeMessage(migrateData.Policies)
+	if len(diffPolicy) > 0 {
+		diffMessage = append(diffMessage, diffPolicy)
+	}
+	diffRole := roles.GetDiffChangeMessage(migrateData.Roles)
+	if len(diffRole) > 0 {
+		diffMessage = append(diffMessage, diffRole)
+	}
+	diffRpc := rpc.GetDiffChangeMessage(migrateData.Rpc)
+	if len(diffRpc) > 0 {
+		diffMessage = append(diffMessage, diffRpc)
+	}
+	diffStorage := storages.GetDiffChangeMessage(migrateData.Storages)
+	if len(diffStorage) > 0 {
+		diffMessage = append(diffMessage, diffStorage)
+	}
+
+	if len(diffMessage) == 0 {
+		ApplyLogger.Info("your code is up to date, nothing to migrate :)")
+	} else {
+		ApplyLogger.Info("report", "list", strings.Join(diffMessage, "\n"))
+	}
 }

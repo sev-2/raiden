@@ -37,15 +37,15 @@ func getBucketUrl(cfg *raiden.Config) string {
 
 func GetBuckets(cfg *raiden.Config) (buckets []objects.Bucket, err error) {
 	return decorateActionWithDataErr("fetch", "storage", func() ([]objects.Bucket, error) {
-		StorageLogger.Debug("fetch all bucket from cloud")
+		StorageLogger.Debug("fetch all bucket")
 		return net.Get[[]objects.Bucket](getBucketUrl(cfg), net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil)
 	})
 }
 
-func GetBucket(cfg *raiden.Config, bucketId string) (buckets objects.Bucket, err error) {
+func GetBucket(cfg *raiden.Config, name string) (buckets objects.Bucket, err error) {
 	return decorateActionWithDataErr("fetch", "storage", func() (objects.Bucket, error) {
-		StorageLogger.Debug("fetch bucket by name from cloud")
-		url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), bucketId)
+		StorageLogger.Debug("fetch bucket")
+		url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), name)
 		return net.Get[objects.Bucket](url, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil)
 	})
 
