@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/*
     tags:
       - v*
 
@@ -13,7 +14,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        goos: [linux, darwin]
+        goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
@@ -29,12 +30,23 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          GOOS=$GOOS GOARCH=$GOARCH go build -trimpath -o build/raiden ./cmd/raiden/main.go
+          VERSION=$([[ ! -z $GITHUB_REF_NAME ]] && echo $GITHUB_REF_NAME || echo $GITHUB_HEAD_NAME)
+          echo "Raiden version: $VERSION"
+          sed -i "s,.*appVersion = \".*\"$,\tappVersion = \"$VERSION\"," 'cmd/raiden/commands/version.go'
+
+          go build -ldflags="-s -w" -trimpath -o build/raiden ./cmd/raiden/main.go
           cd build
           if [[ $GOOS == 'darwin' ]]; then
             cp raiden raiden-macos-"$GOARCH"
+            sha256sum -b raiden-macos-"$GOARCH" > raiden-macos-"$GOARCH".sha256
+          elif [[ $GOOS == 'windows' ]]; then
+            mv raiden raiden.exe
+            sudo apt-get install -y nsis
+            makensis -NOCD -DARCH="$GOARCH" ${GITHUB_WORKSPACE}/scripts/windows.nsi
+            sha256sum -b raiden-"$GOOS"-"$GOARCH"-setup.exe > raiden-"$GOOS"-"$GOARCH"-setup.exe.sha256
           else
             cp raiden raiden-"$GOOS"-"$GOARCH"
+            sha256sum -b raiden-"$GOOS"-"$GOARCH" > raiden-"$GOOS"-"$GOARCH".sha256
           fi
 
       - name: Release
