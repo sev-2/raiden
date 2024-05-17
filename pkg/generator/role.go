@@ -5,11 +5,14 @@ import (
 	"path/filepath"
 	"text/template"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var RoleLogger hclog.Logger = logger.HcLog().Named("generator.role")
 
 // ----- Define type, variable and constant -----
 type GenerateRoleData struct {
@@ -101,7 +104,7 @@ func (r *{{ .Name | ToGoIdentifier }}) CanLogin() bool {
 func (r *{{ .Name | ToGoIdentifier }}) ValidUntil() *objects.SupabaseTime {
 	t, err := time.Parse(raiden.DefaultRoleValidUntilLayout, "{{ .ValidUntil }}")
 	if err != nil {
-		raiden.Error(err)
+		raiden.Error(err.Error())
 		return nil
 	}
 	return objects.NewSupabaseTime(t)
@@ -113,7 +116,7 @@ func (r *{{ .Name | ToGoIdentifier }}) ValidUntil() *objects.SupabaseTime {
 
 func GenerateRoles(basePath string, roles []objects.Role, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, RoleDir)
-	logger.Debugf("GenerateRoles - create %s folder if not exist", folderPath)
+	RoleLogger.Trace("create roles folder if not exist", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
 		if err := utils.CreateFolder(folderPath); err != nil {
 			return err
@@ -179,6 +182,6 @@ func GenerateRole(folderPath string, role objects.Role, generateFn GenerateFn) e
 		FuncMap:      funcMaps,
 	}
 
-	logger.Debugf("GenerateRoles - generate role to %s", input.OutputPath)
+	RoleLogger.Debug("generate role", "path", input.OutputPath)
 	return generateFn(input, nil)
 }

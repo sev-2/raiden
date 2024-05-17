@@ -3,6 +3,7 @@ package commands
 import (
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/cli/generate"
@@ -13,8 +14,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var StartLogger hclog.Logger = logger.HcLog().Named("start")
+
 type StartFlags struct {
-	cli.Flags
+	cli.LogFlags
 	Configure configure.Flags
 	Generate  generate.Flags
 	Imports   imports.Flags
@@ -28,45 +31,53 @@ func StartCommand() *cobra.Command {
 		Use:   "start",
 		Short: "Start new app",
 		Long:  "Start new project, synchronize resource and scaffold application",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			debug := f.CheckAndActivateDebug(cmd)
+		Run: func(cmd *cobra.Command, args []string) {
+			f.CheckAndActivateDebug(cmd)
 
 			// preparation
 			// - get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				return errCurDir
+				StartLogger.Error(errCurDir.Error())
+				return
 			}
 
 			// 1. run configure
 			promptConfig, err := configure.Run(&f.Configure, currentDir)
 			if err != nil {
-				return err
+				StartLogger.Error(err.Error())
+				return
 			}
 
-			logger.Debug("creating new project folder : ", promptConfig.ProjectName)
+			StartLogger.Debug("creating new project folder ", "project-name", promptConfig.ProjectName)
 			if err = utils.CreateFolder(promptConfig.ProjectName); err != nil {
-				return err
+				StartLogger.Error(err.Error())
+				return
 			}
 
-			logger.Debug("start generate configuration file")
 			projectPath := filepath.Join(currentDir, promptConfig.ProjectName)
 			if err = configure.Generate(&promptConfig.Config, projectPath); err != nil {
-				return err
+				StartLogger.Error(err.Error())
+				return
 			}
 
 			// 2. running generate
 			if executeErr := generate.Run(&f.Generate, &promptConfig.Config, projectPath, true); executeErr != nil {
-				return executeErr
+				StartLogger.Error(executeErr.Error())
+				return
 			}
 
 			// 3. running init
 			if executeErr := init_cmd.Run(&f.Init, projectPath, utils.ToGoModuleName(promptConfig.ProjectName)); executeErr != nil {
-				return executeErr
+				StartLogger.Error(executeErr.Error())
+				return
 			}
 
 			// 4. running import
-			return imports.Run(&f.Imports, projectPath, debug)
+			if executeErr := imports.Run(&f.LogFlags, &f.Imports, projectPath); executeErr != nil {
+				StartLogger.Error(executeErr.Error())
+				return
+			}
 		},
 	}
 

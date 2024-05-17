@@ -67,3 +67,16 @@ func BuildStorageFromState(ss StorageState, storage raiden.Bucket) (s objects.Bu
 	BindToSupabaseStorage(&s, storage)
 	return
 }
+
+func (er ExtractStorageResult) ToDeleteFlatMap() map[string]*objects.Bucket {
+	mapData := make(map[string]*objects.Bucket)
+
+	if len(er.Delete) > 0 {
+		for i := range er.Delete {
+			r := er.Delete[i]
+			mapData[r.Name] = &r
+		}
+	}
+
+	return mapData
+}

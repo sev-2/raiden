@@ -4,12 +4,33 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/resource/migrator"
+	"github.com/sev-2/raiden/pkg/resource/policies"
+	"github.com/sev-2/raiden/pkg/resource/roles"
+	"github.com/sev-2/raiden/pkg/resource/rpc"
+	"github.com/sev-2/raiden/pkg/resource/storages"
+	"github.com/sev-2/raiden/pkg/resource/tables"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ApplyLogger hclog.Logger = logger.HcLog().Named("apply")
+
+type MigrateData struct {
+	Tables   []tables.MigrateItem
+	Roles    []roles.MigrateItem
+	Rpc      []rpc.MigrateItem
+	Policies []policies.MigrateItem
+	Storages []storages.MigrateItem
+}
 
 // Migrate resource :
 //
@@ -59,611 +80,256 @@ import (
 //
 // [x] migrate storage
 //
-//	[ ] create new storage
-//	[ ] update storage
-//	[ ] delete storage
+//	[x] create new storage
+//	[x] update storage
+//	[x] delete storage
 //	[ ] add storage acl
 //	[ ] update storage acl
 func Apply(flags *Flags, config *raiden.Config) error {
 	// declare default variable
-	var migrateResource MigrateData
-	var importState ResourceState
+	var migrateData MigrateData
+	var localState state.LocalState
+
+	if flags.DryRun {
+		ApplyLogger.Info("running apply in dry run mode")
+	}
 
 	// load map native role
-	logger.Info("apply : load native role")
+	ApplyLogger.Info("load Native log")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
 	}
 
 	// load app resource
-	logger.Info("apply : load resource from local state")
-	logger.Debug(strings.Repeat("=", 5), " Load app resource from state")
-	latestState, err := loadState()
+	ApplyLogger.Info("load resource from local state")
+	latestLocalState, err := state.Load()
 	if err != nil {
 		return err
 	}
 
-	if latestState == nil {
+	if latestLocalState == nil {
 		return errors.New("state file is not found, please run raiden imports first")
 	} else {
-		importState.State = *latestState
+		localState.State = *latestLocalState
 	}
 
-	logger.Info("apply : extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestState)
+	ApplyLogger.Info("extract table, role, and rpc from local state")
+	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestLocalState)
 	if err != nil {
 		return err
 	}
 	appPolicies := mergeAllPolicy(appTables)
-	logger.Debug(strings.Repeat("=", 5))
 
 	// validate table relation
 	var validateTable []objects.Table
 	validateTable = append(validateTable, appTables.New.ToFlatTable()...)
 	validateTable = append(validateTable, appTables.Existing.ToFlatTable()...)
-	logger.Info("apply : validate local table relation")
+	ApplyLogger.Info("validate local table relation")
 	if err := validateTableRelations(validateTable...); err != nil {
 		return err
 	}
 
 	// validate role in policies is exist
-	logger.Info("apply : validate local role")
+	ApplyLogger.Info("validate local role")
 	if err := validateRoleIsExist(appPolicies, appRoles, mapNativeRole); err != nil {
 		return err
 	}
 
 	// load supabase resource
-	logger.Debug(strings.Repeat("=", 5), " Load supabase resource ")
-	logger.Info("apply : load table, role and rpc from supabase")
+	ApplyLogger.Info("load resource from supabase")
 	resource, err := Load(flags, config)
 	if err != nil {
 		return err
 	}
-	logger.Debug(strings.Repeat("=", 5))
 
 	// filter table for with allowed schema
+	ApplyLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	ApplyLogger.Trace("filter table by schema")
 	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	ApplyLogger.Trace("filter function by schema")
 	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
+	ApplyLogger.Debug("finish filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+
+	ApplyLogger.Trace("remove native role for supabase list role")
 	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)
 
+	ApplyLogger.Info("start build migrate data")
 	if flags.All() || flags.RolesOnly {
-		logger.Info("apply : compare role")
-		if err := bindMigratedRoles(appRoles, resource.Roles, &migrateResource); err != nil {
+		if data, err := roles.BuildMigrateData(appRoles, resource.Roles); err != nil {
 			return err
-		}
-
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Role to migrate")
-			for i := range migrateResource.Roles {
-				t := migrateResource.Roles[i]
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
-				logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
-				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
-			}
-			logger.Debug(strings.Repeat("=", 5))
+		} else {
+			migrateData.Roles = data
 		}
 	}
 
 	if flags.All() || flags.ModelsOnly {
-		logger.Info("apply : compare table")
-		// bind app table to resource
-		if err := bindMigratedTables(appTables, resource.Tables, &migrateResource); err != nil {
+		if data, err := tables.BuildMigrateData(appTables, resource.Tables); err != nil {
 			return err
+		} else {
+			migrateData.Tables = data
 		}
 
 		// bind app policies to resource
-		if err := bindMigratedPolicies(appPolicies, resource.Policies, &migrateResource); err != nil {
+		if data, err := policies.BuildMigrateData(appPolicies, resource.Policies); err != nil {
 			return err
+		} else {
+			migrateData.Policies = data
 		}
-
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Table to migrate")
-			for i := range migrateResource.Tables {
-				t := migrateResource.Tables[i]
-
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
-
-				logger.Debugf("- MigrateType : %s, Table : %s", t.Type, name)
-				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
-				logger.Debugf(" update column  : %+v", t.MigrationItems.ChangeColumnItems)
-				logger.Debugf(" update relations  : %+v", t.MigrationItems.ChangeRelationItems)
-
-			}
-			logger.Debug(strings.Repeat("=", 5))
-
-			logger.Debug(strings.Repeat("=", 5), " Table to policies")
-			for i := range migrateResource.Policies {
-				p := migrateResource.Policies[i]
-
-				var name string
-				if p.NewData.Name != "" {
-					name = p.NewData.Name
-				} else if p.OldData.Name != "" {
-					name = p.OldData.Name
-				}
-
-				logger.Debugf("- MigrateType : %s, Policy : %s", p.Type, name)
-				logger.Debugf(" update items : %+v", p.MigrationItems.ChangeItems)
-
-			}
-			logger.Debug(strings.Repeat("=", 5))
-		}
-
 	}
 
 	if flags.All() || flags.RpcOnly {
-		logger.Info("apply : compare rpc")
-		if err := bindMigratedFunctions(appRpcFunctions, resource.Functions, &migrateResource); err != nil {
+		if data, err := rpc.BuildMigrateData(appRpcFunctions, resource.Functions); err != nil {
 			return err
-		}
-
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Rpc to migrate")
-			for i := range migrateResource.Rpc {
-				t := migrateResource.Rpc[i]
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
-				logger.Debugf("- MigrateType : %s, Name: %s", t.Type, name)
-			}
-			logger.Debug(strings.Repeat("=", 5))
+		} else {
+			migrateData.Rpc = data
 		}
 	}
 
-	if flags.All() || flags.StorageOnly {
-		logger.Info("apply : compare storage")
-		if err := bindMigratedStorage(appStorage, resource.Storages, &migrateResource); err != nil {
+	if flags.All() || flags.StoragesOnly {
+		if data, err := storages.BuildMigrateData(appStorage, resource.Storages); err != nil {
 			return err
-		}
-
-		if flags.Verbose {
-			logger.Debug(strings.Repeat("=", 5), " Storage to migrate")
-			for i := range migrateResource.Storages {
-				t := migrateResource.Storages[i]
-				var name string
-				if t.NewData.Name != "" {
-					name = t.NewData.Name
-				} else if t.OldData.Name != "" {
-					name = t.OldData.Name
-				}
-				logger.Debugf("- MigrateType : %s, Name: %s , update items : %+v", t.Type, name, t.MigrationItems.ChangeItems)
-				logger.Debugf(" update items : %+v", t.MigrationItems.ChangeItems)
-			}
-			logger.Debug(strings.Repeat("=", 5))
-		}
-	}
-
-	migrateErr := MigrateResource(config, &importState, flags.ProjectPath, &migrateResource)
-	if len(migrateErr) > 0 {
-		var errMessages []string
-		for _, e := range migrateErr {
-			errMessages = append(errMessages, e.Error())
-		}
-
-		return errors.New(strings.Join(errMessages, ","))
-	}
-
-	return nil
-}
-
-func bindMigratedTables(etr state.ExtractTableResult, spTables []objects.Table, mr *MigrateData) error {
-	// compare and bind existing table to migrate data
-	mapSpTable := make(map[int]bool)
-	for i := range spTables {
-		t := spTables[i]
-		mapSpTable[t.ID] = true
-	}
-
-	// filter existing table need compare or move to create new
-	var compareTables []objects.Table
-	for i := range etr.Existing {
-		et := etr.Existing[i]
-		if _, isExist := mapSpTable[et.Table.ID]; isExist {
-			compareTables = append(compareTables, et.Table)
 		} else {
-			etr.New = append(etr.New, et)
-		}
-
-	}
-	if rs, err := runApplyCompareTable(spTables, compareTables); err != nil {
-		return err
-	} else {
-		mr.Tables = append(mr.Tables, rs...)
-	}
-
-	// bind new table to migrated data
-	if len(etr.New) > 0 {
-		for i := range etr.New {
-			t := etr.New[i]
-			mr.Tables = append(mr.Tables, MigrateItem[objects.Table, objects.UpdateTableParam]{
-				Type:    MigrateTypeCreate,
-				NewData: t.Table,
-			})
+			migrateData.Storages = data
 		}
 	}
+	ApplyLogger.Info("finish build migrate data")
 
-	// bind delete table to migrate data
-	if len(etr.Delete) > 0 {
-		for i := range etr.Delete {
-			t := etr.Delete[i]
-			isExist := false
-			for i := range spTables {
-				tt := spTables[i]
-				if tt.Name == t.Table.Name {
-					isExist = true
-					break
-				}
+	if !flags.DryRun {
+		migrateErr := Migrate(config, &localState, flags.ProjectPath, &migrateData)
+		if len(migrateErr) > 0 {
+			var errMessages []string
+			for _, e := range migrateErr {
+				errMessages = append(errMessages, e.Error())
 			}
 
-			if isExist {
-				mr.Tables = append(mr.Tables, MigrateItem[objects.Table, objects.UpdateTableParam]{
-					Type:    MigrateTypeDelete,
-					OldData: t.Table,
-				})
-			}
+			return errors.New(strings.Join(errMessages, ","))
 		}
+		ApplyLogger.Info("finish migrate resource")
 	}
-
+	PrintApplyChangeReport(migrateData)
 	return nil
 }
 
-func bindMigratedRoles(er state.ExtractRoleResult, spRoles []objects.Role, mr *MigrateData) error {
-	// compare and bind existing table to migrate data
-	mapSpRole := make(map[int]bool)
-	for i := range spRoles {
-		t := spRoles[i]
-		mapSpRole[t.ID] = true
-	}
+func Migrate(config *raiden.Config, importState *state.LocalState, projectPath string, resource *MigrateData) (errors []error) {
+	wg, errChan, stateChan := sync.WaitGroup{}, make(chan []error), make(chan any)
+	doneListen := UpdateLocalStateFromApply(projectPath, importState, stateChan)
 
-	// filter existing table need compare or move to create new
-	var compareRoles []objects.Role
-	for i := range er.Existing {
-		et := er.Existing[i]
-		if _, isExist := mapSpRole[et.ID]; isExist {
-			compareRoles = append(compareRoles, et)
-		} else {
-			er.New = append(er.New, et)
+	// role must be run first because will be use when create/update rls
+	// and role must be already exist in database
+	if len(resource.Roles) > 0 {
+		errors = roles.Migrate(config, resource.Roles, stateChan, roles.ActionFunc)
+		if len(errors) > 0 {
+			close(stateChan)
+			return errors
 		}
 	}
 
-	if rs, err := runApplyCompareRoles(spRoles, compareRoles); err != nil {
-		return err
-	} else {
-		mr.Roles = append(mr.Roles, rs...)
-	}
-
-	// bind new table to migrated data
-	if len(er.New) > 0 {
-		for i := range er.New {
-			t := er.New[i]
-			mr.Roles = append(mr.Roles, MigrateItem[objects.Role, objects.UpdateRoleParam]{
-				Type:    MigrateTypeCreate,
-				NewData: t,
-			})
-		}
-	}
-
-	if len(er.Delete) > 0 {
-		for i := range er.Delete {
-			t := er.Delete[i]
-			isExist := false
-			for i := range spRoles {
-				tt := spRoles[i]
-				if tt.Name == t.Name {
-					isExist = true
-					break
+	if len(resource.Tables) > 0 {
+		var updateTableRelation []tables.MigrateItem
+		for i := range resource.Tables {
+			t := resource.Tables[i]
+			if len(t.NewData.Relationships) > 0 {
+				if t.Type == migrator.MigrateTypeCreate {
+					updateTableRelation = append(updateTableRelation, tables.MigrateItem{
+						Type:    migrator.MigrateTypeUpdate,
+						NewData: t.NewData,
+						MigrationItems: objects.UpdateTableParam{
+							OldData:             t.NewData,
+							ChangeRelationItems: t.MigrationItems.ChangeRelationItems,
+							ForceCreateRelation: true,
+						},
+					})
+					resource.Tables[i].MigrationItems.ChangeRelationItems = make([]objects.UpdateRelationItem, 0)
+				} else {
+					updateTableRelation = append(updateTableRelation, tables.MigrateItem{
+						Type:    t.Type,
+						NewData: t.NewData,
+						OldData: t.OldData,
+						MigrationItems: objects.UpdateTableParam{
+							OldData:             t.NewData,
+							ChangeRelationItems: t.MigrationItems.ChangeRelationItems,
+						},
+					})
+					resource.Tables[i].MigrationItems.ChangeRelationItems = make([]objects.UpdateRelationItem, 0)
 				}
 			}
+		}
 
-			if isExist {
-				mr.Roles = append(mr.Roles, MigrateItem[objects.Role, objects.UpdateRoleParam]{
-					Type:    MigrateTypeDelete,
-					OldData: t,
-				})
+		// run migrate for table manipulation
+		errors = tables.Migrate(config, resource.Tables, stateChan, tables.ActionFunc)
+		if len(errors) > 0 {
+			close(stateChan)
+			return errors
+		}
+
+		// run migrate for relation manipulation
+		if len(updateTableRelation) > 0 {
+			errors = tables.Migrate(config, updateTableRelation, stateChan, tables.ActionFunc)
+			if len(errors) > 0 {
+				close(stateChan)
+				return errors
 			}
 		}
 	}
 
-	return nil
-}
+	if len(resource.Rpc) > 0 {
+		wg.Add(1)
+		go func(w *sync.WaitGroup, eChan chan []error) {
+			defer wg.Done()
 
-func bindMigratedPolicies(ep state.ExtractedPolicies, spPolicies []objects.Policy, mr *MigrateData) error {
-	// compare and bind existing table to migrate data
-	mapSpPolicies := make(map[string]bool)
-	for i := range spPolicies {
-		t := spPolicies[i]
-		mapSpPolicies[t.Name] = true
-	}
-
-	var comparePolicies []objects.Policy
-	for i := range ep.Existing {
-		p := ep.Existing[i]
-		if _, isExist := mapSpPolicies[p.Name]; isExist {
-			comparePolicies = append(comparePolicies, p)
-		} else {
-			ep.New = append(ep.New, p)
-		}
-	}
-
-	if rs, err := runApplyComparePolicies(spPolicies, comparePolicies); err != nil {
-		return err
-	} else {
-		mr.Policies = append(mr.Policies, rs...)
-	}
-
-	// bind new table to migrated data
-	if len(ep.New) > 0 {
-		for i := range ep.New {
-			t := ep.New[i]
-			mr.Policies = append(mr.Policies, MigrateItem[objects.Policy, objects.UpdatePolicyParam]{
-				Type:    MigrateTypeCreate,
-				NewData: t,
-			})
-		}
-	}
-
-	if len(ep.Delete) > 0 {
-		for i := range ep.Delete {
-			t := ep.Delete[i]
-			isExist := false
-			for i := range spPolicies {
-				tt := spPolicies[i]
-				if tt.Name == t.Name {
-					isExist = true
-					break
-				}
+			errors := rpc.Migrate(config, resource.Rpc, stateChan, rpc.ActionFunc)
+			if len(errors) > 0 {
+				eChan <- errors
+				return
 			}
+		}(&wg, errChan)
+	}
 
-			if isExist {
-				mr.Policies = append(mr.Policies, MigrateItem[objects.Policy, objects.UpdatePolicyParam]{
-					Type:    MigrateTypeDelete,
-					OldData: t,
-				})
+	if len(resource.Policies) > 0 {
+		wg.Add(1)
+		go func(w *sync.WaitGroup, eChan chan []error) {
+			defer w.Done()
+			errors := policies.Migrate(config, resource.Policies, stateChan, policies.ActionFunc)
+			if len(errors) > 0 {
+				eChan <- errors
+				return
 			}
-		}
-	}
-	return nil
-}
-
-func bindMigratedFunctions(er state.ExtractRpcResult, spFn []objects.Function, mr *MigrateData) error {
-	if rs, err := runApplyCompareRpcFunctions(spFn, er.Existing); err != nil {
-		return err
-	} else {
-		mr.Rpc = append(mr.Rpc, rs...)
+		}(&wg, errChan)
 	}
 
-	// bind new table to migrated data
-	if len(er.New) > 0 {
-		for i := range er.New {
-			t := er.New[i]
-			mr.Rpc = append(mr.Rpc, MigrateItem[objects.Function, any]{
-				Type:    MigrateTypeCreate,
-				NewData: t,
-			})
-		}
-	}
+	if len(resource.Storages) > 0 {
+		wg.Add(1)
+		go func(w *sync.WaitGroup, eChan chan []error) {
+			defer w.Done()
 
-	if len(er.Delete) > 0 {
-		for i := range er.Delete {
-			t := er.Delete[i]
-			isExist := false
-			for i := range spFn {
-				tt := spFn[i]
-				if tt.Name == t.Name {
-					isExist = true
-					break
-				}
+			errors := storages.Migrate(config, resource.Storages, stateChan, storages.ActionFunc)
+			if len(errors) > 0 {
+				eChan <- errors
+				return
 			}
+		}(&wg, errChan)
+	}
 
-			if isExist {
-				mr.Rpc = append(mr.Rpc, MigrateItem[objects.Function, any]{
-					Type:    MigrateTypeDelete,
-					OldData: t,
-				})
+	go func() {
+		wg.Wait()
+		close(stateChan)
+		close(errChan)
+	}()
+
+	for {
+		select {
+		case rsErr := <-errChan:
+			if len(rsErr) > 0 {
+				errors = append(errors, rsErr...)
 			}
-		}
-	}
-
-	return nil
-}
-
-func bindMigratedStorage(es state.ExtractStorageResult, spStorages []objects.Bucket, mr *MigrateData) error {
-	// compare and bind existing table to migrate data
-	mapSpStorages := make(map[string]bool)
-	for i := range spStorages {
-		s := spStorages[i]
-		mapSpStorages[s.ID] = true
-	}
-
-	// filter existing table need compare or move to create new
-	var compareStorages []objects.Bucket
-	for i := range es.Existing {
-		et := es.Existing[i]
-		if _, isExist := mapSpStorages[et.ID]; isExist {
-			compareStorages = append(compareStorages, et)
-		} else {
-			es.New = append(es.New, et)
-		}
-	}
-
-	if rs, err := runApplyCompareStorages(spStorages, compareStorages); err != nil {
-		return err
-	} else {
-		mr.Storages = append(mr.Storages, rs...)
-	}
-
-	// bind new table to migrated data
-	if len(es.New) > 0 {
-		for i := range es.New {
-			t := es.New[i]
-			mr.Storages = append(mr.Storages, MigrateItem[objects.Bucket, objects.UpdateBucketParam]{
-				Type:    MigrateTypeCreate,
-				NewData: t,
-			})
-		}
-	}
-
-	if len(es.Delete) > 0 {
-		for i := range es.Delete {
-			t := es.Delete[i]
-			isExist := false
-			for i := range spStorages {
-				tt := spStorages[i]
-				if tt.Name == t.Name {
-					isExist = true
-					break
-				}
+		case saveErr := <-doneListen:
+			if saveErr != nil {
+				errors = append(errors, saveErr)
 			}
-
-			if isExist {
-				mr.Storages = append(mr.Storages, MigrateItem[objects.Bucket, objects.UpdateBucketParam]{
-					Type:    MigrateTypeDelete,
-					OldData: t,
-				})
-			}
+			return
 		}
 	}
-
-	return nil
-}
-
-func runApplyCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) (migratedData []MigrateItem[objects.Role, objects.UpdateRoleParam], err error) {
-	result, e := CompareRoles(appRoles, supabaseRoles, CompareModeApply)
-	if e != nil {
-		err = e
-		return
-	}
-
-	for i := range result {
-		r := result[i]
-
-		migrateType := MigrateTypeIgnore
-		if r.IsConflict {
-			migrateType = MigrateTypeUpdate
-		}
-
-		r.DiffItems.OldData = r.TargetResource
-		migratedData = append(migratedData, MigrateItem[objects.Role, objects.UpdateRoleParam]{
-			Type:           migrateType,
-			NewData:        r.SourceResource,
-			OldData:        r.TargetResource,
-			MigrationItems: r.DiffItems,
-		})
-	}
-
-	return
-}
-
-func runApplyCompareTable(supabaseTable []objects.Table, appTable []objects.Table) (migratedData []MigrateItem[objects.Table, objects.UpdateTableParam], err error) {
-	result, e := CompareTables(appTable, supabaseTable, CompareModeApply)
-	if e != nil {
-		err = e
-		return
-	}
-
-	for i := range result {
-		r := result[i]
-
-		migrateType := MigrateTypeIgnore
-		if r.IsConflict {
-			migrateType = MigrateTypeUpdate
-		}
-
-		r.DiffItems.OldData = r.TargetResource
-		migratedData = append(migratedData, MigrateItem[objects.Table, objects.UpdateTableParam]{
-			Type:           migrateType,
-			NewData:        r.SourceResource,
-			OldData:        r.TargetResource,
-			MigrationItems: r.DiffItems,
-		})
-	}
-
-	return
-}
-
-func runApplyComparePolicies(supabasePolicies []objects.Policy, appPolicies []objects.Policy) (migratedData []MigrateItem[objects.Policy, objects.UpdatePolicyParam], err error) {
-	result := ComparePolicies(appPolicies, supabasePolicies)
-	for i := range result {
-		r := result[i]
-		migrateType := MigrateTypeIgnore
-		if r.IsConflict {
-			migrateType = MigrateTypeUpdate
-		}
-
-		migratedData = append(migratedData, MigrateItem[objects.Policy, objects.UpdatePolicyParam]{
-			Type:           migrateType,
-			NewData:        r.SourceResource,
-			MigrationItems: r.DiffItems,
-		})
-	}
-
-	return
-}
-
-func runApplyCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.Function) (migratedData []MigrateItem[objects.Function, any], err error) {
-	result, e := CompareRpcFunctions(appFn, supabaseFn)
-	if e != nil {
-		err = e
-		return
-	}
-	for i := range result {
-		r := result[i]
-
-		migrateType := MigrateTypeIgnore
-		if r.IsConflict {
-			migrateType = MigrateTypeUpdate
-		}
-
-		migratedData = append(migratedData, MigrateItem[objects.Function, any]{
-			Type:           migrateType,
-			NewData:        r.SourceResource,
-			OldData:        r.TargetResource,
-			MigrationItems: r.DiffItems,
-		})
-	}
-
-	return
-}
-
-func runApplyCompareStorages(supabaseStorage []objects.Bucket, appStorages []objects.Bucket) (migratedData []MigrateItem[objects.Bucket, objects.UpdateBucketParam], err error) {
-	result, e := CompareStorage(appStorages, supabaseStorage)
-	if e != nil {
-		err = e
-		return
-	}
-
-	for i := range result {
-		r := result[i]
-
-		migrateType := MigrateTypeIgnore
-		if r.IsConflict {
-			migrateType = MigrateTypeUpdate
-		}
-
-		r.DiffItems.OldData = r.TargetResource
-		migratedData = append(migratedData, MigrateItem[objects.Bucket, objects.UpdateBucketParam]{
-			Type:           migrateType,
-			NewData:        r.SourceResource,
-			OldData:        r.TargetResource,
-			MigrationItems: r.DiffItems,
-		})
-	}
-
-	return
 }
 
 func validateTableRelations(migratedTables ...objects.Table) error {
@@ -777,4 +443,236 @@ func validateRoleIsExist(appPolicies state.ExtractedPolicies, appRoles state.Ext
 	}
 
 	return nil
+}
+
+func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState, stateChan chan any) (done chan error) {
+	done = make(chan error)
+	go func() {
+		for rs := range stateChan {
+			if rs == nil {
+				continue
+			}
+
+			switch m := rs.(type) {
+			case *tables.MigrateItem:
+				switch m.Type {
+				case migrator.MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					modelStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					modelPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.ModelDir, utils.ToSnakeCase(m.NewData.Name))
+
+					ts := state.TableState{
+						Table:       m.NewData,
+						ModelPath:   modelPath,
+						ModelStruct: modelStruct,
+						LastUpdate:  time.Now(),
+					}
+
+					localState.AddTable(ts)
+				case migrator.MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+
+					localState.DeleteTable(m.OldData.ID)
+				case migrator.MigrateTypeUpdate:
+					fIndex, tState, found := localState.FindTable(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					tState.Table = m.NewData
+					tState.LastUpdate = time.Now()
+					localState.UpdateTable(fIndex, tState)
+				}
+			case *roles.MigrateItem:
+				switch m.Type {
+				case migrator.MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					roleStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					rolePath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.RoleDir, utils.ToSnakeCase(m.NewData.Name))
+
+					r := state.RoleState{
+						Role:       m.NewData,
+						RolePath:   rolePath,
+						RoleStruct: roleStruct,
+						LastUpdate: time.Now(),
+					}
+
+					localState.AddRole(r)
+				case migrator.MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					localState.DeleteRole(m.OldData.ID)
+				case migrator.MigrateTypeUpdate:
+					fIndex, rState, found := localState.FindRole(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Role = m.NewData
+					rState.LastUpdate = time.Now()
+					localState.UpdateRole(fIndex, rState)
+				}
+			case *policies.MigrateItem:
+				switch m.Type {
+				case migrator.MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+
+					fIndex, tState, found := localState.FindTable(m.NewData.TableID)
+					if !found {
+						continue
+					}
+					tState.Policies = append(tState.Policies, m.NewData)
+					tState.LastUpdate = time.Now()
+					localState.UpdateTable(fIndex, tState)
+				case migrator.MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					fIndex, tState, found := localState.FindTable(m.OldData.TableID)
+					if !found {
+						continue
+					}
+
+					// find policy index
+					pi := -1
+					for i := range tState.Policies {
+						p := tState.Policies[i]
+						if p.ID == m.OldData.ID {
+							pi = i
+							break
+						}
+					}
+
+					if pi > -1 {
+						tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+						tState.LastUpdate = time.Now()
+						localState.UpdateTable(fIndex, tState)
+					}
+				case migrator.MigrateTypeUpdate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					fIndex, tState, found := localState.FindTable(m.NewData.TableID)
+					if !found {
+						continue
+					}
+
+					// find policy index
+					pi := -1
+					for i := range tState.Policies {
+						p := tState.Policies[i]
+						if p.ID == m.OldData.ID {
+							pi = i
+							break
+						}
+					}
+					if pi > -1 {
+						tState.Policies[pi] = m.NewData
+						tState.LastUpdate = time.Now()
+						localState.UpdateTable(fIndex, tState)
+					}
+				}
+			case *rpc.MigrateItem:
+				switch m.Type {
+				case migrator.MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					rpcStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					rpcPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.RpcDir, utils.ToSnakeCase(m.NewData.Name))
+
+					r := state.RpcState{
+						Function:   m.NewData,
+						RpcPath:    rpcPath,
+						RpcStruct:  rpcStruct,
+						LastUpdate: time.Now(),
+					}
+					localState.AddRpc(r)
+				case migrator.MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					localState.DeleteRpc(m.OldData.ID)
+				case migrator.MigrateTypeUpdate:
+					fIndex, rState, found := localState.FindRpc(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Function = m.NewData
+					rState.LastUpdate = time.Now()
+					localState.UpdateRpc(fIndex, rState)
+				}
+			case *storages.MigrateItem:
+				switch m.Type {
+				case migrator.MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+
+					r := state.StorageState{
+						Bucket:     m.NewData,
+						LastUpdate: time.Now(),
+					}
+
+					localState.AddStorage(r)
+				case migrator.MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					localState.DeleteStorage(m.OldData.ID)
+				case migrator.MigrateTypeUpdate:
+					fIndex, rState, found := localState.FindStorage(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Bucket = m.NewData
+					rState.LastUpdate = time.Now()
+					localState.UpdateStorage(fIndex, rState)
+				}
+			}
+		}
+		done <- localState.Persist()
+	}()
+	return done
+}
+
+func PrintApplyChangeReport(migrateData MigrateData) {
+	diffMessage := []string{}
+	diffTable := tables.GetDiffChangeMessage(migrateData.Tables)
+	if len(diffTable) > 0 {
+		diffMessage = append(diffMessage, diffTable)
+	}
+	diffPolicy := policies.GetDiffChangeMessage(migrateData.Policies)
+	if len(diffPolicy) > 0 {
+		diffMessage = append(diffMessage, diffPolicy)
+	}
+	diffRole := roles.GetDiffChangeMessage(migrateData.Roles)
+	if len(diffRole) > 0 {
+		diffMessage = append(diffMessage, diffRole)
+	}
+	diffRpc := rpc.GetDiffChangeMessage(migrateData.Rpc)
+	if len(diffRpc) > 0 {
+		diffMessage = append(diffMessage, diffRpc)
+	}
+	diffStorage := storages.GetDiffChangeMessage(migrateData.Storages)
+	if len(diffStorage) > 0 {
+		diffMessage = append(diffMessage, diffStorage)
+	}
+
+	if len(diffMessage) == 0 {
+		ApplyLogger.Info("your code is up to date, nothing to migrate :)")
+	} else {
+		ApplyLogger.Info("report", "list", strings.Join(diffMessage, "\n"))
+	}
 }

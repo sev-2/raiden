@@ -1,88 +1,51 @@
 package raiden
 
 import (
+	"os"
+
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 )
 
-var logInstance *logger.Logger
+var logInstance hclog.Logger
 
 func checkLogInstance() {
 	if logInstance == nil {
-		logInstance = logger.NewLogger()
-		logInstance.SetOutputLevel(3)
+		logInstance = logger.HcLog()
 	}
 }
 
-func SetLogLevel(level logger.LogLevel) {
+func SetLogLevel(level hclog.Level) {
 	checkLogInstance()
 	logInstance.SetLevel(level)
 }
 
-func Info(v ...any) {
+func Info(message string, v ...any) {
 	checkLogInstance()
-	logInstance.Info(v...)
+	logInstance.Info(message, v...)
 }
 
-func Infof(format string, v ...any) {
+func Debug(message string, v ...any) {
 	checkLogInstance()
-	logInstance.Infof(format, v...)
+	logInstance.Debug(message, v...)
 }
 
-func PrintJson(data any, pretty bool) {
+func Error(message string, v ...any) {
 	checkLogInstance()
-	if pretty {
-		logInstance.JsonPretty(data)
-	} else {
-		logInstance.Json(data)
-	}
+	logInstance.Error(message, v...)
 }
 
-func Debug(v ...any) {
-	checkLogInstance()
-	logInstance.Debug(v...)
+func Warning(message string, v ...any) {
+	logInstance.Warn(message, v...)
 }
 
-func Debugf(format string, v ...any) {
+func Panic(message string) {
 	checkLogInstance()
-	logInstance.Debugf(format, v...)
+	panic(message)
 }
 
-func Error(v ...any) {
+func Fatal(message string, v ...any) {
 	checkLogInstance()
-	logInstance.Error(v...)
-}
-
-func Errorf(format string, v ...any) {
-	checkLogInstance()
-	logInstance.Errorf(format, v...)
-}
-
-func Warning(v ...any) {
-	checkLogInstance()
-	logInstance.Warning(v...)
-}
-
-func Warningf(format string, v ...any) {
-	checkLogInstance()
-	logInstance.Warningf(format, v...)
-}
-
-func Panic(v ...any) {
-	checkLogInstance()
-	logInstance.Panic(v...)
-}
-
-func Panicf(format string, v ...any) {
-	checkLogInstance()
-	logInstance.Panicf(format, v...)
-}
-
-func Fatal(v ...any) {
-	checkLogInstance()
-	logInstance.Fatal(v...)
-}
-
-func Fatalf(format string, v ...any) {
-	checkLogInstance()
-	logInstance.Fatalf(format, v...)
+	logInstance.Error(message, v...)
+	os.Exit(1)
 }

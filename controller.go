@@ -14,6 +14,8 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+var ControllerLogger = logger.HcLog().Named("raiden.controller")
+
 type (
 	// The `Controller` interface defines a set of methods that a controller in the Raiden framework
 	// should implement. These methods correspond to different HTTP methods (GET, POST, PUT, PATCH,
@@ -601,6 +603,8 @@ func RestProxy(appCtx Context, modelName string) error {
 	return nil
 }
 
+var storageProxyLogger = logger.HcLog().Named("raiden.controller.storage-proxy")
+
 func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 	// Create a new request object
 	req := fasthttp.AcquireRequest()
@@ -624,7 +628,7 @@ func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
 
-	Debugf("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
+	storageProxyLogger.Debug("Forward request", "method", string(req.Header.Method()), "uri", string(req.URI().FullURI()))
 	if err := fasthttp.Do(req, resp); err != nil {
 		return err
 	}
@@ -640,6 +644,8 @@ func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 }
 
 // Default Proxy Handler
+var proxyLogger = logger.HcLog().Named("raiden.controller.proxy")
+
 func ProxyHandler(
 	targetURL *url.URL,
 	basePath string,
@@ -667,14 +673,13 @@ func ProxyHandler(
 		resp := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(resp)
 
-		Debugf("Proxying to : %s %s", req.Header.Method(), req.URI().FullURI())
-
+		proxyLogger.Debug("Forward request", "method", req.Header.Method(), "uri", req.URI().FullURI())
 		if requestInterceptor != nil {
 			requestInterceptor(req)
 		}
 
 		if err := fasthttp.Do(req, resp); err != nil {
-			logger.Error(err)
+			ControllerLogger.Error("proxy handler", "msg", err.Error())
 			ctx.Response.SetStatusCode(fasthttp.StatusInternalServerError)
 			errResponse := fmt.Sprintf("{ \"messages\": %q}", err)
 			ctx.Response.SetBodyString(errResponse)
@@ -683,7 +688,7 @@ func ProxyHandler(
 
 		if responseInterceptor != nil {
 			if err := responseInterceptor(resp); err != nil {
-				logger.Error(err)
+				ControllerLogger.Error("proxy handler", "msg", err.Error())
 				ctx.Response.SetStatusCode(fasthttp.StatusInternalServerError)
 				errResponse := fmt.Sprintf("{ \"messages\": %q}", err)
 				ctx.Response.SetBodyString(errResponse)

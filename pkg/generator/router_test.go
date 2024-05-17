@@ -4,14 +4,11 @@ import (
 	"testing"
 
 	"github.com/sev-2/raiden/pkg/generator"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRouter(t *testing.T) {
-	logger.SetDebug()
-
 	testPath, err := utils.GetAbsolutePath("/testdata")
 	assert.NoError(t, err)
 

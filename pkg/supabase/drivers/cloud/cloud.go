@@ -3,24 +3,27 @@ package cloud
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/valyala/fasthttp"
 )
 
-func DefaultAuthInterceptor(accessToken string) func(req *fasthttp.Request) error {
-	return func(req *fasthttp.Request) error {
+var CloudLogger = logger.HcLog().Named("supabase.cloud")
+
+func DefaultAuthInterceptor(accessToken string) func(req *http.Request) error {
+	return func(req *http.Request) error {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 		return nil
 	}
 }
 
 func FindProject(cfg *raiden.Config) (objects.Project, error) {
+	CloudLogger.Trace("start find project from supabase")
 	url := fmt.Sprintf("%s/v1/projects", cfg.SupabaseApiUrl)
-	projects, err := client.Get[[]objects.Project](url, client.DefaultTimeout, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	projects, err := net.Get[[]objects.Project](url, net.DefaultTimeout, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return objects.Project{}, err
 	}
@@ -31,7 +34,7 @@ func FindProject(cfg *raiden.Config) (objects.Project, error) {
 			return p, nil
 		}
 	}
-
+	CloudLogger.Trace("finish find project from supabase")
 	return objects.Project{}, nil
 }
 
@@ -40,14 +43,14 @@ type ExecuteQueryParam struct {
 	Query string `json:"query"`
 }
 
-func ExecuteQuery[T any](baseUrl, projectId, query string, reqInterceptor client.RequestInterceptor, resInterceptor client.ResponseInterceptor) (result T, err error) {
+func ExecuteQuery[T any](baseUrl, projectId, query string, reqInterceptor net.RequestInterceptor, resInterceptor net.ResponseInterceptor) (result T, err error) {
 	url := fmt.Sprintf("%s/v1/projects/%s/database/query", baseUrl, projectId)
 	p := ExecuteQueryParam{Query: query}
 	pByte, err := json.Marshal(p)
 	if err != nil {
-		logger.Errorf("error execute query : %s", query)
+		CloudLogger.Error("error execute query", "query", query)
 		return result, err
 	}
 
-	return client.Post[T](url, pByte, client.DefaultTimeout, reqInterceptor, resInterceptor)
+	return net.Post[T](url, pByte, net.DefaultTimeout, reqInterceptor, resInterceptor)
 }

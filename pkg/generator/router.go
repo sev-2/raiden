@@ -10,11 +10,14 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/valyala/fasthttp"
 )
+
+var RouterLogger hclog.Logger = logger.HcLog().Named("generator.router")
 
 // ----- Define type, variable and constant -----
 type (
@@ -81,7 +84,7 @@ func RegisterRoute(server *raiden.Server) {
 // Generate route configuration file
 func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) error {
 	routePath := filepath.Join(basePath, RouterDir)
-	logger.Debugf("GenerateRoute - create %s folder if not exist", routePath)
+	RouterLogger.Trace("create bootstrap folder if not exist", routePath)
 	if exist := utils.IsFolderExists(routePath); !exist {
 		if err := utils.CreateFolder(routePath); err != nil {
 			return err
@@ -101,17 +104,17 @@ func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) e
 		return err
 	}
 
-	logger.Debugf("GenerateRoute - generate route to %s", input.OutputPath)
+	RouterLogger.Debug("generate route", "path", input.OutputPath)
 	return generateFn(input, nil)
 }
 
 func WalkScanControllers(controllerPath string) ([]GenerateRouteItem, error) {
-	logger.Debugf("GenerateRoute - scan %s for register all controller", controllerPath)
+	RouterLogger.Trace("scan all controller", "path", controllerPath)
 
 	routes := make([]GenerateRouteItem, 0)
 	err := filepath.Walk(controllerPath, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
-			logger.Debugf("GenerateRoute - collect routes from %s", path)
+			RouterLogger.Trace("collect routes", "path", path)
 			rs, e := getRoutes(path)
 			if e != nil {
 				return e
@@ -119,7 +122,7 @@ func WalkScanControllers(controllerPath string) ([]GenerateRouteItem, error) {
 
 			for _, r := range rs {
 				if r.Path != "" && len(r.Methods) > 0 {
-					logger.Debugf("GenerateRoute - found controller %s", r.Controller)
+					RouterLogger.Trace("found controller", "controller", r.Controller)
 					routes = append(routes, r)
 				}
 			}
@@ -271,7 +274,7 @@ func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
 	r.Storage = foundRoute.Storage
 
 	tagItems := strings.Split(foundRoute.Tag, " ")
-	r.Methods = generateArrayDeclaration(reflect.ValueOf(foundRoute.Methods), true)
+	r.Methods = GenerateArrayDeclaration(reflect.ValueOf(foundRoute.Methods), true)
 
 	for _, tagItem := range tagItems {
 		items := strings.Split(tagItem, ":")

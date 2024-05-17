@@ -6,8 +6,10 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 )
+
+var MetaLogger = logger.HcLog().Named("supabase.meta")
 
 // ----- Execute Query -----
 type ExecuteQueryParam struct {
@@ -15,15 +17,15 @@ type ExecuteQueryParam struct {
 	Variables any    `json:"variables"`
 }
 
-func ExecuteQuery[T any](baseUrl, query string, variables any, reqInterceptor client.RequestInterceptor, resInterceptor client.ResponseInterceptor) (result T, err error) {
+func ExecuteQuery[T any](baseUrl, query string, variables any, reqInterceptor net.RequestInterceptor, resInterceptor net.ResponseInterceptor) (result T, err error) {
 	url := fmt.Sprintf("%s/query", baseUrl)
 	p := ExecuteQueryParam{Query: query, Variables: variables}
 	pByte, err := json.Marshal(p)
 	if err != nil {
-		logger.Errorf("error execute query : %s", query)
+		MetaLogger.Error("error execute query", "query", query)
 		return result, err
 	}
-	return client.Post[T](url, pByte, client.DefaultTimeout, reqInterceptor, resInterceptor)
+	return net.Post[T](url, pByte, net.DefaultTimeout, reqInterceptor, resInterceptor)
 }
 
 func getBaseUrl(cfg *raiden.Config) string {

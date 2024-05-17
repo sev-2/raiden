@@ -483,3 +483,16 @@ func (f ExtractTableItems) ToFlatTable() (tables []objects.Table) {
 	}
 	return
 }
+
+func (f ExtractTableResult) ToDeleteFlatMap() map[string]*objects.Table {
+	mapData := make(map[string]*objects.Table)
+
+	if len(f.Delete) > 0 {
+		for i := range f.Delete {
+			r := f.Delete[i]
+			mapData[r.Table.Name] = &r.Table
+		}
+	}
+
+	return mapData
+}

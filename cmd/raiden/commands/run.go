@@ -7,13 +7,12 @@ import (
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/cli/generate"
 	"github.com/sev-2/raiden/pkg/cli/serve"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
 type RunFlags struct {
-	cli.Flags
+	cli.LogFlags
 	Build    build.Flags
 	Generate generate.Flags
 }
@@ -25,7 +24,7 @@ func RunCommand() *cobra.Command {
 		Use:    "run",
 		Short:  "Run app server",
 		Long:   "Generate app resource, build binary than serve app",
-		PreRun: PreRun(&f.Flags, generate.PreRun),
+		PreRun: PreRun(&f.LogFlags, generate.PreRun),
 		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
@@ -33,34 +32,35 @@ func RunCommand() *cobra.Command {
 			// - get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				logger.Error(errCurDir)
+				serve.ServeLogger.Error(errCurDir.Error())
 				return
 			}
 
 			// - load config
+			configure.ConfigureLogger.Info("Load configuration")
 			configFilePath := configure.GetConfigFilePath(currentDir)
-			logger.Debug("Load configuration from : ", configFilePath)
+			configure.ConfigureLogger.Debug("config file information", "path", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				logger.Error(err)
+				serve.ServeLogger.Error(err.Error())
 				return
 			}
 
 			// 1. generate app resource
 			if err := generate.Run(&f.Generate, config, currentDir, false); err != nil {
-				logger.Error(err)
+				generate.GenerateLogger.Error(err.Error())
 				return
 			}
 
 			// 2. build app binary
 			if err := build.Run(&f.Build, config, currentDir); err != nil {
-				logger.Error(err)
+				build.BuildLogger.Error(err.Error())
 				return
 			}
 
 			// 3. server application
 			if err := serve.Run(config, currentDir); err != nil {
-				logger.Error(err)
+				serve.ServeLogger.Error(err.Error())
 			}
 		},
 	}

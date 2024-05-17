@@ -6,9 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var StorageRegisterLogger hclog.Logger = logger.HcLog().Named("generator.storage_register")
 
 // ----- Define type, variable and constant -----
 type (
@@ -44,7 +47,7 @@ func RegisterStorages() {
 
 func GenerateStoragesRegister(basePath string, projectName string, generateFn GenerateFn) error {
 	storageRegisterDir := filepath.Join(basePath, StorageRegisterDir)
-	logger.Debugf("GenerateStorageRegister - create %s folder if not exist", storageRegisterDir)
+	StorageRegisterLogger.Trace("create bootstrap folder if not exist", "path", storageRegisterDir)
 	if exist := utils.IsFolderExists(storageRegisterDir); !exist {
 		if err := utils.CreateFolder(storageRegisterDir); err != nil {
 			return err
@@ -52,7 +55,7 @@ func GenerateStoragesRegister(basePath string, projectName string, generateFn Ge
 	}
 
 	storageDir := filepath.Join(basePath, StorageDir)
-	logger.Debugf("GenerateStorageRegister - create %s folder if not exist", storageDir)
+	StorageRegisterLogger.Trace("create storages folder if not exist", "path", storageDir)
 	if exist := utils.IsFolderExists(storageDir); !exist {
 		if err := utils.CreateFolder(storageDir); err != nil {
 			return err
@@ -70,7 +73,7 @@ func GenerateStoragesRegister(basePath string, projectName string, generateFn Ge
 		return err
 	}
 
-	logger.Debugf("GenerateStorageRegister - generate storage register to %s", input.OutputPath)
+	StorageRegisterLogger.Debug("generate storage register", "path", input.OutputPath)
 	return generateFn(input, nil)
 }
 
@@ -106,12 +109,12 @@ func createStorageRegisterInput(projectName string, storageRegisterDir string, s
 }
 
 func WalkScanStorage(storageDir string) ([]string, error) {
-	logger.Debugf("GenerateStorageRegister - scan %s for register all storages", storageDir)
+	StorageRegisterLogger.Trace("scan all storages", "path", storageDir)
 
 	storages := make([]string, 0)
 	err := filepath.Walk(storageDir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
-			logger.Debugf("GenerateStorageRegister - collect storages from %s", path)
+			StorageRegisterLogger.Trace("collect storages", "path", path)
 			rs, e := getStructByBaseName(path, "BucketBase")
 			if e != nil {
 				return e

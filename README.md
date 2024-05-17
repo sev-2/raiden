@@ -39,14 +39,15 @@ Available Commands:
   version     Show application information
 
 Flags:
-  -h, --help      help for raiden
-  -v, --verbose   enable verbose output
+      --debug   enable log with debug mode
+  -h, --help    help for raiden
+      --trace   enable log with trace mode
 
 Use "raiden [command] --help" for more information about a command.
 ```
 
 ## Documentation
-For detailed documentation, including security practices and schema management, visit [sev-2.com].
+For detailed documentation, including security practices and schema management, visit [raiden.sev-2.com](https://raiden.sev-2.com).
 
 ## Contributing
 Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) for more information.

@@ -6,27 +6,29 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/supabase/query"
 	"github.com/sev-2/raiden/pkg/supabase/query/sql"
 )
 
 func GetPolicies(cfg *raiden.Config) ([]objects.Policy, error) {
+	MetaLogger.Trace("start fetching policies from meta")
 	url := fmt.Sprintf("%s%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := client.Get[[]objects.Policy](url, client.DefaultTimeout, nil, nil)
+	rs, err := net.Get[[]objects.Policy](url, net.DefaultTimeout, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
 	}
+	MetaLogger.Trace("finish fetching policies from meta")
 	return rs, err
 }
 
 func GetPolicyByName(cfg *raiden.Config, name string) (result objects.Policy, err error) {
+	MetaLogger.Trace("start fetching policy by name from meta")
 	qTemplate := sql.GetPoliciesQuery + " where pol.polname = %s limit 1"
 	sql := fmt.Sprintf(qTemplate, pq.QuoteLiteral(strings.ToLower(name)))
 
-	// logger.Debug("Get Policy by name - execute : ", sql)
+	// logger.Trace("Get Policy by name - execute : ", sql)
 	rs, err := ExecuteQuery[[]objects.Policy](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get policy error : %s", err)
@@ -37,42 +39,44 @@ func GetPolicyByName(cfg *raiden.Config, name string) (result objects.Policy, er
 		err = fmt.Errorf("get policy %s is not found", name)
 		return
 	}
-
+	MetaLogger.Trace("finish fetching policy by name from meta")
 	return rs[0], nil
 }
 
 func CreatePolicy(cfg *raiden.Config, policy objects.Policy) (objects.Policy, error) {
+	MetaLogger.Trace("start create policy", "name", policy.Name)
 	sql := query.BuildCreatePolicyQuery(policy)
 
 	// Execute SQL Query
-	logger.Debug("Create Policy - execute : ", sql)
 	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return objects.Policy{}, fmt.Errorf("create new policy %s error : %s", policy.Name, err)
 	}
-
+	MetaLogger.Trace("finish create policy", "name", policy.Name)
 	return GetPolicyByName(cfg, policy.Name)
 }
 
 func UpdatePolicy(cfg *raiden.Config, policy objects.Policy, updatePolicyParams objects.UpdatePolicyParam) error {
+	MetaLogger.Trace("start update policy", "name", policy.Name)
 	sql := query.BuildUpdatePolicyQuery(policy, updatePolicyParams)
 	// Execute SQL Query
-	logger.Debug("Update Policy - execute : ", sql)
 	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update policy %s error : %s", policy.Name, err)
 	}
+	MetaLogger.Trace("finish create policy", "name", policy.Name)
 	return nil
 }
 
 func DeletePolicy(cfg *raiden.Config, policy objects.Policy) error {
+	MetaLogger.Trace("start delete policy", "name", policy.Name)
 	sql := query.BuildDeletePolicyQuery(policy)
 
 	// execute delete
-	logger.Debug("Delete Policy - execute : ", sql)
 	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete role %s error : %s", policy.Name, err)
 	}
+	MetaLogger.Trace("finish create policy", "name", policy.Name)
 	return nil
 }

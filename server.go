@@ -16,6 +16,8 @@ import (
 	"github.com/valyala/fasthttp/reuseport"
 )
 
+var ServerLogger = logger.HcLog().Named("raiden.server")
+
 // --- server configuration ----
 type Server struct {
 	Config       *Config
@@ -54,7 +56,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) configureTracer() {
-	Info("configure tracer")
+	ServerLogger.Info("configure tracer")
 	tracerConfig := tracer.AgentConfig{
 		Name:        s.Config.ProjectName,
 		Collector:   tracer.TraceCollector(s.Config.TraceCollector),
@@ -64,18 +66,16 @@ func (s *Server) configureTracer() {
 	}
 	shutdownFn, err := tracer.StartAgent(tracerConfig)
 	if err != nil {
-		logger.Panic(err)
+		ServerLogger.Error("configure tracer err", "err", err)
 	}
 
-	Infof(
-		"tracer connected to %q with service name %q in environment %q with version %q",
-		tracerConfig.Endpoint, tracerConfig.Name, tracerConfig.Environment, tracerConfig.Version,
-	)
+	ServerLogger.With("host", tracerConfig.Endpoint).With("name", tracerConfig.Name).With("environment", tracerConfig.Environment).With("version", tracerConfig.Version).
+		Info("tracer connected")
 	s.ShutdownFunc = append(s.ShutdownFunc, shutdownFn)
 }
 
 func (s *Server) configureRoute() {
-	Info("configure router")
+	ServerLogger.Info("configure router")
 
 	// build router
 	s.Router.BuildHandler()
@@ -99,7 +99,8 @@ func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) 
 	addr := fmt.Sprintf("%s:%s", s.Config.ServerHost, s.Config.ServerPort)
 	ln, err := reuseport.Listen("tcp4", addr)
 	if err != nil {
-		Fatalf("error in reuseport listener: %s", err)
+		ServerLogger.Error("prepare server", "msf", err)
+		os.Exit(1)
 	}
 
 	// create a graceful shutdown listener
@@ -109,7 +110,8 @@ func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) 
 	// Get hostname
 	hostname, err := os.Hostname()
 	if err != nil {
-		Fatalf("hostname unavailable: %s", err)
+		ServerLogger.Error("hostname unavailable", "msf", err)
+		os.Exit(1)
 	}
 	h = hostname
 
@@ -121,8 +123,8 @@ func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) 
 }
 
 func (s *Server) runServer(hostname string, listener net.Listener, errChan chan error) {
-	Infof("%s - Server starting on %v", hostname, listener.Addr())
-	Infof("%s - Press Ctrl+C to stop", hostname)
+	ServerLogger.Info("started server", "hostname", hostname, "addr", listener.Addr())
+	ServerLogger.Info("press Ctrl+C to stop")
 	errChan <- s.HttpServer.Serve(listener)
 }
 
@@ -146,36 +148,37 @@ func (s *Server) Run() {
 		// as "port in use" it will return an error.
 		case err := <-lErrChan:
 			// running server close for clean up all dependency
-			Infof("%s - Clean up all dependency resource", h)
+			ServerLogger.Info("clean up all dependency resource")
 			if errShutdown := s.Shutdown(context.Background()); errShutdown != nil {
-				Warningf("%s - Server shutdown : %s", h, errShutdown)
+				ServerLogger.Warn("server shutdown  error", "msg", errShutdown.Error())
 			}
 
 			if err != nil {
-				Fatalf("%s - Listener error: %s", h, err)
+				ServerLogger.Error("listener error ", "msg", err.Error())
+				os.Exit(1)
 			}
 
-			Infof("%s - Server is shutdown bye :)", h)
+			ServerLogger.Info("server is shutdown bye :)")
 			os.Exit(0)
 
 		// handle termination signal
 		case <-osSignals:
-			fmt.Printf("\n")
-			Warningf("%s - Shutdown signal received. starting shutdown server ...", h)
+			ServerLogger.Warn("shutdown signal received. starting shutdown server ...")
 
 			// Servers in the process of shutting down should disable KeepAlives
 			// FIXME: This causes a data race
-			Infof("%s - Disable keep alive connection", h)
+			ServerLogger.Info("disable keep alive connection")
 			s.HttpServer.DisableKeepalive = true
 
 			// Attempt the graceful shutdown by closing the listener
 			// and completing all inflight requests.
-			Infof("%s - Close connection and wait all request done", h)
+			ServerLogger.Info("close connection and wait all request done")
 			if err := l.Close(); err != nil {
-				Fatalf("%s - Error with graceful close : %s", h, err)
+				ServerLogger.Error("listener error ", "msg", err.Error())
+				os.Exit(1)
 			}
 
-			Infof("%s - Server gracefully stopped.", h)
+			ServerLogger.Info("server gracefully stopped.")
 		}
 	}
 }

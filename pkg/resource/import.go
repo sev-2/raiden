@@ -1,14 +1,25 @@
 package resource
 
 import (
-	"errors"
+	"io"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/resource/roles"
+	"github.com/sev-2/raiden/pkg/resource/rpc"
+	"github.com/sev-2/raiden/pkg/resource/storages"
+	"github.com/sev-2/raiden/pkg/resource/tables"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 
 // List of import resource
 // [x] import table, relation, column specification and acl
@@ -16,50 +27,68 @@ import (
 // [x] import function
 // [x] import storage
 func Import(flags *Flags, config *raiden.Config) error {
+	if flags.DryRun {
+		ImportLogger.Info("running import in dry run mode")
+	}
+
 	// load map native role
-	logger.Info("import : load native role")
+	ImportLogger.Info("load native role")
 	mapNativeRole, err := loadMapNativeRole()
 	if err != nil {
 		return err
 	}
 
 	// load supabase resource
-	logger.Info("import : load table, role, function, model, policy and storage from supabase")
+	ImportLogger.Info("load resource from supabase")
 	spResource, err := Load(flags, config)
 	if err != nil {
 		return err
 	}
 
 	// create import state
+	ImportLogger.Debug("get native roles")
 	nativeStateRoles := filterIsNativeRole(mapNativeRole, spResource.Roles)
 
 	// filter table for with allowed schema
+	ImportLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	ImportLogger.Trace("filter table by schema")
 	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+
+	ImportLogger.Trace("filter function by schema")
 	spResource.Functions = filterFunctionBySchema(spResource.Functions, strings.Split(flags.AllowedSchema, ",")...)
+	ImportLogger.Debug("finish filter table and function by allowed schema")
+
+	ImportLogger.Trace("remove native role for supabase list role")
 	spResource.Roles = filterUserRole(spResource.Roles, mapNativeRole)
 
 	// load app resource
-	logger.Info("import : load local state")
-	latestState, err := loadState()
+	ImportLogger.Info("load resource from local state")
+	localState, err := state.Load()
 	if err != nil {
 		return err
 	}
 
-	logger.Info("import : extract load table, role, function, model and policy from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestState)
+	ImportLogger.Info("extract data from local state")
+	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, localState)
 	if err != nil {
 		return err
 	}
 
-	importState := ResourceState{
+	importState := state.LocalState{
 		State: state.State{
 			Roles: nativeStateRoles,
 		},
 	}
 
+	// dry run import errors
+	dryRunError := []string{}
+
 	// compare resource
+	ImportLogger.Info("compare supabase resource and local resource")
 	if (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
-		logger.Info("import : compare table")
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare table")
+		}
 		// compare table
 		var compareTables []objects.Table
 		for i := range appTables.Existing {
@@ -67,105 +96,302 @@ func Import(flags *Flags, config *raiden.Config) error {
 			compareTables = append(compareTables, et.Table)
 		}
 
-		if err := runImportCompareTable(spResource.Tables, compareTables); err != nil {
-			return err
+		if err := tables.Compare(spResource.Tables, compareTables); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare table")
 		}
 	}
 
 	if (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
-		logger.Info("import : compare roles")
-		if err := runImportCompareRoles(spResource.Roles, appRoles.Existing); err != nil {
-			return err
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare role")
+		}
+		if err := roles.Compare(spResource.Roles, appRoles.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare role")
 		}
 	}
 
 	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
-		logger.Info("import : compare rpc")
-		if err := runImportCompareRpcFunctions(spResource.Functions, appRpcFunctions.Existing); err != nil {
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare rpc")
+		}
+		if err := rpc.Compare(spResource.Functions, appRpcFunctions.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare rpc")
+		}
+	}
+
+	if (flags.All() || flags.StoragesOnly) && len(appStorage.Existing) > 0 {
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare storage")
+		}
+		if err := storages.Compare(spResource.Storages, appStorage.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare storage")
+		}
+	}
+
+	// import report
+	importReport := ImportReport{
+		Role:    roles.GetNewCountData(spResource.Roles, appRoles),
+		Table:   tables.GetNewCountData(spResource.Tables, appTables),
+		Storage: storages.GetNewCountData(spResource.Storages, appStorage),
+		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
+	}
+	if !flags.DryRun {
+		// generate resource
+		if err := generateImportResource(config, &importState, flags.ProjectPath, spResource); err != nil {
 			return err
 		}
+		PrintImportReport(importReport, false)
+	} else {
+		if len(dryRunError) > 0 {
+			errMessage := strings.Join(dryRunError, "\n")
+			ImportLogger.Error("got error", "err-msg", errMessage)
+			return nil
+		}
+		PrintImportReport(importReport, true)
 	}
 
-	if (flags.All() || flags.StorageOnly) && len(appStorage.Existing) > 0 {
-		logger.Info("import : compare storage")
-		if err := runImportCompareStorage(spResource.Storages, appStorage.Existing); err != nil {
+	return nil
+}
+
+// ----- Generate import data -----
+func generateImportResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *Resource) error {
+	if err := generator.CreateInternalFolder(projectPath); err != nil {
+		return err
+	}
+
+	wg, errChan, stateChan := sync.WaitGroup{}, make(chan error), make(chan any)
+	doneListen := UpdateLocalStateFromImport(importState, stateChan)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if len(resource.Tables) > 0 {
+			tableInputs := tables.BuildGenerateModelInputs(resource.Tables, resource.Policies)
+			ImportLogger.Info("start generate tables")
+			captureFunc := ImportDecorateFunc(tableInputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GenerateModelData); ok {
+					if i.StructName == utils.SnakeCaseToPascalCase(item.Table.Name) {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+
+			if err := generator.GenerateModels(projectPath, tableInputs, captureFunc); err != nil {
+				errChan <- err
+			}
+			ImportLogger.Info("finish generate tables")
+		}
+
+		// generate all roles from cloud / pg-meta
+		if len(resource.Roles) > 0 {
+			ImportLogger.Info("start generate roles")
+			captureFunc := ImportDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
+					if i.Name == item.Name {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+
+			if err := generator.GenerateRoles(projectPath, resource.Roles, captureFunc); err != nil {
+				errChan <- err
+			}
+			ImportLogger.Info("finish generate roles")
+		}
+
+		if len(resource.Functions) > 0 {
+			ImportLogger.Info("start generate functions")
+			captureFunc := ImportDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
+					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, captureFunc); errGenRpc != nil {
+				errChan <- errGenRpc
+			}
+			ImportLogger.Info("finish generate roles")
+		}
+
+		if len(resource.Storages) > 0 {
+			ImportLogger.Info("start generate storages")
+			captureFunc := ImportDecorateFunc(resource.Storages, func(item objects.Bucket, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GenerateStoragesData); ok {
+					if utils.ToSnakeCase(i.Name) == utils.ToSnakeCase(item.Name) {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+			if errGenStorage := generator.GenerateStorages(projectPath, resource.Storages, captureFunc); errGenStorage != nil {
+				errChan <- errGenStorage
+			}
+			ImportLogger.Info("finish generate storages")
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(stateChan)
+		close(errChan)
+	}()
+
+	for {
+		select {
+		case rsErr := <-errChan:
+			if rsErr != nil {
+				return rsErr
+			}
+		case saveErr := <-doneListen:
+			return saveErr
+		}
+	}
+}
+
+func ImportDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
+	return func(input generator.GenerateInput, writer io.Writer) error {
+		if err := generator.Generate(input, nil); err != nil {
 			return err
 		}
+		if rs, found := FindImportResource(data, input, findFunc); found {
+			stateChan <- map[string]any{
+				"item":  rs,
+				"input": input,
+			}
+		}
+		return nil
 	}
-
-	// generate resource
-	if err := generateResource(config, &importState, flags.ProjectPath, spResource); err != nil {
-		return err
-	}
-
-	logger.Infof(`imports result - table : %v roles : %v policy : %v function : %v`, len(spResource.Tables), len(spResource.Roles), len(spResource.Policies), len(spResource.Functions))
-	return nil
 }
 
-func runImportCompareTable(supabaseTable []objects.Table, appTable []objects.Table) error {
-	diffResult, err := CompareTables(supabaseTable, appTable, CompareModeImport)
-	if err != nil {
-		return err
-	}
-
-	if len(diffResult) > 0 {
-		for i := range diffResult {
-			d := diffResult[i]
-			PrintDiff("table", d.SourceResource, d.TargetResource, d.Name)
+func FindImportResource[T any](data []T, input generator.GenerateInput, findFunc func(item T, inputData generator.GenerateInput) bool) (item T, found bool) {
+	for i := range data {
+		t := data[i]
+		if findFunc(t, input) {
+			return t, true
 		}
-		return errors.New("import tables is canceled, you have conflict table. please fix it first")
 	}
-
-	return nil
+	return
 }
 
-func runImportCompareRoles(supabaseRoles []objects.Role, appRoles []objects.Role) error {
-	diffResult, err := CompareRoles(supabaseRoles, appRoles, CompareModeImport)
-	if err != nil {
-		return err
-	}
+// ----- Update imported data in local state -----
+func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any) (done chan error) {
+	done = make(chan error)
+	go func() {
+		for rs := range stateChan {
+			if rs == nil {
+				continue
+			}
 
-	if len(diffResult) > 0 {
-		for i := range diffResult {
-			d := diffResult[i]
-			PrintDiff("role", d.SourceResource, d.TargetResource, d.Name)
+			if rsMap, isMap := rs.(map[string]any); isMap {
+				item, input := rsMap["item"], rsMap["input"]
+				if item == nil || input == nil {
+					continue
+				}
+
+				genInput, isGenInput := input.(generator.GenerateInput)
+				if !isGenInput {
+					continue
+				}
+
+				switch parseItem := item.(type) {
+				case *generator.GenerateModelInput:
+					tableState := state.TableState{
+						Table:       parseItem.Table,
+						ModelPath:   genInput.OutputPath,
+						ModelStruct: utils.SnakeCaseToPascalCase(parseItem.Table.Name),
+						LastUpdate:  time.Now(),
+						Relation:    parseItem.Relations,
+						Policies:    parseItem.Policies,
+					}
+					localState.AddTable(tableState)
+				case objects.Role:
+					roleState := state.RoleState{
+						Role:       parseItem,
+						RolePath:   genInput.OutputPath,
+						RoleStruct: utils.SnakeCaseToPascalCase(parseItem.Name),
+						IsNative:   false,
+						LastUpdate: time.Now(),
+					}
+					localState.AddRole(roleState)
+				case objects.Function:
+					rpcState := state.RpcState{
+						Function:   parseItem,
+						RpcPath:    genInput.OutputPath,
+						RpcStruct:  utils.SnakeCaseToPascalCase(parseItem.Name),
+						LastUpdate: time.Now(),
+					}
+					localState.AddRpc(rpcState)
+				case objects.Bucket:
+					storageState := state.StorageState{
+						Bucket:     parseItem,
+						LastUpdate: time.Now(),
+					}
+					localState.AddStorage(storageState)
+				}
+			}
 		}
-		return errors.New("import roles is canceled, you have conflict role. please fix it first")
-	}
-
-	return nil
+		done <- localState.Persist()
+	}()
+	return done
 }
 
-func runImportCompareRpcFunctions(supabaseFn []objects.Function, appFn []objects.Function) error {
-	diffResult, err := CompareRpcFunctions(supabaseFn, appFn)
-	if err != nil {
-		return err
-	}
-
-	if len(diffResult) > 0 {
-		for i := range diffResult {
-			d := diffResult[i]
-			PrintDiff("rpc function", d.SourceResource, d.TargetResource, d.Name)
-		}
-		return errors.New("import rpc function is canceled, you have conflict rpc function. please fix it first")
-	}
-
-	return nil
+// ----- Print import report -----
+type ImportReport struct {
+	Table   int
+	Role    int
+	Rpc     int
+	Storage int
 }
 
-func runImportCompareStorage(supabaseStorage []objects.Bucket, appStorages []objects.Bucket) error {
-	diffResult, err := CompareStorage(supabaseStorage, appStorages)
-	if err != nil {
-		return err
-	}
-
-	if len(diffResult) > 0 {
-		for i := range diffResult {
-			d := diffResult[i]
-			PrintDiff("storage ", d.SourceResource, d.TargetResource, d.Name)
+func PrintImportReport(report ImportReport, dryRun bool) {
+	var message string
+	if !dryRun {
+		message = "import process is complete, your code is up to date"
+		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
+			message = "import process is complete, adding several new resources to the codebase"
+			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
+			return
 		}
-		return errors.New("import storage is canceled, you have conflict rpc function. please fix it first")
+		ImportLogger.Info(message)
+	} else {
+		message = "finish running import in dry run mode, your code is up to date"
+		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
+			message = "finish running import in dry run mode and add several resource"
+			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
+			return
+		}
+		ImportLogger.Info(message)
 	}
-
-	return nil
 }

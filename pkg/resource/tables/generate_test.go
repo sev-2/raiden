@@ -1,9 +1,10 @@
-package resource
+package tables_test
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/sev-2/raiden/pkg/resource/tables"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +16,7 @@ func TestBuildGenerateModelInputs(t *testing.T) {
 	err := json.Unmarshal([]byte(jsonStrData), &sourceTables)
 	assert.NoError(t, err)
 
-	rs := buildGenerateModelInputs(sourceTables, nil)
+	rs := tables.BuildGenerateModelInputs(sourceTables, nil)
 
 	for _, r := range rs {
 		assert.Equal(t, 2, len(r.Relations))

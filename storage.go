@@ -20,8 +20,8 @@ func (b *BucketBase) AllowedMimeTypes() []string {
 	return nil
 }
 
-func (b *BucketBase) FileSizeLimit() *int {
-	return nil
+func (b *BucketBase) FileSizeLimit() int {
+	return 0
 }
 
 func (b *BucketBase) AvifAutoDetection() bool {

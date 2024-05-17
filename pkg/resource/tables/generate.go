@@ -1,118 +1,33 @@
-package resource
+package tables
 
 import (
-	"sync"
+	"fmt"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-// The `generateResource` function generates various resources such as table, roles, policy and etc
-// also generate framework resource like controller, route, main function and etc
-func generateResource(config *raiden.Config, importState *ResourceState, projectPath string, resource *Resource) error {
-	if err := generator.CreateInternalFolder(projectPath); err != nil {
-		return err
+// ----- Convert array of table to map table -----
+type MapTable map[string]*objects.Table
+
+func tableToMap(tables []objects.Table) MapTable {
+	mapTable := make(MapTable)
+	for i := range tables {
+		t := tables[i]
+		key := getMapTableKey(t.Schema, t.Name)
+		mapTable[key] = &t
 	}
-
-	wg, errChan, stateChan := sync.WaitGroup{}, make(chan error), make(chan any)
-	doneListen := ListenImportResource(importState, stateChan)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if len(resource.Tables) > 0 {
-			tableInputs := buildGenerateModelInputs(resource.Tables, resource.Policies)
-			logger.Info("import : generate models")
-
-			captureFunc := ImportDecorateFunc(tableInputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
-				if i, ok := input.BindData.(generator.GenerateModelData); ok {
-					if i.StructName == utils.SnakeCaseToPascalCase(item.Table.Name) {
-						return true
-					}
-				}
-				return false
-			}, stateChan)
-
-			if err := generator.GenerateModels(projectPath, tableInputs, captureFunc); err != nil {
-				errChan <- err
-			}
-		}
-
-		// generate all roles from cloud / pg-meta
-		if len(resource.Roles) > 0 {
-
-			logger.Info("import : generate roles")
-
-			captureFunc := ImportDecorateFunc(resource.Roles, func(item objects.Role, input generator.GenerateInput) bool {
-				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
-					if i.Name == item.Name {
-						return true
-					}
-				}
-				return false
-			}, stateChan)
-
-			if err := generator.GenerateRoles(projectPath, resource.Roles, captureFunc); err != nil {
-				errChan <- err
-			}
-		}
-
-		if len(resource.Functions) > 0 {
-			logger.Info("import : generate functions")
-			captureFunc := ImportDecorateFunc(resource.Functions, func(item objects.Function, input generator.GenerateInput) bool {
-				if i, ok := input.BindData.(generator.GenerateRpcData); ok {
-					if i.Name == utils.SnakeCaseToPascalCase(item.Name) {
-						return true
-					}
-				}
-				return false
-			}, stateChan)
-			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, captureFunc); errGenRpc != nil {
-				logger.Error(errGenRpc)
-				errChan <- errGenRpc
-			}
-		}
-
-		if len(resource.Storages) > 0 {
-			logger.Info("import : generate storage")
-			captureFunc := ImportDecorateFunc(resource.Storages, func(item objects.Bucket, input generator.GenerateInput) bool {
-				if i, ok := input.BindData.(generator.GenerateStoragesData); ok {
-					if utils.ToSnakeCase(i.Name) == utils.ToSnakeCase(item.Name) {
-						return true
-					}
-				}
-				return false
-			}, stateChan)
-			if errGenStorage := generator.GenerateStorages(projectPath, resource.Storages, captureFunc); errGenStorage != nil {
-				logger.Error(errGenStorage)
-				errChan <- errGenStorage
-			}
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(stateChan)
-		close(errChan)
-	}()
-
-	for {
-		select {
-		case rsErr := <-errChan:
-			if rsErr != nil {
-				return rsErr
-			}
-		case saveErr := <-doneListen:
-			return saveErr
-		}
-	}
+	return mapTable
 }
 
-func buildGenerateModelInputs(tables []objects.Table, policies objects.Policies) []*generator.GenerateModelInput {
+func getMapTableKey(schema, name string) string {
+	return fmt.Sprintf("%s.%s", schema, name)
+}
+
+func BuildGenerateModelInputs(tables []objects.Table, policies objects.Policies) []*generator.GenerateModelInput {
 	mapTable := tableToMap(tables)
 	mapRelations := buildGenerateMapRelations(mapTable)
 	return buildGenerateModelInput(mapTable, mapRelations, policies)

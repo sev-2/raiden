@@ -7,12 +7,15 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var RpcLogger hclog.Logger = logger.HcLog().Named("generator.rpc")
 
 // ----- Define type, variable and constant -----
 type (
@@ -141,7 +144,7 @@ func (r *{{ .Name }}) GetRawDefinition() string {
 
 func GenerateRpc(basePath string, projectName string, functions []objects.Function, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, RpcDir)
-	logger.Debugf("GenerateRpc - create %s folder if not exist", folderPath)
+	RpcLogger.Trace("create rpc folder if not exist", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
 		if err := utils.CreateFolder(folderPath); err != nil {
 			return err
@@ -233,7 +236,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 		OutputPath:   filePath,
 	}
 
-	logger.Debugf("GenerateRpc - generate rpc to %s", generateInput.OutputPath)
+	RpcLogger.Debug("generate rpc", "path", generateInput.OutputPath)
 	return generateFn(generateInput, nil)
 }
 
@@ -317,7 +320,7 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 			// splitTextDefault[0] example : in_candidate_name character varying
 			typeParamStr := strings.TrimLeft(strings.TrimRight(splitTextDefault[0], " "), " ")
 
-			// example splitIat :  ["in_candidate_name", "character varying"]
+			// example splitIat result :  ["in_candidate_name", "character varying"]
 			splitIat := strings.SplitN(typeParamStr, " ", 2)
 			if len(splitIat) >= 2 {
 				// example : mapParam["in_candidate_name"] =  "character varying"

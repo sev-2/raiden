@@ -3,12 +3,12 @@ package admin
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/valyala/fasthttp"
 )
 
 func UpdateUser(cfg *raiden.Config, userId string, payload objects.User) (user objects.User, err error) {
@@ -20,10 +20,10 @@ func UpdateUser(cfg *raiden.Config, userId string, payload objects.User) (user o
 	basePublicUrl := strings.TrimRight(cfg.SupabasePublicUrl, "/")
 	url := fmt.Sprintf("%s/auth/v1/admin/users/%s", basePublicUrl, userId)
 
-	auth := func(req *fasthttp.Request) error {
+	auth := func(req *http.Request) error {
 		req.Header.Set("apikey", cfg.ServiceKey)
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.ServiceKey))
 		return nil
 	}
-	return client.Put[objects.User](url, body, client.DefaultTimeout, auth, nil)
+	return net.Put[objects.User](url, body, net.DefaultTimeout, auth, nil)
 }

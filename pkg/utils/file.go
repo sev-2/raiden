@@ -9,6 +9,8 @@ import (
 	"github.com/sev-2/raiden/pkg/logger"
 )
 
+var FileLogger = logger.HcLog().Named("raiden.utils.file")
+
 func CreateFile(fullPath string, deleteIfExist bool) (*os.File, error) {
 	// configure file name
 	folderPath := filepath.Dir(fullPath)
@@ -24,7 +26,7 @@ func CreateFile(fullPath string, deleteIfExist bool) (*os.File, error) {
 	if deleteIfExist && IsFileExists(file) {
 		err := os.Remove(file)
 		if err != nil {
-			logger.Debugf("error delete file : %s", file)
+			FileLogger.Error("delete file", "file", file)
 		}
 	}
 

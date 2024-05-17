@@ -6,13 +6,12 @@ import (
 	"github.com/sev-2/raiden/pkg/cli/build"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/cli/generate"
-	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
 type BuildFlags struct {
-	cli.Flags
+	cli.LogFlags
 	Build    build.Flags
 	Generate generate.Flags
 }
@@ -24,7 +23,7 @@ func BuildCommand() *cobra.Command {
 		Use:    "build",
 		Short:  "Build app binary",
 		Long:   "Build app binary base on configuration",
-		PreRun: PreRun(&f.Flags, build.PreRun),
+		PreRun: PreRun(&f.LogFlags, build.PreRun),
 		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
@@ -32,28 +31,29 @@ func BuildCommand() *cobra.Command {
 			// - get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()
 			if errCurDir != nil {
-				logger.Error(errCurDir)
+				build.BuildLogger.Error(errCurDir.Error())
 				return
 			}
 
 			// - load config
+			build.BuildLogger.Info("Load configuration")
 			configFilePath := configure.GetConfigFilePath(currentDir)
-			logger.Debug("Load configuration from : ", configFilePath)
+			build.BuildLogger.Debug("config file information", "path", configFilePath)
 			config, err := raiden.LoadConfig(&configFilePath)
 			if err != nil {
-				logger.Error(err)
+				build.BuildLogger.Error(err.Error())
 				return
 			}
 
 			// 1. generate
 			if err := generate.Run(&f.Generate, config, currentDir, false); err != nil {
-				logger.Error(err)
+				build.BuildLogger.Error(err.Error())
 				return
 			}
 
 			// 2. build app
 			if err := build.Run(&f.Build, config, currentDir); err != nil {
-				logger.Error(err)
+				build.BuildLogger.Error(err.Error())
 			}
 		},
 	}

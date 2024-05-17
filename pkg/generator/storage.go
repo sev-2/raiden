@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var StorageLogger hclog.Logger = logger.HcLog().Named("generator.storage")
 
 type GenerateStoragesData struct {
 	Imports           []string
@@ -25,46 +28,45 @@ type GenerateStoragesData struct {
 const (
 	StorageDir      = "internal/storages"
 	StorageTemplate = `package {{ .Package }}
-	{{- if gt (len .Imports) 0 }}
-	
-	import (
-	{{- range .Imports}}
-		{{.}}
-	{{- end}}
-	)
-	{{- end }}
-	
-	type {{ .StructName | ToGoIdentifier }} struct {
-		raiden.BucketBase
-	}
-	
-	func (r *{{ .StructName | ToGoIdentifier }}) Name() string {
-		return "{{ .Name }}"
-	}
+{{- if gt (len .Imports) 0 }}
 
-	{{- if .Public }}
-	func (r *{{ .StructName | ToGoIdentifier }}) Public() bool {
-		return {{ .Public }}
-	}
-	{{- end }}
-	{{- if ne .FileSizeLimit 0}}
-	
-	func (r *{{ .StructName | ToGoIdentifier }}) FileSizeLimit() int {
-		return {{ .FileSizeLimit }} // bytes
-	}
-	{{- end }}
-	{{- if ne .AllowedMimeTypes "" }}
+import (
+{{- range .Imports}}
+	{{.}}
+{{- end}}
+)
+{{- end }}
 
-	func (r *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
-		return {{ .AllowedMimeTypes }}
-	}
-	{{- end }}
-	`
+type {{ .StructName | ToGoIdentifier }} struct {
+	raiden.BucketBase
+}
+
+func (r *{{ .StructName | ToGoIdentifier }}) Name() string {
+	return "{{ .Name }}"
+}
+
+{{- if .Public }}
+func (r *{{ .StructName | ToGoIdentifier }}) Public() bool {
+	return {{ .Public }}
+}
+{{- end }}
+{{- if ne .FileSizeLimit 0}}
+
+func (r *{{ .StructName | ToGoIdentifier }}) FileSizeLimit() int {
+	return {{ .FileSizeLimit }} // bytes
+}
+{{- end }}
+{{- if ne .AllowedMimeTypes "" }}
+func (r *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
+	return {{ .AllowedMimeTypes }}
+}
+{{- end }}
+`
 )
 
 func GenerateStorages(basePath string, storages []objects.Bucket, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, StorageDir)
-	logger.Debugf("GenerateStorages - create %s folder if not exist", folderPath)
+	StorageLogger.Trace("create storages folder", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
 		if err := utils.CreateFolder(folderPath); err != nil {
 			return err
@@ -101,7 +103,7 @@ func GenerateStorage(folderPath string, storage objects.Bucket, generateFn Gener
 
 	var allowedMimeTypes = ""
 	if storage.AllowedMimeTypes != nil && len(storage.AllowedMimeTypes) > 0 {
-		allowedMimeTypes = generateArrayDeclaration(reflect.ValueOf(storage.AllowedMimeTypes), false)
+		allowedMimeTypes = GenerateArrayDeclaration(reflect.ValueOf(storage.AllowedMimeTypes), false)
 	}
 
 	structName := utils.ToSnakeCase(storage.Name)
@@ -126,6 +128,6 @@ func GenerateStorage(folderPath string, storage objects.Bucket, generateFn Gener
 		FuncMap:      funcMaps,
 	}
 
-	logger.Debugf("GenerateStorages - generate storages to %s", input.OutputPath)
+	StorageLogger.Debug("generate storages", "path", input.OutputPath)
 	return generateFn(input, nil)
 }

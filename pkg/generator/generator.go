@@ -12,9 +12,12 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+var GeneratorLogger hclog.Logger = logger.HcLog().Named("generator")
 
 // ----- Define type, variable and constant -----
 type GenerateInput struct {
@@ -63,7 +66,7 @@ func Generate(input GenerateInput, writer io.Writer) error {
 
 func CreateInternalFolder(basePath string) (err error) {
 	internalFolderPath := filepath.Join(basePath, "internal")
-	logger.Debugf("CreateInternalFolder - create `%s` folder if not exist", internalFolderPath)
+	GeneratorLogger.Trace("create internal folder if not exist", "path", internalFolderPath)
 	if exist := utils.IsFolderExists(internalFolderPath); !exist {
 		if err := utils.CreateFolder(internalFolderPath); err != nil {
 			return err
@@ -72,7 +75,7 @@ func CreateInternalFolder(basePath string) (err error) {
 	return nil
 }
 
-func generateArrayDeclaration(value reflect.Value, withoutQuote bool) string {
+func GenerateArrayDeclaration(value reflect.Value, withoutQuote bool) string {
 	var arrayValues []string
 	for i := 0; i < value.Len(); i++ {
 		if withoutQuote {
