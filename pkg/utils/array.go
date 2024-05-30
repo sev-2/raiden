@@ -1,6 +1,6 @@
 package utils
 
-// Function to remove multiple elements by indices
+// Function to remove multiple elements by multiple index
 func RemoveByIndex[T any](source []T, index []int) []T {
 	var tmpArr []T
 
