@@ -144,7 +144,15 @@ func Import(flags *Flags, config *raiden.Config) error {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare storage")
 		}
-		if err := storages.Compare(spResource.Storages, appStorage.Existing); err != nil {
+
+		// compare table
+		var compareStorages []objects.Bucket
+		for i := range appStorage.Existing {
+			es := appStorage.Existing[i]
+			compareStorages = append(compareStorages, es.Storage)
+		}
+
+		if err := storages.Compare(spResource.Storages, compareStorages); err != nil {
 			if flags.DryRun {
 				dryRunError = append(dryRunError, err.Error())
 			} else {
@@ -247,15 +255,17 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 
 		if len(resource.Storages) > 0 {
 			ImportLogger.Info("start generate storages")
-			captureFunc := ImportDecorateFunc(resource.Storages, func(item objects.Bucket, input generator.GenerateInput) bool {
+			storageInput := storages.BuildGenerateStorageInput(resource.Storages, resource.Policies)
+
+			captureFunc := ImportDecorateFunc(storageInput, func(item *generator.GenerateStorageInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateStoragesData); ok {
-					if utils.ToSnakeCase(i.Name) == utils.ToSnakeCase(item.Name) {
+					if utils.ToSnakeCase(i.Name) == utils.ToSnakeCase(item.Bucket.Name) {
 						return true
 					}
 				}
 				return false
 			}, stateChan)
-			if errGenStorage := generator.GenerateStorages(projectPath, resource.Storages, captureFunc); errGenStorage != nil {
+			if errGenStorage := generator.GenerateStorages(projectPath, storageInput, captureFunc); errGenStorage != nil {
 				errChan <- errGenStorage
 			}
 			ImportLogger.Info("finish generate storages")
@@ -353,10 +363,13 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 						LastUpdate: time.Now(),
 					}
 					localState.AddRpc(rpcState)
-				case objects.Bucket:
+				case *generator.GenerateStorageInput:
 					storageState := state.StorageState{
-						Bucket:     parseItem,
-						LastUpdate: time.Now(),
+						Storage:       parseItem.Bucket,
+						StoragePath:   genInput.OutputPath,
+						StorageStruct: utils.SnakeCaseToPascalCase(parseItem.Bucket.Name),
+						Policies:      parseItem.Policies,
+						LastUpdate:    time.Now(),
 					}
 					localState.AddStorage(storageState)
 				}

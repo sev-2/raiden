@@ -1,5 +1,7 @@
 package objects
 
+import "strings"
+
 type PolicyCommand string
 
 type Policy struct {
@@ -36,6 +38,24 @@ func (p *Policies) FilterByTable(table string) Policies {
 		}
 	}
 
+	return filteredData
+}
+
+func (p *Policies) FilterByBucket(bucket Bucket) Policies {
+	var filteredData Policies
+	if p == nil {
+		return filteredData
+	}
+
+	for _, v := range *p {
+		if v.Schema != "storage" {
+			continue
+		}
+
+		if strings.Contains(v.Definition, bucket.Name) || (v.Check != nil && strings.Contains(*v.Check, bucket.Name)) {
+			filteredData = append(filteredData, v)
+		}
+	}
 	return filteredData
 }
 

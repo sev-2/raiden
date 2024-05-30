@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
@@ -20,6 +21,17 @@ var (
 	DefaultApiUrl         = "https://api.supabase.com"
 	DefaultIncludedSchema = []string{"public", "auth"}
 )
+
+type RlsType string
+
+const (
+	RlsTypeModel   = "table"
+	RlsTypeStorage = "storage"
+)
+
+func GetPolicyName(command objects.PolicyCommand, resource string, name string) string {
+	return strings.ToLower(fmt.Sprintf("enable %s access for %s %s", command, resource, name))
+}
 
 func FindProject(cfg *raiden.Config) (objects.Project, error) {
 	return cloud.FindProject(cfg)

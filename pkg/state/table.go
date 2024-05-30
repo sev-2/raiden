@@ -8,23 +8,17 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/postgres"
+	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type ExtractTableItem struct {
 	Table             objects.Table
-	Policies          objects.Policies
 	ExtractedPolicies ExtractedPolicies
 }
 
 type ExtractTableItems []ExtractTableItem
-
-type ExtractedPolicies struct {
-	Existing []objects.Policy
-	New      []objects.Policy
-	Delete   []objects.Policy
-}
 
 type ExtractTableResult struct {
 	Existing ExtractTableItems
@@ -37,7 +31,6 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 
 	for i := range tableStates {
 		t := tableStates[i]
-
 		mapTableState[t.Table.Name] = t
 	}
 
@@ -55,11 +48,7 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 			continue
 		}
 
-		tb, e := buildTableFromState(t, ts)
-		if e != nil {
-			err = e
-			return
-		}
+		tb := buildTableFromState(t, ts)
 		result.Existing = append(result.Existing, tb)
 
 		delete(mapTableState, tableName)
@@ -158,7 +147,7 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 	return
 }
 
-func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err error) {
+func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 	modelType := reflect.TypeOf(model)
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
@@ -292,7 +281,7 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem, err 
 	ei.Table.Relationships = relations
 	ei.Table.PrimaryKeys = primaryKeys
 
-	return ei, nil
+	return ei
 }
 
 func bindColumn(field *reflect.StructField, ct *raiden.ColumnTag, c *objects.Column) {
@@ -353,9 +342,11 @@ func bindTableMetadata(field *reflect.StructField, table *objects.Table) {
 
 func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []objects.Policy) {
 	acl := raiden.UnmarshalAclTag(string(field.Tag))
+	tableType := strings.ToLower(string(supabase.RlsTypeModel))
+
 	defaultCheck, defaultDefinition := "true", "true"
 	if len(acl.Read.Roles) > 0 {
-		readPolicyName := getPolicyName(objects.PolicyCommandSelect, ei.Table.Name)
+		readPolicyName := supabase.GetPolicyName(objects.PolicyCommandSelect, tableType, ei.Table.Name)
 		policy := objects.Policy{
 			Name:       readPolicyName,
 			Schema:     ei.Table.Schema,
@@ -367,13 +358,16 @@ func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []o
 		}
 		if policy.Definition == "" {
 			policy.Definition = defaultDefinition
+		} else if policy.Definition != defaultDefinition {
+			policy.Definition = fmt.Sprintf("(%s)", policy.Definition)
 		}
+
 		policies = append(policies, policy)
 	}
 
 	if len(acl.Write.Roles) > 0 {
 		createPolicy := objects.Policy{
-			Name:    getPolicyName(objects.PolicyCommandInsert, ei.Table.Name),
+			Name:    supabase.GetPolicyName(objects.PolicyCommandInsert, tableType, ei.Table.Name),
 			Schema:  ei.Table.Schema,
 			Table:   ei.Table.Name,
 			Action:  "PERMISSIVE",
@@ -383,10 +377,13 @@ func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []o
 		}
 		if createPolicy.Check == nil || (createPolicy.Check != nil && *createPolicy.Check == "") {
 			createPolicy.Check = &defaultCheck
+		} else if createPolicy.Check != nil && *createPolicy.Check != "" && *createPolicy.Check != defaultCheck {
+			check := fmt.Sprintf("(%s)", *createPolicy.Check)
+			createPolicy.Check = &check
 		}
 
 		updatePolicy := objects.Policy{
-			Name:       getPolicyName(objects.PolicyCommandUpdate, ei.Table.Name),
+			Name:       supabase.GetPolicyName(objects.PolicyCommandUpdate, tableType, ei.Table.Name),
 			Schema:     ei.Table.Schema,
 			Table:      ei.Table.Name,
 			Action:     "PERMISSIVE",
@@ -397,10 +394,19 @@ func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []o
 		}
 		if updatePolicy.Check == nil || (updatePolicy.Check != nil && *updatePolicy.Check == "") {
 			updatePolicy.Check = &defaultCheck
+		} else if updatePolicy.Check != nil && *updatePolicy.Check != "" && *updatePolicy.Check != defaultCheck {
+			check := fmt.Sprintf("(%s)", *updatePolicy.Check)
+			updatePolicy.Check = &check
+		}
+
+		if updatePolicy.Definition == "" {
+			updatePolicy.Definition = "true"
+		} else if updatePolicy.Definition != defaultDefinition {
+			updatePolicy.Definition = fmt.Sprintf("(%s)", updatePolicy.Definition)
 		}
 
 		deletePolicy := objects.Policy{
-			Name:       getPolicyName(objects.PolicyCommandDelete, ei.Table.Name),
+			Name:       supabase.GetPolicyName(objects.PolicyCommandDelete, tableType, ei.Table.Name),
 			Schema:     ei.Table.Schema,
 			Table:      ei.Table.Name,
 			Action:     "PERMISSIVE",
@@ -410,6 +416,8 @@ func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []o
 		}
 		if deletePolicy.Definition == "" {
 			deletePolicy.Definition = "true"
+		} else if deletePolicy.Definition != defaultDefinition {
+			deletePolicy.Definition = fmt.Sprintf("(%s)", deletePolicy.Definition)
 		}
 		policies = append(policies, createPolicy, updatePolicy, deletePolicy)
 	}
@@ -470,10 +478,6 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 // get relation table name, base on struct type that defined in relation field
 func getRelationConstrainName(schema, table, foreignKey string) string {
 	return fmt.Sprintf("%s_%s_%s_fkey", schema, table, foreignKey)
-}
-
-func getPolicyName(command objects.PolicyCommand, tableName string) string {
-	return strings.ToLower(fmt.Sprintf("enable %s access for table %s", command, tableName))
 }
 
 func (f ExtractTableItems) ToFlatTable() (tables []objects.Table) {

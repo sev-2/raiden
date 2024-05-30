@@ -191,3 +191,8 @@ func ConvertAllToString(value interface{}) string {
 	}
 	return "unknown type"
 }
+
+func CleanDoubleColonPattern(input string) string {
+	re := regexp.MustCompile(`::\w+`)
+	return re.ReplaceAllString(input, "")
+}
