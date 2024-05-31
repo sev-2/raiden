@@ -6,6 +6,7 @@ import (
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type MigrateItem = migrator.MigrateItem[objects.Policy, objects.UpdatePolicyParam]
@@ -27,14 +28,32 @@ func BuildMigrateData(extractedLocalData state.ExtractedPolicies, supabaseData [
 	}
 
 	Logger.Debug("filter extracted data for update new local policy data")
+	var removeExistingIndex []int
 	var comparePolicies []objects.Policy
 	for i := range extractedLocalData.Existing {
 		p := extractedLocalData.Existing[i]
 		if _, isExist := mapSpPolicies[p.Name]; isExist {
 			comparePolicies = append(comparePolicies, p)
 		} else {
+			removeExistingIndex = append(removeExistingIndex, i)
 			extractedLocalData.New = append(extractedLocalData.New, p)
 		}
+	}
+	if len(removeExistingIndex) > 0 {
+		extractedLocalData.Existing = utils.RemoveByIndex(extractedLocalData.Existing, removeExistingIndex)
+	}
+
+	var removeNewIndex []int
+	for i := range extractedLocalData.New {
+		p := extractedLocalData.New[i]
+		if _, isExist := mapSpPolicies[p.Name]; isExist {
+			comparePolicies = append(comparePolicies, p)
+			extractedLocalData.Existing = append(extractedLocalData.Existing, p)
+			removeNewIndex = append(removeNewIndex, i)
+		}
+	}
+	if len(removeNewIndex) > 0 {
+		extractedLocalData.New = utils.RemoveByIndex(extractedLocalData.New, removeNewIndex)
 	}
 
 	if rs, err := BuildMigrateItem(supabaseData, comparePolicies); err != nil {

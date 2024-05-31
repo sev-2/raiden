@@ -3,7 +3,7 @@ package policies
 import (
 	"bytes"
 	"fmt"
-	"html/template"
+	"text/template"
 
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -102,7 +102,6 @@ const DiffChangeUpdateTemplate = `  - Update Policy {{ .Name }}
 
 func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, error) {
 	diffItems := item.MigrationItems
-
 	var changeMsgArr []string
 	for i := range diffItems.ChangeItems {
 		c := diffItems.ChangeItems[i]
@@ -110,9 +109,37 @@ func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, err
 		case objects.UpdatePolicyName:
 			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "name", item.OldData.Name, item.NewData.Name))
 		case objects.UpdatePolicyDefinition:
-			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "definition", item.OldData.Definition, item.NewData.Definition))
+			oldDef := utils.ConvertAllToString(item.OldData.Definition)
+			if len(oldDef) == 0 {
+				oldDef = "unset"
+			}
+
+			newDef := utils.ConvertAllToString(item.NewData.Definition)
+			if len(newDef) == 0 {
+				newDef = "unset"
+			}
+
+			if oldDef == newDef {
+				continue
+			}
+
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "definition", oldDef, newDef))
 		case objects.UpdatePolicyCheck:
-			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "check", utils.ConvertAllToString(item.OldData.Check), utils.ConvertAllToString(item.NewData.Check)))
+			oldCheck := utils.ConvertAllToString(item.OldData.Check)
+			if len(oldCheck) == 0 {
+				oldCheck = "unset"
+			}
+
+			newCheck := utils.ConvertAllToString(item.NewData.Check)
+			if len(newCheck) == 0 {
+				newCheck = "unset"
+			}
+
+			if oldCheck == newCheck {
+				continue
+			}
+
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "check", oldCheck, newCheck))
 		case objects.UpdatePolicyRoles:
 
 		}

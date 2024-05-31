@@ -8,12 +8,17 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
 var StorageLogger hclog.Logger = logger.HcLog().Named("generator.storage")
 
+type GenerateStorageInput struct {
+	Bucket   objects.Bucket
+	Policies objects.Policies
+}
 type GenerateStoragesData struct {
 	Imports           []string
 	Package           string
@@ -23,6 +28,7 @@ type GenerateStoragesData struct {
 	FileSizeLimit     int
 	AvifAutoDetection bool
 	AllowedMimeTypes  string
+	ObjectAcl         string
 }
 
 const (
@@ -39,6 +45,9 @@ import (
 
 type {{ .StructName | ToGoIdentifier }} struct {
 	raiden.BucketBase
+
+	// Access control
+	Acl string ` + "`json:\"-\" {{ .ObjectAcl }}`" + `
 }
 
 func (r *{{ .StructName | ToGoIdentifier }}) Name() string {
@@ -64,7 +73,7 @@ func (r *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
 `
 )
 
-func GenerateStorages(basePath string, storages []objects.Bucket, generateFn GenerateFn) (err error) {
+func GenerateStorages(basePath string, storages []*GenerateStorageInput, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, StorageDir)
 	StorageLogger.Trace("create storages folder", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -82,41 +91,52 @@ func GenerateStorages(basePath string, storages []objects.Bucket, generateFn Gen
 	return nil
 }
 
-func GenerateStorage(folderPath string, storage objects.Bucket, generateFn GenerateFn) error {
+func GenerateStorage(folderPath string, storage *GenerateStorageInput, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
 	}
 
 	// define file path
-	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(storage.Name), "go"))
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(storage.Bucket.Name), "go"))
 
 	// set imports path
 	var imports []string
 	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
 	imports = append(imports, raidenPath)
 
+	// build rls tag
+	var objectPolicies objects.Policies
+	for i := range storage.Policies {
+		p := storage.Policies[i]
+		if p.Table == "objects" {
+			objectPolicies = append(objectPolicies, p)
+		}
+	}
+	objectRlsTag := BuildRlsTag(objectPolicies, storage.Bucket.Name, supabase.RlsTypeStorage)
+
 	var fileSizeLimit = 0
-	if storage.FileSizeLimit != nil {
-		fileSizeLimit = *storage.FileSizeLimit
+	if storage.Bucket.FileSizeLimit != nil {
+		fileSizeLimit = *storage.Bucket.FileSizeLimit
 	}
 
 	var allowedMimeTypes = ""
-	if storage.AllowedMimeTypes != nil && len(storage.AllowedMimeTypes) > 0 {
-		allowedMimeTypes = GenerateArrayDeclaration(reflect.ValueOf(storage.AllowedMimeTypes), false)
+	if storage.Bucket.AllowedMimeTypes != nil && len(storage.Bucket.AllowedMimeTypes) > 0 {
+		allowedMimeTypes = GenerateArrayDeclaration(reflect.ValueOf(storage.Bucket.AllowedMimeTypes), false)
 	}
 
-	structName := utils.ToSnakeCase(storage.Name)
+	structName := utils.ToSnakeCase(storage.Bucket.Name)
 
 	// execute the template and write to the file
 	data := GenerateStoragesData{
 		Package:          "storages",
 		Imports:          imports,
-		Name:             storage.Name,
+		Name:             storage.Bucket.Name,
 		StructName:       structName,
-		Public:           storage.Public,
+		Public:           storage.Bucket.Public,
 		FileSizeLimit:    fileSizeLimit,
 		AllowedMimeTypes: allowedMimeTypes,
+		ObjectAcl:        objectRlsTag,
 	}
 
 	// set input
