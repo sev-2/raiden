@@ -60,7 +60,7 @@ func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateF
 	filePath := filepath.Join(configPath, fmt.Sprintf("%s.%s", ConfigFile, "yaml"))
 
 	if config.ServerHost == "" {
-		config.ServerHost = "127.0.01"
+		config.ServerHost = "127.0.0.1"
 	}
 
 	if config.ServerPort == "" {

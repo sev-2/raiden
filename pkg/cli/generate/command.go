@@ -111,12 +111,12 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			GenerateLogger.Debug("start generate routes")
 			if initialize {
 				// generate example controller
-				GenerateLogger.Info("start generate hello word controller")
-				if err := generator.GenerateHelloWordController(projectPath, generator.Generate); err != nil {
+				GenerateLogger.Info("start generate hello world controller")
+				if err := generator.GenerateHelloWorldController(projectPath, generator.Generate); err != nil {
 					errChan <- err
 					return
 				}
-				GenerateLogger.Info("finish generate hello word controller")
+				GenerateLogger.Info("finish generate hello world controller")
 			}
 
 			// generate route base on controllers
