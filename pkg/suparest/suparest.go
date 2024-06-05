@@ -1,6 +1,7 @@
 package suparest
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -78,6 +79,29 @@ func (q Query) Get() ([]byte, error) {
 	body := resp.Body()
 
 	return body, nil
+}
+
+func (q Query) Single() ([]byte, error) {
+	result, err := q.Limit(1).Get()
+	if err != nil {
+		return nil, err
+	}
+
+	var object []any
+	err = json.Unmarshal(result, &object)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(object) > 0 {
+		result, err := json.Marshal(object[0])
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	return result, nil
 }
 
 func (q Query) GetUrl() string {
