@@ -393,6 +393,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 	var foundTable = &RpcScannedTable{}
 
 	for _, f := range dFields {
+		f = strings.TrimRight(f, ";")
 		k := strings.ToUpper(f)
 		switch lastField {
 		case postgres.From:

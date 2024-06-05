@@ -130,6 +130,21 @@ func TestExtractRpcTable(t *testing.T) {
 	assert.Equal(t, 1, len(scouter.Relation))
 }
 
+func TestExtractRpcSingleTable(t *testing.T) {
+	definition := `
+	begin
+	    return query select  * from todo;
+	end;`
+
+	_, mapTable, err := generator.ExtractRpcTable(definition)
+	assert.NoError(t, err)
+
+	table, isTableExist := mapTable["todo"]
+	assert.True(t, isTableExist)
+	assert.NotNil(t, table)
+	assert.Equal(t, "todo", table.Name)
+}
+
 func TestNormalizeTableAlias(t *testing.T) {
 	mapAlias := map[string]*generator.RpcScannedTable{
 		"submission": {
