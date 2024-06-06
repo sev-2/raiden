@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
@@ -53,4 +54,11 @@ func ExecuteQuery[T any](baseUrl, projectId, query string, reqInterceptor net.Re
 	}
 
 	return net.Post[T](url, pByte, net.DefaultTimeout, reqInterceptor, resInterceptor)
+}
+
+func cleanupQueryParam(q string) string {
+	cleanQuery := strings.ReplaceAll(q, "\n", " ")
+	cleanQuery = strings.ReplaceAll(cleanQuery, "\t", " ")
+	cleanQuery = strings.ReplaceAll(cleanQuery, "  ", "")
+	return cleanQuery
 }

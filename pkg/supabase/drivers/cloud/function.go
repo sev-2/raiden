@@ -48,6 +48,8 @@ func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, 
 		return objects.Function{}, nil
 	}
 
+	sql = cleanupQueryParam(sql)
+
 	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return objects.Function{}, fmt.Errorf("create new function %s error : %s", fn.Name, err)
@@ -78,6 +80,7 @@ func UpdateFunction(cfg *raiden.Config, fn objects.Function) error {
 	if err != nil {
 		return err
 	}
+	updateSql = cleanupQueryParam(updateSql)
 	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, updateSql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("update function %s error : %s", fn.Name, err)

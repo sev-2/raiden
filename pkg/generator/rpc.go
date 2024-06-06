@@ -258,10 +258,7 @@ func ExtractRpcFunction(fn *objects.Function) (result ExtractRpcDataResult, err 
 
 	// normalize aliases
 	if e := RpcNormalizeTableAliases(mapScannedTable); e != nil {
-		if e != nil {
-			err = e
-			return
-		}
+		err = e
 		return
 	}
 
@@ -349,13 +346,19 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 	}
 
 	// loop for create rpc param and add to params variable
+	paramsUsePrefix := []string{}
+	paramsInCount := 0
 	for i := range fn.Args {
 		fa := fn.Args[i]
 		if fa.Mode != "in" {
 			continue
 		}
 
-		usePrefix = strings.HasPrefix(fa.Name, raiden.DefaultRpcParamPrefix)
+		paramsInCount++
+		if strings.HasPrefix(strings.ToLower(fa.Name), raiden.DefaultRpcParamPrefix) {
+			paramsUsePrefix = append(paramsUsePrefix, fa.Name)
+		}
+
 		fieldName := strings.ReplaceAll(fa.Name, raiden.DefaultRpcParamPrefix, "")
 		p := raiden.RpcParam{
 			Name: fieldName,
@@ -379,6 +382,8 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 		params = append(params, p)
 	}
 
+	usePrefix = len(paramsUsePrefix) == paramsInCount
+
 	return
 }
 
@@ -395,6 +400,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 	for _, f := range dFields {
 		f = strings.TrimRight(f, ";")
 		k := strings.ToUpper(f)
+
 		switch lastField {
 		case postgres.From:
 			if postgres.IsReservedKeyword(k) {
@@ -421,9 +427,14 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				}
 				foundTable.Alias = f
 			}
-		case postgres.Join:
-			if f == postgres.On {
-				lastField = f
+		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right:
+			if k == postgres.Join {
+				lastField += " " + postgres.Join
+				continue
+			}
+		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin:
+			if k == postgres.On {
+				lastField = k
 				continue
 			}
 
@@ -531,12 +542,12 @@ func bindModelToDefinition(def string, mapTable map[string]*RpcScannedTable, par
 
 	for i := range params {
 		p := params[i]
-		key := p.Name
+		findKey, replaceKey := p.Name, p.Name
 		if useParamPrefix {
-			key += raiden.DefaultRpcParamPrefix + key
+			findKey = raiden.DefaultRpcParamPrefix + findKey
 		}
-		pattern := fmt.Sprintf(`\b%s\b`, regexp.QuoteMeta(key))
-		def = regexp.MustCompile(pattern).ReplaceAllString(def, ":"+key)
+		pattern := fmt.Sprintf(`\b%s\b`, regexp.QuoteMeta(findKey))
+		def = regexp.MustCompile(pattern).ReplaceAllString(def, ":"+replaceKey)
 	}
 	return def
 }
