@@ -82,8 +82,8 @@ func GenerateController(file string, data GenerateControllerData, generateFn Gen
 	return generateFn(input, nil)
 }
 
-// ----- Generate hello word -----
-func GenerateHelloWordController(basePath string, generateFn GenerateFn) (err error) {
+// ----- Generate hello world -----
+func GenerateHelloWorldController(basePath string, generateFn GenerateFn) (err error) {
 	controllerPath := filepath.Join(basePath, ControllerDir)
 	ControllerLogger.Trace("create controller folder if not exist", "path", controllerPath)
 	if exist := utils.IsFolderExists(controllerPath); !exist {
@@ -91,10 +91,10 @@ func GenerateHelloWordController(basePath string, generateFn GenerateFn) (err er
 			return err
 		}
 	}
-	return createHelloWordController(controllerPath, generateFn)
+	return createHelloWorldController(controllerPath, generateFn)
 }
 
-func createHelloWordController(controllerPath string, generateFn GenerateFn) error {
+func createHelloWorldController(controllerPath string, generateFn GenerateFn) error {
 	// set file path
 	filePath := filepath.Join(controllerPath, fmt.Sprintf("%s.go", "hello"))
 
@@ -114,7 +114,7 @@ func createHelloWordController(controllerPath string, generateFn GenerateFn) err
 	}
 
 	data := GenerateControllerData{
-		Name:           "HelloWord",
+		Name:           "HelloWorld",
 		Package:        "controllers",
 		HttpTag:        "`path:\"/hello/{name}\" type:\"custom\"`",
 		Imports:        imports,

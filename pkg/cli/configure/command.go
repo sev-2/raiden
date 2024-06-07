@@ -76,7 +76,7 @@ func SimpleConfigure() (*Config, error) {
 			BreakerEnable: true,
 			TraceEnable:   false,
 			Version:       "1.0.0",
-			ServerHost:    "127.0.01",
+			ServerHost:    "127.0.0.1",
 			ServerPort:    "8002",
 		},
 	}
