@@ -198,7 +198,6 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	ApplyLogger.Info("finish build migrate data")
-
 	if !flags.DryRun {
 		migrateErr := Migrate(config, &localState, flags.ProjectPath, &migrateData)
 		if len(migrateErr) > 0 {

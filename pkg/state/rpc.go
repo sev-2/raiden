@@ -1,6 +1,11 @@
 package state
 
 import (
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
@@ -55,6 +60,19 @@ func BindRpcFunction(rpc raiden.Rpc, fn *objects.Function) (err error) {
 	fn.Name = rpc.GetName()
 	fn.Schema = rpc.GetSchema()
 	fn.CompleteStatement = rpc.GetCompleteStmt()
+
+	// validate definition query
+	matches := regexp.MustCompile(`:\w+`).FindAllString(fn.CompleteStatement, -1)
+	if len(matches) > 0 {
+		var errMsg string
+		if len(matches) > 1 {
+			errMsg = fmt.Sprintf("rpc %q is invalid, There are %q keys that are not mapped with any parameters or models.", rpc.GetName(), strings.Join(matches, ","))
+		} else {
+			errMsg = fmt.Sprintf("rpc %q is invalid, There is %q key that is not mapped with any parameters or models.", rpc.GetName(), matches[0])
+		}
+		return errors.New(errMsg)
+	}
+
 	return
 }
 

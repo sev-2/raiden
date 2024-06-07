@@ -76,8 +76,7 @@ func TestExtractRpcData(t *testing.T) {
 		END;
 		$$ LANGUAGE plpgsql;
 		`,
-		ReturnType: "TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)",
-		// ReturnType:      "SETOF submission",
+		ReturnType:      "TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)",
 		Behavior:        "VOLATILE",
 		SecurityDefiner: false,
 	}
@@ -130,6 +129,21 @@ func TestExtractRpcTable(t *testing.T) {
 	assert.Equal(t, 1, len(scouter.Relation))
 }
 
+func TestExtractRpcSingleTable(t *testing.T) {
+	definition := `
+	begin
+	    return query select  * from todo;
+	end;`
+
+	_, mapTable, err := generator.ExtractRpcTable(definition)
+	assert.NoError(t, err)
+
+	table, isTableExist := mapTable["todo"]
+	assert.True(t, isTableExist)
+	assert.NotNil(t, table)
+	assert.Equal(t, "todo", table.Name)
+}
+
 func TestNormalizeTableAlias(t *testing.T) {
 	mapAlias := map[string]*generator.RpcScannedTable{
 		"submission": {
@@ -145,5 +159,93 @@ func TestNormalizeTableAlias(t *testing.T) {
 	err := generator.RpcNormalizeTableAliases(mapAlias)
 	assert.NoError(t, err)
 	assert.Equal(t, "sc", mapAlias["scouter"].Alias)
+}
 
+func TestExtractRpcWithPrefix(t *testing.T) {
+	fn := objects.Function{
+		Schema:   "public",
+		Name:     "get_submissions",
+		Language: "plpgsql",
+		Definition: `begin return query 
+		select s.id, s.created_at, sc.name as sc_name, c.name as c_name 
+		from submission s
+		inner join scouter sc on s.scouter_id = sc.scouter_id 
+		inner join candidate c on s.candidate_id = c.candidate_id 
+		where sc.name = in_scouter_name and c.name = in_candidate_name ; end;
+		`,
+		CompleteStatement: `
+		CREATE OR REPLACE FUNCTION public.get_submissions(in_scouter_name character varying, in_candidate_name character varying)\n 
+		RETURNS TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)\n 
+		LANGUAGE plpgsql\n
+		AS $function$ 
+			begin return query 
+				select s.id, s.created_at, sc.name as sc_name, c.name as c_name from submission s 
+				inner join scouter sc on s.scouter_id = sc.scouter_id 
+				inner join candidate c on s.candidate_id = c.candidate_id 
+				where sc.name = in_scouter_name and c.name = in_candidate_name ; end; 
+		$function$\n
+		`,
+		Args: []objects.FunctionArg{
+			{
+				Mode:       "in",
+				Name:       "in_scouter_name",
+				TypeId:     1043,
+				HasDefault: false,
+			},
+			{
+				Mode:       "in",
+				Name:       "in_candidate_name",
+				TypeId:     1043,
+				HasDefault: false,
+			},
+			{
+				Mode:       "table",
+				Name:       "id",
+				TypeId:     23,
+				HasDefault: false,
+			},
+			{
+				Mode:       "table",
+				Name:       "created_at",
+				TypeId:     23,
+				HasDefault: false,
+			},
+			{
+				Mode:       "table",
+				Name:       "sc_name",
+				TypeId:     23,
+				HasDefault: false,
+			},
+			{
+				Mode:       "table",
+				Name:       "c_name",
+				TypeId:     23,
+				HasDefault: false,
+			},
+		},
+		ArgumentTypes:          "in_scouter_name character varying, in_candidate_name character varying",
+		IdentityArgumentTypes:  "in_scouter_name character varying, in_candidate_name character varying",
+		ReturnTypeID:           2249,
+		ReturnType:             "TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)",
+		ReturnTypeRelationID:   0,
+		IsSetReturningFunction: true,
+		Behavior:               string(raiden.RpcBehaviorVolatile),
+		SecurityDefiner:        false,
+		ConfigParams:           nil,
+	}
+
+	result, err := generator.ExtractRpcFunction(&fn)
+	assert.NoError(t, err)
+
+	assert.Equal(t, fn.Name, result.Rpc.Name)
+	assert.Equal(t, raiden.DefaultRpcSchema, result.Rpc.Schema)
+	assert.Equal(t, raiden.RpcBehaviorVolatile, result.Rpc.Behavior)
+
+	assert.Equal(t, raiden.RpcSecurityTypeInvoker, result.Rpc.SecurityType)
+	assert.Equal(t, raiden.RpcReturnDataTypeTable, result.Rpc.ReturnType)
+	assert.Equal(t, fn.ReturnType, result.OriginalReturnType)
+	assert.Equal(t, 3, len(result.MapScannedTable))
+
+	expectedDefinition := "begin return query select s.id, s.created_at, sc.name as sc_name, c.name as c_name from :s s inner join :sc sc on s.scouter_id = sc.scouter_id inner join :c c on s.candidate_id = c.candidate_id where sc.name = :scouter_name and c.name = :candidate_name ; end;"
+	assert.Equal(t, expectedDefinition, result.Rpc.Definition)
 }

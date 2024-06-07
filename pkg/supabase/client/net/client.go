@@ -101,7 +101,6 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 		return nil, err
 	}
 
-	Logger.Trace("net.response", "body", string(body))
 	if resInterceptor != nil {
 		if err := resInterceptor(resp); err != nil {
 			return body, err
@@ -114,6 +113,7 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 		return nil, err
 	}
 
+	Logger.Trace("net.response", "body", string(body))
 	return body, nil
 }
 
