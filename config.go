@@ -72,11 +72,11 @@ func LoadConfig(path *string) (*Config, error) {
 		config.ServerHost = "127.0.0.1"
 	}
 
-	if config.ServerPort != "" {
+	if config.ServerPort == "" {
 		config.ServerPort = "8002"
 	}
 
-	if config.Version != "" {
+	if config.Version == "" {
 		config.Version = "1.0.0"
 	}
 
