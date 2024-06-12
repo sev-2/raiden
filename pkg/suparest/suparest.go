@@ -13,7 +13,8 @@ import (
 )
 
 type Query struct {
-	model       *ModelBase
+	Context     raiden.Context
+	model       interface{}
 	UseWhere    int
 	Columns     []string
 	EqList      *[]string
@@ -46,8 +47,34 @@ func (q *Query) Error() error {
 	return q.Err
 }
 
+func NewQuery(ctx raiden.Context) *Query {
+	return &Query{
+		Context: ctx,
+	}
+}
+
+func (q *Query) Model(m interface{}) *Query {
+	q.model = m
+	return q
+}
+
+// Deprecated: Will be removed
 func (m *ModelBase) NewQuery() *Query {
 	return &Query{model: m}
+}
+
+func GetTable(m interface{}) string {
+	t := reflect.TypeOf(m)
+
+	field, found := t.FieldByName("Metadata")
+	if !found {
+		fmt.Println("Field \"tableName\" is not found")
+		return ""
+	}
+
+	tableName := field.Tag.Get("tableName")
+
+	return tableName
 }
 
 func (m *ModelBase) Execute() (model *ModelBase) {
@@ -73,7 +100,7 @@ func (q Query) Get() ([]byte, error) {
 	defer fasthttp.ReleaseResponse(resp)
 
 	if err := client.Do(req, resp); err != nil {
-		log.Fatalf("Error making GET request: %s\n", err)
+		return nil, err
 	}
 
 	body := resp.Body()
@@ -111,6 +138,7 @@ func (q Query) GetUrl() string {
 	return url
 }
 
+// Deprecated: Will be removed
 func (m ModelBase) GetTable() string {
 	t := reflect.TypeOf(m)
 
@@ -128,7 +156,7 @@ func (m ModelBase) GetTable() string {
 func buildQueryURI(q Query) string {
 	var output string
 
-	output = fmt.Sprintf("%s?", q.model.GetTable())
+	output = fmt.Sprintf("%s?", GetTable(q.model))
 
 	if len(q.Columns) > 0 {
 		columns := strings.Join(q.Columns, ",")
