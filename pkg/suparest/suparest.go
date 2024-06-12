@@ -1,7 +1,6 @@
 package suparest
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -109,26 +108,15 @@ func (q Query) Get() ([]byte, error) {
 }
 
 func (q Query) Single() ([]byte, error) {
-	result, err := q.Limit(1).Get()
-	if err != nil {
-		return nil, err
-	}
+	url := q.Limit(1).GetUrl()
 
-	var object []any
-	err = json.Unmarshal(result, &object)
-	if err != nil {
-		return nil, err
-	}
+	headers := make(map[string]string)
 
-	if len(object) > 0 {
-		result, err := json.Marshal(object[0])
-		if err != nil {
-			return nil, err
-		}
-		return result, nil
-	}
+	headers["Accept"] = "application/vnd.pgrst.object+json"
 
-	return result, nil
+	res, _ := PostgrestRequest(q.Context, "GET", url, headers)
+
+	return res, nil
 }
 
 func (q Query) GetUrl() string {
