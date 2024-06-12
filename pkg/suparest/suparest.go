@@ -84,27 +84,16 @@ func (q Query) Get() ([]byte, error) {
 
 	url := q.GetUrl()
 
-	client := &fasthttp.Client{}
+	headers := make(map[string]string)
+	headers["Content-Type"] = "application/json"
+	headers["Prefer"] = "return=representation"
 
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
-
-	req.SetRequestURI(url)
-
-	serviceKey := getConfig().ServiceKey
-	req.Header.Set("apikey", serviceKey)
-	req.Header.Set("Authorization", "Bearer "+serviceKey)
-
-	resp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(resp)
-
-	if err := client.Do(req, resp); err != nil {
+	resp, _, err := PostgrestRequest(q.Context, fasthttp.MethodGet, url, nil, headers)
+	if err != nil {
 		return nil, err
 	}
 
-	body := resp.Body()
-
-	return body, nil
+	return resp, nil
 }
 
 func (q Query) Single() ([]byte, error) {
@@ -114,7 +103,10 @@ func (q Query) Single() ([]byte, error) {
 
 	headers["Accept"] = "application/vnd.pgrst.object+json"
 
-	res, _ := PostgrestRequest(q.Context, "GET", url, nil, headers)
+	res, _, err := PostgrestRequest(q.Context, "GET", url, nil, headers)
+	if err != nil {
+		return nil, err
+	}
 
 	return res, nil
 }

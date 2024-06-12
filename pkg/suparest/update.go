@@ -2,7 +2,6 @@ package suparest
 
 import (
 	"encoding/json"
-	"log"
 	"reflect"
 	"strings"
 
@@ -17,11 +16,6 @@ func (q *Query) Update(p interface{}) ([]byte, error) {
 
 	url := q.GetUrl()
 
-	client := &fasthttp.Client{}
-
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
-
 	var cols []string
 	t := reflect.TypeOf(p)
 	for i := 0; i < t.NumField(); i++ {
@@ -29,25 +23,16 @@ func (q *Query) Update(p interface{}) ([]byte, error) {
 		cols = append(cols, field.Name)
 	}
 
-	req.SetRequestURI(url + "&" + strings.Join(cols, ","))
+	url = url + "&" + strings.Join(cols, ",")
 
-	serviceKey := getConfig().ServiceKey
-	req.Header.SetMethod(fasthttp.MethodPatch)
-	req.Header.SetContentType("application/json")
-	req.Header.Set("apikey", serviceKey)
-	req.Header.Set("Authorization", "Bearer "+serviceKey)
-	req.Header.Set("Prefer", "return=representation")
+	headers := make(map[string]string)
+	headers["Content-Type"] = "application/json"
+	headers["Prefer"] = "return=representation"
 
-	req.SetBody(jsonData)
-
-	resp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(resp)
-
-	if err := client.Do(req, resp); err != nil {
-		log.Fatalf("Error making GET request: %s\n", err)
+	body, _, err := PostgrestRequest(q.Context, fasthttp.MethodPatch, url, jsonData, headers)
+	if err != nil {
+		return nil, err
 	}
-
-	body := resp.Body()
 
 	return body, nil
 }

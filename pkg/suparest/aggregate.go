@@ -1,7 +1,6 @@
 package suparest
 
 import (
-	"log"
 	"strconv"
 	"strings"
 
@@ -32,25 +31,14 @@ func (q *Query) Count(opts ...CountOptions) (int, error) {
 
 	url := q.GetUrl()
 
-	client := &fasthttp.Client{}
+	headers := make(map[string]string)
+	headers["Content-Type"] = "application/json"
+	headers["Prefer"] = "count=" + countVal
+	headers["Range-Unit"] = "items"
 
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
-
-	req.SetRequestURI(url)
-
-	serviceKey := getConfig().ServiceKey
-	req.Header.SetMethod(fasthttp.MethodHead)
-	req.Header.Set("apikey", serviceKey)
-	req.Header.Set("Authorization", "Bearer "+serviceKey)
-	req.Header.Set("Prefer", "count="+countVal)
-	req.Header.Set("Range-Unit", "items")
-
-	resp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(resp)
-
-	if err := client.Do(req, resp); err != nil {
-		log.Fatalf("Error making GET request: %s\n", err)
+	_, resp, err := PostgrestRequest(q.Context, fasthttp.MethodHead, url, nil, headers)
+	if err != nil {
+		return 0, err
 	}
 
 	contentRange := resp.Header.Peek("Content-Range")
@@ -60,7 +48,6 @@ func (q *Query) Count(opts ...CountOptions) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	log.Println(string(contentRange), count)
 
 	return count, nil
 }
