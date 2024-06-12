@@ -40,6 +40,7 @@ type (
 		RlsForced  bool
 		StructName string
 		Schema     string
+		TableName  string
 	}
 
 	GenerateModelInput struct {
@@ -68,7 +69,7 @@ type {{ .StructName }} struct {
 {{- end }}
 
 	// Table information
-	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
+	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" tableName:\"{{ .TableName }}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
 
 	// Access control
 	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
@@ -148,6 +149,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 		StructName: utils.SnakeCaseToPascalCase(input.Table.Name),
 		Columns:    columns,
 		Schema:     input.Table.Schema,
+		TableName:  input.Table.Name,
 		RlsTag:     rlsTag,
 		RlsEnable:  input.Table.RLSEnabled,
 		RlsForced:  input.Table.RLSForced,
