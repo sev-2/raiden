@@ -114,7 +114,7 @@ func (q Query) Single() ([]byte, error) {
 
 	headers["Accept"] = "application/vnd.pgrst.object+json"
 
-	res, _ := PostgrestRequest(q.Context, "GET", url, headers)
+	res, _ := PostgrestRequest(q.Context, "GET", url, nil, headers)
 
 	return res, nil
 }

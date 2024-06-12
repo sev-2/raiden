@@ -8,7 +8,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func PostgrestRequest(ctx raiden.Context, method string, url string, headers map[string]string) ([]byte, error) {
+func PostgrestRequest(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string) ([]byte, error) {
 
 	if !isAllowedMethod(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
@@ -44,6 +44,10 @@ func PostgrestRequest(ctx raiden.Context, method string, url string, headers map
 
 	for key, value := range headers {
 		req.Header.Set(key, value)
+	}
+
+	if payload != nil {
+		req.SetBody(payload)
 	}
 
 	res := fasthttp.AcquireResponse()
