@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-co-op/gocron/v2"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/tracer"
 	"github.com/valyala/fasthttp"
@@ -20,10 +21,12 @@ var ServerLogger = logger.HcLog().Named("raiden.server")
 
 // --- server configuration ----
 type Server struct {
-	Config       *Config
-	Router       *router
-	HttpServer   *fasthttp.Server
-	ShutdownFunc []func(ctx context.Context) error
+	Config          *Config
+	Router          *router
+	HttpServer      *fasthttp.Server
+	SchedulerServer gocron.Scheduler
+	ShutdownFunc    []func(ctx context.Context) error
+	jobs            []Job
 }
 
 func NewServer(config *Config) *Server {
@@ -36,6 +39,10 @@ func NewServer(config *Config) *Server {
 
 func (s *Server) RegisterRoute(routes []*Route) {
 	s.Router.routes = append(s.Router.routes, routes...)
+}
+
+func (s *Server) RegisterJobs(jobs []Job) {
+	s.jobs = append(s.jobs, jobs...)
 }
 
 func (s *Server) Use(middleware MiddlewareFn) {
@@ -122,7 +129,35 @@ func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) 
 	return
 }
 
-func (s *Server) runServer(hostname string, listener net.Listener, errChan chan error) {
+func (s *Server) prepareScheduleServer() {
+	if s.Config.ScheduleStatus == ScheduleStatusOff {
+		return
+	}
+
+	ss, err := NewSchedulerServer(s.Config)
+	if err != nil {
+		os.Exit(1)
+		return
+	}
+	s.SchedulerServer = ss.Server
+
+	// register job
+	if len(s.jobs) > 0 {
+		for _, j := range s.jobs {
+			if j == nil {
+				continue
+			}
+			if err := ss.RegisterJob(j); err != nil {
+				os.Exit(1)
+				return
+			}
+		}
+	}
+
+	s.SchedulerServer.Start()
+}
+
+func (s *Server) runHttpServer(hostname string, listener net.Listener, errChan chan error) {
 	ServerLogger.Info("started server", "hostname", hostname, "addr", listener.Addr())
 	ServerLogger.Info("press Ctrl+C to stop")
 	errChan <- s.HttpServer.Serve(listener)
@@ -131,11 +166,13 @@ func (s *Server) runServer(hostname string, listener net.Listener, errChan chan 
 func (s *Server) Run() {
 	s.configure()
 
+	s.prepareScheduleServer()
+
 	// prepare server
 	h, l, lErrChan := s.prepareServer()
 
 	/// Run server
-	go s.runServer(h, l, lErrChan)
+	go s.runHttpServer(h, l, lErrChan)
 
 	// SIGINT/SIGTERM handling
 	osSignals := make(chan os.Signal, 1)
@@ -151,6 +188,14 @@ func (s *Server) Run() {
 			ServerLogger.Info("clean up all dependency resource")
 			if errShutdown := s.Shutdown(context.Background()); errShutdown != nil {
 				ServerLogger.Warn("server shutdown  error", "msg", errShutdown.Error())
+			}
+
+			// shutdown scheduler
+			if s.SchedulerServer != nil {
+				SchedulerLogger.Info("start shutdown ")
+				if err := s.SchedulerServer.Shutdown(); err != nil {
+					SchedulerLogger.Error("error shutdown ", "msg", err.Error())
+				}
 			}
 
 			if err != nil {
@@ -170,10 +215,19 @@ func (s *Server) Run() {
 			ServerLogger.Info("disable keep alive connection")
 			s.HttpServer.DisableKeepalive = true
 
+			// shutdown scheduler=
+			if s.SchedulerServer != nil {
+				SchedulerLogger.Info("start shutdown ")
+				if err := s.SchedulerServer.Shutdown(); err != nil {
+					SchedulerLogger.Error("error shutdown ", "msg", err.Error())
+				}
+			}
+
 			// Attempt the graceful shutdown by closing the listener
 			// and completing all inflight requests.
 			ServerLogger.Info("close connection and wait all request done")
 			if err := l.Close(); err != nil {
+				// shutdown scheduler
 				ServerLogger.Error("listener error ", "msg", err.Error())
 				os.Exit(1)
 			}
