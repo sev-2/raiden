@@ -42,6 +42,7 @@ func main() {
 
 	// register route
 	bootstrap.RegisterRoute(server)
+	bootstrap.RegisterJobs(server)
 
 	// run server
 	server.Run()

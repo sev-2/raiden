@@ -41,7 +41,7 @@ func (s *Server) RegisterRoute(routes []*Route) {
 	s.Router.routes = append(s.Router.routes, routes...)
 }
 
-func (s *Server) RegisterJobs(jobs []Job) {
+func (s *Server) RegisterJobs(jobs ...Job) {
 	s.jobs = append(s.jobs, jobs...)
 }
 
