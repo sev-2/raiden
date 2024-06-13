@@ -103,5 +103,5 @@ func (s *SchedulerServer) RegisterJob(job Job) error {
 }
 
 // ----- TODO
-// 1. make auto create log run table
-// 2. make default action before and and after job running
+// 1. make auto create `schedule_log` to save all job report
+// 2. make function to record report job after running and save to database
