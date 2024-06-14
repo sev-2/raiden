@@ -647,7 +647,7 @@ func extractRpcResult(returnReflectType reflect.Type, rpc Rpc) (q string, err er
 	case RpcReturnDataTypeSetOf:
 		return buildRpcReturnSetOf(returnReflectType)
 	case RpcReturnDataTypeTable:
-		return buildRpcReturnTable(returnReflectType, rpc)
+		return buildRpcReturnTable(returnReflectType)
 	default:
 		return string(rpc.GetReturnType()), nil
 	}
@@ -661,7 +661,7 @@ func buildRpcReturnSetOf(returnReflectType reflect.Type) (q string, err error) {
 	return fmt.Sprintf("setof %s", st.Name()), nil
 }
 
-func buildRpcReturnTable(returnReflectType reflect.Type, rpc Rpc) (q string, err error) {
+func buildRpcReturnTable(returnReflectType reflect.Type) (q string, err error) {
 	st, e := findStruct(returnReflectType)
 	if e != nil {
 		err = e
@@ -674,7 +674,7 @@ func buildRpcReturnTable(returnReflectType reflect.Type, rpc Rpc) (q string, err
 		return
 	}
 
-	pq, ep := p.ToQuery(rpc.UseParamPrefix())
+	pq, ep := p.ToQuery(false)
 	if ep != nil {
 		return q, ep
 	}
@@ -706,10 +706,12 @@ func buildRpcDefinition(rpc Rpc) string {
 	for i := range params {
 		p := params[i]
 		key := p.Name
+		replaceKey := key
 		if rpc.UseParamPrefix() {
-			key += DefaultRpcParamPrefix + key
+			replaceKey = DefaultRpcParamPrefix + key
 		}
-		definition = utils.MatchReplacer(definition, ":"+key, key)
+
+		definition = utils.MatchReplacer(definition, ":"+key, replaceKey)
 	}
 
 	return definition

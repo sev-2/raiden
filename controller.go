@@ -158,7 +158,7 @@ func (*ControllerBase) AfterHead(ctx Context) error {
 // ----- Rest Controller -----
 type RestController struct {
 	Controller
-	ModelName string
+	TableName string
 }
 
 // AfterAll implements Controller.
@@ -275,12 +275,12 @@ func (rc RestController) BeforePut(ctx Context) error {
 
 // Delete implements Controller.
 func (rc RestController) Delete(ctx Context) error {
-	return RestProxy(ctx, rc.ModelName)
+	return RestProxy(ctx, rc.TableName)
 }
 
 // Get implements Controller.
 func (rc RestController) Get(ctx Context) error {
-	return RestProxy(ctx, rc.ModelName)
+	return RestProxy(ctx, rc.TableName)
 }
 
 // Head implements Controller.
@@ -297,17 +297,17 @@ func (rc RestController) Options(ctx Context) error {
 
 // Patch implements Controller.
 func (rc RestController) Patch(ctx Context) error {
-	return RestProxy(ctx, rc.ModelName)
+	return RestProxy(ctx, rc.TableName)
 }
 
 // Post implements Controller.
 func (rc RestController) Post(ctx Context) error {
-	return RestProxy(ctx, rc.ModelName)
+	return RestProxy(ctx, rc.TableName)
 }
 
 // Put implements Controller.
 func (rc RestController) Put(ctx Context) error {
-	return RestProxy(ctx, rc.ModelName)
+	return RestProxy(ctx, rc.TableName)
 }
 
 // ----- Rest Controller -----
@@ -570,7 +570,9 @@ func (c *HealthController) Get(ctx Context) error {
 }
 
 // RestHandler
-func RestProxy(appCtx Context, modelName string) error {
+var restProxyLogger = logger.HcLog().Named("raiden.controller.rest-proxy")
+
+func RestProxy(appCtx Context, TableName string) error {
 	// Create a new request object
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -578,7 +580,7 @@ func RestProxy(appCtx Context, modelName string) error {
 	// Copy the original request to the new request object
 	appCtx.RequestContext().Request.CopyTo(req)
 
-	proxyUrl := fmt.Sprintf("%s/rest/v1/%s", appCtx.Config().SupabasePublicUrl, strings.ToLower(modelName))
+	proxyUrl := fmt.Sprintf("%s/rest/v1/%s", appCtx.Config().SupabasePublicUrl, TableName)
 	queryParam := appCtx.RequestContext().Request.URI().QueryString()
 	if len(queryParam) > 0 {
 		proxyUrl = fmt.Sprintf("%s?%s", proxyUrl, queryParam)
@@ -589,6 +591,7 @@ func RestProxy(appCtx Context, modelName string) error {
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
 
+	restProxyLogger.Debug("forward request", "method", string(req.Header.Method()), "uri", string(req.URI().FullURI()))
 	if err := fasthttp.Do(req, resp); err != nil {
 		return err
 	}
@@ -599,6 +602,8 @@ func RestProxy(appCtx Context, modelName string) error {
 
 	appCtx.RequestContext().Response.SetStatusCode(resp.StatusCode())
 	appCtx.RequestContext().Response.SetBody(resp.Body())
+
+	restProxyLogger.Debug("response", "method", resp.StatusCode(), "uri", string(req.URI().FullURI()), "body", string(resp.Body()))
 
 	return nil
 }

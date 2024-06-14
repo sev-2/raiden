@@ -167,6 +167,15 @@ func extractAppResource(f *Flags, latestState *state.State) (
 		return
 	}
 
+	if f.StoragesOnly || f.ModelsOnly {
+		ImportLogger.Debug("Start extract role")
+		extractedRole, err = state.ExtractRole(latestState.Roles, registeredRoles, false)
+		if err != nil {
+			return
+		}
+		ImportLogger.Debug("Finish extract role")
+	}
+
 	if f.All() || f.ModelsOnly {
 		ImportLogger.Debug("Start extract table")
 		extractedTable, err = state.ExtractTable(latestState.Tables, registeredModels)

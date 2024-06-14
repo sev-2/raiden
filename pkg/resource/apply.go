@@ -18,6 +18,7 @@ import (
 	"github.com/sev-2/raiden/pkg/resource/storages"
 	"github.com/sev-2/raiden/pkg/resource/tables"
 	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -119,7 +120,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	if err != nil {
 		return err
 	}
-	appPolicies := mergeAllPolicy(appTables)
+	appPolicies := mergeAllPolicy(appTables, appStorage)
 
 	// validate table relation
 	var validateTable []objects.Table
@@ -169,13 +170,6 @@ func Apply(flags *Flags, config *raiden.Config) error {
 		} else {
 			migrateData.Tables = data
 		}
-
-		// bind app policies to resource
-		if data, err := policies.BuildMigrateData(appPolicies, resource.Policies); err != nil {
-			return err
-		} else {
-			migrateData.Policies = data
-		}
 	}
 
 	if flags.All() || flags.RpcOnly {
@@ -193,8 +187,17 @@ func Apply(flags *Flags, config *raiden.Config) error {
 			migrateData.Storages = data
 		}
 	}
-	ApplyLogger.Info("finish build migrate data")
 
+	if len(appPolicies.New) > 0 || len(appPolicies.Existing) > 0 || len(appPolicies.Delete) > 0 {
+		// bind app policies to resource
+		if data, err := policies.BuildMigrateData(appPolicies, resource.Policies); err != nil {
+			return err
+		} else {
+			migrateData.Policies = data
+		}
+	}
+
+	ApplyLogger.Info("finish build migrate data")
 	if !flags.DryRun {
 		migrateErr := Migrate(config, &localState, flags.ProjectPath, &migrateData)
 		if len(migrateErr) > 0 {
@@ -378,7 +381,7 @@ func validateTableRelations(migratedTables ...objects.Table) error {
 	return nil
 }
 
-func mergeAllPolicy(et state.ExtractTableResult) (rs state.ExtractedPolicies) {
+func mergeAllPolicy(et state.ExtractTableResult, es state.ExtractStorageResult) (rs state.ExtractedPolicies) {
 	for i := range et.New {
 		t := et.New[i]
 		if len(t.ExtractedPolicies.New) > 0 {
@@ -395,6 +398,44 @@ func mergeAllPolicy(et state.ExtractTableResult) (rs state.ExtractedPolicies) {
 
 		if len(t.ExtractedPolicies.Existing) > 0 {
 			rs.Existing = append(rs.Existing, t.ExtractedPolicies.Existing...)
+		}
+
+		if len(t.ExtractedPolicies.Delete) > 0 {
+			rs.Delete = append(rs.Delete, t.ExtractedPolicies.Delete...)
+		}
+	}
+
+	for i := range es.New {
+		t := es.New[i]
+		if len(t.ExtractedPolicies.New) > 0 {
+			rs.New = append(rs.New, t.ExtractedPolicies.New...)
+		}
+	}
+
+	for i := range es.Existing {
+		t := es.Existing[i]
+
+		if len(t.ExtractedPolicies.New) > 0 {
+			rs.New = append(rs.New, t.ExtractedPolicies.New...)
+		}
+
+		if len(t.ExtractedPolicies.Existing) > 0 {
+			rs.Existing = append(rs.Existing, t.ExtractedPolicies.Existing...)
+		}
+
+		if len(t.ExtractedPolicies.Delete) > 0 {
+			rs.Delete = append(rs.Delete, t.ExtractedPolicies.Delete...)
+		}
+	}
+
+	for i := range es.Delete {
+		t := es.Delete[i]
+		if len(t.ExtractedPolicies.New) > 0 {
+			rs.Delete = append(rs.Delete, t.ExtractedPolicies.New...)
+		}
+
+		if len(t.ExtractedPolicies.Existing) > 0 {
+			rs.Delete = append(rs.Delete, t.ExtractedPolicies.Existing...)
 		}
 
 		if len(t.ExtractedPolicies.Delete) > 0 {
@@ -526,60 +567,124 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 						continue
 					}
 
-					fIndex, tState, found := localState.FindTable(m.NewData.TableID)
-					if !found {
-						continue
+					if m.NewData.Schema == supabase.DefaultStorageSchema && m.NewData.Table == supabase.DefaultObjectTable {
+						fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name)
+						if !found {
+							continue
+						}
+						tState.Policies = append(tState.Policies, m.NewData)
+						tState.LastUpdate = time.Now()
+						localState.UpdateStorage(fIndex, tState)
+						ApplyLogger.Trace("new permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
+					} else {
+						fIndex, tState, found := localState.FindTable(m.NewData.TableID)
+						if !found {
+							continue
+						}
+						tState.Policies = append(tState.Policies, m.NewData)
+						tState.LastUpdate = time.Now()
+						ApplyLogger.Trace("new permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
+						localState.UpdateTable(fIndex, tState)
 					}
-					tState.Policies = append(tState.Policies, m.NewData)
-					tState.LastUpdate = time.Now()
-					localState.UpdateTable(fIndex, tState)
 				case migrator.MigrateTypeDelete:
 					if m.OldData.Name == "" {
 						continue
 					}
-					fIndex, tState, found := localState.FindTable(m.OldData.TableID)
-					if !found {
-						continue
-					}
 
-					// find policy index
-					pi := -1
-					for i := range tState.Policies {
-						p := tState.Policies[i]
-						if p.ID == m.OldData.ID {
-							pi = i
-							break
+					if m.OldData.Schema == supabase.DefaultStorageSchema && m.OldData.Table == supabase.DefaultObjectTable {
+						fIndex, tState, found := localState.FindStorageByPermissionName(m.OldData.Name)
+						if !found {
+							continue
+						}
+
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
+							}
+						}
+
+						if pi > -1 {
+							tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+							tState.LastUpdate = time.Now()
+							localState.UpdateStorage(fIndex, tState)
+							ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Storage.Name, "permission", m.OldData.Name)
+						}
+					} else {
+						fIndex, tState, found := localState.FindTable(m.OldData.TableID)
+						if !found {
+							continue
+						}
+
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
+							}
+						}
+
+						if pi > -1 {
+							tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+							tState.LastUpdate = time.Now()
+							localState.UpdateTable(fIndex, tState)
+							ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.OldData.Name)
 						}
 					}
 
-					if pi > -1 {
-						tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
-						tState.LastUpdate = time.Now()
-						localState.UpdateTable(fIndex, tState)
-					}
 				case migrator.MigrateTypeUpdate:
 					if m.NewData.Name == "" {
 						continue
 					}
-					fIndex, tState, found := localState.FindTable(m.NewData.TableID)
-					if !found {
-						continue
-					}
+					if m.NewData.Schema == supabase.DefaultStorageSchema && m.NewData.Table == supabase.DefaultObjectTable {
+						fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name)
+						if !found {
+							continue
+						}
 
-					// find policy index
-					pi := -1
-					for i := range tState.Policies {
-						p := tState.Policies[i]
-						if p.ID == m.OldData.ID {
-							pi = i
-							break
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
+							}
+						}
+						if pi > -1 {
+							tState.Policies[pi] = m.NewData
+							tState.LastUpdate = time.Now()
+							ApplyLogger.Debug("update permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
+						}
+						localState.UpdateStorage(fIndex, tState)
+					} else {
+						fIndex, tState, found := localState.FindTable(m.NewData.TableID)
+						if !found {
+							continue
+						}
+
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
+							}
+						}
+						if pi > -1 {
+							tState.Policies[pi] = m.NewData
+							tState.LastUpdate = time.Now()
+							localState.UpdateTable(fIndex, tState)
+							ApplyLogger.Trace("update permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
 						}
 					}
-					if pi > -1 {
-						tState.Policies[pi] = m.NewData
-						tState.LastUpdate = time.Now()
-						localState.UpdateTable(fIndex, tState)
-					}
+
 				}
 			case *rpc.MigrateItem:
 				switch m.Type {
@@ -620,7 +725,7 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 					}
 
 					r := state.StorageState{
-						Bucket:     m.NewData,
+						Storage:    m.NewData,
 						LastUpdate: time.Now(),
 					}
 
@@ -636,7 +741,7 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 						continue
 					}
 
-					rState.Bucket = m.NewData
+					rState.Storage = m.NewData
 					rState.LastUpdate = time.Now()
 					localState.UpdateStorage(fIndex, rState)
 				}

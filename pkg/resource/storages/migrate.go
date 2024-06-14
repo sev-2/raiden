@@ -31,8 +31,8 @@ func BuildMigrateData(extractedLocalData state.ExtractStorageResult, supabaseDat
 	var compareStorages []objects.Bucket
 	for i := range extractedLocalData.Existing {
 		et := extractedLocalData.Existing[i]
-		if _, isExist := mapSpStorages[et.ID]; isExist {
-			compareStorages = append(compareStorages, et)
+		if _, isExist := mapSpStorages[et.Storage.ID]; isExist {
+			compareStorages = append(compareStorages, et.Storage)
 		} else {
 			extractedLocalData.New = append(extractedLocalData.New, et)
 		}
@@ -51,7 +51,7 @@ func BuildMigrateData(extractedLocalData state.ExtractStorageResult, supabaseDat
 			t := extractedLocalData.New[i]
 			migrateData = append(migrateData, MigrateItem{
 				Type:    migrator.MigrateTypeCreate,
-				NewData: t,
+				NewData: t.Storage,
 			})
 		}
 	}
@@ -63,7 +63,7 @@ func BuildMigrateData(extractedLocalData state.ExtractStorageResult, supabaseDat
 			isExist := false
 			for i := range supabaseData {
 				tt := supabaseData[i]
-				if tt.Name == t.Name {
+				if tt.Name == t.Storage.Name {
 					isExist = true
 					break
 				}
@@ -72,7 +72,7 @@ func BuildMigrateData(extractedLocalData state.ExtractStorageResult, supabaseDat
 			if isExist {
 				migrateData = append(migrateData, MigrateItem{
 					Type:    migrator.MigrateTypeDelete,
-					OldData: t,
+					OldData: t.Storage,
 				})
 			}
 		}

@@ -1,6 +1,7 @@
 package raiden
 
 import (
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -38,17 +39,6 @@ type (
 
 		TargetPrimaryKey string
 		TargetForeignKey string
-	}
-
-	Acl struct {
-		Roles []string
-		Check *string
-		Using string
-	}
-
-	AclTag struct {
-		Read  Acl
-		Write Acl
 	}
 
 	RelationType string
@@ -149,29 +139,20 @@ func UnmarshalJoinTag(tag string) JoinTag {
 	return joinTag
 }
 
-func UnmarshalAclTag(tag string) AclTag {
-	var aclTag AclTag
-
-	aclTagMap := utils.ParseTag(tag)
-	if readTag, exist := aclTagMap["read"]; exist && len(readTag) > 0 {
-		aclTag.Read.Roles = strings.Split(readTag, ",")
+func GetTableName(model any) (tableName string) {
+	rt := reflect.TypeOf(model)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
 	}
 
-	if writeTag, exist := aclTagMap["write"]; exist && len(writeTag) > 0 {
-		aclTag.Write.Roles = strings.Split(writeTag, ",")
-	}
+	tableName = strings.ToLower(utils.ToSnakeCase(rt.Name()))
+	field, found := rt.FieldByName("Metadata")
+	if found {
+		foundTableName := field.Tag.Get("tableName")
+		if foundTableName != "" {
+			tableName = foundTableName
+		}
 
-	if readTagUsing, exist := aclTagMap["readUsing"]; exist && len(readTagUsing) > 0 {
-		aclTag.Read.Using = readTagUsing
 	}
-
-	if writeTagCheck, exist := aclTagMap["writeCheck"]; exist && len(writeTagCheck) > 0 {
-		aclTag.Write.Check = &writeTagCheck
-	}
-
-	if writeTagUsing, exist := aclTagMap["writeUsing"]; exist && len(writeTagUsing) > 0 {
-		aclTag.Write.Using = writeTagUsing
-	}
-
-	return aclTag
+	return
 }

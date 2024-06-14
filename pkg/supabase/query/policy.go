@@ -29,10 +29,10 @@ func BuildCreatePolicyQuery(policy objects.Policy) string {
 		roleList += pq.QuoteIdentifier(role)
 
 		grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
-			IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
-				GRANT %s ON %s TO %s;
+			IF NOT HAS_TABLE_PRIVILEGE('%s', '%s.%s', '%s') THEN
+				GRANT %s ON %s.%s TO %s;
 			END IF;
-		`, role, policy.Table, policy.Command, policy.Command, policy.Table, role))
+		`, role, policy.Schema, policy.Table, policy.Command, policy.Command, policy.Schema, policy.Table, role))
 	}
 
 	createQuery := fmt.Sprintf(`
@@ -67,7 +67,7 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 				nameSql = fmt.Sprintf("%s RENAME TO %s;", alter, policy.Name)
 			}
 		case objects.UpdatePolicyCheck:
-			if policy.Check == nil || (policy.Check != nil && *policy.Check != "") {
+			if policy.Check == nil || (policy.Check != nil && *policy.Check == "") {
 				defaultCheck := "true"
 				policy.Check = &defaultCheck
 			}
@@ -83,10 +83,10 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 
 			for _, role := range policy.Roles {
 				grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
-					IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
-						GRANT %s ON %s TO %s;
+					IF NOT HAS_TABLE_PRIVILEGE('%s', '%s.%s', '%s') THEN
+						GRANT %s ON %s.%s TO %s;
 					END IF;
-				`, role, policy.Table, policy.Command, policy.Command, policy.Table, role))
+				`, role, policy.Schema, policy.Table, policy.Command, policy.Command, policy.Schema, policy.Table, role))
 			}
 		}
 	}
@@ -98,10 +98,10 @@ func BuildDeletePolicyQuery(policy objects.Policy) string {
 	revokeAccessTables := []string{}
 	for _, role := range policy.Roles {
 		revokeAccessTables = append(revokeAccessTables, fmt.Sprintf(`
-			IF HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
-				REVOKE %s ON %s FROM %s;
+			IF HAS_TABLE_PRIVILEGE('%s', '%s.%s', '%s') THEN
+				REVOKE %s ON %s.%s FROM %s;
 			END IF;
-		`, role, policy.Table, policy.Command, policy.Command, policy.Table, role))
+		`, role, policy.Schema, policy.Table, policy.Command, policy.Command, policy.Schema, policy.Table, role))
 	}
 
 	revokeAccessQuery := fmt.Sprintf(`

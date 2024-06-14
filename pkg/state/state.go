@@ -10,11 +10,12 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var StateLogger = logger.HcLog().Named("supabase.state")
+var StateLogger = logger.HcLog().Named("raiden.state")
 
 type (
 	State struct {
@@ -49,8 +50,11 @@ type (
 	}
 
 	StorageState struct {
-		Bucket     objects.Bucket
-		LastUpdate time.Time
+		Storage       objects.Bucket
+		StoragePath   string
+		StorageStruct string
+		LastUpdate    time.Time
+		Policies      []objects.Policy
 	}
 
 	Relation struct {
@@ -77,6 +81,12 @@ type (
 		State      State
 		NeedUpdate bool
 		Mutex      sync.RWMutex
+	}
+
+	ExtractedPolicies struct {
+		Existing []objects.Policy
+		New      []objects.Policy
+		Delete   []objects.Policy
 	}
 )
 
@@ -266,7 +276,37 @@ func (s *LocalState) FindStorage(storageId string) (index int, storageState Stor
 	for i := range s.State.Storage {
 		r := s.State.Storage[i]
 
-		if r.Bucket.ID == storageId {
+		if r.Storage.ID == storageId {
+			found = true
+			storageState = r
+			index = i
+			return
+		}
+	}
+	return
+}
+
+func (s *LocalState) FindStorageByPermissionName(name string) (index int, storageState StorageState, found bool) {
+	// find storage name
+	splitName := strings.SplitN(name, supabase.RlsTypeStorage, 2)
+	if len(splitName) != 2 {
+		found = false
+		return
+	}
+
+	storageName := strings.TrimLeft(strings.TrimRight(splitName[1], " "), " ")
+	return s.FindStorageByName(storageName)
+}
+
+func (s *LocalState) FindStorageByName(name string) (index int, storageState StorageState, found bool) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	found = false
+
+	for i := range s.State.Storage {
+		r := s.State.Storage[i]
+		if strings.EqualFold(r.Storage.Name, name) {
 			found = true
 			storageState = r
 			index = i
@@ -292,7 +332,7 @@ func (s *LocalState) DeleteStorage(storageId string) {
 	for i := range s.State.Storage {
 		r := s.State.Storage[i]
 
-		if r.Bucket.ID == storageId {
+		if r.Storage.ID == storageId {
 			index = i
 			break
 		}
@@ -301,7 +341,7 @@ func (s *LocalState) DeleteStorage(storageId string) {
 	if index == -1 {
 		return
 	}
-	s.State.Roles = append(s.State.Roles[:index], s.State.Roles[index+1:]...)
+	s.State.Storage = append(s.State.Storage[:index], s.State.Storage[index+1:]...)
 	s.NeedUpdate = true
 }
 

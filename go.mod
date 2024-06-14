@@ -6,6 +6,7 @@ require (
 	github.com/erikgeiser/promptkit v0.9.0
 	github.com/fasthttp/websocket v1.5.8
 	github.com/fatih/color v1.16.0
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
@@ -38,6 +39,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -78,7 +80,6 @@ require (
 
 require (
 	github.com/fasthttp/router v1.4.22
-	github.com/gertd/go-pluralize v0.2.1
 	github.com/go-playground/validator/v10 v10.17.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lib/pq v1.10.9

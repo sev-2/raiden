@@ -14,6 +14,9 @@ import (
 
 var StorageLogger = logger.HcLog().Named("supabase.storage")
 
+var DefaultStorageSchema = "storage"
+var DefaultObjectTable = "objects"
+
 type CreateBucketSuccessResponse struct {
 	Name string `json:"name"`
 }

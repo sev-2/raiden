@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/sev-2/raiden/pkg/logger"
@@ -161,28 +160,6 @@ func (r *router) findRouteGroup(routeType RouteType) *fs_router.Group {
 	return r.groups[routeType]
 }
 
-func (r *router) bindRouteGroup(group *fs_router.Group, chain Chain, route *Route) {
-	for _, m := range route.Methods {
-		handler := chain.Then(m, route.Type, route.Controller)
-		switch strings.ToUpper(m) {
-		case fasthttp.MethodGet:
-			group.GET(route.Path, buildHandler(r.config, r.tracer, handler))
-		case fasthttp.MethodPost:
-			group.POST(route.Path, buildHandler(r.config, r.tracer, handler))
-		case fasthttp.MethodPut:
-			group.PUT(route.Path, buildHandler(r.config, r.tracer, handler))
-		case fasthttp.MethodPatch:
-			group.PATCH(route.Path, buildHandler(r.config, r.tracer, handler))
-		case fasthttp.MethodDelete:
-			group.DELETE(route.Path, buildHandler(r.config, r.tracer, handler))
-		case fasthttp.MethodOptions:
-			group.OPTIONS(route.Path, buildHandler(r.config, r.tracer, handler))
-		case fasthttp.MethodHead:
-			group.HEAD(route.Path, buildHandler(r.config, r.tracer, handler))
-		}
-	}
-}
-
 func (r *router) bindRoute(chain Chain, route *Route) {
 	for _, m := range route.Methods {
 		handler := chain.Then(m, route.Type, route.Controller)
@@ -202,17 +179,6 @@ func (r *router) bindRoute(chain Chain, route *Route) {
 		case fasthttp.MethodHead:
 			r.engine.HEAD(route.Path, buildHandler(r.config, r.tracer, handler))
 		}
-	}
-}
-
-func (r *router) registerHandler(route *Route) {
-	chain := NewChain()
-	if group := r.findRouteGroup(route.Type); group != nil {
-		chain = r.buildNativeMiddleware(route, chain)
-		if len(r.middlewares) > 0 {
-			chain = r.buildAppMiddleware(chain)
-		}
-		r.bindRouteGroup(group, chain, route)
 	}
 }
 
@@ -264,16 +230,9 @@ func (r *router) registerRestHandler(route *Route) {
 			chain = r.buildAppMiddleware(chain)
 		}
 
-		rt := reflect.TypeOf(route.Model)
-		if rt.Kind() == reflect.Ptr {
-			rt = rt.Elem()
-		}
-
-		modelName := rt.Name()
-
 		restController := RestController{
 			Controller: route.Controller,
-			ModelName:  modelName,
+			TableName:  GetTableName(route.Model),
 		}
 
 		group.GET(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodGet, route.Type, restController)))

@@ -23,16 +23,16 @@ func Compare(source []objects.Function, target []objects.Function) error {
 }
 
 func CompareList(sourceFn []objects.Function, targetFn []objects.Function) (diffResult []CompareDiffResult, err error) {
-	mapTargetFn := make(map[int]objects.Function)
+	mapTargetFn := make(map[string]objects.Function)
 	for i := range targetFn {
 		f := targetFn[i]
-		mapTargetFn[f.ID] = f
+		mapTargetFn[f.Name] = f
 	}
 
 	for i := range sourceFn {
 		s := sourceFn[i]
 
-		t, isExist := mapTargetFn[s.ID]
+		t, isExist := mapTargetFn[s.Name]
 		if !isExist {
 			continue
 		}

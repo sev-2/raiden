@@ -10,7 +10,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/gertd/go-pluralize"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -69,11 +68,6 @@ func SnakeCaseToPascalCase(s string) string {
 		words[i] = caser.String(words[i])
 	}
 	return strings.Join(words, "")
-}
-
-func ToPlural(word string) string {
-	client := pluralize.NewClient()
-	return client.Plural(word)
 }
 
 func MatchReplacer(query string, paramKey string, replacement string) string {
@@ -190,4 +184,9 @@ func ConvertAllToString(value interface{}) string {
 		return "unknown type"
 	}
 	return "unknown type"
+}
+
+func CleanDoubleColonPattern(input string) string {
+	re := regexp.MustCompile(`::\w+`)
+	return re.ReplaceAllString(input, "")
 }
