@@ -35,12 +35,7 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 	}
 
 	for _, t := range appTable {
-		tableType := reflect.TypeOf(t)
-		if tableType.Kind() == reflect.Ptr {
-			tableType = tableType.Elem()
-		}
-
-		tableName := utils.ToSnakeCase(tableType.Name())
+		tableName := raiden.GetTableName(t)
 		ts, isExist := mapTableState[tableName]
 		if !isExist {
 			nt := buildTableFromModel(t)
@@ -79,7 +74,7 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 		modelType = modelType.Elem()
 	}
 
-	ei.Table.Name = utils.ToSnakeCase(modelType.Name())
+	ei.Table.Name = raiden.GetTableName(model)
 
 	// add metadata
 	metadataField, isExist := modelType.FieldByName("Metadata")
@@ -155,7 +150,7 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 
 	// Get the reflect.Type of the struct
 	ei.Table = state.Table
-	ei.Table.Name = utils.ToSnakeCase(modelType.Name())
+	ei.Table.Name = raiden.GetTableName(model)
 
 	// map column for make check if column exist and reuse default
 	mapColumn := make(map[string]objects.Column)
@@ -201,8 +196,6 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 	// Iterate over the fields of the struct
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
-		// Get field name and tag
-		fieldName := field.Name
 
 		switch field.Name {
 		case "Metadata", "Acl":
@@ -223,7 +216,7 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 
 				bindColumn(&field, &ct, &c)
 
-				if c.IsIdentity {
+				if ct.PrimaryKey {
 					if pk, exist := mapPrimaryKey[c.Name]; exist {
 						pk.Schema = c.Schema
 						pk.TableName = ei.Table.Name
@@ -236,15 +229,17 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 							TableName: ei.Table.Name,
 						})
 					}
-					c.IsUnique = false
 				}
 
 				columns = append(columns, c)
 			}
 
 			if joinTag := field.Tag.Get("join"); len(joinTag) > 0 {
-				if r := buildTableRelation(ei.Table.Name, fieldName, ei.Table.Schema, mapRelation, joinTag); r.ConstraintName != "" {
-					relations = append(relations, r)
+				tableName := findTypeName(field.Type, reflect.Struct, 4)
+				if tableName != "" {
+					if r := buildTableRelation(ei.Table.Name, tableName, ei.Table.Schema, mapRelation, joinTag); r.ConstraintName != "" {
+						relations = append(relations, r)
+					}
 				}
 			}
 		}
@@ -292,10 +287,6 @@ func bindColumn(field *reflect.StructField, ct *raiden.ColumnTag, c *objects.Col
 		c.Name = ct.Name
 	} else {
 		ct.Name = utils.ToSnakeCase(field.Name)
-	}
-
-	if ct.PrimaryKey {
-		c.IsIdentity = true
 	}
 
 	if ct.Type != "" {
@@ -499,4 +490,23 @@ func (f ExtractTableResult) ToDeleteFlatMap() map[string]*objects.Table {
 	}
 
 	return mapData
+}
+
+func findTypeName(sf reflect.Type, findType reflect.Kind, maxDeep int) string {
+	if maxDeep == 0 {
+		return ""
+	}
+
+	if sf.Kind() == findType {
+		return sf.Name()
+	}
+
+	switch sf.Kind() {
+	case reflect.Ptr:
+		return findTypeName(sf.Elem(), findType, maxDeep-1)
+	case reflect.Array:
+		return findTypeName(sf.Elem(), findType, maxDeep-1)
+	default:
+		return ""
+	}
 }

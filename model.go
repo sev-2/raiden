@@ -1,8 +1,11 @@
 package raiden
 
 import (
+	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type (
@@ -134,4 +137,22 @@ func UnmarshalJoinTag(tag string) JoinTag {
 	}
 
 	return joinTag
+}
+
+func GetTableName(model any) (tableName string) {
+	rt := reflect.TypeOf(model)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+
+	tableName = strings.ToLower(utils.ToSnakeCase(rt.Name()))
+	field, found := rt.FieldByName("Metadata")
+	if found {
+		foundTableName := field.Tag.Get("tableName")
+		if foundTableName != "" {
+			tableName = foundTableName
+		}
+
+	}
+	return
 }
