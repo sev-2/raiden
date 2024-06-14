@@ -2,8 +2,10 @@ package tables
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type CompareDiffResult struct {
@@ -103,6 +105,7 @@ func CompareItem(source, target objects.Table) (diffResult CompareDiffResult) {
 	} else {
 		diffResult.IsConflict = true
 	}
+
 	diffResult.DiffItems = updateItem
 	return
 }
@@ -157,7 +160,7 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 
 		if (sourceDefault != nil && targetDefault == nil) ||
 			(sourceDefault == nil && targetDefault != nil) ||
-			(sourceDefault != nil && targetDefault != nil && *sourceDefault != *targetDefault) {
+			(sourceDefault != nil && targetDefault != nil && utils.CleanDoubleColonPattern(*sourceDefault) != utils.CleanDoubleColonPattern(*targetDefault)) {
 			updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
 		}
 
@@ -205,6 +208,9 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 	mapTargetRelation := make(map[string]objects.TablesRelationship)
 	for i := range target {
 		c := target[i]
+		if !strings.HasPrefix(c.ConstraintName, fmt.Sprintf("%s_", c.SourceSchema)) {
+			c.ConstraintName = fmt.Sprintf("%s_%s", c.SourceSchema, c.ConstraintName)
+		}
 		mapTargetRelation[c.ConstraintName] = c
 	}
 
@@ -213,6 +219,11 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 
 		if sc.SourceTableName != table.Name {
 			continue
+		}
+
+		if !strings.HasPrefix(sc.ConstraintName, fmt.Sprintf("%s_", sc.SourceSchema)) {
+			Logger.Info("constrain name update", "from", sc.ConstraintName, "to", fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName))
+			sc.ConstraintName = fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName)
 		}
 
 		t, exist := mapTargetRelation[sc.ConstraintName]

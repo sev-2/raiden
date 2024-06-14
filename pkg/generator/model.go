@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/jinzhu/inflection"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
@@ -36,6 +37,7 @@ type (
 		RlsForced  bool
 		StructName string
 		Schema     string
+		TableName  string
 	}
 
 	GenerateModelInput struct {
@@ -64,8 +66,7 @@ type {{ .StructName }} struct {
 {{- end }}
 
 	// Table information
-	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
-
+	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" tableName:\"{{ .TableName }}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
 	// Access control
 	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
 	
@@ -126,9 +127,32 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 			key := fmt.Sprintf("%s_%s", input.Table.Name, r.Table)
 			_, exist := mapRelationName[key]
 			if exist {
-				r.Table = fmt.Sprintf("%ss", r.Through)
+				r.Table = inflection.Plural(r.Through)
+				key = fmt.Sprintf("%s_%s", input.Table.Name, r.Table)
+				mapRelationName[key] = true
 			} else {
 				mapRelationName[key] = true
+			}
+		}
+
+		if r.RelationType == raiden.RelationTypeHasOne {
+			snakeFk := utils.ToSnakeCase(r.ForeignKey)
+			fkTableSplit := strings.Split(snakeFk, "_")
+			fkName := inflection.Singular(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
+
+			r.Table = inflection.Singular(utils.SnakeCaseToPascalCase(r.Table))
+			if fkName != r.Table {
+				r.Table = fmt.Sprintf("%s%s", r.Table, fkName)
+			}
+		}
+
+		if r.RelationType == raiden.RelationTypeHasMany {
+			snakeFk := utils.ToSnakeCase(r.ForeignKey)
+			fkTableSplit := strings.Split(snakeFk, "_")
+			fkName := inflection.Plural(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
+			r.Table = inflection.Plural(utils.SnakeCaseToPascalCase(r.Table))
+			if fkName != r.Table {
+				r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
 			}
 		}
 
@@ -143,6 +167,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 		StructName: utils.SnakeCaseToPascalCase(input.Table.Name),
 		Columns:    columns,
 		Schema:     input.Table.Schema,
+		TableName:  input.Table.Name,
 		RlsTag:     rlsTag,
 		RlsEnable:  input.Table.RLSEnabled,
 		RlsForced:  input.Table.RLSForced,
@@ -243,7 +268,7 @@ func buildColumnTag(c objects.Column, mapPk map[string]bool) string {
 	if c.DefaultValue != "" {
 		defaultStr, isString := c.DefaultValue.(string)
 		if isString {
-			columnTags = append(columnTags, "default:"+defaultStr)
+			columnTags = append(columnTags, "default:"+utils.CleanDoubleColonPattern(defaultStr))
 		}
 	}
 
