@@ -177,6 +177,13 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 		}
 		GenerateLogger.Debug("finish generate storages register file")
 
+		// generate job register
+		GenerateLogger.Debug("start generate job register file")
+		if err := generator.GenerateJobRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+			errChan <- err
+		}
+		GenerateLogger.Debug("finish generate job register file")
+
 		if initialize {
 			// generate import main function
 			GenerateLogger.Debug("start generate import main function file")

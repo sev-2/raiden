@@ -116,7 +116,7 @@ func createHelloWorldController(controllerPath string, generateFn GenerateFn) er
 	data := GenerateControllerData{
 		Name:           "HelloWorld",
 		Package:        "controllers",
-		HttpTag:        "`path:\"/hello/{name}\" type:\"custom\"`",
+		HttpTag:        "`path:\"/hello\" type:\"custom\"`",
 		Imports:        imports,
 		RequestFields:  requestFields,
 		ResponseFields: responseField,

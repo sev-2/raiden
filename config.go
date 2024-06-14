@@ -33,6 +33,7 @@ type Config struct {
 	SupabaseApiUrl         string           `mapstructure:"SUPABASE_API_URL"`
 	SupabaseApiBasePath    string           `mapstructure:"SUPABASE_API_BASE_PATH"`
 	SupabasePublicUrl      string           `mapstructure:"SUPABASE_PUBLIC_URL"`
+	ScheduleStatus         ScheduleStatus   `mapstructure:"SCHEDULE_STATUS"`
 	TraceEnable            bool             `mapstructure:"TRACE_ENABLE"`
 	TraceCollector         string           `mapstructure:"TRACE_COLLECTOR"`
 	TraceCollectorEndpoint string           `mapstructure:"TRACE_COLLECTOR_ENDPOINT"`
@@ -82,6 +83,10 @@ func LoadConfig(path *string) (*Config, error) {
 
 	if config.Environment == "" {
 		config.Environment = "development"
+	}
+
+	if config.ScheduleStatus == "" {
+		config.ScheduleStatus = ScheduleStatusOff
 	}
 
 	if len(config.SupabaseApiBasePath) > 0 && config.SupabaseApiBasePath[0] != '/' {
