@@ -67,6 +67,7 @@ type {{ .StructName }} struct {
 
 	// Table information
 	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" tableName:\"{{ .TableName }}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
+
 	// Access control
 	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
 	
