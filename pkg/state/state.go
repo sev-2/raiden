@@ -15,7 +15,7 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
-var StateLogger = logger.HcLog().Named("supabase.state")
+var StateLogger = logger.HcLog().Named("raiden.state")
 
 type (
 	State struct {
