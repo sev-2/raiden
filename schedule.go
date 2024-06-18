@@ -2,6 +2,7 @@ package raiden
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
@@ -43,6 +44,20 @@ func (j *JobBase) Before(cfg *Config, jobID uuid.UUID, jobName string) {}
 
 func (j *JobBase) Task(cfg *Config) error {
 	return nil
+}
+
+// ---- Scheduler monitor
+type schedulerMonitor struct {
+}
+
+func (m *schedulerMonitor) IncrementJob(id uuid.UUID, name string, tags []string, status gocron.JobStatus) {
+	logger.HcLog().Info("record job status", "job_name", name, "status", status)
+}
+
+// RecordJobTiming will provide details about the job and the timing and expects the underlying implementation
+// to handle instantiating and recording the value
+func (m *schedulerMonitor) RecordJobTiming(startTime, endTime time.Time, id uuid.UUID, name string, tags []string) {
+	logger.HcLog().Info("record job time", "job_name", name, "star_time", startTime.Format(time.RFC3339), "end_time", endTime.Format(time.RFC3339), "duration", endTime.Sub(startTime).String())
 }
 
 // ----- Scheduler server
@@ -101,7 +116,3 @@ func (s *SchedulerServer) RegisterJob(job Job) error {
 	SchedulerLogger.Info("start run job", "id", j.ID(), "name", j.Name())
 	return nil
 }
-
-// ----- TODO
-// 1. make auto create `schedule_log` to save all job report
-// 2. make function to record report job after running and save to database

@@ -134,7 +134,7 @@ func (s *Server) prepareScheduleServer() {
 		return
 	}
 
-	ss, err := NewSchedulerServer(s.Config)
+	ss, err := NewSchedulerServer(s.Config, gocron.WithMonitor(&schedulerMonitor{}))
 	if err != nil {
 		os.Exit(1)
 		return
