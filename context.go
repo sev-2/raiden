@@ -3,6 +3,7 @@ package raiden
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
@@ -30,6 +31,7 @@ type (
 		SetSpan(span trace.Span)
 
 		Tracer() trace.Tracer
+		NewJobCtx() (JobContext, error)
 
 		Write(data []byte)
 		WriteError(err error)
@@ -42,9 +44,10 @@ type (
 	Ctx struct {
 		context.Context
 		*fasthttp.RequestCtx
-		config *Config
-		span   trace.Span
-		tracer trace.Tracer
+		config  *Config
+		span    trace.Span
+		tracer  trace.Tracer
+		jobChan chan JobParams
 	}
 )
 
@@ -79,6 +82,16 @@ func (c *Ctx) SetSpan(span trace.Span) {
 
 func (c *Ctx) Tracer() trace.Tracer {
 	return c.tracer
+}
+
+func (c *Ctx) NewJobCtx() (JobContext, error) {
+	if c.jobChan != nil {
+		jobCtx := newJobCtx(c.config, c.jobChan, make(JobData))
+		spanCtx := trace.SpanContextFromContext(c.Context)
+		jobCtx.SetContext(trace.ContextWithSpanContext(context.Background(), spanCtx))
+		return jobCtx, nil
+	}
+	return nil, errors.New(("event channel not available, enable scheduler to use this feature"))
 }
 
 func (c *Ctx) Ctx() context.Context {
