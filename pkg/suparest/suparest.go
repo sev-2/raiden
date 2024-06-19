@@ -52,17 +52,8 @@ func NewQuery(ctx raiden.Context) *Query {
 	}
 }
 
-func (q *Query) Model(m interface{}, relations []interface{}) *Query {
+func (q *Query) Model(m interface{}) *Query {
 	q.model = m
-
-	for _, v := range relations {
-		table := GetTable(v)
-		q.Columns = append(
-			q.Columns,
-			fmt.Sprintf("%s(*)", table),
-		)
-	}
-
 	return q
 }
 
