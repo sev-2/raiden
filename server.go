@@ -15,6 +15,8 @@ import (
 	"github.com/sev-2/raiden/pkg/tracer"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/reuseport"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var ServerLogger = logger.HcLog().Named("raiden.server")
@@ -24,9 +26,10 @@ type Server struct {
 	Config          *Config
 	Router          *router
 	HttpServer      *fasthttp.Server
-	SchedulerServer gocron.Scheduler
+	SchedulerServer Scheduler
 	ShutdownFunc    []func(ctx context.Context) error
 	jobs            []Job
+	tracer          trace.Tracer
 }
 
 func NewServer(config *Config) *Server {
@@ -62,7 +65,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) configureTracer() {
+func (s *Server) configureTracer() error {
 	ServerLogger.Info("configure tracer")
 	tracerConfig := tracer.AgentConfig{
 		Name:        s.Config.ProjectName,
@@ -71,18 +74,26 @@ func (s *Server) configureTracer() {
 		Environment: s.Config.Environment,
 		Version:     "1.0.0",
 	}
+
 	shutdownFn, err := tracer.StartAgent(tracerConfig)
 	if err != nil {
-		ServerLogger.Error("configure tracer err", "err", err)
+		return err
 	}
 
 	ServerLogger.With("host", tracerConfig.Endpoint).With("name", tracerConfig.Name).With("environment", tracerConfig.Environment).With("version", tracerConfig.Version).
 		Info("tracer connected")
 	s.ShutdownFunc = append(s.ShutdownFunc, shutdownFn)
+
+	s.tracer = otel.Tracer(fmt.Sprintf("%s tracer", s.Config.ProjectName))
+	return nil
 }
 
 func (s *Server) configureRoute() {
 	ServerLogger.Info("configure router")
+
+	if s.tracer != nil {
+		s.Router.SetTracer(s.tracer)
+	}
 
 	// build router
 	s.Router.BuildHandler()
@@ -94,15 +105,11 @@ func (s *Server) configureRoute() {
 	s.HttpServer.Handler = s.Router.GetHandler()
 }
 
-func (s *Server) configure() {
-	if s.Config.TraceEnable {
-		s.configureTracer()
-	}
-
+func (s *Server) configureHttpServer() {
 	s.configureRoute()
 }
 
-func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) {
+func (s *Server) prepareHttpServer() (h string, l net.Listener, errChan chan error) {
 	addr := fmt.Sprintf("%s:%s", s.Config.ServerHost, s.Config.ServerPort)
 	ln, err := reuseport.Listen("tcp4", addr)
 	if err != nil {
@@ -129,17 +136,22 @@ func (s *Server) prepareServer() (h string, l net.Listener, errChan chan error) 
 	return
 }
 
-func (s *Server) prepareScheduleServer() {
+func (s *Server) runScheduleServer() {
 	if s.Config.ScheduleStatus == ScheduleStatusOff {
 		return
 	}
 
-	ss, err := NewSchedulerServer(s.Config)
+	ss, err := NewSchedulerServer(s.Config, gocron.WithMonitor(&schedulerMonitor{}), gocron.WithLimitConcurrentJobs(2, gocron.LimitModeReschedule))
 	if err != nil {
 		os.Exit(1)
 		return
 	}
-	s.SchedulerServer = ss.Server
+
+	if s.tracer != nil {
+		ss.SetTracer(s.tracer)
+	}
+
+	s.SchedulerServer = ss
 
 	// register job
 	if len(s.jobs) > 0 {
@@ -155,6 +167,10 @@ func (s *Server) prepareScheduleServer() {
 	}
 
 	s.SchedulerServer.Start()
+	go ss.ListenJobChan()
+
+	s.Router.SetJobChan(ss.JobChan)
+	s.ShutdownFunc = append(s.ShutdownFunc, ss.Stop)
 }
 
 func (s *Server) runHttpServer(hostname string, listener net.Listener, errChan chan error) {
@@ -164,12 +180,19 @@ func (s *Server) runHttpServer(hostname string, listener net.Listener, errChan c
 }
 
 func (s *Server) Run() {
-	s.configure()
+	if s.Config.TraceEnable {
+		if err := s.configureTracer(); err != nil {
+			ServerLogger.Error("configure tracer err", "err", err)
+			os.Exit(1)
+		}
+	}
 
-	s.prepareScheduleServer()
+	s.runScheduleServer()
 
 	// prepare server
-	h, l, lErrChan := s.prepareServer()
+	s.configureHttpServer()
+
+	h, l, lErrChan := s.prepareHttpServer()
 
 	/// Run server
 	go s.runHttpServer(h, l, lErrChan)
@@ -190,20 +213,12 @@ func (s *Server) Run() {
 				ServerLogger.Warn("server shutdown  error", "msg", errShutdown.Error())
 			}
 
-			// shutdown scheduler
-			if s.SchedulerServer != nil {
-				SchedulerLogger.Info("start shutdown ")
-				if err := s.SchedulerServer.Shutdown(); err != nil {
-					SchedulerLogger.Error("error shutdown ", "msg", err.Error())
-				}
-			}
-
 			if err != nil {
 				ServerLogger.Error("listener error ", "msg", err.Error())
 				os.Exit(1)
 			}
 
-			ServerLogger.Info("server is shutdown bye :)")
+			ServerLogger.Info("server gracefully stopped.")
 			os.Exit(0)
 
 		// handle termination signal
@@ -214,14 +229,6 @@ func (s *Server) Run() {
 			// FIXME: This causes a data race
 			ServerLogger.Info("disable keep alive connection")
 			s.HttpServer.DisableKeepalive = true
-
-			// shutdown scheduler=
-			if s.SchedulerServer != nil {
-				SchedulerLogger.Info("start shutdown ")
-				if err := s.SchedulerServer.Shutdown(); err != nil {
-					SchedulerLogger.Error("error shutdown ", "msg", err.Error())
-				}
-			}
 
 			// Attempt the graceful shutdown by closing the listener
 			// and completing all inflight requests.

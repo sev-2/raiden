@@ -10,7 +10,6 @@ import (
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/valyala/fasthttp"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
 	fs_router "github.com/fasthttp/router"
@@ -47,12 +46,6 @@ const (
 func NewRouter(config *Config) *router {
 	engine := fs_router.New()
 	groups := createRouteGroups(engine)
-
-	var tracer trace.Tracer
-	if config.TraceEnable {
-		tracer = otel.Tracer(fmt.Sprintf("%s tracer", config.ProjectName))
-	}
-
 	// register native controller
 	defaultRoutes := []*Route{
 		{
@@ -67,7 +60,6 @@ func NewRouter(config *Config) *router {
 		engine: engine,
 		config: config,
 		groups: groups,
-		tracer: tracer,
 		routes: defaultRoutes,
 	}
 }
@@ -79,6 +71,15 @@ type router struct {
 	middlewares []MiddlewareFn
 	routes      []*Route
 	tracer      trace.Tracer
+	jobChan     chan JobParams
+}
+
+func (r *router) SetJobChan(jobChan chan JobParams) {
+	r.jobChan = jobChan
+}
+
+func (r *router) SetTracer(tracer trace.Tracer) {
+	r.tracer = tracer
 }
 
 func (r *router) RegisterMiddlewares(middlewares []MiddlewareFn) *router {
@@ -165,19 +166,19 @@ func (r *router) bindRoute(chain Chain, route *Route) {
 		handler := chain.Then(m, route.Type, route.Controller)
 		switch strings.ToUpper(m) {
 		case fasthttp.MethodGet:
-			r.engine.GET(route.Path, buildHandler(r.config, r.tracer, handler))
+			r.engine.GET(route.Path, buildHandler(r.config, r.tracer, r.jobChan, handler))
 		case fasthttp.MethodPost:
-			r.engine.POST(route.Path, buildHandler(r.config, r.tracer, handler))
+			r.engine.POST(route.Path, buildHandler(r.config, r.tracer, r.jobChan, handler))
 		case fasthttp.MethodPut:
-			r.engine.PUT(route.Path, buildHandler(r.config, r.tracer, handler))
+			r.engine.PUT(route.Path, buildHandler(r.config, r.tracer, r.jobChan, handler))
 		case fasthttp.MethodPatch:
-			r.engine.PATCH(route.Path, buildHandler(r.config, r.tracer, handler))
+			r.engine.PATCH(route.Path, buildHandler(r.config, r.tracer, r.jobChan, handler))
 		case fasthttp.MethodDelete:
-			r.engine.DELETE(route.Path, buildHandler(r.config, r.tracer, handler))
+			r.engine.DELETE(route.Path, buildHandler(r.config, r.tracer, r.jobChan, handler))
 		case fasthttp.MethodOptions:
-			r.engine.OPTIONS(route.Path, buildHandler(r.config, r.tracer, handler))
+			r.engine.OPTIONS(route.Path, buildHandler(r.config, r.tracer, r.jobChan, handler))
 		case fasthttp.MethodHead:
-			r.engine.HEAD(route.Path, buildHandler(r.config, r.tracer, handler))
+			r.engine.HEAD(route.Path, buildHandler(r.config, r.tracer, r.jobChan, handler))
 		}
 	}
 }
@@ -207,7 +208,7 @@ func (r *router) registerRpcAndFunctionHandler(route *Route) {
 			chain = r.buildAppMiddleware(chain)
 		}
 		group.POST(route.Path, buildHandler(
-			r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, route.Controller),
+			r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodPost, route.Type, route.Controller),
 		))
 	}
 }
@@ -235,11 +236,11 @@ func (r *router) registerRestHandler(route *Route) {
 			TableName:  GetTableName(route.Model),
 		}
 
-		group.GET(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodGet, route.Type, restController)))
-		group.POST(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, restController)))
-		group.PUT(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPut, route.Type, restController)))
-		group.PATCH(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
-		group.DELETE(route.Path, buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+		group.GET(route.Path, buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(route.Path, buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(route.Path, buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(route.Path, buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(route.Path, buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
 	}
 }
 
@@ -257,11 +258,11 @@ func (r *router) registerStorageHandler(route *Route) {
 			RoutePath:  route.Path,
 		}
 
-		group.GET(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodGet, route.Type, restController)))
-		group.POST(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPost, route.Type, restController)))
-		group.PUT(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPut, route.Type, restController)))
-		group.PATCH(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
-		group.DELETE(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+		group.GET(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
 	}
 }
 
@@ -300,13 +301,14 @@ func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group 
 
 // The function "buildHandler" creates a fasthttp.RequestHandler that executes a given RouteHandlerFn
 // with a provided Config and trace.Tracer.
-func buildHandler(config *Config, tracer trace.Tracer, handler RouteHandlerFn) fasthttp.RequestHandler {
+func buildHandler(config *Config, tracer trace.Tracer, jobChan chan JobParams, handler RouteHandlerFn) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		appContext := &Ctx{
 			RequestCtx: ctx,
 			config:     config,
 			tracer:     tracer,
 			Context:    context.Background(),
+			jobChan:    jobChan,
 		}
 		// execute actual handler from controller
 		if err := handler(appContext); err != nil {

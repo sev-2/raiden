@@ -21,6 +21,7 @@ type MockContext struct {
 	SpanFn              func() trace.Span
 	SetSpanFn           func(span trace.Span)
 	TracerFn            func() trace.Tracer
+	NewJobCtxFn         func() (raiden.JobContext, error)
 	WriteFn             func(data []byte)
 	WriteErrorFn        func(err error)
 }
@@ -71,6 +72,10 @@ func (c *MockContext) SetSpan(span trace.Span) {
 
 func (c *MockContext) Tracer() trace.Tracer {
 	return c.TracerFn()
+}
+
+func (c *MockContext) NewJobCtx() (raiden.JobContext, error) {
+	return c.NewJobCtxFn()
 }
 
 func (c *MockContext) Write(data []byte) {
