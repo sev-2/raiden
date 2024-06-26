@@ -107,11 +107,16 @@ func (c *Ctx) SetCtx(ctx context.Context) {
 }
 
 func (c *Ctx) Get(key string) any {
-	value := c.data[key]
-	return value
+	if c.data == nil {
+		c.data = make(map[string]any)
+	}
+	return c.data[key]
 }
 
 func (c *Ctx) Set(key string, value any) {
+	if c.data == nil {
+		c.data = make(map[string]any)
+	}
 	c.data[key] = value
 }
 

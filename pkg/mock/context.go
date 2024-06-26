@@ -26,6 +26,7 @@ type MockContext struct {
 	WriteErrorFn        func(err error)
 	SetFn               func(key string, value any)
 	GetFn               func(key string) any
+	Data                map[string]any
 }
 
 func (c *MockContext) Ctx() context.Context {
@@ -88,10 +89,10 @@ func (c *MockContext) WriteError(err error) {
 	c.WriteErrorFn(err)
 }
 
-func (c *MockContext) Set(key string, value any) {
-	c.SetFn(key, value)
+func (c *MockContext) Get(key string) any {
+	return c.Data[key]
 }
 
-func (c *MockContext) Get(key string) any {
-	return c.GetFn(key)
+func (c *MockContext) Set(key string, value any) {
+	c.Data[key] = value
 }

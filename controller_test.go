@@ -1,6 +1,8 @@
 package raiden_test
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -22,7 +24,7 @@ type Result struct {
 type Controller struct {
 	raiden.ControllerBase
 
-	// Reserver Field
+	// Reserved Field
 	Payload *Payload
 	Result  Result
 }
@@ -32,7 +34,52 @@ func (h *Controller) Get(ctx raiden.Context) error {
 	return ctx.SendJson(h.Result)
 }
 
-func TestControllerHandler(t *testing.T) {
+type DataController struct {
+	raiden.ControllerBase
+
+	// Reserved Field
+	Payload map[string]any
+	Result  map[string]any
+}
+
+func (h *DataController) BeforeGet(ctx raiden.Context) error {
+	ctx.Set("message", "from before get middleware")
+	return nil
+}
+
+func (h *DataController) Get(ctx raiden.Context) error {
+	msg := ctx.Get("message")
+	msg, isString := msg.(string)
+	if !isString {
+		return ctx.SendErrorWithCode(500, errors.New("get - invalid message type"))
+	}
+
+	if msg != "from before get middleware" {
+		return ctx.SendErrorWithCode(500, errors.New("get - invalid message value"))
+	}
+
+	h.Result = map[string]any{
+		"message": msg,
+	}
+	ctx.Set("message", "from get handler")
+	return ctx.SendJson(h.Result)
+}
+
+func (h *DataController) AfterGet(ctx raiden.Context) error {
+	msg := ctx.Get("message")
+	msg, isString := msg.(string)
+	if !isString {
+		return ctx.SendErrorWithCode(500, errors.New("after get - invalid message type"))
+	}
+
+	if msg != "from get handler" {
+		return ctx.SendErrorWithCode(500, errors.New("after get - invalid message value"))
+	}
+
+	return nil
+}
+
+func TestController_Handler(t *testing.T) {
 	var testResult any
 	mockContext := mock.MockContext{
 		SendJsonFn: func(data any) error {
@@ -40,7 +87,7 @@ func TestControllerHandler(t *testing.T) {
 			return nil
 		},
 		SendErrorWithCodeFn: func(statusCode int, err error) error {
-			return nil
+			return err
 		},
 	}
 
@@ -64,4 +111,34 @@ func TestControllerHandler(t *testing.T) {
 	result, isResult := testResult.(Result)
 	assert.Equal(t, true, isResult)
 	assert.Equal(t, fmt.Sprintf("%s - hello %s", "greeting", "raiden"), result.Message)
+}
+
+func TestController_PassData(t *testing.T) {
+	var reqCtx fasthttp.RequestCtx
+	context := raiden.Ctx{
+		RequestCtx: &reqCtx,
+	}
+
+	// setup required data
+	controller := &DataController{}
+
+	err := controller.BeforeGet(&context)
+	assert.NoError(t, err)
+
+	err = controller.Get(&context)
+	assert.NoError(t, err)
+
+	err = controller.AfterGet(&context)
+	assert.NoError(t, err)
+
+	response := reqCtx.Response.Body()
+	assert.NotNil(t, response)
+
+	mapData := make(map[string]any)
+	err = json.Unmarshal(response, &mapData)
+	assert.NoError(t, err)
+
+	message, isMessageExist := mapData["message"]
+	assert.True(t, isMessageExist)
+	assert.Equal(t, "from before get middleware", message)
 }
