@@ -3,6 +3,7 @@ package suparest
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/sev-2/raiden"
@@ -17,6 +18,14 @@ func (q Query) Select(columns ...string) (model *Query) {
 
 	for _, v := range columns {
 		if !validSet[v] {
+			if strings.Contains(v, ":") {
+				c := strings.Split(v, ":")
+				isMatch, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]{1,59}`, c[0])
+				if validSet[c[1]] && isMatch {
+					continue
+				}
+			}
+
 			raiden.Fatal(fmt.Sprintf("invalid column: %s is not available on %s table", v, GetTable(q.model)))
 		}
 	}
