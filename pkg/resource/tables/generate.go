@@ -27,10 +27,10 @@ func getMapTableKey(schema, name string) string {
 	return fmt.Sprintf("%s.%s", schema, name)
 }
 
-func BuildGenerateModelInputs(tables []objects.Table, policies objects.Policies) []*generator.GenerateModelInput {
+func BuildGenerateModelInputs(tables []objects.Table, policies objects.Policies, mapModelValidationTags map[string]state.ModelValidationTag) []*generator.GenerateModelInput {
 	mapTable := tableToMap(tables)
 	mapRelations := buildGenerateMapRelations(mapTable)
-	return buildGenerateModelInput(mapTable, mapRelations, policies)
+	return buildGenerateModelInput(mapTable, mapRelations, policies, mapModelValidationTags)
 }
 
 // ---- build table relation for generated -----
@@ -166,7 +166,7 @@ func mergeGenerateManyToManyCandidate(candidates []*ManyToManyTable, mapRelation
 }
 
 // --- attach relation to table
-func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations, policies objects.Policies) []*generator.GenerateModelInput {
+func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations, policies objects.Policies, mapModelValidationTags map[string]state.ModelValidationTag) []*generator.GenerateModelInput {
 	generateInputs := make([]*generator.GenerateModelInput, 0)
 	for k, v := range mapTable {
 		input := generator.GenerateModelInput{
@@ -182,6 +182,10 @@ func buildGenerateModelInput(mapTable MapTable, mapRelations MapRelations, polic
 			}
 		}
 
+		vTag, exist := mapModelValidationTags[input.Table.Name]
+		if exist && vTag != nil {
+			input.ValidationTags = vTag
+		}
 		generateInputs = append(generateInputs, &input)
 	}
 	return generateInputs

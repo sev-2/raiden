@@ -82,6 +82,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 
 	// dry run import errors
 	dryRunError := []string{}
+	mapModelValidationTags := make(map[string]state.ModelValidationTag)
 
 	// compare resource
 	ImportLogger.Info("compare supabase resource and local resource")
@@ -89,11 +90,23 @@ func Import(flags *Flags, config *raiden.Config) error {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare table")
 		}
+
+		for i := range appTables.New {
+			nt := appTables.New[i]
+			if nt.ValidationTags != nil {
+				mapModelValidationTags[nt.Table.Name] = nt.ValidationTags
+			}
+		}
+
 		// compare table
 		var compareTables []objects.Table
 		for i := range appTables.Existing {
 			et := appTables.Existing[i]
 			compareTables = append(compareTables, et.Table)
+
+			if et.ValidationTags != nil {
+				mapModelValidationTags[et.Table.Name] = et.ValidationTags
+			}
 		}
 
 		if err := tables.Compare(spResource.Tables, compareTables); err != nil {
@@ -173,7 +186,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 	if !flags.DryRun {
 		// generate resource
-		if err := generateImportResource(config, &importState, flags.ProjectPath, spResource); err != nil {
+		if err := generateImportResource(config, &importState, flags.ProjectPath, spResource, mapModelValidationTags); err != nil {
 			return err
 		}
 		PrintImportReport(importReport, false)
@@ -190,7 +203,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 }
 
 // ----- Generate import data -----
-func generateImportResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *Resource) error {
+func generateImportResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *Resource, mapModelValidationTags map[string]state.ModelValidationTag) error {
 	if err := generator.CreateInternalFolder(projectPath); err != nil {
 		return err
 	}
@@ -202,7 +215,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 	go func() {
 		defer wg.Done()
 		if len(resource.Tables) > 0 {
-			tableInputs := tables.BuildGenerateModelInputs(resource.Tables, resource.Policies)
+			tableInputs := tables.BuildGenerateModelInputs(resource.Tables, resource.Policies, mapModelValidationTags)
 			ImportLogger.Info("start generate tables")
 			captureFunc := ImportDecorateFunc(tableInputs, func(item *generator.GenerateModelInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateModelData); ok {

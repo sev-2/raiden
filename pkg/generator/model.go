@@ -41,9 +41,10 @@ type (
 	}
 
 	GenerateModelInput struct {
-		Table     objects.Table
-		Relations []state.Relation
-		Policies  objects.Policies
+		Table          objects.Table
+		Relations      []state.Relation
+		Policies       objects.Policies
+		ValidationTags state.ModelValidationTag
 	}
 )
 
@@ -109,7 +110,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 	}
 
 	// map column data
-	columns, importsPath := MapTableAttributes(input.Table)
+	columns, importsPath := MapTableAttributes(input.Table, input.ValidationTags)
 	rlsTag := BuildRlsTag(input.Policies, input.Table.Name, supabase.RlsTypeModel)
 	raidenPath := "github.com/sev-2/raiden"
 	importsPath = append(importsPath, raidenPath)
@@ -189,7 +190,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 }
 
 // map table to column, map pg type to go type and get dependency import path
-func MapTableAttributes(table objects.Table) (columns []GenerateModelColumn, importsPath []string) {
+func MapTableAttributes(table objects.Table, validationTags state.ModelValidationTag) (columns []GenerateModelColumn, importsPath []string) {
 	importsMap := make(map[string]any)
 	mapPrimaryKey := map[string]bool{}
 	for _, k := range table.PrimaryKeys {
@@ -199,7 +200,7 @@ func MapTableAttributes(table objects.Table) (columns []GenerateModelColumn, imp
 	for _, c := range table.Columns {
 		column := GenerateModelColumn{
 			Name: c.Name,
-			Tag:  buildColumnTag(c, mapPrimaryKey),
+			Tag:  buildColumnTag(c, mapPrimaryKey, validationTags),
 			Type: postgres.ToGoType(postgres.DataType(c.DataType), c.IsNullable),
 		}
 
@@ -232,12 +233,19 @@ func MapTableAttributes(table objects.Table) (columns []GenerateModelColumn, imp
 	return
 }
 
-func buildColumnTag(c objects.Column, mapPk map[string]bool) string {
+func buildColumnTag(c objects.Column, mapPk map[string]bool, validationTags state.ModelValidationTag) string {
 	var tags []string
 
 	// append json tag
 	jsonTag := fmt.Sprintf("json:%q", utils.ToSnakeCase(c.Name)+",omitempty")
 	tags = append(tags, jsonTag)
+
+	// append validate tag
+	if validationTags != nil {
+		if vTag, exist := validationTags[c.Name]; exist {
+			tags = append(tags, fmt.Sprintf("validate:%q", vTag))
+		}
+	}
 
 	// append column tag
 	columnTags := []string{
