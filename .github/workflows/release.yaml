@@ -56,41 +56,30 @@ jobs:
           files: build/raiden-*
           make_latest: true
           generate_release_notes: true
-
+  
   push-version:
-    needs: build
+    needs: build-and-release
     runs-on: ubuntu-latest
     if: success()
-    env:
-      changelog: false
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get the latest tag
-        id: get_tag
-        run: echo "::set-output name=tag::${{ github.event.release.tag_name }}"
-
-      - name: Check for jq and install if missing
+      - name: Checkout target repo
         run: |
-          if ! command -v jq &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y jq
-          fi
+          git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/sev-2/docs.git docs
 
-      - name: Check for changelog and assets
-        id: check_files
+      - name: Write JSON file
         run: |
-          if [ -f "CHANGELOG.md" ]; then echo "changelog=true" >> $GITHUB_ENV; else echo "changelog=false" >> $GITHUB_ENV; fi
-          if [ -d "assets" ]; then echo "assets=true" >> $GITHUB_ENV; else echo "assets=false" >> $GITHUB_ENV; fi
+          echo "{\"version\": \"$GITHUB_REF_NAME\"}" > docs/public/latest.json
 
-      - name: Push tag, changelog, and assets to documentation API
+      - name: Commit and push changes
         run: |
-          payload="{\"version\": \"${{ steps.get_tag.outputs.tag }}\""
-          if [ "${{ env.changelog }}" == "true" ]; then
-            changelog_content=$(cat CHANGELOG.md | jq -Rs .)
-            payload="$payload, \"changelog\": $changelog_content"
-          fi
-          payload="$payload}"
-          echo $payload | jq .
-          curl -X POST -H "Content-Type: application/json" -d "$payload" https://eoajuw00wc34s58.m.pipedream.net/push-version-tests
+          cd docs
+          git config --global user.name "raiden-ci"
+          git config --global user.email "raiden-ci@sev-2.com"
+          git remote set-url origin https://$GITHUB_USER:$GITHUB_TOKEN@github.com/sev-2/docs.git
+          git add .
+          git commit -m "Update to version $GITHUB_REF_NAME"
+          git push
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+      GITHUB_USER: ${{ secrets.TARGET_USERNAME }}
