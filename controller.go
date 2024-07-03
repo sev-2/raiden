@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/valyala/fasthttp"
@@ -158,6 +159,7 @@ func (*ControllerBase) AfterHead(ctx Context) error {
 // ----- Rest Controller -----
 type RestController struct {
 	Controller
+	Model     any
 	TableName string
 }
 
@@ -297,20 +299,41 @@ func (rc RestController) Options(ctx Context) error {
 
 // Patch implements Controller.
 func (rc RestController) Patch(ctx Context) error {
+	model := createObjectFromAnyData(rc.Model)
+	json.Unmarshal(ctx.RequestContext().Request.Body(), model)
+
+	if err := Validate(model); err != nil {
+		return err
+	}
+
 	return RestProxy(ctx, rc.TableName)
 }
 
 // Post implements Controller.
 func (rc RestController) Post(ctx Context) error {
+	model := createObjectFromAnyData(rc.Model)
+	json.Unmarshal(ctx.RequestContext().Request.Body(), model)
+
+	if err := Validate(model); err != nil {
+		return err
+	}
+
 	return RestProxy(ctx, rc.TableName)
 }
 
 // Put implements Controller.
 func (rc RestController) Put(ctx Context) error {
+	model := createObjectFromAnyData(rc.Model)
+	json.Unmarshal(ctx.RequestContext().Request.Body(), model)
+
+	if err := Validate(model); err != nil {
+		return err
+	}
+
 	return RestProxy(ctx, rc.TableName)
 }
 
-// ----- Rest Controller -----
+// ----- Storage Controller -----
 type StorageController struct {
 	Controller
 	BucketName string
@@ -532,6 +555,14 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 	return nil
 }
 
+func createObjectFromAnyData(data any) any {
+	rt := reflect.TypeOf(data)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	return reflect.New(rt).Interface()
+}
+
 // The function `setPayloadValue` sets the value of a field in a struct based on its type.
 func setPayloadValue(fieldValue reflect.Value, value string) error {
 	switch fieldValue.Kind() {
@@ -591,8 +622,8 @@ func RestProxy(appCtx Context, TableName string) error {
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
 
-	restProxyLogger.Debug("forward request", "method", string(req.Header.Method()), "uri", string(req.URI().FullURI()))
-	if err := fasthttp.Do(req, resp); err != nil {
+	restProxyLogger.Debug("forward request", "method", string(req.Header.Method()), "uri", string(req.URI().FullURI()), "header", string(req.Header.RawHeaders()), "body", string(appCtx.RequestContext().Request.Body()))
+	if err := fasthttp.DoTimeout(req, resp, 30*time.Second); err != nil {
 		return err
 	}
 

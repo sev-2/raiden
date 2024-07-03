@@ -233,6 +233,7 @@ func (r *router) registerRestHandler(route *Route) {
 
 		restController := RestController{
 			Controller: route.Controller,
+			Model:      route.Model,
 			TableName:  GetTableName(route.Model),
 		}
 

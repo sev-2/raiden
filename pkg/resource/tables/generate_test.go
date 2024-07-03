@@ -16,7 +16,7 @@ func TestBuildGenerateModelInputs(t *testing.T) {
 	err := json.Unmarshal([]byte(jsonStrData), &sourceTables)
 	assert.NoError(t, err)
 
-	rs := tables.BuildGenerateModelInputs(sourceTables, nil)
+	rs := tables.BuildGenerateModelInputs(sourceTables, nil, nil)
 
 	for _, r := range rs {
 		assert.Equal(t, 2, len(r.Relations))

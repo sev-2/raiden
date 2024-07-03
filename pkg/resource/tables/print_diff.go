@@ -130,8 +130,8 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 		diffColumns := []string{}
 
 		// mas source column
-		mapSColumns, _ := generator.MapTableAttributes(diffData.SourceResource)
-		mapTColumns, _ := generator.MapTableAttributes(diffData.TargetResource)
+		mapSColumns, _ := generator.MapTableAttributes(diffData.SourceResource, nil)
+		mapTColumns, _ := generator.MapTableAttributes(diffData.TargetResource, nil)
 
 		// find source column
 		for ic := range diffData.DiffItems.ChangeColumnItems {

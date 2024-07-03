@@ -13,8 +13,11 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
+type ModelValidationTag map[string]string
+
 type ExtractTableItem struct {
 	Table             objects.Table
+	ValidationTags    ModelValidationTag
 	ExtractedPolicies ExtractedPolicies
 }
 
@@ -75,6 +78,7 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 	}
 
 	ei.Table.Name = raiden.GetTableName(model)
+	ei.ValidationTags = make(ModelValidationTag)
 
 	// add metadata
 	metadataField, isExist := modelType.FieldByName("Metadata")
@@ -114,6 +118,10 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 					// set is unique to false if is primary key
 					c.IsUnique = false
 				}
+
+				if vTag := field.Tag.Get("validate"); len(vTag) > 0 {
+					ei.ValidationTags[c.Name] = vTag
+				}
 			}
 
 			if join := field.Tag.Get("join"); len(join) > 0 {
@@ -151,6 +159,7 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 	// Get the reflect.Type of the struct
 	ei.Table = state.Table
 	ei.Table.Name = raiden.GetTableName(model)
+	ei.ValidationTags = make(ModelValidationTag)
 
 	// map column for make check if column exist and reuse default
 	mapColumn := make(map[string]objects.Column)
@@ -229,6 +238,10 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 							TableName: ei.Table.Name,
 						})
 					}
+				}
+
+				if vTag := field.Tag.Get("validate"); len(vTag) > 0 {
+					ei.ValidationTags[c.Name] = vTag
 				}
 
 				columns = append(columns, c)
