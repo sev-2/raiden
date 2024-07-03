@@ -61,7 +61,8 @@ import (
 {{- end }}
 
 type {{ .StructName }} struct {
-	raiden.ModelBase
+	db.ModelBase
+
 {{- range .Columns }}
 	{{ .Name | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
 {{- end }}
@@ -71,7 +72,7 @@ type {{ .StructName }} struct {
 
 	// Access control
 	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
-	
+
 {{- if gt (len .Relations) 0 }}
 
 	// Relations
