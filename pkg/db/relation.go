@@ -1,4 +1,4 @@
-package suparest
+package db
 
 import (
 	"fmt"
