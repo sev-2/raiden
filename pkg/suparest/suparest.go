@@ -65,6 +65,10 @@ func (m *ModelBase) NewQuery() *Query {
 func GetTable(m interface{}) string {
 	t := reflect.TypeOf(m)
 
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
 	field, found := t.FieldByName("Metadata")
 	if !found {
 		fmt.Println("Field \"tableName\" is not found")
