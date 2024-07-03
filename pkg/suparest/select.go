@@ -17,6 +17,10 @@ func (q Query) Select(columns ...string) (model *Query) {
 	}
 
 	for _, v := range columns {
+		if v == "*" {
+			continue
+		}
+
 		if !validSet[v] {
 			if strings.Contains(v, ":") {
 				c := strings.Split(v, ":")
