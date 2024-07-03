@@ -71,10 +71,10 @@ func RegisterRole(list ...raiden.Role) {
 }
 
 // ----- Handle register models -----
-var registeredModels []any
+var RegisteredModels []any
 
 func RegisterModels(list ...any) {
-	registeredModels = append(registeredModels, list...)
+	RegisteredModels = append(RegisteredModels, list...)
 }
 
 // ----- Handle register storages -----
@@ -178,7 +178,7 @@ func extractAppResource(f *Flags, latestState *state.State) (
 
 	if f.All() || f.ModelsOnly {
 		ImportLogger.Debug("Start extract table")
-		extractedTable, err = state.ExtractTable(latestState.Tables, registeredModels)
+		extractedTable, err = state.ExtractTable(latestState.Tables, RegisteredModels)
 		if err != nil {
 			return
 		}
