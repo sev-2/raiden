@@ -5,6 +5,7 @@ import (
 	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/configure"
 	"github.com/sev-2/raiden/pkg/cli/serve"
+	"github.com/sev-2/raiden/pkg/cli/version"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,9 @@ func ServeCommand() *cobra.Command {
 		PreRun: PreRun(&f.LogFlags, serve.PreRun),
 		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
+
+			// check latest version
+			version.Run(appVersion)
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()

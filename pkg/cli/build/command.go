@@ -33,8 +33,8 @@ var buildDir = "build"
 // allowing the user to specify the target operating system and processor architecture
 // when running the command.
 func (f *Flags) Bind(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.OS, "os", "", "specifiy target operating system")
-	cmd.Flags().StringVar(&f.Arch, "arch", "", "specifiy target processor architecture")
+	cmd.Flags().StringVar(&f.OS, "os", "", "specify target operating system")
+	cmd.Flags().StringVar(&f.Arch, "arch", "", "specify target processor architecture")
 }
 
 // The function `PreRun` checks if the necessary configuration and initialization files exist in the

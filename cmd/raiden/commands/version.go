@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/fatih/color"
+	"github.com/sev-2/raiden/pkg/cli/version"
 	"github.com/spf13/cobra"
 )
 
@@ -56,6 +57,10 @@ func VersionCommand() *cobra.Command {
 				goVersion,
 				os, arch, numCPU,
 			)
+
+			// check latest version
+			version.Run(appVersion)
+
 		},
 	}
 }

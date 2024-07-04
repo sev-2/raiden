@@ -9,6 +9,7 @@ import (
 	"github.com/sev-2/raiden/pkg/cli/generate"
 	"github.com/sev-2/raiden/pkg/cli/imports"
 	init_cmd "github.com/sev-2/raiden/pkg/cli/init"
+	"github.com/sev-2/raiden/pkg/cli/version"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/spf13/cobra"
@@ -33,6 +34,9 @@ func StartCommand() *cobra.Command {
 		Long:  "Start new project, synchronize resource and scaffold application",
 		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
+
+			// check latest version
+			version.Run(appVersion)
 
 			// preparation
 			// - get current directory
