@@ -16,9 +16,10 @@ import (
 	"github.com/erikgeiser/promptkit/confirmation"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
+	"golang.org/x/mod/modfile"
 )
 
-var versionLogger hclog.Logger = logger.HcLog()
+var VersionLogger hclog.Logger = logger.HcLog()
 
 const (
 	latestVersionUrl  = "https://raiden.sev-2.com/latest.json"
@@ -26,7 +27,7 @@ const (
 	updateScriptShUrl = "https://raiden.sev-2.com/update.sh"
 )
 
-func Run(currentVersion string) (errUpdate error) {
+func Run(currentVersion string) (isLatest bool, isUpdate bool, errUpdate error) {
 	// get latest version
 	latestVersion, err := FetchLatestVersion()
 	if err != nil {
@@ -34,22 +35,23 @@ func Run(currentVersion string) (errUpdate error) {
 	}
 
 	// check if have new version
-	if latestVersion == currentVersion {
+	isLatest = latestVersion == currentVersion
+	if isLatest {
 		return
 	}
 
-	isUpdate, errUpdate := promptUpdateConfiguration(latestVersion)
+	confirmationText := fmt.Sprintf("raiden-cli version %s has been released, do you want to update first ?", latestVersion)
+	isUpdate, errUpdate = promptUpdateConfirmation(confirmationText)
 	if errUpdate != nil {
-		versionLogger.Error(errUpdate.Error())
-		os.Exit(0)
+		return
 	}
 
 	if !isUpdate {
-		os.Exit(0)
+		return
 	}
 
 	// ensure temporary folder
-	versionLogger.Info("prepare new binary installation")
+	VersionLogger.Info("prepare new binary installation")
 	tmpDir := fmt.Sprintf("%s/raiden", os.TempDir())
 	err = ensureTmpDir(tmpDir)
 	if err != nil {
@@ -65,7 +67,7 @@ func Run(currentVersion string) (errUpdate error) {
 	}
 
 	// download all binary
-	versionLogger.Info("download new binary")
+	VersionLogger.Info("download new binary")
 	downloadBinaryUrl := fmt.Sprintf("%s/%s/%s", baseDownloadUrl, latestVersion, binaryName)
 	err = downloadFile(downloadBinaryUrl, tmpDir+"/"+binaryName)
 	if err != nil {
@@ -87,7 +89,7 @@ func Run(currentVersion string) (errUpdate error) {
 	}
 
 	// Verify the SHA256 checksum
-	versionLogger.Info("verify downloaded binary")
+	VersionLogger.Info("verify downloaded binary")
 	valid, err := verifySHA256(tmpDir+"/"+binaryName, tmpDir+"/"+sha256Name)
 	if err != nil {
 		errUpdate = fmt.Errorf("error verifying SHA256 checksum: %v", err)
@@ -98,15 +100,46 @@ func Run(currentVersion string) (errUpdate error) {
 		return
 	}
 
-	versionLogger.Info("starting upgrade raiden in different process")
+	VersionLogger.Info("starting upgrade raiden in different process")
 	err = updateBinary(fmt.Sprintf("%s/%s", tmpDir, "update.sh"), fmt.Sprintf("%s/%s", tmpDir, binaryName))
 	if err != nil {
-		versionLogger.Error(err.Error())
+		errUpdate = err
+		return
 	}
-	versionLogger.Info("follow upgrade process, bye :)")
-
-	os.Exit(0)
+	VersionLogger.Info("follow upgrade process, bye :)")
 	return
+}
+
+func RunPackage(latestVersion string) error {
+	version, err := getVersion("go.mod", "github.com/sev-2/raiden")
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("package version : ", version)
+
+	if version == latestVersion {
+		return nil
+	}
+
+	confirmationText := fmt.Sprintf("raiden package version %s has been released, do you want to update package first ?", latestVersion)
+	isUpdate, errUpdate := promptUpdateConfirmation(confirmationText)
+	if errUpdate != nil {
+		return errUpdate
+	}
+
+	if !isUpdate {
+		return nil
+	}
+
+	VersionLogger.Info("start update version")
+	cmd := exec.Command("go", "get", "-u", fmt.Sprintf("github.com/sev-2/raiden@%s", latestVersion))
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("err update version : %s %s", err, output)
+	}
+	VersionLogger.Info(fmt.Sprintf("success update package to version %s", latestVersion))
+	return nil
 }
 
 func FetchLatestVersion() (version string, errFetch error) {
@@ -241,8 +274,7 @@ func verifySHA256(filepath, sha256path string) (bool, error) {
 	return fileHash == expectedHash, nil
 }
 
-func promptUpdateConfiguration(latestVersion string) (bool, error) {
-	confirmationText := fmt.Sprintf("raiden-cli version %s has been released, do you want to update first ?", latestVersion)
+func promptUpdateConfirmation(confirmationText string) (bool, error) {
 	input := confirmation.New(confirmationText, confirmation.Undecided)
 	input.DefaultValue = confirmation.Yes
 
@@ -311,4 +343,33 @@ func getLinuxCommand(command string) (*exec.Cmd, error) {
 	}
 
 	return nil, fmt.Errorf("no supported terminal emulator found")
+}
+
+func getVersion(modulePath string, packageName string) (string, error) {
+	// Open the go.mod file
+	file, err := os.Open(modulePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// Read the file content
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+	// Parse the go.mod file
+	modFile, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Find the version for the specified package
+	for _, r := range modFile.Require {
+		if r.Mod.Path == packageName {
+			return r.Mod.Version, nil
+		}
+	}
+
+	return "", fmt.Errorf("package %s not found in go.mod", packageName)
 }

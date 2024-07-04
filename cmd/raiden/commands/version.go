@@ -59,7 +59,12 @@ func VersionCommand() *cobra.Command {
 			)
 
 			// check latest version
-			version.Run(appVersion)
+			_, isUpdate, errVersion := version.Run(appVersion)
+			if isUpdate {
+				if errVersion != nil {
+					version.VersionLogger.Error(errVersion.Error())
+				}
+			}
 
 		},
 	}

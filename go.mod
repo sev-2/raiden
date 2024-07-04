@@ -96,5 +96,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.22.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.22.0
 	go.opentelemetry.io/otel/sdk v1.22.0
+	golang.org/x/mod v0.18.0
 	golang.org/x/sys v0.18.0 // indirect
 )

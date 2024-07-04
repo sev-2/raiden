@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/hashicorp/go-hclog"
@@ -36,7 +37,13 @@ func StartCommand() *cobra.Command {
 			f.CheckAndActivateDebug(cmd)
 
 			// check latest version
-			version.Run(appVersion)
+			_, isUpdate, errVersion := version.Run(appVersion)
+			if isUpdate {
+				if errVersion != nil {
+					version.VersionLogger.Error(errVersion.Error())
+				}
+				os.Exit(0)
+			}
 
 			// preparation
 			// - get current directory

@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"os"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/cli"
 	"github.com/sev-2/raiden/pkg/cli/apply"
@@ -28,8 +30,21 @@ func ApplyCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			f.CheckAndActivateDebug(cmd)
 
-			// check latest version
-			version.Run(appVersion)
+			// check latest versions
+			isLatest, isUpdate, errVersion := version.Run(appVersion)
+			if isUpdate {
+				if errVersion != nil {
+					version.VersionLogger.Error(errVersion.Error())
+				}
+				os.Exit(0)
+			}
+
+			if isLatest {
+				if err := version.RunPackage(appVersion); err != nil {
+					version.VersionLogger.Error(err.Error())
+					return
+				}
+			}
 
 			// get current directory
 			currentDir, errCurDir := utils.GetCurrentDirectory()

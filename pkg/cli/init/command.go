@@ -1,7 +1,6 @@
 package init
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -63,7 +62,6 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 		if !isReInit {
 			return nil
 		}
-
 		utils.DeleteFile(goModFile)
 		utils.DeleteFile(filepath.Join(projectPath, "go.sum"))
 	}
@@ -71,12 +69,9 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 	// running go mod init
 	InitLogger.Info("init repository")
 	InitLogger.Debug("execute command", "cmd", fmt.Sprint("go mod init ", moduleName))
-	var stdout bytes.Buffer
 	cmdModInit := exec.Command("go", "mod", "init", moduleName)
-	cmdModInit.Stdout = &stdout
-	cmdModInit.Stderr = os.Stderr
 
-	if err := cmdModInit.Run(); err != nil {
+	if _, err := cmdModInit.CombinedOutput(); err != nil {
 		return fmt.Errorf("error init project : %v", err)
 	}
 
@@ -88,10 +83,8 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 	}
 	InitLogger.Debug("execute command", "cmd", fmt.Sprintf("go get %s ", repoName))
 	cmdRaidenInit := exec.Command("go", "get", "-u", repoName)
-	cmdModInit.Stdout = &stdout
-	cmdRaidenInit.Stderr = os.Stderr
 
-	if err := cmdRaidenInit.Run(); err != nil {
+	if _, err := cmdRaidenInit.CombinedOutput(); err != nil {
 		return fmt.Errorf("error get raiden app : %v", err)
 	}
 
@@ -99,13 +92,12 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 	InitLogger.Info("init all dependency")
 	InitLogger.Debug("execute command", "cmd", "go mod tidy")
 	cmdModTidy := exec.Command("go", "mod", "tidy")
-	cmdModInit.Stdout = &stdout
-	cmdModTidy.Stderr = os.Stderr
 
-	if err := cmdModTidy.Run(); err != nil {
+	if _, err := cmdModTidy.CombinedOutput(); err != nil {
 		return fmt.Errorf("error install dependency : %v", err)
 	}
 
+	InitLogger.Info("finish setup project :)")
 	return nil
 }
 
