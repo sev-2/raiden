@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feat/*
+      - release-integration/official-web
     tags:
       - v*
 
