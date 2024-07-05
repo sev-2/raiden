@@ -3,7 +3,6 @@ package db
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/sev-2/raiden"
@@ -57,31 +56,4 @@ func (q *Query) With(r string, columns map[string][]string, fkeys map[string]str
 	q.Columns = append(q.Columns, selects...)
 
 	return q
-}
-
-func findModel(models []interface{}, targetName string) interface{} {
-	for _, m := range models {
-		if reflect.TypeOf(m).Elem().Name() == targetName {
-			return m
-		}
-	}
-
-	return nil
-}
-
-func reverseSortString(n []string) []string {
-	sort.Slice(n, func(i, j int) bool {
-		return n[i] < n[j]
-	})
-
-	return n
-}
-
-func keyExist(maps map[string]string, s string) bool {
-	for key, _ := range maps {
-		if key == s {
-			return true
-		}
-	}
-	return false
 }

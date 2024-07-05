@@ -2,8 +2,6 @@ package db
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"reflect"
 	"strings"
 
@@ -213,22 +211,4 @@ func buildQueryURI(q Query) string {
 	}
 
 	return output
-}
-
-func getConfig() *raiden.Config {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-
-	configFilePath := strings.Join([]string{currentDir, "app.yaml"}, string(os.PathSeparator))
-
-	config, err := raiden.LoadConfig(&configFilePath)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-
-	return config
 }
