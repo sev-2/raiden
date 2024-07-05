@@ -40,6 +40,13 @@ func Run(currentVersion string) (isLatest bool, isUpdate bool, errUpdate error) 
 		return
 	}
 
+	// TODO : remove this after implement auto update in widows
+	if runtime.GOOS == "windows" {
+		infoMessage := fmt.Sprintf("raiden-cli version %s has been released, download version in our github release page", latestVersion)
+		VersionLogger.Info(infoMessage)
+		return
+	}
+
 	confirmationText := fmt.Sprintf("raiden-cli version %s has been released, do you want to update first ?", latestVersion)
 	isUpdate, errUpdate = promptUpdateConfirmation(confirmationText)
 	if errUpdate != nil {
@@ -115,8 +122,6 @@ func RunPackage(latestVersion string) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("package version : ", version)
 
 	if version == latestVersion {
 		return nil
@@ -283,7 +288,7 @@ func promptUpdateConfirmation(confirmationText string) (bool, error) {
 
 func updateBinary(updateScriptPath, binaryPath string) error {
 	if runtime.GOOS == "windows" {
-		// TODO : implement this
+		// TODO : implement install binary in windows
 	} else {
 		// Check if the script file exists
 		if _, err := os.Stat(updateScriptPath); os.IsNotExist(err) {
