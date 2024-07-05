@@ -10,7 +10,7 @@ import (
 	"github.com/sev-2/raiden/pkg/resource"
 )
 
-func (q *Query) With(r string, columns map[string][]string) *Query {
+func (q *Query) With(r string, columns map[string][]string, fkeys map[string]string) *Query {
 
 	relations := strings.Split(r, ".")
 
@@ -26,9 +26,7 @@ func (q *Query) With(r string, columns map[string][]string) *Query {
 	}
 
 	for _, m := range relations {
-		tbl, _ := parseFkey(m)
-
-		if !regs[tbl] {
+		if !regs[m] {
 			raiden.Fatal(fmt.Sprintf("invalid model name: %s", m))
 		}
 	}
@@ -36,15 +34,13 @@ func (q *Query) With(r string, columns map[string][]string) *Query {
 	var selects []string
 
 	for _, r := range reverseSortString(relations) {
-		tbl, fkey := parseFkey(r)
+		table := GetTable(findModel(resource.RegisteredModels, r))
 
-		table := GetTable(findModel(resource.RegisteredModels, tbl))
-
-		if fkey != "" {
-			table = table + "!" + fkey
+		if keyExist(fkeys, r) {
+			table = table + "!" + fkeys[r]
 		}
 
-		cols := strings.Join(columns[tbl], ",")
+		cols := strings.Join(columns[r], ",")
 
 		if len(cols) == 0 {
 			cols = "*"
@@ -81,10 +77,11 @@ func reverseSortString(n []string) []string {
 	return n
 }
 
-func parseFkey(s string) (string, string) {
-	t := strings.Split(s, "!")
-	if len(t) > 1 {
-		return t[0], t[1]
+func keyExist(maps map[string]string, s string) bool {
+	for key, _ := range maps {
+		if key == s {
+			return true
+		}
 	}
-	return t[0], ""
+	return false
 }
