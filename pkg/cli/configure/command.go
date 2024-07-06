@@ -384,7 +384,7 @@ func PromptBreakerEnable(c *Config) error {
 // ----- Prompt Job -----
 
 func PromptJob(c *Config) error {
-	input := confirmation.New("Would you like to turn initially on scheduler/cron job?", confirmation.No)
+	input := confirmation.New("Would you like to initially turned ON for the scheduler/cron job?", confirmation.No)
 	input.DefaultValue = confirmation.No
 
 	inputBool, err := input.RunPrompt()
