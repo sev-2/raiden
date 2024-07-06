@@ -73,11 +73,12 @@ func Run(f *Flags, projectPath string) (*Config, error) {
 func SimpleConfigure() (*Config, error) {
 	config := &Config{
 		raiden.Config{
-			BreakerEnable: true,
-			TraceEnable:   false,
-			Version:       "1.0.0",
-			ServerHost:    "127.0.0.1",
-			ServerPort:    "8002",
+			ScheduleStatus: "off",
+			BreakerEnable:  true,
+			TraceEnable:    false,
+			Version:        "1.0.0",
+			ServerHost:     "127.0.0.1",
+			ServerPort:     "8002",
 		},
 	}
 
@@ -129,6 +130,11 @@ func SimpleConfigure() (*Config, error) {
 	}
 
 	if err := PromptServiceKey(config); err != nil {
+		return nil, err
+	}
+
+	// Prompt Job
+	if err := PromptJob(config); err != nil {
 		return nil, err
 	}
 
@@ -372,6 +378,23 @@ func PromptBreakerEnable(c *Config) error {
 	}
 
 	c.BreakerEnable = inputBool
+	return nil
+}
+
+// ----- Prompt Job -----
+
+func PromptJob(c *Config) error {
+	input := confirmation.New("Would you like to turn initially on scheduler/cron job?", confirmation.No)
+	input.DefaultValue = confirmation.No
+
+	inputBool, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	if inputBool {
+		c.ScheduleStatus = "on"
+	}
 	return nil
 }
 
