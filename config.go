@@ -95,3 +95,27 @@ func LoadConfig(path *string) (*Config, error) {
 
 	return &config, nil
 }
+
+func (*Config) GetBool(key string) bool {
+	return viper.GetBool(key)
+}
+
+func (*Config) GetString(key string) string {
+	return viper.GetString(key)
+}
+
+func (*Config) GetStringSlice(key string) []string {
+	return viper.GetStringSlice(key)
+}
+
+func (*Config) GetInt(key string) int {
+	return viper.GetInt(key)
+}
+
+func (*Config) GetIntSlice(key string) []int {
+	return viper.GetIntSlice(key)
+}
+
+func (*Config) GetFloat64(key string) float64 {
+	return viper.GetFloat64(key)
+}
