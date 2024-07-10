@@ -40,13 +40,6 @@ func Run(currentVersion string) (isLatest bool, isUpdate bool, errUpdate error) 
 		return
 	}
 
-	// TODO : remove this after implement auto update in widows
-	if runtime.GOOS == "windows" {
-		infoMessage := fmt.Sprintf("raiden-cli version %s has been released, download version in our github release page", latestVersion)
-		VersionLogger.Info(infoMessage)
-		return
-	}
-
 	confirmationText := fmt.Sprintf("raiden-cli version %s has been released, do you want to update first ?", latestVersion)
 	isUpdate, errUpdate = promptUpdateConfirmation(confirmationText)
 	if errUpdate != nil {
@@ -89,10 +82,13 @@ func Run(currentVersion string) (isLatest bool, isUpdate bool, errUpdate error) 
 		return
 	}
 
-	err = downloadFile(updateScriptShUrl, tmpDir+"/update.sh")
-	if err != nil {
-		errUpdate = fmt.Errorf("error downloading update script : %v", err)
-		return
+	scriptFileName := "update.sh"
+	if runtime.GOOS != "windows" {
+		err = downloadFile(updateScriptShUrl, tmpDir+"/"+scriptFileName)
+		if err != nil {
+			errUpdate = fmt.Errorf("error downloading linux update script : %v", err)
+			return
+		}
 	}
 
 	// Verify the SHA256 checksum
@@ -107,13 +103,27 @@ func Run(currentVersion string) (isLatest bool, isUpdate bool, errUpdate error) 
 		return
 	}
 
-	VersionLogger.Info("starting upgrade raiden in different process")
-	err = updateBinary(fmt.Sprintf("%s/%s", tmpDir, "update.sh"), fmt.Sprintf("%s/%s", tmpDir, binaryName))
+	if runtime.GOOS != "windows" {
+		VersionLogger.Info("starting upgrade raiden in different process")
+	}
+
+	scriptPath := fmt.Sprintf("%s/%s", tmpDir, scriptFileName)
+	binaryPath := fmt.Sprintf("%s/%s", tmpDir, binaryName)
+	if runtime.GOOS == "windows" {
+		tmpDir = fmt.Sprintf("%s\\raiden", os.TempDir())
+		binaryPath = fmt.Sprintf("%s\\%s", tmpDir, binaryName)
+		scriptPath = ""
+	}
+
+	err = updateBinary(scriptPath, binaryPath)
 	if err != nil {
 		errUpdate = err
 		return
 	}
-	VersionLogger.Info("follow upgrade process, bye :)")
+
+	if runtime.GOOS != "windows" {
+		VersionLogger.Info("follow upgrade process, bye :)")
+	}
 	return
 }
 
@@ -287,8 +297,10 @@ func promptUpdateConfirmation(confirmationText string) (bool, error) {
 }
 
 func updateBinary(updateScriptPath, binaryPath string) error {
+
+	command := fmt.Sprintf("%s %s", updateScriptPath, binaryPath)
 	if runtime.GOOS == "windows" {
-		// TODO : implement install binary in windows
+		command = binaryPath
 	} else {
 		// Check if the script file exists
 		if _, err := os.Stat(updateScriptPath); os.IsNotExist(err) {
@@ -299,18 +311,18 @@ func updateBinary(updateScriptPath, binaryPath string) error {
 		if err := os.Chmod(updateScriptPath, 0755); err != nil {
 			return fmt.Errorf("failed setting executable permissions : %s", err)
 		}
-		return spawnTerminalAndRunCommand(fmt.Sprintf("%s %s", updateScriptPath, binaryPath))
 	}
 
-	return nil
+	return spawnTerminalAndRunCommand(command)
 }
 
 func spawnTerminalAndRunCommand(command string) error {
+	logger.HcLog().Info(command)
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "cmd", "/k", command)
+		cmd = getWindowsCommand(command)
 	case "darwin":
 		cmd = exec.Command("osascript", "-e", `tell application "Terminal" to do script "`+command+`"`)
 	case "linux":
@@ -377,4 +389,9 @@ func getVersion(modulePath string, packageName string) (string, error) {
 	}
 
 	return "", fmt.Errorf("package %s not found in go.mod", packageName)
+}
+
+func getWindowsCommand(command string) *exec.Cmd {
+	VersionLogger.Info("running new raiden installer, follow installation process :)")
+	return exec.Command("cmd", "/c", command)
 }
