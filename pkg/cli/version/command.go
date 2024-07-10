@@ -317,14 +317,13 @@ func updateBinary(updateScriptPath, binaryPath string) error {
 }
 
 func spawnTerminalAndRunCommand(command string) error {
-	logger.HcLog().Info(command)
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
 	case "windows":
 		cmd = getWindowsCommand(command)
 	case "darwin":
-		cmd = exec.Command("open", "-a", "Terminal", command)
+		cmd = exec.Command("osascript", "-e", `tell application "Terminal" to do script "`+command+`"`)
 	case "linux":
 		_, err := getLinuxCommand(command)
 		if err != nil {
