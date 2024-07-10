@@ -324,7 +324,7 @@ func spawnTerminalAndRunCommand(command string) error {
 	case "windows":
 		cmd = getWindowsCommand(command)
 	case "darwin":
-		cmd = exec.Command("osascript", "-e", `tell application "Terminal" to do script "`+command+`"`)
+		cmd = exec.Command("open", "-a", "Terminal", command)
 	case "linux":
 		_, err := getLinuxCommand(command)
 		if err != nil {
