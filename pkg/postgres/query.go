@@ -44,6 +44,7 @@ const (
 	IsNull    = "IS NULL"
 	IsNotNull = "IS NOT NULL"
 	End       = "END"
+	With      = "WITH"
 )
 
 // ReservedKeywords contains all reserved keywords in PostgreSQL
@@ -91,6 +92,7 @@ var ReservedKeywords = map[string]struct{}{
 	IsNull:    {},
 	IsNotNull: {},
 	End:       {},
+	With:      {},
 }
 
 func IsReservedKeyword(str string) bool {
