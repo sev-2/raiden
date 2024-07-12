@@ -3,34 +3,22 @@ package db
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/sev-2/raiden"
 )
 
 func (q Query) Select(columns []string) (model *Query) {
-	validSet := make(map[string]bool)
 
-	for _, v := range GetColumnList(q.model) {
-		validSet[v] = true
-	}
+	for _, column := range columns {
+		if !isValidColumn(q, column) {
+			errorMessage := fmt.Sprintf(
+				"invalid column: %s is not available on \"%s\" table.",
+				column,
+				GetTable(q.model),
+			)
 
-	for _, v := range columns {
-		if v == "*" {
-			continue
-		}
-
-		if !validSet[v] {
-			if strings.Contains(v, ":") {
-				c := strings.Split(v, ":")
-				isMatch, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]{1,59}`, c[0])
-				if validSet[c[1]] && isMatch {
-					continue
-				}
-			}
-
-			raiden.Fatal(fmt.Sprintf("invalid column: %s is not available on %s table", v, GetTable(q.model)))
+			raiden.Fatal(errorMessage)
 		}
 	}
 
@@ -57,4 +45,22 @@ func GetColumnList(m interface{}) []string {
 	}
 
 	return columns
+}
+
+func isValidColumn(q Query, column string) bool {
+	if column == "*" {
+		return true
+	}
+
+	validSet := make(map[string]bool)
+
+	for _, v := range GetColumnList(q.model) {
+		validSet[v] = true
+	}
+
+	if validSet[column] {
+		return true
+	}
+
+	return false
 }
