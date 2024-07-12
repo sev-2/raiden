@@ -36,19 +36,26 @@ func (q *Query) With(r string, columns map[string][]string, fkeys map[string]str
 		model := findModel(resource.RegisteredModels, r)
 		table := GetTable(model)
 
+		if fkeys[r] != "inner" {
+			if !isValidColumnName(fkeys[r]) {
+				err := fmt.Sprintf("invalid column: \"%s\" name is invalid.", fkeys[r])
+				raiden.Fatal(err)
+			}
+		}
+
 		if keyExist(fkeys, r) {
 			table = table + "!" + fkeys[r]
 		}
 
 		for _, c := range columns[r] {
-			if !isValidColumn(model, c) {
-				errorMessage := fmt.Sprintf(
-					"invalid column: \"%s\" is not available on \"%s\" table.",
-					c,
-					table,
-				)
+			if !isColumnExist(model, c) {
+				err := fmt.Sprintf("invalid column: \"%s\" is not available on \"%s\" table.", c, table)
+				raiden.Fatal(err)
+			}
 
-				raiden.Fatal(errorMessage)
+			if !isValidColumnName(c) {
+				err := fmt.Sprintf("invalid column: \"%s\" name is invalid.", c)
+				raiden.Fatal(err)
 			}
 		}
 
