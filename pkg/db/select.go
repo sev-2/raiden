@@ -8,17 +8,35 @@ import (
 	"github.com/sev-2/raiden"
 )
 
-func (q Query) Select(columns []string) (model *Query) {
+func (q Query) Select(columns []string, aliases map[string]string) (model *Query) {
 
 	for _, column := range columns {
 		if !isValidColumn(q, column) {
 			errorMessage := fmt.Sprintf(
-				"invalid column: %s is not available on \"%s\" table.",
+				"invalid column: \"%s\" is not available on \"%s\" table.",
 				column,
 				GetTable(q.model),
 			)
 
 			raiden.Fatal(errorMessage)
+		}
+	}
+
+	for column, _ := range aliases {
+		if !isValidColumn(q, column) {
+			errorMessage := fmt.Sprintf(
+				"invalid alias column: \"%s\" is not available on \"%s\" table.",
+				column,
+				GetTable(q.model),
+			)
+
+			raiden.Fatal(errorMessage)
+		}
+	}
+
+	for i, column := range columns {
+		if aliases[column] != "" {
+			columns[i] = aliases[column] + ":" + column
 		}
 	}
 
