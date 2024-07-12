@@ -33,10 +33,23 @@ func (q *Query) With(r string, columns map[string][]string, fkeys map[string]str
 	var selects []string
 
 	for _, r := range reverseSortString(relations) {
-		table := GetTable(findModel(resource.RegisteredModels, r))
+		model := findModel(resource.RegisteredModels, r)
+		table := GetTable(model)
 
 		if keyExist(fkeys, r) {
 			table = table + "!" + fkeys[r]
+		}
+
+		for _, c := range columns[r] {
+			if !isValidColumn(model, c) {
+				errorMessage := fmt.Sprintf(
+					"invalid column: \"%s\" is not available on \"%s\" table.",
+					c,
+					table,
+				)
+
+				raiden.Fatal(errorMessage)
+			}
 		}
 
 		cols := strings.Join(columns[r], ",")

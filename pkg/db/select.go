@@ -11,7 +11,7 @@ import (
 func (q Query) Select(columns []string, aliases map[string]string) (model *Query) {
 
 	for _, column := range columns {
-		if !isValidColumn(q, column) {
+		if !isValidColumn(q.model, column) {
 			errorMessage := fmt.Sprintf(
 				"invalid column: \"%s\" is not available on \"%s\" table.",
 				column,
@@ -23,7 +23,7 @@ func (q Query) Select(columns []string, aliases map[string]string) (model *Query
 	}
 
 	for column, _ := range aliases {
-		if !isValidColumn(q, column) {
+		if !isValidColumn(q.model, column) {
 			errorMessage := fmt.Sprintf(
 				"invalid alias column: \"%s\" is not available on \"%s\" table.",
 				column,
@@ -47,6 +47,10 @@ func (q Query) Select(columns []string, aliases map[string]string) (model *Query
 func GetColumnList(m interface{}) []string {
 	r := reflect.TypeOf(m)
 
+	if r.Kind() == reflect.Ptr {
+		r = r.Elem()
+	}
+
 	var columns []string
 
 	for i := 0; i < r.NumField(); i++ {
@@ -65,14 +69,14 @@ func GetColumnList(m interface{}) []string {
 	return columns
 }
 
-func isValidColumn(q Query, column string) bool {
+func isValidColumn(model interface{}, column string) bool {
 	if column == "*" {
 		return true
 	}
 
 	validSet := make(map[string]bool)
 
-	for _, v := range GetColumnList(q.model) {
+	for _, v := range GetColumnList(model) {
 		validSet[v] = true
 	}
 
