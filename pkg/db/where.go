@@ -8,156 +8,264 @@ import (
 )
 
 func (q *Query) Eq(column string, value any) *Query {
-	q.UseWhere++
 
-	if q.EqList == nil {
-		q.EqList = &[]string{}
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
 	}
 
-	*q.EqList = append(
-		*q.EqList,
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=eq.%s", column, getStringValue(value)),
 	)
 
 	return q
 }
 
-func (q *Query) Neq(column string, value any) *Query {
-	q.UseWhere++
+func (q *Query) OrEq(column string, value any) *Query {
 
-	if q.NeqList == nil {
-		q.NeqList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
 	}
 
-	*q.NeqList = append(
-		*q.NeqList,
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.eq.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) Neq(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=neq.%s", column, getStringValue(value)),
 	)
 
 	return q
 }
 
-func (q *Query) Or(column string, value any) *Query {
-	q.UseWhere++
+func (q *Query) OrNeq(column string, value any) *Query {
 
-	if q.OrList == nil {
-		q.OrList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
 	}
 
-	*q.OrList = append(
-		*q.OrList,
-		fmt.Sprintf("%s=or.%s", column, getStringValue(value)),
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.neq.%s", column, getStringValue(value)),
 	)
 
 	return q
 }
 
 func (q *Query) Lt(column string, value any) *Query {
-	q.UseWhere++
 
-	if q.LtList == nil {
-		q.LtList = &[]string{}
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
 	}
 
-	*q.LtList = append(
-		*q.LtList,
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=lt.%s", column, getStringValue(value)),
 	)
 
 	return q
 }
 
-func (q *Query) Lte(column string, value any) *Query {
-	q.UseWhere++
+func (q *Query) OrLt(column string, value any) *Query {
 
-	if q.LteList == nil {
-		q.LteList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
 	}
 
-	*q.LteList = append(
-		*q.LteList,
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.lt.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) Lte(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=lte.%s", column, getStringValue(value)),
 	)
 
 	return q
 }
 
-func (q *Query) Gt(column string, value int) *Query {
-	q.UseWhere++
+func (q *Query) OrLte(column string, value any) *Query {
 
-	if q.GtList == nil {
-		q.GtList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
 	}
 
-	*q.GtList = append(
-		*q.GtList,
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.lte.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) Gt(column string, value int) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=gt.%s", column, getStringValue(value)),
 	)
 
 	return q
 }
 
-func (q *Query) Gte(column string, value any) *Query {
-	q.UseWhere++
+func (q *Query) OrGt(column string, value int) *Query {
 
-	if q.GteList == nil {
-		q.GteList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
 	}
 
-	*q.GteList = append(
-		*q.GteList,
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.gt.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) Gte(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=gte.%s", column, getStringValue(value)),
 	)
 
 	return q
 }
 
-func (q *Query) In(column string, value any) *Query {
-	q.UseWhere++
+func (q *Query) OrGte(column string, value any) *Query {
 
-	if q.InList == nil {
-		q.InList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
+	}
+
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.gte.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) In(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
 	}
 
 	strValues := strings.Join(SliceToStringSlice(value), ",")
 
-	*q.InList = append(
-		*q.InList,
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=in.(%s)", column, strValues),
 	)
 
 	return q
 }
 
-func (q *Query) Like(column string, value string) *Query {
-	q.UseWhere++
+func (q *Query) OrIn(column string, value any) *Query {
 
-	if q.LikeList == nil {
-		q.LikeList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
+	}
+
+	strValues := strings.Join(SliceToStringSlice(value), ",")
+
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.in.(%s)", column, strValues),
+	)
+
+	return q
+}
+
+func (q *Query) Like(column string, value string) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
 	}
 
 	value = strings.ReplaceAll(value, "%", "*")
 
-	*q.LikeList = append(
-		*q.LikeList,
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=like.%s", column, getStringWithSpace(value)),
 	)
 
 	return q
 }
 
-func (q *Query) Ilike(column string, value string) *Query {
-	q.UseWhere++
+func (q *Query) OrLike(column string, value string) *Query {
 
-	if q.IlikeList == nil {
-		q.IlikeList = &[]string{}
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
 	}
 
 	value = strings.ReplaceAll(value, "%", "*")
 
-	*q.IlikeList = append(
-		*q.IlikeList,
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.like.%s", column, getStringWithSpace(value)),
+	)
+
+	return q
+}
+
+func (q *Query) Ilike(column string, value string) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	value = strings.ReplaceAll(value, "%", "*")
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
 		fmt.Sprintf("%s=ilike.%s", column, getStringWithSpace(value)),
+	)
+
+	return q
+}
+
+func (q *Query) OrIlike(column string, value string) *Query {
+
+	if q.WhereOrList == nil {
+		q.WhereOrList = &[]string{}
+	}
+
+	value = strings.ReplaceAll(value, "%", "*")
+
+	*q.WhereOrList = append(
+		*q.WhereOrList,
+		fmt.Sprintf("%s.ilike.%s", column, getStringWithSpace(value)),
 	)
 
 	return q

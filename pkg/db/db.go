@@ -10,24 +10,15 @@ import (
 )
 
 type Query struct {
-	Context     raiden.Context
-	model       interface{}
-	UseWhere    int
-	Columns     []string
-	EqList      *[]string
-	NeqList     *[]string
-	OrList      *[]string
-	InList      *[]string
-	LtList      *[]string
-	LteList     *[]string
-	GtList      *[]string
-	GteList     *[]string
-	LikeList    *[]string
-	IlikeList   *[]string
-	OrderList   *[]string
-	LimitValue  int
-	OffsetValue int
-	Err         error
+	Context      raiden.Context
+	model        interface{}
+	Columns      []string
+	WhereAndList *[]string
+	WhereOrList  *[]string
+	OrderList    *[]string
+	LimitValue   int
+	OffsetValue  int
+	Err          error
 }
 
 type ModelBase struct {
@@ -53,11 +44,6 @@ func NewQuery(ctx raiden.Context) *Query {
 func (q *Query) Model(m interface{}) *Query {
 	q.model = m
 	return q
-}
-
-// Deprecated: Will be removed
-func (m *ModelBase) NewQuery() *Query {
-	return &Query{model: m}
 }
 
 func GetTable(m interface{}) string {
@@ -120,21 +106,6 @@ func (q Query) GetUrl() string {
 	return url
 }
 
-// Deprecated: Will be removed
-func (m ModelBase) GetTable() string {
-	t := reflect.TypeOf(m)
-
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	if t.Name() == "" {
-		return reflect.TypeOf(m).Field(0).Name
-	}
-
-	return t.Name()
-}
-
 func buildQueryURI(q Query) string {
 	var output string
 
@@ -147,54 +118,14 @@ func buildQueryURI(q Query) string {
 		output += "select=*"
 	}
 
-	if q.EqList != nil && len(*q.EqList) > 0 {
-		eqList := strings.Join(*q.EqList, "&")
+	if q.WhereAndList != nil && len(*q.WhereAndList) > 0 {
+		eqList := strings.Join(*q.WhereAndList, "&")
 		output += fmt.Sprintf("&%s", eqList)
 	}
 
-	if q.NeqList != nil && len(*q.NeqList) > 0 {
-		neqList := strings.Join(*q.NeqList, "&")
-		output += fmt.Sprintf("&%s", neqList)
-	}
-
-	if q.OrList != nil && len(*q.OrList) > 0 {
-		orList := strings.Join(*q.OrList, "&")
-		output += fmt.Sprintf("&%s", orList)
-	}
-
-	if q.InList != nil && len(*q.InList) > 0 {
-		inList := strings.Join(*q.InList, "&")
-		output += fmt.Sprintf("&%s", inList)
-	}
-
-	if q.LtList != nil && len(*q.LtList) > 0 {
-		ltList := strings.Join(*q.LtList, "&")
-		output += fmt.Sprintf("&%s", ltList)
-	}
-
-	if q.LteList != nil && len(*q.LteList) > 0 {
-		ltList := strings.Join(*q.LteList, "&")
-		output += fmt.Sprintf("&%s", ltList)
-	}
-
-	if q.GtList != nil && len(*q.GtList) > 0 {
-		ltList := strings.Join(*q.GtList, "&")
-		output += fmt.Sprintf("&%s", ltList)
-	}
-
-	if q.GteList != nil && len(*q.GteList) > 0 {
-		ltList := strings.Join(*q.GteList, "&")
-		output += fmt.Sprintf("&%s", ltList)
-	}
-
-	if q.LikeList != nil && len(*q.LikeList) > 0 {
-		ltList := strings.Join(*q.LikeList, "&")
-		output += fmt.Sprintf("&%s", ltList)
-	}
-
-	if q.IlikeList != nil && len(*q.IlikeList) > 0 {
-		ltList := strings.Join(*q.IlikeList, "&")
-		output += fmt.Sprintf("&%s", ltList)
+	if q.WhereOrList != nil && len(*q.WhereOrList) > 0 {
+		list := strings.Join(*q.WhereOrList, ",")
+		output += fmt.Sprintf("&or=(%s)", list)
 	}
 
 	if q.OrderList != nil && len(*q.OrderList) > 0 {

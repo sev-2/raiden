@@ -9,7 +9,7 @@ import (
 	"github.com/sev-2/raiden"
 )
 
-func (q Query) Select(columns ...string) (model *Query) {
+func (q Query) Select(columns []string) (model *Query) {
 	validSet := make(map[string]bool)
 
 	for _, v := range GetColumnList(q.model) {
