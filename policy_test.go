@@ -1,7 +1,5 @@
 package raiden_test
 
-// write unit test for policy.go
-
 import (
 	"testing"
 
