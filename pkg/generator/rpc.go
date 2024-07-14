@@ -396,7 +396,6 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 
 	// extract table name
 	var lastField string
-	var writeMode bool
 	var foundTable = &RpcScannedTable{}
 
 	// value true if command start with create, update, delete, alter, drop, alter, truncate and etc
