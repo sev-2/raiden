@@ -50,7 +50,7 @@ type BarController struct {
 	Result  BarResponse
 }
 
-func (c *BarController) Get(ctx raiden.Context) error {
+func (c *BarController) Post(ctx raiden.Context) error {
 	c.Result.Message = "bar message"
 	return ctx.SendJson(c.Result)
 }
