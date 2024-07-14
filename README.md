@@ -1,5 +1,6 @@
 # Raiden Framework
 [![Build Status](https://github.com/sev-2/raiden/workflows/Run%20Tests/badge.svg?branch=main)](https://github.com/sev-2/raiden/actions?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/sev-2/raiden/branch/main/graph/badge.svg)](https://codecov.io/gh/sev-2/raiden)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sev-2/raiden)](https://goreportcard.com/report/github.com/sev-2/raiden)
 
 ## Introduction
