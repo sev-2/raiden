@@ -268,7 +268,8 @@ func ExtractRpcFunction(fn *objects.Function) (result ExtractRpcDataResult, err 
 		securityType = raiden.RpcSecurityTypeDefiner
 	}
 
-	returnType := raiden.RpcReturnDataTypeVoid
+	var returnType raiden.RpcReturnDataType
+
 	returnTypeLc := strings.ToLower(fn.ReturnType)
 	if strings.Contains(returnTypeLc, "setof") {
 		returnType = raiden.RpcReturnDataTypeSetOf
@@ -523,6 +524,8 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 			lastField = k
 		}
 	}
+
+	fmt.Printf("mapResult : %+v\n", mapResult)
 
 	return strings.Join(dFields, " "), mapResult, nil
 }

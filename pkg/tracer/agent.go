@@ -3,7 +3,6 @@ package tracer
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/url"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -60,12 +58,9 @@ func StartAgent(c AgentConfig) (func(ctx context.Context) error, error) {
 		return nil, err
 	}
 
-	// stdOutExporter, _ := newStdOutExporter(log.Writer())
-
 	// Create new trace provicer
 	bsp := sdktrace.NewBatchSpanProcessor(traceExporter)
 	tp := sdktrace.NewTracerProvider(
-		// sdktrace.WithBatcher(stdOutExporter),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithResource(res),
 		sdktrace.WithSpanProcessor(bsp),
@@ -75,17 +70,6 @@ func StartAgent(c AgentConfig) (func(ctx context.Context) error, error) {
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	return traceProvider.Shutdown, nil
-}
-
-// export trace data to std.out
-func newStdOutExporter(w io.Writer) (sdktrace.SpanExporter, error) {
-	return stdouttrace.New(
-		stdouttrace.WithWriter(w),
-		// Use human readable output.
-		stdouttrace.WithPrettyPrint(),
-		// Do not print timestamps for the demo.
-		stdouttrace.WithoutTimestamps(),
-	)
 }
 
 // create new exporter base on agent configuration

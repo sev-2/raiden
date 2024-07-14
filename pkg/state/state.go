@@ -382,7 +382,10 @@ func Save(state *State) error {
 		return err
 	}
 
-	utils.DeleteFile(tmpFilePath)
+	if err := utils.DeleteFile(tmpFilePath); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -405,7 +408,9 @@ func GetStateFilePath() (path string, err error) {
 func CreateTmpState(stateFile string) string {
 	filePathTmp := stateFile + ".tmp"
 	if exist := utils.IsFileExists(stateFile); exist {
-		utils.CopyFile(stateFile, filePathTmp)
+		if err := utils.CopyFile(stateFile, filePathTmp); err != nil {
+			return ""
+		}
 	}
 
 	return filePathTmp
@@ -414,7 +419,9 @@ func CreateTmpState(stateFile string) string {
 func RestoreFromTmp(tmpFile string) {
 	if utils.IsFileExists(tmpFile) {
 		filePath := strings.TrimSuffix(tmpFile, ".tmp")
-		utils.CopyFile(filePath, filePath)
+		if err := utils.CopyFile(filePath, filePath); err != nil {
+			StateLogger.Debug("failed to restore from tmp", "path", tmpFile)
+		}
 		return
 	}
 
@@ -428,9 +435,13 @@ func Load() (*State, error) {
 	}
 
 	if !utils.IsFileExists(filePath) {
-		// save empty sta
-		Save(&State{})
-		return nil, nil
+		// save empty state
+		err := Save(&State{})
+		if err != nil {
+			return nil, err
+		} else {
+			return nil, nil
+		}
 	}
 
 	file, err := os.Open(filePath)

@@ -31,6 +31,7 @@ func Run(currentVersion string) (isLatest bool, isUpdate bool, errUpdate error) 
 	// get latest version
 	latestVersion, err := FetchLatestVersion()
 	if err != nil {
+		errUpdate = err
 		return
 	}
 
@@ -163,8 +164,9 @@ func FetchLatestVersion() (version string, errFetch error) {
 	if err != nil {
 		if logger.HcLog().IsInfo() {
 			errFetch = errors.New("failed get latest version")
+		} else {
+			errFetch = err
 		}
-		errFetch = err
 		return
 	}
 	defer resp.Body.Close()
@@ -173,8 +175,9 @@ func FetchLatestVersion() (version string, errFetch error) {
 	if err != nil {
 		if logger.HcLog().IsInfo() {
 			errFetch = errors.New("invalid version data")
+		} else {
+			errFetch = err
 		}
-		errFetch = err
 		return
 	}
 
@@ -184,8 +187,9 @@ func FetchLatestVersion() (version string, errFetch error) {
 	if err != nil {
 		if logger.HcLog().IsInfo() {
 			errFetch = errors.New("invalid version format data")
+		} else {
+			errFetch = err
 		}
-		errFetch = err
 	}
 
 	if v, exist := response["version"]; exist {

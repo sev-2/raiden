@@ -43,23 +43,6 @@ type DefaultResponse struct {
 	Message string `json:"message"`
 }
 
-// func initClient() Client {
-// 	if httpClientInstance == nil {
-// 		maxIdleConnDuration, _ := time.ParseDuration("1h")
-// 		httpClientInstance = &fasthttp.Client{
-// 			MaxIdleConnDuration:           maxIdleConnDuration,
-// 			NoDefaultUserAgentHeader:      true,
-// 			DisableHeaderNamesNormalizing: true,
-// 			DisablePathNormalizing:        true,
-// 			Dial: (&fasthttp.TCPDialer{
-// 				Concurrency:      4096,
-// 				DNSCacheDuration: time.Hour,
-// 			}).Dial,
-// 		}
-// 	}
-// 	return httpClientInstance
-// }
-
 func getClient() Client {
 	maxIdleConnDuration := time.Hour * 1
 	return &fasthttp.Client{

@@ -27,5 +27,8 @@ func main() {
 
 	f.Bind(rootCmd)
 
-	rootCmd.Execute()
+	err := rootCmd.Execute()
+	if err != nil {
+		panic(err)
+	}
 }

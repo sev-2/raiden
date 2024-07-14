@@ -24,6 +24,9 @@ build-macos:
 build-macos-arm64:
 	GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(CLI_BINARY_NAME)_macos_arm64_$(CLI_VERSION) ./cmd/raiden/main.go
 
+test:
+	go test ./...
+
 clean:
 	go clean
 	rm -f $(BINARY_NAME)_*
