@@ -1,10 +1,11 @@
-package raiden
+package raiden_test
 
 import (
 	"os"
 	"testing"
 
 	"github.com/ory/viper"
+	"github.com/sev-2/raiden"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -45,7 +46,7 @@ VERSION: "2.0.0"
 	file.Close()
 
 	path := file.Name()
-	config, err := LoadConfig(&path)
+	config, err := raiden.LoadConfig(&path)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -76,7 +77,7 @@ ACCESS_TOKEN: "test-access-token"
 	file.Close()
 
 	path := file.Name()
-	config, err := LoadConfig(&path)
+	config, err := raiden.LoadConfig(&path)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -104,7 +105,7 @@ ACCESS_TOKEN: "test-access-token"
 
 func TestLoadConfig_InvalidFile(t *testing.T) {
 	invalidPath := "non_existent_file.yaml"
-	_, err := LoadConfig(&invalidPath)
+	_, err := raiden.LoadConfig(&invalidPath)
 	if err == nil {
 		t.Fatalf("expected an error, got nil")
 	}
@@ -125,7 +126,7 @@ func TestLoadConfig_InvalidContent(t *testing.T) {
 	file.Close()
 
 	path := file.Name()
-	_, err = LoadConfig(&path)
+	_, err = raiden.LoadConfig(&path)
 	if err == nil {
 		t.Fatalf("expected an error, got nil")
 	}
@@ -133,7 +134,7 @@ func TestLoadConfig_InvalidContent(t *testing.T) {
 
 func TestGetBool(t *testing.T) {
 	viper.Set("TEST_BOOL", true)
-	config := &Config{}
+	config := &raiden.Config{}
 	value := config.GetBool("TEST_BOOL")
 	if value != true {
 		t.Errorf("expected true, got %v", value)
@@ -142,7 +143,7 @@ func TestGetBool(t *testing.T) {
 
 func TestGetString(t *testing.T) {
 	viper.Set("TEST_STRING", "value")
-	config := &Config{}
+	config := &raiden.Config{}
 	value := config.GetString("TEST_STRING")
 	if value != "value" {
 		t.Errorf("expected 'value', got %s", value)
@@ -151,7 +152,7 @@ func TestGetString(t *testing.T) {
 
 func TestGetStringSlice(t *testing.T) {
 	viper.Set("TEST_STRING_SLICE", []string{"a", "b", "c"})
-	config := &Config{}
+	config := &raiden.Config{}
 	value := config.GetStringSlice("TEST_STRING_SLICE")
 	expected := []string{"a", "b", "c"}
 	for i, v := range value {
@@ -163,7 +164,7 @@ func TestGetStringSlice(t *testing.T) {
 
 func TestGetInt(t *testing.T) {
 	viper.Set("TEST_INT", 42)
-	config := &Config{}
+	config := &raiden.Config{}
 	value := config.GetInt("TEST_INT")
 	if value != 42 {
 		t.Errorf("expected 42, got %d", value)
@@ -172,7 +173,7 @@ func TestGetInt(t *testing.T) {
 
 func TestGetIntSlice(t *testing.T) {
 	viper.Set("TEST_INT_SLICE", []int{1, 2, 3})
-	config := &Config{}
+	config := &raiden.Config{}
 	value := config.GetIntSlice("TEST_INT_SLICE")
 	expected := []int{1, 2, 3}
 	for i, v := range value {
@@ -184,7 +185,7 @@ func TestGetIntSlice(t *testing.T) {
 
 func TestGetFloat64(t *testing.T) {
 	viper.Set("TEST_FLOAT", 3.14)
-	config := &Config{}
+	config := &raiden.Config{}
 	value := config.GetFloat64("TEST_FLOAT")
 	if value != 3.14 {
 		t.Errorf("expected 3.14, got %f", value)
