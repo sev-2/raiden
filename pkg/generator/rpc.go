@@ -268,7 +268,8 @@ func ExtractRpcFunction(fn *objects.Function) (result ExtractRpcDataResult, err 
 		securityType = raiden.RpcSecurityTypeDefiner
 	}
 
-	returnType := raiden.RpcReturnDataTypeVoid
+	var returnType raiden.RpcReturnDataType
+
 	returnTypeLc := strings.ToLower(fn.ReturnType)
 	if strings.Contains(returnTypeLc, "setof") {
 		returnType = raiden.RpcReturnDataTypeSetOf
@@ -395,11 +396,11 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 
 	// extract table name
 	var lastField string
+	var writeMode bool
 	var foundTable = &RpcScannedTable{}
 
 	// value true if command start with create, update, delete, alter, drop, alter, truncate and etc
 	// value false if command start with select or with
-	var writeMode = false
 
 	for _, f := range dFields {
 		f = strings.TrimRight(f, ";")

@@ -62,8 +62,12 @@ func Run(flags *Flags, projectPath string, moduleName string) error {
 		if !isReInit {
 			return nil
 		}
-		utils.DeleteFile(goModFile)
-		utils.DeleteFile(filepath.Join(projectPath, "go.sum"))
+		if err := utils.DeleteFile(goModFile); err != nil {
+			return err
+		}
+		if err := utils.DeleteFile(filepath.Join(projectPath, "go.sum")); err != nil {
+			return err
+		}
 	}
 
 	// running go mod init

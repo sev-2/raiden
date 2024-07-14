@@ -83,7 +83,9 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 	// set output
 	output := GetBuildFilePath(projectPath, runtime.GOOS, "import")
 	if utils.IsFileExists(output) {
-		utils.DeleteFile(output)
+		if err := utils.DeleteFile(output); err != nil {
+			return err
+		}
 	}
 
 	// Run the "go build" command
