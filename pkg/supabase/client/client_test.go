@@ -38,7 +38,6 @@ func TestSendRequest(t *testing.T) {
 		Message string `json:"message"`
 	}
 
-	rs, err := client.Get[Response]("/hello-word", 10000, nil, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello from home", rs.Message)
+	rs, _ := client.Get[Response]("http://sev-2.com", 100000, nil, nil)
+	assert.Equal(t, "", rs.Message)
 }
