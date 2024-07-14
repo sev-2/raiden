@@ -1,0 +1,63 @@
+run:
+  timeout: 5m
+linters:
+  enable:
+    - asciicheck
+    - dogsled
+    - durationcheck
+    - errcheck
+    - exportloopref
+    - gofmt
+    - goimports
+    - gosec
+    - misspell
+    - nilerr
+    - nolintlint
+
+linters-settings:
+  gosec:
+    # To select a subset of rules to run.
+    # Available rules: https://github.com/securego/gosec#available-rules
+    # Default: [] - means include all rules
+    includes:
+      - G102
+      - G106
+      - G108
+      - G109
+      - G111
+      - G112
+      - G201
+      - G203
+
+issues:
+  exclude-rules:
+    - linters:
+        - structcheck
+        - unused
+      text: "`data` is unused"
+    - linters:
+        - staticcheck
+      text: "SA1019:"
+    - linters:
+        - revive
+      text: "var-naming:"
+    - linters:
+        - revive
+      text: "exported:"
+    - path: _test\.go
+      linters:
+        - gosec # security is not make sense in tests
+    - path: pkg/supabase/drivers/.*
+      linters:
+        - staticcheck
+        - nilerr 
+    - path: pkg/supabase/client/client.go
+      linters:
+        - unused # false positive
+    - path: pkg/suparest/suparest.go
+      linters:
+        - unused # false positive
+    - path: websocket.go
+      linters:
+        - gosimple # Not that simple :)
+

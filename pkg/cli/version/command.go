@@ -31,6 +31,7 @@ func Run(currentVersion string) (isLatest bool, isUpdate bool, errUpdate error) 
 	// get latest version
 	latestVersion, err := FetchLatestVersion()
 	if err != nil {
+		errUpdate = err
 		return
 	}
 

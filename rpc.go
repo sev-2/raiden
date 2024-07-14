@@ -366,7 +366,7 @@ func UnmarshalRpcParamTag(tag string) (RpcParamTag, error) {
 		case "type":
 			pType, err := GetValidRpcParamType(value, true)
 			if err != nil {
-				return paramTag, nil
+				return paramTag, err
 			}
 			paramTag.Type = string(pType)
 		case "default":
