@@ -35,6 +35,8 @@ SERVER_PORT: {{ .ServerPort }}
 ENVIRONMENT: development
 VERSION: 1.0.0
 
+SCHEDULE_STATUS: '{{ .ScheduleStatus }}'
+
 BREAKER_ENABLE: {{ .BreakerEnable }}
 
 TRACE_ENABLE: {{ .TraceEnable }}

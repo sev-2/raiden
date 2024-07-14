@@ -116,7 +116,14 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 					errChan <- err
 					return
 				}
-				GenerateLogger.Info("finish generate hello world controller")
+
+				// generate example job
+				GenerateLogger.Info("start generate hello world job")
+				if err := generator.GenerateHelloWorldJob(projectPath, generator.Generate); err != nil {
+					errChan <- err
+					return
+				}
+				GenerateLogger.Info("finish generate hello world job")
 			}
 
 			// generate route base on controllers
