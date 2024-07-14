@@ -401,15 +401,17 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 
 	// value true if command start with create, update, delete, alter, drop, alter, truncate and etc
 	// value false if command start with select or with
+	var readMode = true
 
 	for _, f := range dFields {
 		f = strings.TrimRight(f, ";")
 		k := strings.ToUpper(f)
 
-		if k == postgres.Select || k == postgres.With {
-			writeMode = false
-		} else {
-			writeMode = true
+		switch k {
+		case postgres.Create, postgres.Update, postgres.Delete, postgres.Alter:
+			readMode = false
+		case postgres.Select, postgres.With:
+			readMode = true
 		}
 
 		switch lastField {
@@ -463,7 +465,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				foundTable.Alias = f
 			}
 		case postgres.On:
-			if writeMode {
+			if !readMode {
 				lastField = k
 				continue
 			}
