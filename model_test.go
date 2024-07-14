@@ -23,9 +23,9 @@ func TestUnMarshallColumnTag_IdFromSequence(t *testing.T) {
 
 	column := raiden.UnmarshalColumnTag(tag)
 
-	assert.Equal(t, "name", column.Name)
-	assert.Equal(t, "varchar(10)", column.Type)
-	assert.Equal(t, true, column.Nullable)
+	assert.Equal(t, "id", column.Name)
+	assert.Equal(t, "integer", column.Type)
+	assert.Equal(t, false, column.Nullable)
 }
 
 // ---- Test get table name

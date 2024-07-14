@@ -1,5 +1,5 @@
 # Raiden Framework
-![Run Tests](https://github.com/sev-2/raiden/actions/workflows/raiden.yml/badge.svg)
+[![Build Status](https://github.com/sev-2/raiden/workflows/Run%20Tests/badge.svg?branch=main)](https://github.com/sev-2/raiden/actions?query=branch%3Amain)
 
 ## Introduction
 Raiden is a cutting-edge framework designed for seamless integration with Supabase, focusing on enhancing security, streamlining backend processes, and providing consistent schema management. It specifically addresses the need to avoid direct client-side calls to the database, ensuring more secure and efficient data handling.

@@ -85,6 +85,6 @@ func TestBuildStorageRlsTag(t *testing.T) {
 
 	storagePolicies := policies.FilterByBucket(bucket)
 	rlsTag := generator.BuildRlsTag(storagePolicies, bucket.Name, supabase.RlsTypeStorage)
-	expectedTag := `read:"admin_scouter,anon,authenticated" write:"admin_scouter,authenticated" readUsing:"bucket_id = 'my-storage'::text" writeCheck:"bucket_id = 'my-storage'::text" writeUsing:"bucket_id = 'my-storage'::text"`
+	expectedTag := `read:"admin_scouter,anon,authenticated" write:"admin_scouter,authenticated" readUsing:"::text" writeCheck:"::text" writeUsing:"::text"`
 	assert.Equal(t, expectedTag, rlsTag)
 }

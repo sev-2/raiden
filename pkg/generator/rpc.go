@@ -524,6 +524,8 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 		}
 	}
 
+	fmt.Printf("mapResult : %+v\n", mapResult)
+
 	return strings.Join(dFields, " "), mapResult, nil
 }
 
