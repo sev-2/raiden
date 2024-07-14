@@ -312,6 +312,7 @@ func bindColumn(field *reflect.StructField, ct *raiden.ColumnTag, c *objects.Col
 	c.DefaultValue = ct.Default
 
 	if ct.AutoIncrement {
+		c.IsIdentity = true
 		c.IdentityGeneration = "BY DEFAULT"
 	}
 

@@ -56,3 +56,30 @@ jobs:
           files: build/raiden-*
           make_latest: true
           generate_release_notes: true
+  
+  push-version:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout target repo
+        run: |
+          git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/sev-2/docs.git docs
+
+      - name: Write JSON file
+        run: |
+          echo "{\"version\": \"$GITHUB_REF_NAME\"}" > docs/public/latest.json
+
+      - name: Commit and push changes
+        run: |
+          cd docs
+          git config --global user.name "raiden-ci"
+          git config --global user.email "raiden-ci@sev-2.com"
+          git remote set-url origin https://$GITHUB_USER:$GITHUB_TOKEN@github.com/sev-2/docs.git
+          git add .
+          git commit -m "Update to version $GITHUB_REF_NAME"
+          git push
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+      GITHUB_USER: ${{ secrets.TARGET_USERNAME }}

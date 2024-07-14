@@ -249,3 +249,15 @@ func TestExtractRpcWithPrefix(t *testing.T) {
 	expectedDefinition := "begin return query select s.id, s.created_at, sc.name as sc_name, c.name as c_name from :s s inner join :sc sc on s.scouter_id = sc.scouter_id inner join :c c on s.candidate_id = c.candidate_id where sc.name = :scouter_name and c.name = :candidate_name ; end;"
 	assert.Equal(t, expectedDefinition, result.Rpc.Definition)
 }
+
+func TestExtractQueryWithWrite(t *testing.T) {
+	definition := `
+	BEGIN
+		drop table if exists _temptbl ; create temp table _temptbl ( id int, name varchar(250), description text, address varchar(200), latitude double precision, longitude double precision, price varchar(200), open_hours json, images json, google_maps_id int, created_at timestamp, updated_at timestamp, review_count_diff int, check_in_count_diff int, distance double precision ) on commit drop ; 
+	END;
+`
+
+	_, mapTable, err := generator.ExtractRpcTable(definition)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(mapTable))
+}
