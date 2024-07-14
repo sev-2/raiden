@@ -263,7 +263,7 @@ func TestStorageController(t *testing.T) {
 // Test ProxyHandler
 func TestProxyHandler(t *testing.T) {
 	ctx := newMockCtx()
-	targetURL, _ := url.Parse("http://localhost")
+	targetURL, _ := url.Parse("http://example.com")
 
 	handler := raiden.ProxyHandler(
 		targetURL,

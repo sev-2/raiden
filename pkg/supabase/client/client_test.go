@@ -38,6 +38,6 @@ func TestSendRequest(t *testing.T) {
 		Message string `json:"message"`
 	}
 
-	rs, _ := client.Get[Response]("http://localhost", 100000, nil, nil)
+	rs, _ := client.Get[Response]("http://example.com", 100000, nil, nil)
 	assert.Equal(t, "", rs.Message)
 }
