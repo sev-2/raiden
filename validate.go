@@ -23,7 +23,10 @@ func Validate(payload any, requestValidators ...ValidatorFunc) error {
 	validatorInstance := validator.New()
 	if len(requestValidators) > 0 {
 		for _, rv := range requestValidators {
-			validatorInstance.RegisterValidation(rv.Name, rv.Validator)
+			err := validatorInstance.RegisterValidation(rv.Name, rv.Validator)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

@@ -205,7 +205,10 @@ func (s *SchedulerServer) RegisterJob(job Job) error {
 						jobCtx.SetSpan(span)
 					}
 
-					scServer.Server.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartImmediately()), wrapJobTask(jobCtx, jobValue), getJobOptions(s.Server, jobCtx, jobValue)...)
+					_, err := scServer.Server.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartImmediately()), wrapJobTask(jobCtx, jobValue), getJobOptions(s.Server, jobCtx, jobValue)...)
+					if err != nil {
+						SchedulerLogger.Error("failed run job", "name", job.Name())
+					}
 				}
 			}, s, reflect.TypeOf(job).Elem()),
 			gocron.WithName(fmt.Sprintf("wrapper-executor %s", job.Name())))
@@ -238,7 +241,10 @@ func (s *SchedulerServer) ListenJobChan() {
 					jobCtx.SetContext(spanCtx)
 					jobCtx.SetSpan(span)
 				}
-				server.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartImmediately()), wrapJobTask(jobCtx, job), getJobOptions(s.Server, jobCtx, params.Job)...)
+				_, err := server.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartImmediately()), wrapJobTask(jobCtx, job), getJobOptions(s.Server, jobCtx, params.Job)...)
+				if err != nil {
+					SchedulerLogger.Error("failed schedule job", "name", job.Name())
+				}
 			}(s.Server, s.Config, s.JobChan, jobParams)
 		}
 	}
@@ -249,7 +255,11 @@ func (s SchedulerServer) Start() {
 }
 
 func (s SchedulerServer) Stop(ctx context.Context) error {
-	s.Server.Shutdown()
+	err := s.Server.Shutdown()
+	if err != nil {
+		return err
+	}
+
 	close(s.JobChan)
 
 	return nil
@@ -280,7 +290,10 @@ func getJobOptions(server gocron.Scheduler, jobCtx JobContext, job Job) []gocron
 		}),
 		gocron.AfterJobRuns(func(jobID uuid.UUID, jobName string) {
 			job.After(jobCtx, jobID, jobName)
-			server.RemoveJob(jobID)
+			err := server.RemoveJob(jobID)
+			if err != nil {
+				SchedulerLogger.Error("failed removing job", "name", jobName)
+			}
 
 			if span := jobCtx.Span(); span != nil {
 				span.SetStatus(codes.Ok, fmt.Sprintf("job %s is successfully run", jobName))
@@ -289,7 +302,10 @@ func getJobOptions(server gocron.Scheduler, jobCtx JobContext, job Job) []gocron
 		}),
 		gocron.AfterJobRunsWithError(func(jobID uuid.UUID, jobName string, err error) {
 			job.AfterErr(jobCtx, jobID, jobName, err)
-			server.RemoveJob(jobID)
+			err1 := server.RemoveJob(jobID)
+			if err1 != nil {
+				SchedulerLogger.Error("failed removing job", "name", jobName)
+			}
 
 			if span := jobCtx.Span(); span != nil {
 				span.SetStatus(codes.Error, fmt.Sprintf("job %s is fail", jobName))

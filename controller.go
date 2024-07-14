@@ -300,10 +300,13 @@ func (rc RestController) Options(ctx Context) error {
 // Patch implements Controller.
 func (rc RestController) Patch(ctx Context) error {
 	model := createObjectFromAnyData(rc.Model)
-	json.Unmarshal(ctx.RequestContext().Request.Body(), model)
-
-	if err := Validate(model); err != nil {
+	err := json.Unmarshal(ctx.RequestContext().Request.Body(), model)
+	if err != nil {
 		return err
+	}
+
+	if err1 := Validate(model); err1 != nil {
+		return err1
 	}
 
 	return RestProxy(ctx, rc.TableName)
@@ -312,10 +315,13 @@ func (rc RestController) Patch(ctx Context) error {
 // Post implements Controller.
 func (rc RestController) Post(ctx Context) error {
 	model := createObjectFromAnyData(rc.Model)
-	json.Unmarshal(ctx.RequestContext().Request.Body(), model)
-
-	if err := Validate(model); err != nil {
+	err := json.Unmarshal(ctx.RequestContext().Request.Body(), model)
+	if err != nil {
 		return err
+	}
+
+	if err1 := Validate(model); err1 != nil {
+		return err1
 	}
 
 	return RestProxy(ctx, rc.TableName)
@@ -324,10 +330,13 @@ func (rc RestController) Post(ctx Context) error {
 // Put implements Controller.
 func (rc RestController) Put(ctx Context) error {
 	model := createObjectFromAnyData(rc.Model)
-	json.Unmarshal(ctx.RequestContext().Request.Body(), model)
-
-	if err := Validate(model); err != nil {
+	err := json.Unmarshal(ctx.RequestContext().Request.Body(), model)
+	if err != nil {
 		return err
+	}
+
+	if err1 := Validate(model); err1 != nil {
+		return err1
 	}
 
 	return RestProxy(ctx, rc.TableName)

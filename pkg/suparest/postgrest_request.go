@@ -74,7 +74,7 @@ func isAllowedMethod(method string) bool {
 	}
 
 	for _, item := range methods {
-		if strings.ToLower(item) == strings.ToLower(method) {
+		if strings.EqualFold(item, method) {
 			return true
 		}
 	}

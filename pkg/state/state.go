@@ -382,7 +382,10 @@ func Save(state *State) error {
 		return err
 	}
 
-	utils.DeleteFile(tmpFilePath)
+	if err := utils.DeleteFile(tmpFilePath); err != nil {
+		return err
+	}
+
 	return nil
 }
 
