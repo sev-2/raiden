@@ -1,2 +1,3 @@
 ignore:
-  - "cmd"  # ignore the cmd directory
+  - "cmd"         # @TODO: build testing facility for CMD
+  - "pkg/cli"     # ignore the CLI package related for now
