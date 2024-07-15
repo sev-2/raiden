@@ -3,6 +3,9 @@ package raiden_test
 // write unit test for router.go file
 import (
 	"os"
+	"os/exec"
+	"time"
+	"syscall"
 	"testing"
 
 	"github.com/sev-2/raiden"
@@ -98,12 +101,24 @@ func TestRouter_GetRegisteredRoutes(t *testing.T) {
 }
 
 func TestRouter_PrintRoutes(t *testing.T) {
-	conf := loadConfig()
-	router := raiden.NewRouter(conf)
-	route := raiden.Route{Methods: []string{"GET", "POST"}, Path: "/"}
-	routes := []*raiden.Route{&route}
-	router.Register(routes)
-	router.PrintRegisteredRoute()
+	if os.Getenv("TEST_RUN") == "1" {
+		conf := loadConfig()
+		router := raiden.NewRouter(conf)
+		route := raiden.Route{Methods: []string{"GET", "POST"}, Path: "/"}
+		routes := []*raiden.Route{&route}
+		router.Register(routes)
+		router.PrintRegisteredRoute()
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestRouter_PrintRoutes")
+	cmd.Env = append(os.Environ(), "TEST_RUN=1")
+	err := cmd.Start()
+	assert.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+	err1 := cmd.Process.Signal(syscall.SIGTERM)
+	assert.NoError(t, err1)
 }
 
 func TestRouter_GetHandler(t *testing.T) {
