@@ -39,7 +39,7 @@ func getConfig() *raiden.Config {
 }
 
 func keyExist(maps map[string]string, s string) bool {
-	for key, _ := range maps {
+	for key := range maps {
 		if key == s {
 			return true
 		}

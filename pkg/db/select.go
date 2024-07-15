@@ -25,7 +25,7 @@ func (q Query) Select(columns []string, aliases map[string]string) (model *Query
 		}
 	}
 
-	for column, _ := range aliases {
+	for column := range aliases {
 		if !isColumnExist(q.model, column) {
 			err := fmt.Sprintf("invalid alias column: \"%s\" is invalid or not available on \"%s\" table.", column, table)
 			raiden.Fatal(err)
