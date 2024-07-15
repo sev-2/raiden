@@ -1,6 +1,5 @@
 package raiden_test
 
-// write unit test for router.go file
 import (
 	"os"
 	"os/exec"

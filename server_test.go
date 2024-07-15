@@ -1,7 +1,5 @@
 package raiden_test
 
-// Write unit test for server.go for its public functions
-// and use mocks to mock the dependencies
 import (
 	"os"
 	"os/exec"
