@@ -25,6 +25,8 @@ func TestToGoType(t *testing.T) {
 		{postgres.BooleanType, false, "bool"},
 		{postgres.UuidType, false, "uuid.UUID"},
 		{postgres.JsonType, false, "interface{}"},
+		{postgres.JsonbType, false, "interface{}"},
+		{"unknown", false, "interface{}"},
 	}
 
 	for _, test := range tests {
@@ -55,6 +57,7 @@ func TestToPostgresType(t *testing.T) {
 		{"uuid.UUID", postgres.UuidType},
 		{"interface{}", postgres.TextType},
 		{"any", postgres.TextType},
+		{"unknown", postgres.TextType},
 	}
 
 	for _, test := range tests {
@@ -75,6 +78,8 @@ func TestIsValidDataType(t *testing.T) {
 		{"bigint", true},
 		{"text", true},
 		{"unknown", false},
+		{"BOOLEAN", true},
+		{"timestamp with time zone", true},
 	}
 
 	for _, test := range tests {
@@ -94,10 +99,31 @@ func TestGetPgDataTypeName(t *testing.T) {
 		{postgres.SmallIntType, false, postgres.SmallIntType},
 		{postgres.SerialType, false, postgres.SerialType},
 		{postgres.IntType, false, postgres.IntType},
+		{postgres.BigIntType, false, postgres.BigIntType},
+		{postgres.BigSerialType, false, postgres.BigSerialType},
+		{postgres.DecimalType, false, postgres.DecimalType},
+		{postgres.NumericType, false, postgres.NumericType},
+		{postgres.RealType, false, postgres.RealType},
 		{postgres.DoublePrecisionType, true, postgres.DoublePrecisionTypeAlias},
+		{postgres.DoublePrecisionType, false, postgres.DoublePrecisionType},
 		{postgres.VarcharType, true, postgres.VarcharTypeAlias},
+		{postgres.VarcharType, false, postgres.VarcharType},
+		{postgres.CharType, false, postgres.CharType},
+		{postgres.BpcharType, false, postgres.BpcharType},
+		{postgres.TextType, false, postgres.TextType},
+		{postgres.TimestampType, true, postgres.TimestampTypeAlias},
+		{postgres.TimestampType, false, postgres.TimestampType},
 		{postgres.TimestampTzType, true, postgres.TimestampTzTypeAlias},
+		{postgres.TimestampTzType, false, postgres.TimestampTzType},
+		{postgres.TimeType, true, postgres.TimeTypeAlias},
+		{postgres.TimeType, false, postgres.TimeType},
 		{postgres.TimeTzType, true, postgres.TimeTzTypeAlias},
+		{postgres.TimeTzType, false, postgres.TimeTzType},
+		{postgres.DateType, false, postgres.DateType},
+		{postgres.IntervalType, false, postgres.IntervalType},
+		{postgres.BooleanType, false, postgres.BooleanType},
+		{postgres.UuidType, false, postgres.UuidType},
+		{postgres.JsonType, false, postgres.JsonType},
 		{postgres.JsonbType, false, postgres.JsonType},
 	}
 
@@ -148,6 +174,16 @@ func TestKnownRoles(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.roleName, func(t *testing.T) {
 			assert.Equal(t, test.roleName, test.knownRole.Name())
+			assert.NotNil(t, test.knownRole.InheritRole())
+			assert.NotNil(t, test.knownRole.CanLogin())
+			assert.NotNil(t, test.knownRole.ConnectionLimit())
+			assert.NotNil(t, test.knownRole.CanBypassRls())
+			assert.NotNil(t, test.knownRole.CanCreateDB())
+			assert.NotNil(t, test.knownRole.CanCreateRole())
+			assert.NotNil(t, test.knownRole.CanLogin())
+			// @TODO: Uncomment when the following methods are implemented
+			// assert.NotNil(t, test.knownRole.IsReplicationRole())
+			// assert.NotNil(t, test.knownRole.IsSuperuser())
 		})
 	}
 }
