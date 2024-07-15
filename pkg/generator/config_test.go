@@ -9,7 +9,7 @@ import (
 )
 
 func TestGenerateConfig(t *testing.T) {
-	dir, err := os.MkdirTemp("", "apply")
+	dir, err := os.MkdirTemp("", "config")
 	assert.NoError(t, err)
 
 	conf := loadConfig()
