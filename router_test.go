@@ -37,8 +37,8 @@ SUPABASE_API_URL: "http://test-supabase-api-url"
 SUPABASE_API_BASE_PATH: "/api"
 SUPABASE_PUBLIC_URL: "http://test-supabase-public-url"
 SCHEDULE_STATUS: "on"
-TRACE_ENABLE: true
-TRACE_COLLECTOR: "collector"
+TRACE_ENABLE: false
+TRACE_COLLECTOR: "zipkin"
 TRACE_COLLECTOR_ENDPOINT: "endpoint"
 VERSION: "2.0.0"
 `
