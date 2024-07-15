@@ -83,19 +83,11 @@ func isColumnExist(model interface{}, column string) bool {
 		validSet[v] = true
 	}
 
-	if validSet[column] {
-		return true
-	}
-
-	return false
+	return validSet[column]
 }
 
 func isValidColumnName(column string) bool {
 	isAllowed, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]{1,59}`, column)
 
-	if !isAllowed {
-		return false
-	}
-
-	return true
+	return isAllowed
 }
