@@ -25,12 +25,6 @@ type ModelBase struct {
 	raiden.ModelBase
 }
 
-type Where struct {
-	column   string
-	operator string
-	value    any
-}
-
 func (q *Query) Error() error {
 	return q.Err
 }
