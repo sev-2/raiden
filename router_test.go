@@ -4,9 +4,9 @@ package raiden_test
 import (
 	"os"
 	"os/exec"
-	"time"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/sev-2/raiden"
 	"github.com/stretchr/testify/assert"
