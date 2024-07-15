@@ -1,3 +1,4 @@
 ignore:
   - "cmd"         # @TODO: build testing facility for CMD
   - "pkg/cli"     # ignore the CLI package related for now
+  - "pkg/mock"
