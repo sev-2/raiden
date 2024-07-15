@@ -21,4 +21,8 @@ func TestGenerateController(t *testing.T) {
 	err2 := generator.GenerateHelloWorldController(dir, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/controllers/hello.go")
+
+	err3 := generator.GenerateRoute(dir, "test", generator.GenerateFn(generator.Generate))
+	assert.NoError(t, err3)
+	assert.FileExists(t, dir+"/internal/bootstrap/route.go")
 }
