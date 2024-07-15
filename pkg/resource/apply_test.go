@@ -75,6 +75,7 @@ func TestApply(t *testing.T) {
 
 		err := resource.Apply(flags, config)
 		assert.NoError(t, err)
+		return
 	}
 	cmd := exec.Command(os.Args[0], "-test.run=TestApply")
 	cmd.Env = append(os.Environ(), "TEST_RUN=1")
