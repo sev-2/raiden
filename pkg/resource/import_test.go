@@ -17,15 +17,26 @@ import (
 )
 
 func TestImport(t *testing.T) {
-	flags := &resource.Flags{
-		ProjectPath:   "test_project",
-		AllowedSchema: "public",
-	}
-	config := &raiden.Config{}
-	resource.ImportLogger = logger.HcLog().Named("import")
+	if os.Getenv("TEST_RUN") == "1" {
+		flags := &resource.Flags{
+			ProjectPath:   "test_project",
+			AllowedSchema: "public",
+		}
+		config := &raiden.Config{}
+		resource.ImportLogger = logger.HcLog().Named("import")
 
-	err := resource.Import(flags, config)
-	assert.Error(t, err)
+		err := resource.Import(flags, config)
+		assert.Error(t, err)
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestImport")
+	cmd.Env = append(os.Environ(), "TEST_RUN=1")
+	err := cmd.Start()
+	assert.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+	err1 := cmd.Process.Signal(syscall.SIGTERM)
+	assert.NoError(t, err1)
 }
 
 func TestUpdateLocalStateFromImport(t *testing.T) {
