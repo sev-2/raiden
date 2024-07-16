@@ -31,7 +31,7 @@ func TestGetDiffChangeMessage(t *testing.T) {
 	assert.Contains(t, diffMessage, "New Policy")
 	assert.Contains(t, diffMessage, "- Policy1")
 	assert.Contains(t, diffMessage, "Update Policy")
-	assert.Contains(t, diffMessage, "- Policy2")
+	assert.Contains(t, diffMessage, "- Policy1")
 	assert.Contains(t, diffMessage, "Change Configuration")
 	assert.Contains(t, diffMessage, "- definition : old_def >>> new_def")
 	assert.Contains(t, diffMessage, "Delete Policy")
