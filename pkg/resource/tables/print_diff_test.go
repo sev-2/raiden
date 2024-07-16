@@ -96,6 +96,12 @@ func TestGenerateDiffMessage(t *testing.T) {
 		IsConflict:     true,
 		SourceResource: objects.Table{Name: "source_table"},
 		TargetResource: objects.Table{Name: "target_table"},
+		DiffItems: objects.UpdateTableParam{
+			ChangeItems:         []objects.UpdateTableType{objects.UpdateTableName},
+			ChangeColumnItems:   []objects.UpdateColumnItem{{UpdateItems: []objects.UpdateColumnType{objects.UpdateColumnDataType}}},
+			ChangeRelationItems: []objects.UpdateRelationItem{{Type: objects.UpdateRelationCreate}},
+			OldData:             objects.Table{Name: "old_table"},
+		},
 	}
 
 	sRelation := tables.MapRelations{}
