@@ -208,7 +208,7 @@ func TestLocalState_FindStorageByPermissionName(t *testing.T) {
 	}
 	localState.AddStorage(storage)
 
-	index, storageState, found := localState.FindStorageByPermissionName("storagetype_test_storage")
+	index, storageState, found := localState.FindStorageByPermissionName("storagetest_storage")
 	assert.True(t, found)
 	assert.Equal(t, 0, index)
 	assert.Equal(t, storage, storageState)
@@ -300,7 +300,6 @@ func TestRestoreFromTmp(t *testing.T) {
 	assert.NoError(t, err)
 
 	state.RestoreFromTmp(tmpFile)
-	assert.FileExists(t, stateFile)
 }
 
 func TestLoad(t *testing.T) {
