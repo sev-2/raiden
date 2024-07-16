@@ -21,7 +21,7 @@ type Submission struct {
 	Metadata string `json:"-" schema:"public"`
 
 	// Access control
-	Acl string `json:"-" read:"" write:""`
+	Acl string `json:"-" read:"anon" write:"anon"`
 
 	// Relations
 	Candidate *Candidate `json:"candidate,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:candidate_id"`
@@ -37,7 +37,7 @@ type Candidate struct {
 	Metadata string `json:"-" schema:"public" replicaIdentity:"DEFAULT"`
 
 	// Access control
-	Acl string `json:"-" read:"" write:""`
+	Acl string `json:"-" read:"anon" write:"authenticated"`
 
 	// Relations
 	Submission []*Submission `json:"submission,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:candidate_id"`
