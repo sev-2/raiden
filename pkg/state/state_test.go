@@ -252,25 +252,6 @@ func TestLocalState_DeleteStorage(t *testing.T) {
 	assert.Empty(t, localState.State.Storage)
 }
 
-func TestLocalState_Persist(t *testing.T) {
-	localState := &state.LocalState{}
-	localState.AddTable(state.TableState{
-		Table: objects.Table{Name: "test_table"},
-	})
-
-	err := localState.Persist()
-	assert.NoError(t, err)
-}
-
-func TestSave(t *testing.T) {
-	stateData := &state.State{
-		Tables: []state.TableState{
-			{Table: objects.Table{Name: "test_table"}},
-		},
-	}
-	err := state.Save(stateData)
-	assert.NoError(t, err)
-}
 
 func TestGetStateFilePath(t *testing.T) {
 	path, err := state.GetStateFilePath()
@@ -302,7 +283,35 @@ func TestRestoreFromTmp(t *testing.T) {
 	state.RestoreFromTmp(tmpFile)
 }
 
+func TestSave(t *testing.T) {
+	stateData := &state.State{
+		Tables: []state.TableState{
+			{Table: objects.Table{Name: "test_table"}},
+		},
+	}
+
+	filePath, err := state.GetStateFilePath()
+	assert.NoError(t, err)
+
+	err1 := os.WriteFile(filePath, []byte("test"), 0644)
+	assert.NoError(t, err1)
+
+	err2 := state.Save(stateData)
+	assert.NoError(t, err2)
+}
+
+func TestLocalState_Persist(t *testing.T) {
+	localState := &state.LocalState{}
+	localState.AddTable(state.TableState{
+		Table: objects.Table{Name: "test_table"},
+	})
+
+	err := localState.Persist()
+	assert.NoError(t, err)
+}
+
 func TestLoad(t *testing.T) {
+
 	_, err := state.Load()
 	assert.NoError(t, err)
 }
