@@ -252,7 +252,6 @@ func TestLocalState_DeleteStorage(t *testing.T) {
 	assert.Empty(t, localState.State.Storage)
 }
 
-
 func TestGetStateFilePath(t *testing.T) {
 	path, err := state.GetStateFilePath()
 	assert.NoError(t, err)
