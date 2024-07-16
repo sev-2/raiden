@@ -315,6 +315,14 @@ func (rc RestController) Patch(ctx Context) error {
 // Post implements Controller.
 func (rc RestController) Post(ctx Context) error {
 	model := createObjectFromAnyData(rc.Model)
+
+	// Handle the case where we need to unmarshal into a slice of models
+	// REST request has possibility to be a bulk, means data is array
+	if strings.HasPrefix(string(ctx.RequestContext().Request.Body()), "[") &&
+		strings.HasSuffix(string(ctx.RequestContext().Request.Body()), "]") {
+		model = createSliceObjectFromAnyData(rc.Model)
+	}
+
 	err := json.Unmarshal(ctx.RequestContext().Request.Body(), model)
 	if err != nil {
 		return err
@@ -570,13 +578,17 @@ func createObjectFromAnyData(data any) any {
 		rt = rt.Elem()
 	}
 
-	if rt.Kind() == reflect.Slice || rt.Kind() == reflect.Array {
-		// Create a new slice or array of the same type
-		newSlice := reflect.MakeSlice(rt, 0, 0)
-		return newSlice.Interface()
+	return reflect.New(rt).Interface()
+}
+
+func createSliceObjectFromAnyData(data any) any {
+	rt := reflect.TypeOf(data)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
 	}
 
-	return reflect.New(rt).Interface()
+	newSlice := reflect.MakeSlice(reflect.SliceOf(rt), 0, 0)
+	return reflect.New(newSlice.Type()).Interface()
 }
 
 // The function `setPayloadValue` sets the value of a field in a struct based on its type.
