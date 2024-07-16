@@ -569,6 +569,13 @@ func createObjectFromAnyData(data any) any {
 	if rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
 	}
+
+	if rt.Kind() == reflect.Slice || rt.Kind() == reflect.Array {
+		// Create a new slice or array of the same type
+		newSlice := reflect.MakeSlice(rt, 0, 0)
+		return newSlice.Interface()
+	}
+
 	return reflect.New(rt).Interface()
 }
 
