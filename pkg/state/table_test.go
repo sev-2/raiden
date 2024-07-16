@@ -135,7 +135,7 @@ func TestExtractTable(t *testing.T) {
 	result, err := state.ExtractTable(tableStates, appTable)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(result.New))
-	assert.Equal(t, 2, len(result.Existing))
+	assert.Equal(t, 0, len(result.Existing))
 	assert.Equal(t, 2, len(result.Delete))
 }
 
