@@ -113,30 +113,49 @@ func TestExtractTable_WithRelation(t *testing.T) {
 func TestExtractTable(t *testing.T) {
 	tableStates := []state.TableState{
 		{
-			Table: objects.Table{Name: "table1"},
+			Table: objects.Table{
+				Name: "submission",
+				Relationships: []objects.TablesRelationship{
+					{
+						SourceSchema:      "public",
+						SourceTableName:   "submission",
+						SourceColumnName:  "candidate_id",
+						TargetTableSchema: "public",
+						TargetTableName:   "candidate",
+						TargetColumnName:  "id",
+					},
+				},
+				PrimaryKeys: []objects.PrimaryKey{
+					{
+						Name:      "id",
+						Schema:    "public",
+						TableName: "submission",
+					},
+				},
+				Columns: []objects.Column{
+					{
+						Name: "id",
+					},
+					{
+						Name: "scouter_id",
+					},
+					{
+						Name: "candidate_id",
+					},
+					{
+						Name: "score",
+					},
+				},
+			},
 		},
-		{
-			Table: objects.Table{Name: "table2"},
-		},
-	}
-	appTable := []any{
-		struct {
-			Metadata string `schema:"schema1" rlsEnable:"true" rlsForced:"true"`
-			Column1  string `column:"name:column1"`
-			Acl      string `acl:""`
-		}{},
-		struct {
-			Metadata string `schema:"schema2" rlsEnable:"false" rlsForced:"false"`
-			Column2  string `column:"name:column2"`
-			Acl      string `acl:""`
-		}{},
 	}
 
+	appTable := []any{&Submission{}}
 	result, err := state.ExtractTable(tableStates, appTable)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(result.New))
-	assert.Equal(t, 0, len(result.Existing))
-	assert.Equal(t, 2, len(result.Delete))
+	assert.Equal(t, 0, len(result.New))
+	assert.Equal(t, 1, len(result.Existing))
+	assert.Equal(t, 0, len(result.Delete))
 }
 
 func TestToFlatTable(t *testing.T) {
