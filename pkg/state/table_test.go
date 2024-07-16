@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -107,4 +108,67 @@ func TestExtractTable_WithRelation(t *testing.T) {
 	assert.Equal(t, "score", rs.New[0].Table.Columns[3].Name)
 	assert.Equal(t, "note", rs.New[0].Table.Columns[4].Name)
 	assert.Equal(t, "created_at", rs.New[0].Table.Columns[5].Name)
+}
+
+func TestExtractTable(t *testing.T) {
+	tableStates := []state.TableState{
+		{
+			Table: objects.Table{Name: "table1"},
+		},
+		{
+			Table: objects.Table{Name: "table2"},
+		},
+	}
+	appTable := []any{
+		struct {
+			Metadata string `schema:"schema1" rlsEnable:"true" rlsForced:"true"`
+			Column1  string `column:"name:column1"`
+			Acl      string `acl:""`
+		}{},
+		struct {
+			Metadata string `schema:"schema2" rlsEnable:"false" rlsForced:"false"`
+			Column2  string `column:"name:column2"`
+			Acl      string `acl:""`
+		}{},
+	}
+
+	result, err := state.ExtractTable(tableStates, appTable)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(result.New))
+	assert.Equal(t, 2, len(result.Existing))
+	assert.Equal(t, 2, len(result.Delete))
+}
+
+func TestToFlatTable(t *testing.T) {
+	items := state.ExtractTableItems{
+		{
+			Table: objects.Table{Name: "table1"},
+		},
+		{
+			Table: objects.Table{Name: "table2"},
+		},
+	}
+
+	tables := items.ToFlatTable()
+	assert.Equal(t, 2, len(tables))
+	assert.Equal(t, "table1", tables[0].Name)
+	assert.Equal(t, "table2", tables[1].Name)
+}
+
+func TestToDeleteFlatMap(t *testing.T) {
+	result := state.ExtractTableResult{
+		Delete: state.ExtractTableItems{
+			{
+				Table: objects.Table{Name: "table1"},
+			},
+			{
+				Table: objects.Table{Name: "table2"},
+			},
+		},
+	}
+
+	mapData := result.ToDeleteFlatMap()
+	assert.Equal(t, 2, len(mapData))
+	assert.Equal(t, "table1", mapData["table1"].Name)
+	assert.Equal(t, "table2", mapData["table2"].Name)
 }
