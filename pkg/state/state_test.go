@@ -10,26 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type MockTable struct {
-	ID   int
-	Name string
-}
-
-type MockRole struct {
-	ID   int
-	Name string
-}
-
-type MockRpc struct {
-	ID   int
-	Name string
-}
-
-type MockStorage struct {
-	ID   string
-	Name string
-}
-
 func TestLocalState_AddTable(t *testing.T) {
 	localState := &state.LocalState{}
 	table := state.TableState{
