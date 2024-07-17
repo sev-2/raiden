@@ -5,8 +5,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-
-	"github.com/sev-2/raiden"
 )
 
 func (q Query) Select(columns []string, aliases map[string]string) (model *Query) {
@@ -15,25 +13,25 @@ func (q Query) Select(columns []string, aliases map[string]string) (model *Query
 
 	for _, column := range columns {
 		if !isColumnExist(q.model, column) {
-			err := fmt.Sprintf("invalid column: \"%s\" is not available on \"%s\" table.", column, table)
-			raiden.Fatal(err)
+			err := fmt.Errorf("invalid column: \"%s\" is not available on \"%s\" table", column, table)
+			q.Errors = append(q.Errors, err)
 		}
 
 		if !isValidColumnName(column) {
-			err := fmt.Sprintf("invalid column: \"%s\" name is invalid.", column)
-			raiden.Fatal(err)
+			err := fmt.Errorf("invalid column: \"%s\" name is invalid", column)
+			q.Errors = append(q.Errors, err)
 		}
 	}
 
 	for column := range aliases {
 		if !isColumnExist(q.model, column) {
-			err := fmt.Sprintf("invalid alias column: \"%s\" is invalid or not available on \"%s\" table.", column, table)
-			raiden.Fatal(err)
+			err := fmt.Errorf("invalid alias column: \"%s\" is invalid or not available on \"%s\" table", column, table)
+			q.Errors = append(q.Errors, err)
 		}
 
 		if !isValidColumnName(column) {
-			err := fmt.Sprintf("invalid alias column: \"%s\" name is invalid.", column)
-			raiden.Fatal(err)
+			err := fmt.Errorf("invalid alias column: \"%s\" name is invalid", column)
+			q.Errors = append(q.Errors, err)
 		}
 	}
 

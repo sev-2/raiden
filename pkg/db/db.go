@@ -18,15 +18,15 @@ type Query struct {
 	OrderList    *[]string
 	LimitValue   int
 	OffsetValue  int
-	Err          error
+	Errors       []error
 }
 
 type ModelBase struct {
 	raiden.ModelBase
 }
 
-func (q *Query) Error() error {
-	return q.Err
+func (q *Query) HasError() bool {
+	return len(q.Errors) > 0
 }
 
 func NewQuery(ctx raiden.Context) *Query {
