@@ -4,9 +4,11 @@ const (
 	Select    = "SELECT"
 	From      = "FROM"
 	Where     = "WHERE"
+	Order     = "ORDER"
 	OrderBy   = "ORDER BY"
 	Limit     = "LIMIT"
 	Offset    = "OFFSET"
+	Group     = "GROUP"
 	GroupBy   = "GROUP BY"
 	Having    = "HAVING"
 	Insert    = "INSERT INTO"
@@ -52,9 +54,11 @@ var ReservedKeywords = map[string]struct{}{
 	Select:    {},
 	From:      {},
 	Where:     {},
+	Order:     {},
 	OrderBy:   {},
 	Limit:     {},
 	Offset:    {},
+	Group:     {},
 	GroupBy:   {},
 	Having:    {},
 	Insert:    {},

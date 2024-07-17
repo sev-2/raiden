@@ -26,6 +26,7 @@ type RpcReturnDataType string
 // Define constants for rpc input data type
 const (
 	RpcParamDataTypeInteger          RpcParamDataType = "INTEGER"
+	RpcParamDataTypeNumeric          RpcParamDataType = "NUMERIC"
 	RpcParamDataTypeBigInt           RpcParamDataType = "BIGINT"
 	RpcParamDataTypeReal             RpcParamDataType = "REAL"
 	RpcParamDataTypeDoublePreci      RpcParamDataType = "DOUBLE PRECISION"
@@ -71,7 +72,7 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "int64"
 	case RpcParamDataTypeReal:
 		return "float32"
-	case RpcParamDataTypeDoublePreci:
+	case RpcParamDataTypeDoublePreci, RpcParamDataTypeNumeric:
 		return "float64"
 	case RpcParamDataTypeText, RpcParamDataTypeVarchar, RpcParamDataTypeVarcharAlias:
 		return "string"
@@ -99,6 +100,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeReal, nil
 	case RpcParamDataTypeDoublePreci:
 		return RpcParamDataTypeDoublePreci, nil
+	case RpcParamDataTypeNumeric:
+		return RpcParamDataTypeNumeric, nil
 	case RpcParamDataTypeText:
 		return RpcParamDataTypeText, nil
 	case RpcParamDataTypeVarchar, RpcParamDataTypeVarcharAlias:

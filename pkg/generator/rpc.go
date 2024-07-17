@@ -142,7 +142,7 @@ func (r *{{ .Name }}) GetRawDefinition() string {
 }`
 )
 
-func GenerateRpc(basePath string, projectName string, functions []objects.Function, generateFn GenerateFn) (err error) {
+func GenerateRpc(basePath string, projectName string, functions []objects.Function, tables []objects.Table, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, RpcDir)
 	RpcLogger.Trace("create rpc folder if not exist", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -153,7 +153,7 @@ func GenerateRpc(basePath string, projectName string, functions []objects.Functi
 
 	for i := range functions {
 		f := functions[i]
-		if err := generateRpcItem(folderPath, projectName, &f, generateFn); err != nil {
+		if err := generateRpcItem(folderPath, projectName, &f, tables, generateFn); err != nil {
 			return err
 		}
 	}
@@ -161,7 +161,7 @@ func GenerateRpc(basePath string, projectName string, functions []objects.Functi
 	return nil
 }
 
-func generateRpcItem(folderPath string, projectName string, function *objects.Function, generateFn GenerateFn) error {
+func generateRpcItem(folderPath string, projectName string, function *objects.Function, tables []objects.Table, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToSnakeCase": utils.ToSnakeCase},
@@ -178,7 +178,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(function.Name), "go"))
 
 	// // extract rpc function
-	result, err := ExtractRpcFunction(function)
+	result, err := ExtractRpcFunction(function, tables)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 	return generateFn(generateInput, nil)
 }
 
-func ExtractRpcFunction(fn *objects.Function) (result ExtractRpcDataResult, err error) {
+func ExtractRpcFunction(fn *objects.Function, tables []objects.Table) (result ExtractRpcDataResult, err error) {
 	//  extract param
 	params, usePrefix, e := ExtractRpcParam(fn)
 	if e != nil {
@@ -254,6 +254,21 @@ func ExtractRpcFunction(fn *objects.Function) (result ExtractRpcDataResult, err 
 	if e != nil {
 		err = e
 		return
+	}
+
+	// validate to actual exist table
+	if len(tables) > 0 {
+		mapTable := make(map[string]any)
+		for _, v := range tables {
+			mapTable[v.Name] = true
+		}
+
+		for k := range mapScannedTable {
+			_, exist := mapTable[k]
+			if !exist {
+				delete(mapScannedTable, k)
+			}
+		}
 	}
 
 	// normalize aliases
@@ -371,7 +386,8 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 			pt = strings.TrimLeft(strings.TrimRight(pt, " "), " ")
 			paramType, err := raiden.GetValidRpcParamType(pt, true)
 			if err != nil {
-				return params, usePrefix, err
+				err = fmt.Errorf("got error in rpc '%s' return param type > %s", fn.Name, err.Error())
+				return params, usePrefix, fmt.Errorf("%s %s", fa.Name, err.Error())
 			}
 			p.Type = paramType
 		}
@@ -390,6 +406,7 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 
 // code for detect table in query and return array of object contain table name, table aliases and relation
 func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
+	def = removeSQLComments(def)
 	dFields := strings.Fields(utils.CleanUpString(def))
 	mapResult := make(map[string]*RpcScannedTable)
 	mapTableOrAlias := make(map[string]string)
@@ -407,14 +424,15 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 		k := strings.ToUpper(f)
 
 		switch k {
-		case postgres.Create, postgres.Update, postgres.Delete, postgres.Alter:
+		case postgres.Create, postgres.Update, postgres.Delete, postgres.Alter, postgres.With:
 			readMode = false
-		case postgres.Select, postgres.With:
+		case postgres.Select:
 			readMode = true
 		}
 
 		switch lastField {
 		case postgres.From:
+			// stop condition
 			if postgres.IsReservedKeyword(k) {
 				mapResult[foundTable.Name] = foundTable
 				mapTableOrAlias[foundTable.Name] = foundTable.Name
@@ -426,6 +444,10 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				continue
 			}
 
+			if postgres.IsReservedSymbol(f) || k[0] == '(' || k[0] == ')' {
+				continue
+			}
+
 			if len(foundTable.Name) == 0 {
 				split := strings.Split(f, ".")
 				if len(split) == 2 {
@@ -434,9 +456,6 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				}
 				foundTable.Name = f
 			} else {
-				if postgres.IsReservedSymbol(f) {
-					continue
-				}
 				foundTable.Alias = f
 			}
 		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right:
@@ -445,7 +464,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				continue
 			}
 		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin:
-			if k == postgres.On {
+			if k == postgres.On || postgres.IsReservedSymbol(f) || k[0] == '(' || k[0] == ')' {
 				lastField = k
 				continue
 			}
@@ -458,13 +477,10 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				}
 				foundTable.Name = f
 			} else {
-				if postgres.IsReservedSymbol(f) {
-					continue
-				}
 				foundTable.Alias = f
 			}
 		case postgres.On:
-			if !readMode {
+			if !readMode || k[0] == '(' || k[0] == ')' {
 				lastField = k
 				continue
 			}
@@ -525,8 +541,6 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 		}
 	}
 
-	fmt.Printf("mapResult : %+v\n", mapResult)
-
 	return strings.Join(dFields, " "), mapResult, nil
 }
 
@@ -539,7 +553,7 @@ func RpcNormalizeTableAliases(mapTables map[string]*RpcScannedTable) error {
 	}
 
 	for _, v := range mapTables {
-		if v.Alias != "" && v.Name != "" {
+		if (v.Alias != "" && v.Name != "") || v.Name == "" {
 			continue
 		}
 		newAlias := findAvailableAlias(v.Name, mapAlias, 1)
@@ -572,7 +586,7 @@ func bindModelToDefinition(def string, mapTable map[string]*RpcScannedTable, par
 }
 
 func findAvailableAlias(tableName string, mapAlias map[string]bool, sub int) (alias string) {
-	if len(tableName) == sub {
+	if sub >= len(tableName) {
 		return ""
 	}
 
@@ -677,7 +691,7 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 			cName := splitC[0]
 			cType, e := raiden.GetValidRpcParamType(splitC[1], true)
 			if e != nil {
-				err = e
+				err = fmt.Errorf("got error in rpc '%s' return table in column %s > %s", r.Rpc.Name, splitC[0], e.Error())
 				return
 			}
 
@@ -745,4 +759,15 @@ func (r *ExtractRpcDataResult) GetBehavior() (behavior string) {
 	default:
 		return "RpcBehaviorVolatile"
 	}
+}
+
+func removeSQLComments(query string) string {
+	lines := strings.Split(query, "\n")
+	var result []string
+	for _, line := range lines {
+		if !strings.HasPrefix(strings.TrimSpace(line), "--") {
+			result = append(result, line)
+		}
+	}
+	return strings.Join(result, "\n")
 }

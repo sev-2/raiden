@@ -84,7 +84,7 @@ func TestExtractRpcData(t *testing.T) {
 		SecurityDefiner: false,
 	}
 
-	result, err := generator.ExtractRpcFunction(&fn)
+	result, err := generator.ExtractRpcFunction(&fn, []objects.Table{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, fn.Name, result.Rpc.Name)
@@ -237,7 +237,7 @@ func TestExtractRpcWithPrefix(t *testing.T) {
 		ConfigParams:           nil,
 	}
 
-	result, err := generator.ExtractRpcFunction(&fn)
+	result, err := generator.ExtractRpcFunction(&fn, []objects.Table{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, fn.Name, result.Rpc.Name)
@@ -256,13 +256,40 @@ func TestExtractRpcWithPrefix(t *testing.T) {
 func TestExtractQueryWithWrite(t *testing.T) {
 	definition := `
 	BEGIN
-		drop table if exists _temptbl ; create temp table _temptbl ( id int, name varchar(250), description text, address varchar(200), latitude double precision, longitude double precision, price varchar(200), open_hours json, images json, google_maps_id int, created_at timestamp, updated_at timestamp, review_count_diff int, check_in_count_diff int, distance double precision ) on commit drop ; 
-	END;
-`
+    RETURN QUERY
+		WITH recent_likes AS (
+			SELECT
+				fl1.food_id,
+				COUNT(*) AS recent_like_count
+			FROM
+				food_likes fl1
+			WHERE
+				fl1.food_id = ANY (string_to_array(food_ids, ',')::INT[]) AND
+				fl1.created_at >= NOW() - INTERVAL '30 days'
+			GROUP BY fl1.food_id
+		), previous_likes AS (
+			SELECT
+				fl2.food_id,
+				COUNT(*) AS previous_like_count
+			FROM
+				food_likes fl2
+			WHERE
+				fl2.food_id = ANY (string_to_array(food_ids, ',')::INT[]) AND
+				fl2.created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days'
+			GROUP BY fl2.food_id
+		)
+		SELECT
+			rci.food_id,
+			COALESCE(rci.recent_like_count, 0) - COALESCE(p.previous_like_count, 0) AS likes_count_diff
+		FROM
+			recent_likes rci
+		LEFT JOIN previous_likes p ON rci.food_id = p.food_id
+		ORDER BY likes_count_diff DESC;
+	END;	`
 
 	_, mapTable, err := generator.ExtractRpcTable(definition)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(mapTable))
+	assert.Equal(t, 2, len(mapTable))
 }
 
 func TestGenerateRpc(t *testing.T) {
