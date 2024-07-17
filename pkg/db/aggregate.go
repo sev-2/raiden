@@ -1,10 +1,10 @@
 package db
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
-	"github.com/sev-2/raiden"
 	"github.com/valyala/fasthttp"
 )
 
@@ -25,7 +25,7 @@ func (q *Query) Count(opts ...CountOptions) (int, error) {
 		case "estimated":
 			countVal = "estimated"
 		default:
-			raiden.Fatal("Unrecognized count options.")
+			q.Errors = append(q.Errors, errors.New("unrecognized count options"))
 		}
 	}
 
