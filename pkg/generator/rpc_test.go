@@ -289,7 +289,7 @@ func TestExtractQueryWithWrite(t *testing.T) {
 
 	_, mapTable, err := generator.ExtractRpcTable(definition)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(mapTable))
+	assert.Equal(t, 3, len(mapTable))
 }
 
 func TestGenerateRpc(t *testing.T) {
