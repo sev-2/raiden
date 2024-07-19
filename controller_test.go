@@ -339,7 +339,7 @@ func TestMarshallAndValidate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "search_value", controller.Payload.Search)
 	assert.Equal(t, "resource_value", controller.Payload.Resource)
-  
+
 }
 
 func TestController_PassDataRestPost(t *testing.T) {
