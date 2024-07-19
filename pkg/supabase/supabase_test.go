@@ -692,6 +692,28 @@ func TestGetRoles_Cloud(t *testing.T) {
 
 	_, err := supabase.GetRoles(cfg)
 	assert.Error(t, err)
+
+	remoteRoles := []objects.Role{
+		{
+			ID:   1,
+			Name: "some-role",
+		},
+		{
+			ID:   2,
+			Name: "another-role",
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetRolesWithExpectedResponse(200, remoteRoles)
+	assert.NoError(t, err0)
+
+	roles, err1 := supabase.GetRoles(cfg)
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteRoles), len(roles))
 }
 
 func TestGetRoles_SelfHosted(t *testing.T) {
@@ -699,6 +721,28 @@ func TestGetRoles_SelfHosted(t *testing.T) {
 
 	_, err := supabase.GetRoles(cfg)
 	assert.Error(t, err)
+
+	remoteRoles := []objects.Role{
+		{
+			ID:   1,
+			Name: "some-role",
+		},
+		{
+			ID:   2,
+			Name: "another-role",
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetRolesWithExpectedResponse(200, remoteRoles)
+	assert.NoError(t, err0)
+
+	roles, err1 := supabase.GetRoles(cfg)
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteRoles), len(roles))
 }
 
 func TestCreateRole_Cloud(t *testing.T) {

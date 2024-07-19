@@ -122,3 +122,20 @@ func (m *MockSupabase) MockDeleteTableWithExpectedResponse(httpCode int) error {
 	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
 	return nil
 }
+
+func (m *MockSupabase) MockGetRolesWithExpectedResponse(httpCode int, roles []objects.Role) error {
+	var method = "GET"
+	var url = fmt.Sprintf("%s%s/roles", m.Cfg.SupabaseApiUrl, m.Cfg.SupabaseApiBasePath)
+	if m.Cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		method = "POST"
+		url = fmt.Sprintf("%s/v1/projects/%s/database/query", m.Cfg.SupabaseApiUrl, m.Cfg.ProjectId)
+	}
+
+	data, err := json.Marshal(roles)
+	if err != nil {
+		return err
+	}
+
+	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
+	return nil
+}
