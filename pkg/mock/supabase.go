@@ -139,3 +139,19 @@ func (m *MockSupabase) MockGetRolesWithExpectedResponse(httpCode int, roles []ob
 	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
 	return nil
 }
+
+func (m *MockSupabase) MockGetRoleByNameWithExpectedResponse(httpCode int, role objects.Role) error {
+	method := "POST"
+	var url = fmt.Sprintf("%s%s/query", m.Cfg.SupabaseApiUrl, m.Cfg.SupabaseApiBasePath)
+	if m.Cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		url = fmt.Sprintf("%s/v1/projects/%s/database/query", m.Cfg.SupabaseApiUrl, m.Cfg.ProjectId)
+	}
+
+	data, err := json.Marshal([]objects.Role{role})
+	if err != nil {
+		return err
+	}
+
+	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
+	return nil
+}
