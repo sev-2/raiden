@@ -64,10 +64,14 @@ func TestFindProject_SelfHosted(t *testing.T) {
 }
 
 func TestGetTables_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err0 := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err0)
+
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	cfg := loadCloudConfig()
 	url := fmt.Sprintf("%s/v1/projects/%s/database/query", cfg.SupabaseApiUrl, cfg.ProjectId)
 	remoteTables := []objects.Table{
 		{
@@ -94,8 +98,33 @@ func TestGetTables_Cloud(t *testing.T) {
 func TestGetTables_SelfHosted(t *testing.T) {
 	cfg := loadSelfHostedConfig()
 
-	_, err := supabase.GetTables(cfg, []string{"test-schema"})
-	assert.Error(t, err)
+	_, err0 := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err0)
+
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl,cfg.SupabaseApiBasePath)
+	remoteTables := []objects.Table{
+		{
+			ID:   1,
+			Name: "some-table",
+		},
+		{
+			ID:   2,
+			Name: "another-table",
+		},
+	}
+
+	data, err := json.Marshal(remoteTables)
+	assert.NoError(t, err)
+
+	httpmock.RegisterResponder("GET", url,
+		httpmock.NewStringResponder(200, string(data)))
+
+	tables, err1 := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteTables), len(tables))
 }
 
 func TestCreateTable_Cloud(t *testing.T) {
