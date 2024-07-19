@@ -9,6 +9,7 @@ require (
 	github.com/go-co-op/gocron/v2 v2.5.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-hclog v1.6.3
+	github.com/jarcoal/httpmock v1.3.1
 	github.com/jinzhu/inflection v1.0.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
@@ -94,7 +95,6 @@ require (
 	github.com/valyala/fasthttp v1.52.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.22.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.22.0
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.22.0
 	go.opentelemetry.io/otel/sdk v1.22.0
 	golang.org/x/mod v0.18.0
 	golang.org/x/sys v0.18.0 // indirect

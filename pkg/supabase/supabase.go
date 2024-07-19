@@ -81,6 +81,20 @@ func GetTables(cfg *raiden.Config, includedSchemas []string) (tables []objects.T
 	})
 }
 
+func GetTableByName(cfg *raiden.Config, name string, schema string, includeColumn bool) (result objects.Table, err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get table by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("Fetch", "table", func() (objects.Table, error) {
+			return cloud.GetTableByName(cfg, name, schema, includeColumn)
+		})
+	}
+
+	SupabaseLogger.Debug("Get table by name from supabase pg-meta")
+	return decorateActionWithDataErr("Fetch", "table", func() (objects.Table, error) {
+		return meta.GetTableByName(cfg, name, schema, includeColumn)
+	})
+}
+
 func CreateTable(cfg *raiden.Config, table objects.Table) (rs objects.Table, err error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Create new table to supabase cloud", "table", table.Name, "project-id", cfg.ProjectId)
@@ -398,9 +412,9 @@ func decorateActionWithDataErr[T any](action, resource string, fetchFn func() (T
 
 		switch rv.Kind() {
 		case reflect.Array, reflect.Slice:
-			err = fmt.Errorf("failed %s list of %s", action, resource)
+			err = fmt.Errorf("failed %s list of %s. Reason: %v", action, resource, err)
 		default:
-			err = fmt.Errorf("failed %s data %s", action, resource)
+			err = fmt.Errorf("failed %s data %s. Reason: %v", action, resource, err)
 		}
 	}
 	return data, err
@@ -409,7 +423,7 @@ func decorateActionWithDataErr[T any](action, resource string, fetchFn func() (T
 func decorateActionErr(action, resource string, fetchFn func() error) error {
 	err := fetchFn()
 	if err != nil && (StorageLogger.GetLevel() != hclog.Trace && StorageLogger.GetLevel() != hclog.Debug) {
-		err = fmt.Errorf("failed %s list of %s", action, resource)
+		err = fmt.Errorf("failed %s list of %s. Reason: %v", action, resource, err)
 	}
 	return err
 }

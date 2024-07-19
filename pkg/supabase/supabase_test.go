@@ -1,21 +1,26 @@
 package supabase_test
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/jarcoal/httpmock"
 )
 
 func loadCloudConfig() *raiden.Config {
 	return &raiden.Config{
 		DeploymentTarget:    "cloud",
 		ProjectId:           "test-project-id",
-		SupabaseApiBasePath: "http://localhost:8080",
-		SupabaseApiUrl:      "http://localhost:8080",
+		ProjectName:         "My Great Project",
+		SupabaseApiBasePath: "/v1",
+		SupabaseApiUrl:      "http://supabase.cloud.com",
 	}
 }
 
@@ -23,8 +28,8 @@ func loadSelfHostedConfig() *raiden.Config {
 	return &raiden.Config{
 		DeploymentTarget:    "self-hosted",
 		ProjectId:           "test-project-local-id",
-		SupabaseApiBasePath: "http://localhost:8080",
-		SupabaseApiUrl:      "http://localhost:8080",
+		SupabaseApiBasePath: "/v1",
+		SupabaseApiUrl:      "http://supabase.local.com",
 	}
 }
 
@@ -35,10 +40,17 @@ func TestGetPolicyName(t *testing.T) {
 }
 
 func TestFindProject_Cloud(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	httpmock.RegisterResponder("GET", "http://supabase.cloud.com/v1/projects",
+		httpmock.NewStringResponder(200, `[{"id": "test-project-id", "name": "My Great Project"}]`))
+
 	cfg := loadCloudConfig()
 
-	_, err := supabase.FindProject(cfg)
-	assert.Error(t, err)
+	project, err := supabase.FindProject(cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, cfg.ProjectId, project.Id)
 }
 
 func TestFindProject_SelfHosted(t *testing.T) {
@@ -52,10 +64,31 @@ func TestFindProject_SelfHosted(t *testing.T) {
 }
 
 func TestGetTables_Cloud(t *testing.T) {
-	cfg := loadCloudConfig()
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
 
-	_, err := supabase.GetTables(cfg, []string{"test-schema"})
-	assert.Error(t, err)
+	cfg := loadCloudConfig()
+	url := fmt.Sprintf("%s/v1/projects/%s/database/query", cfg.SupabaseApiUrl, cfg.ProjectId)
+	remoteTables := []objects.Table{
+		{
+			ID:   1,
+			Name: "some-table",
+		},
+		{
+			ID:   2,
+			Name: "another-table",
+		},
+	}
+
+	data, err := json.Marshal(remoteTables)
+	assert.NoError(t, err)
+
+	httpmock.RegisterResponder("POST", url,
+		httpmock.NewStringResponder(200, string(data)))
+
+	tables, err1 := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteTables), len(tables))
 }
 
 func TestGetTables_SelfHosted(t *testing.T) {
