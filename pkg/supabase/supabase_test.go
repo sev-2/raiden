@@ -226,3 +226,59 @@ func TestGetFunctions_SelfHosted(t *testing.T) {
 	_, err := supabase.GetFunctions(cfg)
 	assert.Error(t, err)
 }
+
+func TestCreateFunction_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.CreateFunction(cfg, objects.Function{})
+	assert.Error(t, err)
+}
+
+func TestCreateFunction_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.CreateFunction(cfg, objects.Function{})
+	assert.Error(t, err)
+}
+
+func TestUpdateFunction_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.UpdateFunction(cfg, objects.Function{})
+	assert.Error(t, err)
+}
+
+func TestUpdateFunction_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.UpdateFunction(cfg, objects.Function{})
+	assert.Error(t, err)
+}
+
+func TestDeleteFunction_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.DeleteFunction(cfg, objects.Function{})
+	assert.Error(t, err)
+}
+
+func TestDeleteFunction_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.DeleteFunction(cfg, objects.Function{})
+	assert.Error(t, err)
+}
+
+func TestAdminUpdateUser_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.AdminUpdateUserData(cfg, "some-id", objects.User{})
+	assert.Error(t, err)
+}
+
+func TestAdminUpdateUser_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.AdminUpdateUserData(cfg, "some-id", objects.User{})
+	assert.Error(t, err)
+}
