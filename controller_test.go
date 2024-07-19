@@ -35,6 +35,11 @@ func (h *Controller) Get(ctx raiden.Context) error {
 	return ctx.SendJson(h.Result)
 }
 
+func (h *Controller) Post(ctx raiden.Context) error {
+	h.Result.Message = fmt.Sprintf("Data: %v", ctx.RequestContext().Request.String())
+	return ctx.SendJson(h.Result)
+}
+
 type DataController struct {
 	raiden.ControllerBase
 
@@ -75,6 +80,43 @@ func (h *DataController) AfterGet(ctx raiden.Context) error {
 
 	if msg != "from get handler" {
 		return ctx.SendErrorWithCode(500, errors.New("after get - invalid message value"))
+	}
+
+	return nil
+}
+
+func (h *DataController) BeforePost(ctx raiden.Context) error {
+	ctx.Set("message", "from before post middleware")
+	return nil
+}
+
+func (h *DataController) Post(ctx raiden.Context) error {
+	msg := ctx.Get("message")
+	msg, isString := msg.(string)
+	if !isString {
+		return ctx.SendErrorWithCode(500, errors.New("post - invalid message type"))
+	}
+
+	if msg != "from before post middleware" {
+		return ctx.SendErrorWithCode(500, errors.New("post - invalid message value"))
+	}
+
+	h.Result = map[string]any{
+		"message": msg,
+	}
+	ctx.Set("message", "from post handler")
+	return ctx.SendJson(h.Result)
+}
+
+func (h *DataController) AfterPost(ctx raiden.Context) error {
+	msg := ctx.Get("message")
+	msg, isString := msg.(string)
+	if !isString {
+		return ctx.SendErrorWithCode(500, errors.New("after post - invalid message type"))
+	}
+
+	if msg != "from post handler" {
+		return ctx.SendErrorWithCode(500, errors.New("after post - invalid message value"))
 	}
 
 	return nil
@@ -297,4 +339,35 @@ func TestMarshallAndValidate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "search_value", controller.Payload.Search)
 	assert.Equal(t, "resource_value", controller.Payload.Resource)
+  
+}
+
+func TestController_PassDataRestPost(t *testing.T) {
+	var reqCtx fasthttp.RequestCtx
+	context := raiden.Ctx{
+		RequestCtx: &reqCtx,
+	}
+
+	// setup required data
+	controller := &DataController{}
+
+	err := controller.BeforePost(&context)
+	assert.NoError(t, err)
+
+	err = controller.Post(&context)
+	assert.NoError(t, err)
+
+	err = controller.AfterPost(&context)
+	assert.NoError(t, err)
+
+	response := reqCtx.Response.Body()
+	assert.NotNil(t, response)
+
+	mapData := make(map[string]any)
+	err = json.Unmarshal(response, &mapData)
+	assert.NoError(t, err)
+
+	message, isMessageExist := mapData["message"]
+	assert.True(t, isMessageExist)
+	assert.Equal(t, "from before post middleware", message)
 }
