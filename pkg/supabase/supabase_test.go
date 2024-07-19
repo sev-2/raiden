@@ -114,3 +114,115 @@ func TestGetRoles_SelfHosted(t *testing.T) {
 	_, err := supabase.GetRoles(cfg)
 	assert.Error(t, err)
 }
+
+func TestCreateRole_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.CreateRole(cfg, objects.Role{})
+	assert.Error(t, err)
+}
+
+func TestCreateRole_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.CreateRole(cfg, objects.Role{})
+	assert.Error(t, err)
+}
+
+func TestUpdateRole_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{})
+	assert.Error(t, err)
+}
+
+func TestUpdateRole_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{})
+	assert.Error(t, err)
+}
+
+func TestDeleteRole_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.DeleteRole(cfg, objects.Role{})
+	assert.Error(t, err)
+}
+
+func TestDeleteRole_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.DeleteRole(cfg, objects.Role{})
+	assert.Error(t, err)
+}
+
+func TestGetPolicies_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetPolicies(cfg)
+	assert.Error(t, err)
+}
+
+func TestGetPolicies_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetPolicies(cfg)
+	assert.Error(t, err)
+}
+
+func TestCreatePolicy_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.CreatePolicy(cfg, objects.Policy{})
+	assert.Error(t, err)
+}
+
+func TestCreatePolicy_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.CreatePolicy(cfg, objects.Policy{})
+	assert.Error(t, err)
+}
+
+func TestUpdatePolicy_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.UpdatePolicy(cfg, objects.Policy{}, objects.UpdatePolicyParam{})
+	assert.Error(t, err)
+}
+
+func TestUpdatePolicy_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.UpdatePolicy(cfg, objects.Policy{}, objects.UpdatePolicyParam{})
+	assert.Error(t, err)
+}
+
+func TestDeletePolicy_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.DeletePolicy(cfg, objects.Policy{})
+	assert.Error(t, err)
+}
+
+func TestDeletePolicy_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.DeletePolicy(cfg, objects.Policy{})
+	assert.Error(t, err)
+}
+
+func TestGetFunctions_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetFunctions(cfg)
+	assert.Error(t, err)
+}
+
+func TestGetFunctions_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetFunctions(cfg)
+	assert.Error(t, err)
+}
