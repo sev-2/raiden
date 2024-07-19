@@ -28,6 +28,12 @@ func loadSelfHostedConfig() *raiden.Config {
 	}
 }
 
+func TestGetPolicyName(t *testing.T) {
+
+	expectedPolicyName := "enable test-policy access for some-resource some-action"
+	assert.Equal(t, expectedPolicyName, supabase.GetPolicyName("test-policy", "some-resource", "some-action"))
+}
+
 func TestFindProject_Cloud(t *testing.T) {
 	cfg := loadCloudConfig()
 
@@ -280,5 +286,40 @@ func TestAdminUpdateUser_SelfHosted(t *testing.T) {
 	cfg := loadSelfHostedConfig()
 
 	_, err := supabase.AdminUpdateUserData(cfg, "some-id", objects.User{})
+	assert.Error(t, err)
+}
+
+func TestGetBuckets_All(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetBuckets(cfg)
+	assert.Error(t, err)
+}
+
+func TestGetBucket_All(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetBucket(cfg, "some-bucket")
+	assert.Error(t, err)
+}
+
+func TestCreateBucket_All(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.CreateBucket(cfg, objects.Bucket{})
+	assert.Error(t, err)
+}
+
+func TestUpdateBucket_All(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.UpdateBucket(cfg, objects.Bucket{}, objects.UpdateBucketParam{})
+	assert.NoError(t, err)
+}
+
+func TestDeleteBucket_All(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.DeleteBucket(cfg, objects.Bucket{})
 	assert.Error(t, err)
 }
