@@ -193,6 +193,14 @@ func TestUpdateTable_Cloud(t *testing.T) {
 				Name: "another-column",
 			},
 		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "some-constraint",
+				SourceSchema:      "some-schema",
+				SourceColumnName:  "some-column",
+				TargetTableSchema: "other-schema",
+			},
+		},
 	}
 
 	updateParam := objects.UpdateTableParam{
