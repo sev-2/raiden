@@ -182,6 +182,41 @@ func TestUpdateTable_Cloud(t *testing.T) {
 
 	err := supabase.UpdateTable(cfg, objects.Table{}, objects.UpdateTableParam{})
 	assert.Error(t, err)
+
+	localTable := objects.Table{
+		Name: "some-table",
+	}
+	updateParam := objects.UpdateTableParam{
+		OldData: localTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnName,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{},
+				Type: objects.UpdateRelationCreate,
+			},
+		},
+		ForceCreateRelation: true,
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateTableWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateTable(cfg, localTable, updateParam)
+	assert.NoError(t, err1)
 }
 
 func TestUpdateTable_SelfHosted(t *testing.T) {
@@ -189,6 +224,41 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 
 	err := supabase.UpdateTable(cfg, objects.Table{}, objects.UpdateTableParam{})
 	assert.Error(t, err)
+
+	localTable := objects.Table{
+		Name: "some-table",
+	}
+	updateParam := objects.UpdateTableParam{
+		OldData: localTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnName,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{},
+				Type: objects.UpdateRelationCreate,
+			},
+		},
+		ForceCreateRelation: true,
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateTableWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateTable(cfg, localTable, updateParam)
+	assert.NoError(t, err1)
 }
 
 func TestDeleteTable_Cloud(t *testing.T) {

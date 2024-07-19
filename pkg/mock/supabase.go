@@ -88,3 +88,20 @@ func (m *MockSupabase) MockCreateTableWithExpectedResponse(httpCode int, table o
 	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
 	return nil
 }
+
+func (m *MockSupabase) MockUpdateTableWithExpectedResponse(httpCode int) error {
+	var method = "POST"
+	var url = fmt.Sprintf("%s%s/query", m.Cfg.SupabaseApiUrl, m.Cfg.SupabaseApiBasePath)
+	if m.Cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		method = "POST"
+		url = fmt.Sprintf("%s/v1/projects/%s/database/query", m.Cfg.SupabaseApiUrl, m.Cfg.ProjectId)
+	}
+
+	data, err := json.Marshal(objects.Table{})
+	if err != nil {
+		return err
+	}
+
+	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
+	return nil
+}
