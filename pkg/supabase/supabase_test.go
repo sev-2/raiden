@@ -104,7 +104,7 @@ func TestGetTables_SelfHosted(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl,cfg.SupabaseApiBasePath)
+	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	remoteTables := []objects.Table{
 		{
 			ID:   1,
