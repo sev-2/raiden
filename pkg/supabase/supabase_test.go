@@ -132,6 +132,24 @@ func TestCreateTable_Cloud(t *testing.T) {
 
 	_, err := supabase.CreateTable(cfg, objects.Table{})
 	assert.Error(t, err)
+
+	localTable := objects.Table{
+		Name: "some-table",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTableByNameWithExpectedResponse(200, localTable)
+	assert.NoError(t, err0)
+
+	err1 := mock.MockCreateTableWithExpectedResponse(200, localTable)
+	assert.NoError(t, err1)
+
+	createdTable, err2 := supabase.CreateTable(cfg, localTable)
+	assert.NoError(t, err2)
+	assert.Equal(t, localTable.Name, createdTable.Name)
 }
 
 func TestCreateTable_SelfHosted(t *testing.T) {
@@ -139,6 +157,24 @@ func TestCreateTable_SelfHosted(t *testing.T) {
 
 	_, err := supabase.CreateTable(cfg, objects.Table{})
 	assert.Error(t, err)
+
+	localTable := objects.Table{
+		Name: "some-table",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTableByNameWithExpectedResponse(200, localTable)
+	assert.NoError(t, err0)
+
+	err1 := mock.MockCreateTableWithExpectedResponse(200, localTable)
+	assert.NoError(t, err1)
+
+	createdTable, err2 := supabase.CreateTable(cfg, localTable)
+	assert.NoError(t, err2)
+	assert.Equal(t, localTable.Name, createdTable.Name)
 }
 
 func TestUpdateTable_Cloud(t *testing.T) {

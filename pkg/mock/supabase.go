@@ -54,3 +54,37 @@ func (m *MockSupabase) MockGetTablesWithExpectedResponse(httpCode int, tables []
 	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
 	return nil
 }
+
+func (m *MockSupabase) MockGetTableByNameWithExpectedResponse(httpCode int, table objects.Table) error {
+	var method = "GET"
+	var url = fmt.Sprintf("%s%s/tables", m.Cfg.SupabaseApiUrl, m.Cfg.SupabaseApiBasePath)
+	if m.Cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		method = "POST"
+		url = fmt.Sprintf("%s/v1/projects/%s/database/query", m.Cfg.SupabaseApiUrl, m.Cfg.ProjectId)
+	}
+
+	data, err := json.Marshal([]objects.Table{table})
+	if err != nil {
+		return err
+	}
+
+	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
+	return nil
+}
+
+func (m *MockSupabase) MockCreateTableWithExpectedResponse(httpCode int, table objects.Table) error {
+	var method = "POST"
+	var url = fmt.Sprintf("%s%s/query", m.Cfg.SupabaseApiUrl, m.Cfg.SupabaseApiBasePath)
+	if m.Cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		method = "POST"
+		url = fmt.Sprintf("%s/v1/projects/%s/database/query", m.Cfg.SupabaseApiUrl, m.Cfg.ProjectId)
+	}
+
+	data, err := json.Marshal([]objects.Table{table})
+	if err != nil {
+		return err
+	}
+
+	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(data)))
+	return nil
+}
