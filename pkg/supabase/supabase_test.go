@@ -44,3 +44,73 @@ func TestFindProject_SelfHosted(t *testing.T) {
 	assert.Equal(t, expectedError, err)
 	assert.Equal(t, objects.Project{}, project)
 }
+
+func TestGetTables_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err)
+}
+
+func TestGetTables_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err)
+}
+
+func TestCreateTable_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.CreateTable(cfg, objects.Table{})
+	assert.Error(t, err)
+}
+
+func TestCreateTable_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.CreateTable(cfg, objects.Table{})
+	assert.Error(t, err)
+}
+
+func TestUpdateTable_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.UpdateTable(cfg, objects.Table{}, objects.UpdateTableParam{})
+	assert.Error(t, err)
+}
+
+func TestUpdateTable_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.UpdateTable(cfg, objects.Table{}, objects.UpdateTableParam{})
+	assert.Error(t, err)
+}
+
+func TestDeleteTable_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.DeleteTable(cfg, objects.Table{}, true)
+	assert.Error(t, err)
+}
+
+func TestDeleteTable_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.DeleteTable(cfg, objects.Table{}, true)
+	assert.Error(t, err)
+}
+
+func TestGetRoles_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetRoles(cfg)
+	assert.Error(t, err)
+}
+
+func TestGetRoles_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetRoles(cfg)
+	assert.Error(t, err)
+}
