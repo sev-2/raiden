@@ -202,7 +202,7 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
 				Data: objects.TablesRelationship{
-					ConstraintName:    "some-constraint",
+					ConstraintName:    "",
 					SourceSchema:      "some-schema",
 					SourceColumnName:  "some-column",
 					TargetTableSchema: "other-schema",
@@ -211,6 +211,32 @@ func TestUpdateTable_Cloud(t *testing.T) {
 			},
 		},
 		ForceCreateRelation: true,
+	}
+	updateParam1 := objects.UpdateTableParam{
+		OldData: localTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnName,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationCreate,
+			},
+		},
+		ForceCreateRelation: false,
 	}
 
 	mock := mock.MockSupabase{Cfg: cfg}
@@ -222,6 +248,9 @@ func TestUpdateTable_Cloud(t *testing.T) {
 
 	err1 := supabase.UpdateTable(cfg, localTable, updateParam)
 	assert.NoError(t, err1)
+
+	err2 := supabase.UpdateTable(cfg, localTable, updateParam1)
+	assert.NoError(t, err2)
 }
 
 func TestUpdateTable_SelfHosted(t *testing.T) {
@@ -249,7 +278,7 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
 				Data: objects.TablesRelationship{
-					ConstraintName:    "some-constraint",
+					ConstraintName:    "",
 					SourceSchema:      "some-schema",
 					SourceColumnName:  "some-column",
 					TargetTableSchema: "other-schema",
