@@ -246,7 +246,7 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
 				Data: objects.TablesRelationship{
-					ConstraintName:    "",
+					ConstraintName:    "some-constraint",
 					SourceSchema:      "some-schema",
 					SourceColumnName:  "some-column",
 					TargetTableSchema: "other-schema",
@@ -283,7 +283,7 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
 				Data: objects.TablesRelationship{
-					ConstraintName:    "",
+					ConstraintName:    "some-constraint",
 					SourceSchema:      "some-schema",
 					SourceColumnName:  "some-column",
 					TargetTableSchema: "other-schema",
