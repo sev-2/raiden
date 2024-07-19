@@ -185,6 +185,14 @@ func TestUpdateTable_Cloud(t *testing.T) {
 
 	localTable := objects.Table{
 		Name: "some-table",
+		Columns: []objects.Column{
+			{
+				Name: "some-column",
+			},
+			{
+				Name: "another-column",
+			},
+		},
 	}
 
 	updateParam := objects.UpdateTableParam{
@@ -242,7 +250,17 @@ func TestUpdateTable_Cloud(t *testing.T) {
 	}
 
 	updateParam2 := objects.UpdateTableParam{
-		OldData: localTable,
+		OldData: objects.Table{
+			Name: "some-table",
+			Columns: []objects.Column{
+				{
+					Name: "old-column",
+				},
+				{
+					Name: "another-old-column",
+				},
+			},
+		},
 		ChangeColumnItems: []objects.UpdateColumnItem{
 			{
 				Name: "some-column",
