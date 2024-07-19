@@ -292,7 +292,7 @@ func TestUpdateTable_Cloud(t *testing.T) {
 			{
 				Name: "some-column",
 				UpdateItems: []objects.UpdateColumnType{
-					objects.UpdateColumnDelete,
+					objects.UpdateColumnNew,
 				},
 			},
 		},
