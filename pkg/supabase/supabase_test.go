@@ -419,7 +419,24 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 
 	localTable := objects.Table{
 		Name: "some-table",
+		Columns: []objects.Column{
+			{
+				Name: "some-column",
+			},
+			{
+				Name: "another-column",
+			},
+		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "some-constraint",
+				SourceSchema:      "some-schema",
+				SourceColumnName:  "some-column",
+				TargetTableSchema: "other-schema",
+			},
+		},
 	}
+
 	updateParam := objects.UpdateTableParam{
 		OldData: localTable,
 		ChangeColumnItems: []objects.UpdateColumnItem{
@@ -447,6 +464,161 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 		ForceCreateRelation: true,
 	}
 
+	updateParam1 := objects.UpdateTableParam{
+		OldData: localTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnName,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "some-constraint",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationCreate,
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
+	updateParam1NoConstraint := objects.UpdateTableParam{
+		OldData: localTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnName,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationCreate,
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
+	updateParam2 := objects.UpdateTableParam{
+		OldData: objects.Table{
+			Name: "some-table",
+			Columns: []objects.Column{
+				{
+					Name: "old-column",
+				},
+				{
+					Name: "another-old-column",
+				},
+			},
+		},
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnDelete,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "some-constraint",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationUpdate,
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
+	updateParam2NoConstraint := objects.UpdateTableParam{
+		OldData: objects.Table{
+			Name: "some-table",
+			Columns: []objects.Column{
+				{
+					Name: "old-column",
+				},
+				{
+					Name: "another-old-column",
+				},
+			},
+		},
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnDelete,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationUpdate,
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
+	updateParam3 := objects.UpdateTableParam{
+		OldData: localTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnNew,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationDelete,
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
 	mock := mock.MockSupabase{Cfg: cfg}
 	mock.Activate()
 	defer mock.Deactivate()
@@ -456,6 +628,21 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 
 	err1 := supabase.UpdateTable(cfg, localTable, updateParam)
 	assert.NoError(t, err1)
+
+	err2 := supabase.UpdateTable(cfg, localTable, updateParam1)
+	assert.NoError(t, err2)
+
+	err2NoC := supabase.UpdateTable(cfg, localTable, updateParam1NoConstraint)
+	assert.NoError(t, err2NoC)
+
+	err3 := supabase.UpdateTable(cfg, localTable, updateParam2)
+	assert.NoError(t, err3)
+
+	err3NoC := supabase.UpdateTable(cfg, localTable, updateParam2NoConstraint)
+	assert.NoError(t, err3NoC)
+
+	err4 := supabase.UpdateTable(cfg, localTable, updateParam3)
+	assert.NoError(t, err4)
 }
 
 func TestDeleteTable_Cloud(t *testing.T) {
