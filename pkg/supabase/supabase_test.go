@@ -266,6 +266,20 @@ func TestDeleteTable_Cloud(t *testing.T) {
 
 	err := supabase.DeleteTable(cfg, objects.Table{}, true)
 	assert.Error(t, err)
+
+	localTable := objects.Table{
+		Name: "some-table",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteTableWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteTable(cfg, localTable, true)
+	assert.NoError(t, err1)
 }
 
 func TestDeleteTable_SelfHosted(t *testing.T) {
@@ -273,6 +287,20 @@ func TestDeleteTable_SelfHosted(t *testing.T) {
 
 	err := supabase.DeleteTable(cfg, objects.Table{}, true)
 	assert.Error(t, err)
+
+	localTable := objects.Table{
+		Name: "some-table",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteTableWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteTable(cfg, localTable, true)
+	assert.NoError(t, err1)
 }
 
 func TestGetRoles_Cloud(t *testing.T) {
