@@ -257,6 +257,33 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		ForceCreateRelation: false,
 	}
 
+	updateParam1NoConstraint := objects.UpdateTableParam{
+		OldData: localTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnName,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationCreate,
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
 	updateParam2 := objects.UpdateTableParam{
 		OldData: objects.Table{
 			Name: "some-table",
@@ -284,6 +311,43 @@ func TestUpdateTable_Cloud(t *testing.T) {
 			{
 				Data: objects.TablesRelationship{
 					ConstraintName:    "some-constraint",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationUpdate,
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
+	updateParam2NoConstraint := objects.UpdateTableParam{
+		OldData: objects.Table{
+			Name: "some-table",
+			Columns: []objects.Column{
+				{
+					Name: "old-column",
+				},
+				{
+					Name: "another-old-column",
+				},
+			},
+		},
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnDelete,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
 					SourceSchema:      "some-schema",
 					SourceColumnName:  "some-column",
 					TargetTableSchema: "other-schema",
@@ -334,8 +398,14 @@ func TestUpdateTable_Cloud(t *testing.T) {
 	err2 := supabase.UpdateTable(cfg, localTable, updateParam1)
 	assert.NoError(t, err2)
 
+	err2NoC := supabase.UpdateTable(cfg, localTable, updateParam1NoConstraint)
+	assert.NoError(t, err2NoC)
+
 	err3 := supabase.UpdateTable(cfg, localTable, updateParam2)
 	assert.NoError(t, err3)
+
+	err3NoC := supabase.UpdateTable(cfg, localTable, updateParam2NoConstraint)
+	assert.NoError(t, err3NoC)
 
 	err4 := supabase.UpdateTable(cfg, localTable, updateParam3)
 	assert.NoError(t, err4)
