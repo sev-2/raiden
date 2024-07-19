@@ -796,6 +796,21 @@ func TestCreateRole_Cloud(t *testing.T) {
 
 	_, err := supabase.CreateRole(cfg, objects.Role{})
 	assert.Error(t, err)
+
+	localRole := objects.Role{
+		Name: "some-role",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockCreateRoleWithExpectedResponse(200, localRole)
+	assert.NoError(t, err0)
+
+	createdRole, err1 := supabase.CreateRole(cfg, localRole)
+	assert.NoError(t, err1)
+	assert.Equal(t, localRole.Name, createdRole.Name)
 }
 
 func TestCreateRole_SelfHosted(t *testing.T) {
@@ -803,6 +818,21 @@ func TestCreateRole_SelfHosted(t *testing.T) {
 
 	_, err := supabase.CreateRole(cfg, objects.Role{})
 	assert.Error(t, err)
+
+	localRole := objects.Role{
+		Name: "some-role",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockCreateRoleWithExpectedResponse(200, localRole)
+	assert.NoError(t, err0)
+
+	createdRole, err1 := supabase.CreateRole(cfg, localRole)
+	assert.NoError(t, err1)
+	assert.Equal(t, localRole.Name, createdRole.Name)
 }
 
 func TestUpdateRole_Cloud(t *testing.T) {
