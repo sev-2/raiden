@@ -1,22 +1,19 @@
 package supabase_test
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/mock"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/jarcoal/httpmock"
 )
 
 func loadCloudConfig() *raiden.Config {
 	return &raiden.Config{
-		DeploymentTarget:    "cloud",
+		DeploymentTarget:    raiden.DeploymentTargetCloud,
 		ProjectId:           "test-project-id",
 		ProjectName:         "My Great Project",
 		SupabaseApiBasePath: "/v1",
@@ -26,7 +23,7 @@ func loadCloudConfig() *raiden.Config {
 
 func loadSelfHostedConfig() *raiden.Config {
 	return &raiden.Config{
-		DeploymentTarget:    "self-hosted",
+		DeploymentTarget:    raiden.DeploymentTargetSelfHosted,
 		ProjectId:           "test-project-local-id",
 		SupabaseApiBasePath: "/v1",
 		SupabaseApiUrl:      "http://supabase.local.com",
@@ -40,16 +37,25 @@ func TestGetPolicyName(t *testing.T) {
 }
 
 func TestFindProject_Cloud(t *testing.T) {
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("GET", "http://supabase.cloud.com/v1/projects",
-		httpmock.NewStringResponder(200, `[{"id": "test-project-id", "name": "My Great Project"}]`))
-
 	cfg := loadCloudConfig()
 
-	project, err := supabase.FindProject(cfg)
+	_, err0 := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err0)
+
+	project := objects.Project{
+		Id:   "test-project-id",
+		Name: "My Great Project",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockFindProjectWithExpectedResponse(200, project)
 	assert.NoError(t, err)
+
+	project, err1 := supabase.FindProject(cfg)
+	assert.NoError(t, err1)
 	assert.Equal(t, cfg.ProjectId, project.Id)
 }
 
@@ -69,10 +75,6 @@ func TestGetTables_Cloud(t *testing.T) {
 	_, err0 := supabase.GetTables(cfg, []string{"test-schema"})
 	assert.Error(t, err0)
 
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	url := fmt.Sprintf("%s/v1/projects/%s/database/query", cfg.SupabaseApiUrl, cfg.ProjectId)
 	remoteTables := []objects.Table{
 		{
 			ID:   1,
@@ -84,11 +86,12 @@ func TestGetTables_Cloud(t *testing.T) {
 		},
 	}
 
-	data, err := json.Marshal(remoteTables)
-	assert.NoError(t, err)
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
 
-	httpmock.RegisterResponder("POST", url,
-		httpmock.NewStringResponder(200, string(data)))
+	err := mock.MockGetTablesWithExpectedResponse(200, remoteTables)
+	assert.NoError(t, err)
 
 	tables, err1 := supabase.GetTables(cfg, []string{"test-schema"})
 	assert.NoError(t, err1)
@@ -96,15 +99,11 @@ func TestGetTables_Cloud(t *testing.T) {
 }
 
 func TestGetTables_SelfHosted(t *testing.T) {
-	cfg := loadSelfHostedConfig()
+	cfg := loadCloudConfig()
 
 	_, err0 := supabase.GetTables(cfg, []string{"test-schema"})
 	assert.Error(t, err0)
 
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	remoteTables := []objects.Table{
 		{
 			ID:   1,
@@ -116,11 +115,12 @@ func TestGetTables_SelfHosted(t *testing.T) {
 		},
 	}
 
-	data, err := json.Marshal(remoteTables)
-	assert.NoError(t, err)
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
 
-	httpmock.RegisterResponder("GET", url,
-		httpmock.NewStringResponder(200, string(data)))
+	err := mock.MockGetTablesWithExpectedResponse(200, remoteTables)
+	assert.NoError(t, err)
 
 	tables, err1 := supabase.GetTables(cfg, []string{"test-schema"})
 	assert.NoError(t, err1)
