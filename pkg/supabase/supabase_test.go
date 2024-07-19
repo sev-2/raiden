@@ -201,7 +201,12 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		},
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
-				Data: objects.TablesRelationship{},
+				Data: objects.TablesRelationship{
+					ConstraintName:    "some-constraint",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
 				Type: objects.UpdateRelationCreate,
 			},
 		},
@@ -243,7 +248,12 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 		},
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
-				Data: objects.TablesRelationship{},
+				Data: objects.TablesRelationship{
+					ConstraintName:    "some-constraint",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
 				Type: objects.UpdateRelationCreate,
 			},
 		},
