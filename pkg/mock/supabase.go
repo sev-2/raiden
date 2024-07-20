@@ -153,6 +153,12 @@ func (m *MockSupabase) MockDeleteFunctionWithExpectedResponse(httpCode int) erro
 	return registerMock(method, url, httpCode, objects.Function{})
 }
 
+func (m *MockSupabase) MockAdminUpdateUserDataWithExpectedResponse(httpCode int, user objects.User) error {
+	method, url := getMethodAndUrl(m.Cfg, "adminUpdateUserData")
+
+	return registerMock(method, url, httpCode, user)
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -169,6 +175,10 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		method = "POST"
 		url = fmt.Sprintf("%s/v1/projects/%s/database/query", cfg.SupabaseApiUrl, cfg.ProjectId)
+		if actionType == "adminUpdateUserData" {
+			method = "PUT"
+			url = fmt.Sprintf("%s/auth/v1/admin/users/user-id", cfg.SupabaseApiUrl)
+		}
 	} else {
 		switch actionType {
 		case "getTables":
