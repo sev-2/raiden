@@ -230,12 +230,12 @@ func TestMigrate(t *testing.T) {
 					},
 					Relationships: []objects.TablesRelationship{
 						{
-							ConstraintName:    "test_constraint",
-							SourceSchema:      "public",
+							ConstraintName:    "test_constraint_old",
+							SourceSchema:      "private",
 							SourceTableName:   "test_table",
 							SourceColumnName:  "id",
 							TargetTableSchema: "public",
-							TargetTableName:   "test_table",
+							TargetTableName:   "old_table",
 							TargetColumnName:  "id",
 						},
 					},
