@@ -75,6 +75,18 @@ var (
 			},
 		},
 	}
+
+	checkPolicy = "some-check"
+
+	localPolicy = objects.Policy{
+		Name:       "some-policy",
+		Definition: "SOME DEFINITION",
+		Check:      &checkPolicy,
+		Roles:      []string{"some-role"},
+		Schema:     "some-schema",
+		Table:      "some-table",
+		Command:    "ALL",
+	}
 )
 
 func loadCloudConfig() *raiden.Config {
@@ -1141,10 +1153,6 @@ func TestCreatePolicy_Cloud(t *testing.T) {
 	_, err := supabase.CreatePolicy(cfg, objects.Policy{})
 	assert.Error(t, err)
 
-	localPolicy := objects.Policy{
-		Name: "some-policy",
-	}
-
 	mock := mock.MockSupabase{Cfg: cfg}
 	mock.Activate()
 	defer mock.Deactivate()
@@ -1158,10 +1166,6 @@ func TestCreatePolicy_SelfHosted(t *testing.T) {
 
 	_, err := supabase.CreatePolicy(cfg, objects.Policy{})
 	assert.Error(t, err)
-
-	localPolicy := objects.Policy{
-		Name: "some-policy",
-	}
 
 	mock := mock.MockSupabase{Cfg: cfg}
 	mock.Activate()
@@ -1177,14 +1181,13 @@ func TestUpdatePolicy_Cloud(t *testing.T) {
 	err := supabase.UpdatePolicy(cfg, objects.Policy{}, objects.UpdatePolicyParam{})
 	assert.Error(t, err)
 
-	localPolicy := objects.Policy{
-		Name: "some-policy",
-	}
-
 	updateParam := objects.UpdatePolicyParam{
 		Name: "some-policy",
 		ChangeItems: []objects.UpdatePolicyType{
 			objects.UpdatePolicyName,
+			objects.UpdatePolicyCheck,
+			objects.UpdatePolicyDefinition,
+			objects.UpdatePolicyRoles,
 		},
 	}
 
@@ -1205,14 +1208,13 @@ func TestUpdatePolicy_SelfHosted(t *testing.T) {
 	err := supabase.UpdatePolicy(cfg, objects.Policy{}, objects.UpdatePolicyParam{})
 	assert.Error(t, err)
 
-	localPolicy := objects.Policy{
-		Name: "some-policy",
-	}
-
 	updateParam := objects.UpdatePolicyParam{
 		Name: "some-policy",
 		ChangeItems: []objects.UpdatePolicyType{
 			objects.UpdatePolicyName,
+			objects.UpdatePolicyCheck,
+			objects.UpdatePolicyDefinition,
+			objects.UpdatePolicyRoles,
 		},
 	}
 
