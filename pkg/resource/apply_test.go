@@ -41,6 +41,44 @@ func TestApply(t *testing.T) {
 	assert.Error(t, err)
 
 	flags.DryRun = false
+	importState := &state.LocalState{
+		State: state.State{
+			Tables: []state.TableState{
+				{
+					Table: objects.Table{
+						Name:        "test_local_table",
+						PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+						Columns: []objects.Column{
+							{Name: "id", DataType: "uuid"},
+							{Name: "name", DataType: "text"},
+						},
+						Relationships: []objects.TablesRelationship{
+							{
+								ConstraintName:    "test_local_constraint",
+								SourceSchema:      "public",
+								SourceTableName:   "test_local_table",
+								SourceColumnName:  "id",
+								TargetTableSchema: "public",
+								TargetTableName:   "test_table",
+								TargetColumnName:  "id",
+							},
+						},
+					},
+				},
+			},
+			Storage: []state.StorageState{
+				{
+					Storage: objects.Bucket{
+						Name:   "test_bucket_policy",
+						Public: true,
+					},
+				},
+			},
+		},
+	}
+
+	errSaveState := state.Save(&importState.State)
+	assert.NoError(t, errSaveState)
 
 	mock := &mock.MockSupabase{Cfg: config}
 	mock.Activate()
@@ -54,6 +92,9 @@ func TestApply(t *testing.T) {
 
 	err = resource.Apply(flags, config)
 	assert.NoError(t, err)
+
+	errReset := state.Save(&state.State{})
+	assert.NoError(t, errReset)
 }
 
 func TestMigrate(t *testing.T) {
@@ -93,6 +134,9 @@ func TestMigrate(t *testing.T) {
 			},
 		},
 	}
+
+	errSaveState := state.Save(&importState.State)
+	assert.NoError(t, errSaveState)
 
 	projectPath := "/path/to/project"
 	resources := &resource.MigrateData{
@@ -328,6 +372,9 @@ func TestMigrate(t *testing.T) {
 
 	errs := resource.Migrate(config, importState, projectPath, resources)
 	assert.Empty(t, errs)
+
+	errReset := state.Save(&state.State{})
+	assert.NoError(t, errReset)
 }
 
 func TestUpdateLocalStateFromApply(t *testing.T) {
