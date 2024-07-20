@@ -19,6 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type MockOtherTable struct {
+	raiden.ModelBase
+	Id int64 `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false"`
+
+	// Table information
+	Metadata string `json:"-" schema:"public" tableName:"other_table" rlsEnable:"false" rlsForced:"false"`
+}
+
 type MockNewTable struct {
 	raiden.ModelBase
 
@@ -26,12 +34,16 @@ type MockNewTable struct {
 	Title     *string    `json:"title,omitempty" column:"name:title;type:varchar;nullable;default:'255'::character varying"`
 	Body      *string    `json:"body,omitempty" column:"name:body;type:text;nullable"`
 	CreatedAt *time.Time `json:"created_at,omitempty" column:"name:created_at;type:timestampz;nullable;default:now()"`
+	TableID   int64      `json:"table_id,omitempty" column:"name:table_id;type:bigint;"`
 
 	// Table information
 	Metadata string `json:"-" schema:"public" tableName:"test_table" rlsEnable:"false" rlsForced:"false"`
 
 	// Access control
 	Acl string `json:"-" read:"" write:""`
+
+	// Relations
+	OtherTable *MockOtherTable `json:"other_table,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:table_id"`
 }
 
 type MockNewRole struct {
@@ -153,6 +165,7 @@ func TestApply(t *testing.T) {
 	assert.NoError(t, err1)
 
 	resource.RegisterModels(MockNewTable{})
+	resource.RegisterModels(MockOtherTable{})
 	resource.RegisterRole(MockNewRole{})
 
 	err = resource.Apply(flags, config)
