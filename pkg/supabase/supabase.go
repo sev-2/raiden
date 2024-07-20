@@ -278,6 +278,19 @@ func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
 	})
 }
 
+func GetFunctionByName(cfg *raiden.Config, schema string, name string) (objects.Function, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get function by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "rpc", func() (objects.Function, error) {
+			return cloud.GetFunctionByName(cfg, schema, name)
+		})
+	}
+	SupabaseLogger.Debug("Get function by name from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "rpc", func() (objects.Function, error) {
+		return meta.GetFunctionByName(cfg, schema, name)
+	})
+}
+
 func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Create function from supabase cloud", "project-id", cfg.ProjectId)

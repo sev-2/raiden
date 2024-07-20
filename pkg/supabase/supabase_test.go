@@ -1184,6 +1184,26 @@ func TestGetFunctions_Cloud(t *testing.T) {
 
 	_, err := supabase.GetFunctions(cfg)
 	assert.Error(t, err)
+
+	remoteFunctions := []objects.Function{
+		{
+			Name: "some-function",
+		},
+		{
+			Name: "another-function",
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetFunctionsWithExpectedResponse(200, remoteFunctions)
+	assert.NoError(t, err0)
+
+	functions, err1 := supabase.GetFunctions(cfg)
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteFunctions), len(functions))
 }
 
 func TestGetFunctions_SelfHosted(t *testing.T) {
@@ -1191,6 +1211,70 @@ func TestGetFunctions_SelfHosted(t *testing.T) {
 
 	_, err := supabase.GetFunctions(cfg)
 	assert.Error(t, err)
+
+	remoteFunctions := []objects.Function{
+		{
+			Name: "some-function",
+		},
+		{
+			Name: "another-function",
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetFunctionsWithExpectedResponse(200, remoteFunctions)
+	assert.NoError(t, err0)
+
+	functions, err1 := supabase.GetFunctions(cfg)
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteFunctions), len(functions))
+}
+
+func TestGetFunctionByName_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetFunctions(cfg)
+	assert.Error(t, err)
+
+	remoteFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetFunctionByNameWithExpectedResponse(200, remoteFunction)
+	assert.NoError(t, err0)
+
+	function, err1 := supabase.GetFunctionByName(cfg, "some-schema", "some-function")
+	assert.NoError(t, err1)
+	assert.Equal(t, remoteFunction.Name, function.Name)
+}
+
+func TestGetFunctionByName_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetFunctions(cfg)
+	assert.Error(t, err)
+
+	remoteFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetFunctionByNameWithExpectedResponse(200, remoteFunction)
+	assert.NoError(t, err0)
+
+	function, err1 := supabase.GetFunctionByName(cfg, "some-schema", "some-function")
+	assert.NoError(t, err1)
+	assert.Equal(t, remoteFunction.Name, function.Name)
 }
 
 func TestCreateFunction_Cloud(t *testing.T) {

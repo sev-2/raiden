@@ -129,6 +129,12 @@ func (m *MockSupabase) MockGetFunctionsWithExpectedResponse(httpCode int, functi
 	return registerMock(method, url, httpCode, functions)
 }
 
+func (m *MockSupabase) MockGetFunctionByNameWithExpectedResponse(httpCode int, function objects.Function) error {
+	method, url := getMethodAndUrl(m.Cfg, "getFunctionByName")
+
+	return registerMock(method, url, httpCode, []objects.Function{function})
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -159,6 +165,9 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 		case "getFunctions":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+		case "getFunctionByName":
+			method = "POST"
+			url = fmt.Sprintf("%s/query", cfg.SupabaseApiUrl)
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
