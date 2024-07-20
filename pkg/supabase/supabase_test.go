@@ -3,6 +3,7 @@ package supabase_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/mock"
@@ -892,14 +893,29 @@ func TestUpdateRole_Cloud(t *testing.T) {
 	err := supabase.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{})
 	assert.Error(t, err)
 
+	var validUntil = objects.NewSupabaseTime(time.Now())
+
+	_, errT := validUntil.MarshalJSON()
+	assert.NoError(t, errT)
+
 	localRole := objects.Role{
-		Name: "some-role",
+		Name:        "some-role",
+		CanLogin:    true,
+		IsSuperuser: true,
+		ValidUntil:  validUntil,
 	}
 
 	updateParam := objects.UpdateRoleParam{
 		OldData: localRole,
 		ChangeItems: []objects.UpdateRoleType{
 			objects.UpdateRoleName,
+			objects.UpdateRoleIsReplication,
+			objects.UpdateRoleIsSuperUser,
+			objects.UpdateRoleInheritRole,
+			objects.UpdateRoleCanBypassRls,
+			objects.UpdateRoleCanCreateDb,
+			objects.UpdateRoleCanLogin,
+			objects.UpdateRoleValidUntil,
 		},
 	}
 
@@ -920,14 +936,29 @@ func TestUpdateRole_SelfHosted(t *testing.T) {
 	err := supabase.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{})
 	assert.Error(t, err)
 
+	var validUntil = objects.NewSupabaseTime(time.Now())
+
+	_, errT := validUntil.MarshalJSON()
+	assert.NoError(t, errT)
+
 	localRole := objects.Role{
-		Name: "some-role",
+		Name:        "some-role",
+		CanLogin:    true,
+		IsSuperuser: true,
+		ValidUntil:  validUntil,
 	}
 
 	updateParam := objects.UpdateRoleParam{
 		OldData: localRole,
 		ChangeItems: []objects.UpdateRoleType{
 			objects.UpdateRoleName,
+			objects.UpdateRoleIsReplication,
+			objects.UpdateRoleIsSuperUser,
+			objects.UpdateRoleInheritRole,
+			objects.UpdateRoleCanBypassRls,
+			objects.UpdateRoleCanCreateDb,
+			objects.UpdateRoleCanLogin,
+			objects.UpdateRoleValidUntil,
 		},
 	}
 
