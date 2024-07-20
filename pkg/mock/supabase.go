@@ -93,6 +93,24 @@ func (m *MockSupabase) MockDeleteRoleWithExpectedResponse(httpCode int) error {
 	return registerMock(method, url, httpCode, objects.Role{})
 }
 
+func (m *MockSupabase) MockGetPoliciesWithExpectedResponse(httpCode int, policies []objects.Policy) error {
+	method, url := getMethodAndUrl(m.Cfg, "getPolicies")
+
+	return registerMock(method, url, httpCode, policies)
+}
+
+func (m *MockSupabase) MockCreatePolicyWithExpectedResponse(httpCode int, policy objects.Policy) error {
+	method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(method, url, httpCode, []objects.Policy{policy})
+}
+
+func (m *MockSupabase) MockUpdatePolicyWithExpectedResponse(httpCode int) error {
+	method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(method, url, httpCode, objects.Policy{})
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -117,6 +135,9 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 		case "getRoles":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+		case "getPolicies":
+			method = "GET"
+			url = fmt.Sprintf("%s%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
