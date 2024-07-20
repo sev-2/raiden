@@ -130,9 +130,27 @@ func (m *MockSupabase) MockGetFunctionsWithExpectedResponse(httpCode int, functi
 }
 
 func (m *MockSupabase) MockGetFunctionByNameWithExpectedResponse(httpCode int, function objects.Function) error {
-	method, url := getMethodAndUrl(m.Cfg, "getFunctionByName")
+	method, url := getMethodAndUrl(m.Cfg, "postQuery")
 
 	return registerMock(method, url, httpCode, []objects.Function{function})
+}
+
+func (m *MockSupabase) MockCreateFunctionWithExpectedResponse(httpCode int, function objects.Function) error {
+	method, url := getMethodAndUrl(m.Cfg, "postQuery")
+
+	return registerMock(method, url, httpCode, []objects.Function{function})
+}
+
+func (m *MockSupabase) MockUpdateFunctionWithExpectedResponse(httpCode int) error {
+	method, url := getMethodAndUrl(m.Cfg, "postQuery")
+
+	return registerMock(method, url, httpCode, objects.Function{})
+}
+
+func (m *MockSupabase) MockDeleteFunctionWithExpectedResponse(httpCode int) error {
+	method, url := getMethodAndUrl(m.Cfg, "postQuery")
+
+	return registerMock(method, url, httpCode, objects.Function{})
 }
 
 func registerMock(method, url string, httpCode int, data interface{}) error {
@@ -165,7 +183,7 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 		case "getFunctions":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-		case "getFunctionByName":
+		case "postQuery":
 			method = "POST"
 			url = fmt.Sprintf("%s/query", cfg.SupabaseApiUrl)
 		default:

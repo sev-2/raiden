@@ -1282,6 +1282,21 @@ func TestCreateFunction_Cloud(t *testing.T) {
 
 	_, err := supabase.CreateFunction(cfg, objects.Function{})
 	assert.Error(t, err)
+
+	localFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockCreateFunctionWithExpectedResponse(200, localFunction)
+	assert.NoError(t, err0)
+
+	createdFunction, err1 := supabase.CreateFunction(cfg, localFunction)
+	assert.NoError(t, err1)
+	assert.Equal(t, localFunction.Name, createdFunction.Name)
 }
 
 func TestCreateFunction_SelfHosted(t *testing.T) {
@@ -1289,6 +1304,21 @@ func TestCreateFunction_SelfHosted(t *testing.T) {
 
 	_, err := supabase.CreateFunction(cfg, objects.Function{})
 	assert.Error(t, err)
+
+	localFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockCreateFunctionWithExpectedResponse(200, localFunction)
+	assert.NoError(t, err0)
+
+	createdFunction, err1 := supabase.CreateFunction(cfg, localFunction)
+	assert.NoError(t, err1)
+	assert.Equal(t, localFunction.Name, createdFunction.Name)
 }
 
 func TestUpdateFunction_Cloud(t *testing.T) {
@@ -1296,6 +1326,20 @@ func TestUpdateFunction_Cloud(t *testing.T) {
 
 	err := supabase.UpdateFunction(cfg, objects.Function{})
 	assert.Error(t, err)
+
+	localFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateFunctionWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateFunction(cfg, localFunction)
+	assert.NoError(t, err1)
 }
 
 func TestUpdateFunction_SelfHosted(t *testing.T) {
@@ -1303,6 +1347,20 @@ func TestUpdateFunction_SelfHosted(t *testing.T) {
 
 	err := supabase.UpdateFunction(cfg, objects.Function{})
 	assert.Error(t, err)
+
+	localFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateFunctionWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateFunction(cfg, localFunction)
+	assert.NoError(t, err1)
 }
 
 func TestDeleteFunction_Cloud(t *testing.T) {
@@ -1310,6 +1368,20 @@ func TestDeleteFunction_Cloud(t *testing.T) {
 
 	err := supabase.DeleteFunction(cfg, objects.Function{})
 	assert.Error(t, err)
+
+	localFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteFunctionWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteFunction(cfg, localFunction)
+	assert.NoError(t, err1)
 }
 
 func TestDeleteFunction_SelfHosted(t *testing.T) {
@@ -1317,6 +1389,20 @@ func TestDeleteFunction_SelfHosted(t *testing.T) {
 
 	err := supabase.DeleteFunction(cfg, objects.Function{})
 	assert.Error(t, err)
+
+	localFunction := objects.Function{
+		Name: "some-function",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteFunctionWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteFunction(cfg, localFunction)
+	assert.NoError(t, err1)
 }
 
 func TestAdminUpdateUser_Cloud(t *testing.T) {
