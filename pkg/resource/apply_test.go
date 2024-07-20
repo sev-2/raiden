@@ -178,7 +178,27 @@ func TestMigrate(t *testing.T) {
 				},
 			},
 		},
-		Policies: []policies.MigrateItem{},
+		Policies: []policies.MigrateItem{
+			{
+				Type: migrator.MigrateTypeCreate,
+				NewData: objects.Policy{
+					Schema: "public",
+					Table:  "test_table",
+				},
+			},
+			{
+				Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Policy{
+					Schema: "public",
+					Table:  "test_table",
+				},
+				NewData: objects.Policy{
+					Schema: "public",
+					Table:  "test_table",
+					Action: "SELECT",
+				},
+			},
+		},
 		Storages: []storages.MigrateItem{},
 	}
 
