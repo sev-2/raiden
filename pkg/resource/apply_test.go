@@ -62,7 +62,23 @@ func TestMigrate(t *testing.T) {
 			Tables: []state.TableState{
 				{
 					Table: objects.Table{
-						Name: "test_table",
+						Name:        "test_table",
+						PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+						Columns: []objects.Column{
+							{Name: "id", DataType: "uuid"},
+							{Name: "name", DataType: "text"},
+						},
+						Relationships: []objects.TablesRelationship{
+							{
+								ConstraintName:    "test_constraint",
+								SourceSchema:      "public",
+								SourceTableName:   "test_table",
+								SourceColumnName:  "id",
+								TargetTableSchema: "public",
+								TargetTableName:   "test_table",
+								TargetColumnName:  "id",
+							},
+						},
 					},
 				},
 			},
