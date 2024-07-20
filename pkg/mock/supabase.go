@@ -6,6 +6,7 @@ import (
 
 	"github.com/jarcoal/httpmock"
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
@@ -165,6 +166,24 @@ func (m *MockSupabase) MockGetBucketsWithExpectedResponse(httpCode int, data int
 	return registerMock(method, url, httpCode, data)
 }
 
+func (m *MockSupabase) MockGetBucketByNameWithExpectedResponse(httpCode int, bucket objects.Bucket) error {
+	method, url := getMethodAndUrl(m.Cfg, "getBuckets")
+
+	return registerMock(method, url+"/"+bucket.Name, httpCode, bucket)
+}
+
+func (m *MockSupabase) MockCreateBucketsWithExpectedResponse(httpCode int, data interface{}) error {
+	method, url := getMethodAndUrl(m.Cfg, "createBucket")
+
+	return registerMock(method, url, httpCode, data)
+}
+
+func (m *MockSupabase) MockDeleteBucketsWithExpectedResponse(httpCode int) error {
+	method, url := getMethodAndUrl(m.Cfg, "deleteBucket")
+
+	return registerMock(method, url, httpCode, supabase.DefaultBucketSuccessResponse{})
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -187,6 +206,12 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 		} else if actionType == "getBuckets" {
 			method = "GET"
 			url = fmt.Sprintf("%s/storage/v1/bucket", cfg.SupabaseApiUrl)
+		} else if actionType == "createBucket" {
+			method = "POST"
+			url = fmt.Sprintf("%s/storage/v1/bucket", cfg.SupabaseApiUrl)
+		} else if actionType == "deleteBucket" {
+			method = "DELETE"
+			url = fmt.Sprintf("%s/storage/v1/bucket/", cfg.SupabaseApiUrl)
 		}
 	} else {
 		switch actionType {
@@ -205,6 +230,15 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 		case "postQuery":
 			method = "POST"
 			url = fmt.Sprintf("%s/query", cfg.SupabaseApiUrl)
+		case "getBuckets":
+			method = "GET"
+			url = fmt.Sprintf("%s/bucket", cfg.SupabaseApiUrl)
+		case "createBucket":
+			method = "POST"
+			url = fmt.Sprintf("%s/bucket", cfg.SupabaseApiUrl)
+		case "deleteBucket":
+			method = "DELETE"
+			url = fmt.Sprintf("%s/bucket", cfg.SupabaseApiUrl)
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)

@@ -198,8 +198,41 @@ func TestMigrate(t *testing.T) {
 					Action: "SELECT",
 				},
 			},
+			{
+				Type: migrator.MigrateTypeDelete,
+				OldData: objects.Policy{
+					Schema: "public",
+					Table:  "test_table_deleted",
+				},
+			},
 		},
-		Storages: []storages.MigrateItem{},
+		Storages: []storages.MigrateItem{
+			{
+				Type: migrator.MigrateTypeCreate,
+				NewData: objects.Bucket{
+					Name:   "test_bucket",
+					Public: true,
+				},
+			},
+			{
+				Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Bucket{
+					Name:   "test_bucket1",
+					Public: true,
+				},
+				NewData: objects.Bucket{
+					Name:   "test_bucket1",
+					Public: false,
+				},
+			},
+			{
+				Type: migrator.MigrateTypeDelete,
+				OldData: objects.Bucket{
+					Name:   "test_bucket_deleted",
+					Public: true,
+				},
+			},
+		},
 	}
 
 	mock := &mock.MockSupabase{Cfg: config}
@@ -208,6 +241,15 @@ func TestMigrate(t *testing.T) {
 
 	err0 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{{Name: "test_table"}})
 	assert.NoError(t, err0)
+
+	err1 := mock.MockCreateBucketsWithExpectedResponse(200, objects.Bucket{Name: "test_bucket"})
+	assert.NoError(t, err1)
+
+	err2 := mock.MockDeleteBucketsWithExpectedResponse(200)
+	assert.NoError(t, err2)
+
+	err3 := mock.MockGetBucketByNameWithExpectedResponse(200, objects.Bucket{Name: "test_bucket"})
+	assert.NoError(t, err3)
 
 	errs := resource.Migrate(config, importState, projectPath, resources)
 	assert.Empty(t, errs)
