@@ -1,13 +1,11 @@
 package resource_test
 
 import (
-	"os"
-	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/mock"
 	"github.com/sev-2/raiden/pkg/resource"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/resource/policies"
@@ -21,70 +19,40 @@ import (
 )
 
 func loadConfig() *raiden.Config {
-	// Create a temporary config file with valid content
-	file, err := os.CreateTemp("", "config*.yaml")
-	if err != nil {
-		return nil
+	return &raiden.Config{
+		DeploymentTarget:    raiden.DeploymentTargetCloud,
+		ProjectId:           "test-project-id",
+		ProjectName:         "test-project",
+		SupabaseApiBasePath: "/v1",
+		SupabaseApiUrl:      "http://supabase.cloud.com",
+		SupabasePublicUrl:   "http://supabase.cloud.com",
 	}
-	defer os.Remove(file.Name())
-
-	configContent := `
-ACCESS_TOKEN: "test-access-token"
-ANON_KEY: "test-anon-key"
-BREAKER_ENABLE: true
-CORS_ALLOWED_ORIGINS: "*"
-CORS_ALLOWED_METHODS: "GET,POST"
-CORS_ALLOWED_HEADERS: "Content-Type"
-CORS_ALLOWED_CREDENTIALS: true
-DEPLOYMENT_TARGET: "cloud"
-ENVIRONMENT: "production"
-PROJECT_ID: "test-project-id"
-PROJECT_NAME: "test-project"
-SERVICE_KEY: "test-service-key"
-SERVER_HOST: "127.0.0.1"
-SERVER_PORT: "8080"
-SUPABASE_API_URL: "http://test-supabase-api-url"
-SUPABASE_API_BASE_PATH: "/api"
-SUPABASE_PUBLIC_URL: "http://test-supabase-public-url"
-SCHEDULE_STATUS: "on"
-TRACE_ENABLE: false
-TRACE_COLLECTOR: "zipkin"
-TRACE_COLLECTOR_ENDPOINT: "endpoint"
-VERSION: "2.0.0"
-`
-	if _, err := file.WriteString(configContent); err != nil {
-		return nil
-	}
-	file.Close()
-
-	path := file.Name()
-	config, err := raiden.LoadConfig(&path)
-	if err != nil {
-		return nil
-	}
-	return config
 }
 
 func TestApply(t *testing.T) {
-	if os.Getenv("TEST_RUN") == "1" {
-		flags := &resource.Flags{
-			DryRun:        true,
-			AllowedSchema: "public",
-		}
-		config := loadConfig()
-
-		err := resource.Apply(flags, config)
-		assert.NoError(t, err)
-		return
+	flags := &resource.Flags{
+		DryRun:        true,
+		AllowedSchema: "public",
 	}
-	cmd := exec.Command(os.Args[0], "-test.run=TestApply")
-	cmd.Env = append(os.Environ(), "TEST_RUN=1")
-	err := cmd.Start()
-	assert.NoError(t, err)
+	config := loadConfig()
 
-	time.Sleep(1 * time.Second)
-	err1 := cmd.Process.Signal(syscall.SIGTERM)
+	err := resource.Apply(flags, config)
+	assert.Error(t, err)
+
+	flags.DryRun = false
+
+	mock := &mock.MockSupabase{Cfg: config}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{})
+	assert.NoError(t, err0)
+
+	err1 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{})
 	assert.NoError(t, err1)
+
+	err = resource.Apply(flags, config)
+	assert.NoError(t, err)
 }
 
 func TestMigrate(t *testing.T) {

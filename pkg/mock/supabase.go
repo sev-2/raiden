@@ -159,6 +159,12 @@ func (m *MockSupabase) MockAdminUpdateUserDataWithExpectedResponse(httpCode int,
 	return registerMock(method, url, httpCode, user)
 }
 
+func (m *MockSupabase) MockGetBucketsWithExpectedResponse(httpCode int, data interface{}) error {
+	method, url := getMethodAndUrl(m.Cfg, "getBuckets")
+
+	return registerMock(method, url, httpCode, data)
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -178,6 +184,9 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 		if actionType == "adminUpdateUserData" {
 			method = "PUT"
 			url = fmt.Sprintf("%s/auth/v1/admin/users/user-id", cfg.SupabaseApiUrl)
+		} else if actionType == "getBuckets" {
+			method = "GET"
+			url = fmt.Sprintf("%s/storage/v1/bucket", cfg.SupabaseApiUrl)
 		}
 	} else {
 		switch actionType {
