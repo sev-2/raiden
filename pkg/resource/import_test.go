@@ -1,11 +1,12 @@
 package resource_test
 
 import (
+	"os"
 	"testing"
 
-	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/mock"
 	"github.com/sev-2/raiden/pkg/resource"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -17,11 +18,49 @@ func TestImport(t *testing.T) {
 		ProjectPath:   "test_project",
 		AllowedSchema: "public",
 	}
-	config := &raiden.Config{}
+	config := loadConfig()
 	resource.ImportLogger = logger.HcLog().Named("import")
 
 	err := resource.Import(flags, config)
 	assert.Error(t, err)
+
+	mock := &mock.MockSupabase{Cfg: config}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockFindProjectWithExpectedResponse(200, objects.Project{})
+	assert.NoError(t, err0)
+
+	err1 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
+		{Name: "table1"},
+		{Name: "table2"},
+	})
+	assert.NoError(t, err1)
+
+	err2 := mock.MockGetFunctionsWithExpectedResponse(200, []objects.Function{
+		{Name: "func1"},
+		{Name: "func2"},
+	})
+	assert.NoError(t, err2)
+
+	err3 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
+		{Name: "role1"},
+		{Name: "role2"},
+	})
+	assert.NoError(t, err3)
+
+	err4 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{
+		{Name: "storage1"},
+		{Name: "storage2"},
+	})
+	assert.NoError(t, err4)
+
+	dir, errDir := os.MkdirTemp("", "import")
+	assert.NoError(t, errDir)
+	flags.ProjectPath = dir
+
+	errFinal := resource.Import(flags, config)
+	assert.NoError(t, errFinal)
 }
 
 func TestUpdateLocalStateFromImport(t *testing.T) {
