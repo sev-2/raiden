@@ -899,23 +899,31 @@ func TestUpdateRole_Cloud(t *testing.T) {
 	assert.NoError(t, errT)
 
 	localRole := objects.Role{
-		Name:        "some-role",
-		CanLogin:    true,
-		IsSuperuser: true,
-		ValidUntil:  validUntil,
+		Name:            "some-role",
+		CanLogin:        true,
+		IsSuperuser:     true,
+		ValidUntil:      validUntil,
+		ConnectionLimit: 11,
+		Config: map[string]interface{}{
+			"somekey":  "somevalue",
+			"otherkey": "othervalue",
+		},
 	}
 
 	updateParam := objects.UpdateRoleParam{
 		OldData: localRole,
 		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateConnectionLimit,
 			objects.UpdateRoleName,
 			objects.UpdateRoleIsReplication,
 			objects.UpdateRoleIsSuperUser,
 			objects.UpdateRoleInheritRole,
 			objects.UpdateRoleCanBypassRls,
+			objects.UpdateRoleCanCreateRole,
 			objects.UpdateRoleCanCreateDb,
 			objects.UpdateRoleCanLogin,
 			objects.UpdateRoleValidUntil,
+			objects.UpdateRoleConfig,
 		},
 	}
 
@@ -942,23 +950,31 @@ func TestUpdateRole_SelfHosted(t *testing.T) {
 	assert.NoError(t, errT)
 
 	localRole := objects.Role{
-		Name:        "some-role",
-		CanLogin:    true,
-		IsSuperuser: true,
-		ValidUntil:  validUntil,
+		Name:            "some-role",
+		CanLogin:        true,
+		IsSuperuser:     true,
+		ValidUntil:      validUntil,
+		ConnectionLimit: 11,
+		Config: map[string]interface{}{
+			"somekey":  "somevalue",
+			"otherkey": "othervalue",
+		},
 	}
 
 	updateParam := objects.UpdateRoleParam{
 		OldData: localRole,
 		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateConnectionLimit,
 			objects.UpdateRoleName,
 			objects.UpdateRoleIsReplication,
 			objects.UpdateRoleIsSuperUser,
 			objects.UpdateRoleInheritRole,
 			objects.UpdateRoleCanBypassRls,
+			objects.UpdateRoleCanCreateRole,
 			objects.UpdateRoleCanCreateDb,
 			objects.UpdateRoleCanLogin,
 			objects.UpdateRoleValidUntil,
+			objects.UpdateRoleConfig,
 		},
 	}
 
