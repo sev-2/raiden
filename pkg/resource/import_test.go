@@ -10,6 +10,7 @@ import (
 	"github.com/sev-2/raiden/pkg/resource"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,26 +33,26 @@ func TestImport(t *testing.T) {
 	assert.NoError(t, err0)
 
 	err1 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
-		{Name: "table1"},
-		{Name: "table2"},
+		{Name: "some_table"},
+		{Name: "other_table"},
 	})
 	assert.NoError(t, err1)
 
 	err2 := mock.MockGetFunctionsWithExpectedResponse(200, []objects.Function{
-		{Name: "func1"},
-		{Name: "func2"},
+		{Name: "some_function"},
+		{Name: "other_function"},
 	})
 	assert.NoError(t, err2)
 
 	err3 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
-		{Name: "role1"},
-		{Name: "role2"},
+		{Name: "some_role"},
+		{Name: "other_role"},
 	})
 	assert.NoError(t, err3)
 
 	err4 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{
-		{Name: "storage1"},
-		{Name: "storage2"},
+		{Name: "some_bucket"},
+		{Name: "other_bucket"},
 	})
 	assert.NoError(t, err4)
 
@@ -61,6 +62,11 @@ func TestImport(t *testing.T) {
 
 	errFinal := resource.Import(flags, config)
 	assert.NoError(t, errFinal)
+
+	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/roles"))
+	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/storages"))
+
+	defer os.RemoveAll(dir)
 }
 
 func TestUpdateLocalStateFromImport(t *testing.T) {
