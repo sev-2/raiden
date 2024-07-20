@@ -14,6 +14,7 @@ import (
 	"github.com/sev-2/raiden/pkg/resource/storages"
 	"github.com/sev-2/raiden/pkg/resource/tables"
 	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
 )
@@ -215,6 +216,14 @@ func TestMigrate(t *testing.T) {
 				},
 			},
 			{
+				Type: migrator.MigrateTypeCreate,
+				NewData: objects.Policy{
+					Name:   "test_policy_default",
+					Schema: supabase.DefaultStorageSchema,
+					Table:  supabase.DefaultObjectTable,
+				},
+			},
+			{
 				Type: migrator.MigrateTypeUpdate,
 				OldData: objects.Policy{
 					Name:   "test_policy1",
@@ -229,11 +238,33 @@ func TestMigrate(t *testing.T) {
 				},
 			},
 			{
+				Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Policy{
+					Name:   "test_policy2",
+					Schema: "public",
+					Table:  "test_table",
+				},
+				NewData: objects.Policy{
+					Name:   "test_policy2",
+					Schema: supabase.DefaultStorageSchema,
+					Table:  supabase.DefaultObjectTable,
+					Action: "SELECT",
+				},
+			},
+			{
 				Type: migrator.MigrateTypeDelete,
 				OldData: objects.Policy{
 					Name:   "test_deleted_policy",
 					Schema: "public",
 					Table:  "test_table_deleted",
+				},
+			},
+			{
+				Type: migrator.MigrateTypeDelete,
+				OldData: objects.Policy{
+					Name:   "test_deleted_policy_default",
+					Schema: supabase.DefaultStorageSchema,
+					Table:  supabase.DefaultObjectTable,
 				},
 			},
 		},
