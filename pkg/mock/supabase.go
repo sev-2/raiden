@@ -81,6 +81,12 @@ func (m *MockSupabase) MockCreateRoleWithExpectedResponse(httpCode int, role obj
 	return registerMock(method, url, httpCode, []objects.Role{role})
 }
 
+func (m *MockSupabase) MockUpdateRoleWithExpectedResponse(httpCode int) error {
+	method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(method, url, httpCode, objects.Role{})
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {

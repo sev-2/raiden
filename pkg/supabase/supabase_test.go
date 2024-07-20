@@ -840,6 +840,27 @@ func TestUpdateRole_Cloud(t *testing.T) {
 
 	err := supabase.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{})
 	assert.Error(t, err)
+
+	localRole := objects.Role{
+		Name: "some-role",
+	}
+
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateRoleName,
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.NoError(t, err1)
 }
 
 func TestUpdateRole_SelfHosted(t *testing.T) {
@@ -847,6 +868,27 @@ func TestUpdateRole_SelfHosted(t *testing.T) {
 
 	err := supabase.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{})
 	assert.Error(t, err)
+
+	localRole := objects.Role{
+		Name: "some-role",
+	}
+
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateRoleName,
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.NoError(t, err1)
 }
 
 func TestDeleteRole_Cloud(t *testing.T) {
