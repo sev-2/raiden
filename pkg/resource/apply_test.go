@@ -86,7 +86,7 @@ func TestMigrate(t *testing.T) {
 			Storage: []state.StorageState{
 				{
 					Storage: objects.Bucket{
-						Name:   "storage_test_bucket_policy",
+						Name:   "test_bucket_policy",
 						Public: true,
 					},
 				},
@@ -226,7 +226,7 @@ func TestMigrate(t *testing.T) {
 			{
 				Type: migrator.MigrateTypeCreate,
 				NewData: objects.Policy{
-					Name:   "storage_test_bucket_policy",
+					Name:   "storage test_bucket_policy",
 					Schema: supabase.DefaultStorageSchema,
 					Table:  supabase.DefaultObjectTable,
 				},
@@ -253,7 +253,7 @@ func TestMigrate(t *testing.T) {
 					Table:  "test_table",
 				},
 				NewData: objects.Policy{
-					Name:   "storage_test_bucket_policy",
+					Name:   "storage test_bucket_policy",
 					Schema: supabase.DefaultStorageSchema,
 					Table:  supabase.DefaultObjectTable,
 					Action: "SELECT",
@@ -270,7 +270,7 @@ func TestMigrate(t *testing.T) {
 			{
 				Type: migrator.MigrateTypeDelete,
 				OldData: objects.Policy{
-					Name:   "storage_test_bucket_policy",
+					Name:   "storage test_bucket_policy",
 					Schema: supabase.DefaultStorageSchema,
 					Table:  supabase.DefaultObjectTable,
 				},
