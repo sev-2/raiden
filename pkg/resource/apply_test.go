@@ -37,7 +37,7 @@ type MockNewTable struct {
 	TableID   int64      `json:"table_id,omitempty" column:"name:table_id;type:bigint;"`
 
 	// Table information
-	Metadata string `json:"-" schema:"public" tableName:"test_table" rlsEnable:"false" rlsForced:"false"`
+	Metadata string `json:"-" schema:"private" tableName:"test_table" rlsEnable:"false" rlsForced:"false"`
 
 	// Access control
 	Acl string `json:"-" read:"" write:""`
@@ -245,6 +245,7 @@ func TestMigrate(t *testing.T) {
 				Type: migrator.MigrateTypeUpdate,
 				OldData: objects.Table{
 					Name:        "test_table",
+					Schema:      "private",
 					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
 					Columns: []objects.Column{
 						{Name: "id", DataType: "uuid"},
@@ -253,10 +254,11 @@ func TestMigrate(t *testing.T) {
 				},
 				NewData: objects.Table{
 					Name:        "test_table",
+					Schema:      "public",
 					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
 					Columns: []objects.Column{
 						{Name: "id", DataType: "uuid"},
-						{Name: "name", DataType: "text"},
+						{Name: "name", DataType: "json"},
 						{Name: "age", DataType: "integer"},
 					},
 					Relationships: []objects.TablesRelationship{
