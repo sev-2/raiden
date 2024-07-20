@@ -151,7 +151,33 @@ func TestMigrate(t *testing.T) {
 				},
 			},
 		},
-		Rpc:      []rpc.MigrateItem{},
+		Rpc: []rpc.MigrateItem{
+			{
+				Type: migrator.MigrateTypeCreate,
+				NewData: objects.Function{
+					Name:              "test_rpc",
+					CompleteStatement: "test_rpc()",
+				},
+			},
+			{
+				Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Function{
+					Name:              "test_rpc",
+					CompleteStatement: "test_rpc()",
+				},
+				NewData: objects.Function{
+					Name:              "test_rpc",
+					CompleteStatement: "test_rpc_updated()",
+				},
+			},
+			{
+				Type: migrator.MigrateTypeDelete,
+				OldData: objects.Function{
+					Name:              "test_rpc_deleted",
+					CompleteStatement: "test_rpc_deleted()",
+				},
+			},
+		},
 		Policies: []policies.MigrateItem{},
 		Storages: []storages.MigrateItem{},
 	}
