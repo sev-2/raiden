@@ -34,7 +34,7 @@ func TestRouter(t *testing.T) {
 
 	assert.Equal(t, "raiden.RouteTypeCustom", fooRoute.Type)
 	assert.Equal(t, "\"/foo/{name}\"", fooRoute.Path)
-	assert.Equal(t, "[]string{fasthttp.MethodPost, fasthttp.MethodGet}", fooRoute.Methods)
+	assert.Equal(t, "[]string{fasthttp.MethodPost, fasthttp.MethodPatch, fasthttp.MethodPut, fasthttp.MethodDelete, fasthttp.MethodHead, fasthttp.MethodOptions, fasthttp.MethodGet}", fooRoute.Methods)
 	assert.Equal(t, "testdata.FooController{}", fooRoute.Controller)
 
 	assert.Equal(t, "raiden.RouteTypeFunction", barRoute.Type)
