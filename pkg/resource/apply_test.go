@@ -92,6 +92,15 @@ func TestMigrate(t *testing.T) {
 						{Name: "id", DataType: "uuid"},
 						{Name: "name", DataType: "text"},
 					},
+				},
+				NewData: objects.Table{
+					Name:        "test_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+						{Name: "age", DataType: "integer"},
+					},
 					Relationships: []objects.TablesRelationship{
 						{
 							ConstraintName:    "test_constraint",
@@ -102,15 +111,6 @@ func TestMigrate(t *testing.T) {
 							TargetTableName:   "test_table",
 							TargetColumnName:  "id",
 						},
-					},
-				},
-				NewData: objects.Table{
-					Name:        "test_table",
-					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
-					Columns: []objects.Column{
-						{Name: "id", DataType: "uuid"},
-						{Name: "name", DataType: "text"},
-						{Name: "age", DataType: "integer"},
 					},
 				},
 			},
