@@ -60,6 +60,10 @@ func TestImport(t *testing.T) {
 	assert.NoError(t, errDir)
 	flags.ProjectPath = dir
 
+	resource.RegisterModels(MockNewTable{})
+	resource.RegisterModels(MockOtherTable{})
+	resource.RegisterRole(MockNewRole{})
+
 	errFinal := resource.Import(flags, config)
 	assert.NoError(t, errFinal)
 
