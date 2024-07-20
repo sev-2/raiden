@@ -56,16 +56,90 @@ func TestApply(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	config := &raiden.Config{}
+	config := loadConfig()
 	importState := &state.LocalState{}
 	projectPath := "/path/to/project"
 	resources := &resource.MigrateData{
-		Tables:   []tables.MigrateItem{},
-		Roles:    []roles.MigrateItem{},
+		Tables: []tables.MigrateItem{
+			{
+				Type: migrator.MigrateTypeCreate,
+				NewData: objects.Table{
+					Name:        "test_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+					},
+				},
+			},
+			{
+				Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Table{
+					Name:        "test_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+					},
+				},
+				NewData: objects.Table{
+					Name:        "test_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+						{Name: "age", DataType: "integer"},
+					},
+				},
+			},
+			{
+				Type: migrator.MigrateTypeDelete,
+				OldData: objects.Table{
+					Name:        "test_table_deleted",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+					},
+				},
+			},
+		},
+		Roles: []roles.MigrateItem{
+			{
+				Type: migrator.MigrateTypeCreate,
+				NewData: objects.Role{
+					Name: "test_role",
+				},
+			},
+			{
+				Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Role{
+					Name:     "test_role",
+					CanLogin: false,
+				},
+				NewData: objects.Role{
+					Name:     "test_role",
+					CanLogin: true,
+				},
+			},
+			{
+				Type: migrator.MigrateTypeDelete,
+				OldData: objects.Role{
+					Name: "test_role_deleted",
+				},
+			},
+		},
 		Rpc:      []rpc.MigrateItem{},
 		Policies: []policies.MigrateItem{},
 		Storages: []storages.MigrateItem{},
 	}
+
+	mock := &mock.MockSupabase{Cfg: config}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{{Name: "test_table"}})
+	assert.NoError(t, err0)
 
 	errs := resource.Migrate(config, importState, projectPath, resources)
 	assert.Empty(t, errs)
