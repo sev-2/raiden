@@ -123,6 +123,12 @@ func (m *MockSupabase) MockDeletePolicyWithExpectedResponse(httpCode int) error 
 	return registerMock(method, url, httpCode, objects.Policy{})
 }
 
+func (m *MockSupabase) MockGetFunctionsWithExpectedResponse(httpCode int, functions []objects.Function) error {
+	method, url := getMethodAndUrl(m.Cfg, "getFunctions")
+
+	return registerMock(method, url, httpCode, functions)
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -150,6 +156,9 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string) {
 		case "getPolicies":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+		case "getFunctions":
+			method = "GET"
+			url = fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)

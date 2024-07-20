@@ -697,6 +697,10 @@ func TestGetRoles_Cloud(t *testing.T) {
 		{
 			ID:   1,
 			Name: "some-role",
+			Config: map[string]interface{}{
+				"somekey":  "somevalue",
+				"otherkey": "othervalue",
+			},
 		},
 		{
 			ID:   2,
@@ -726,6 +730,10 @@ func TestGetRoles_SelfHosted(t *testing.T) {
 		{
 			ID:   1,
 			Name: "some-role",
+			Config: map[string]interface{}{
+				"somekey":  "somevalue",
+				"otherkey": "othervalue",
+			},
 		},
 		{
 			ID:   2,
