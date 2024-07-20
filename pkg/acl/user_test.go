@@ -60,6 +60,14 @@ func TestSetUserRole(t *testing.T) {
 }
 
 func TestGetAvailableRole(t *testing.T) {
+	mockEmptyState := state.State{}
+	err0 := state.Save(&mockEmptyState)
+	assert.NoError(t, err0)
+
+	emptyRoles, err1 := acl.GetAvailableRole()
+	assert.Nil(t, err1)
+	assert.Empty(t, emptyRoles)
+
 	localRole := objects.Role{Name: "sample-role"}
 	mockState := state.State{
 		Roles: []state.RoleState{
@@ -68,8 +76,8 @@ func TestGetAvailableRole(t *testing.T) {
 			},
 		},
 	}
-	err1 := state.Save(&mockState)
-	assert.NoError(t, err1)
+	err2 := state.Save(&mockState)
+	assert.NoError(t, err2)
 
 	roles, err := acl.GetAvailableRole()
 	assert.Nil(t, err)
