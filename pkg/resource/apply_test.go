@@ -57,7 +57,18 @@ func TestApply(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	config := loadConfig()
-	importState := &state.LocalState{}
+	importState := &state.LocalState{
+		State: state.State{
+			Tables: []state.TableState{
+				{
+					Table: objects.Table{
+						Name: "test_table",
+					},
+				},
+			},
+		},
+	}
+
 	projectPath := "/path/to/project"
 	resources := &resource.MigrateData{
 		Tables: []tables.MigrateItem{
