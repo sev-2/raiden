@@ -19,6 +19,57 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type MockNewTable struct {
+	raiden.ModelBase
+
+	Id        int64      `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false"`
+	Title     *string    `json:"title,omitempty" column:"name:title;type:varchar;nullable;default:'255'::character varying"`
+	Body      *string    `json:"body,omitempty" column:"name:body;type:text;nullable"`
+	CreatedAt *time.Time `json:"created_at,omitempty" column:"name:created_at;type:timestampz;nullable;default:now()"`
+
+	// Table information
+	Metadata string `json:"-" schema:"public" tableName:"test_table" rlsEnable:"false" rlsForced:"false"`
+
+	// Access control
+	Acl string `json:"-" read:"" write:""`
+}
+
+type MockNewRole struct {
+	raiden.Role
+}
+
+func (m MockNewRole) Name() string {
+	return "test_role"
+}
+
+func (m MockNewRole) CanLogin() bool {
+	return true
+}
+
+func (m MockNewRole) CanCreateDB() bool {
+	return true
+}
+
+func (m MockNewRole) CanCreateRole() bool {
+	return true
+}
+
+func (m MockNewRole) InheritRole() bool {
+	return true
+}
+
+func (m MockNewRole) ConnectionLimit() int {
+	return 10
+}
+
+func (m MockNewRole) ValidUntil() *objects.SupabaseTime {
+	return objects.NewSupabaseTime(time.Now().AddDate(0, 1, 0))
+}
+
+func (m MockNewRole) CanBypassRls() bool {
+	return true
+}
+
 func loadConfig() *raiden.Config {
 	return &raiden.Config{
 		DeploymentTarget:    raiden.DeploymentTargetCloud,
@@ -74,6 +125,13 @@ func TestApply(t *testing.T) {
 					},
 				},
 			},
+			Roles: []state.RoleState{
+				{
+					Role: objects.Role{
+						Name: "test_role",
+					},
+				},
+			},
 		},
 	}
 
@@ -84,11 +142,18 @@ func TestApply(t *testing.T) {
 	mock.Activate()
 	defer mock.Deactivate()
 
-	err0 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{})
+	err0 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
+		{
+			Name: "test_role",
+		},
+	})
 	assert.NoError(t, err0)
 
 	err1 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{})
 	assert.NoError(t, err1)
+
+	resource.RegisterModels(MockNewTable{})
+	resource.RegisterRole(MockNewRole{})
 
 	err = resource.Apply(flags, config)
 	assert.NoError(t, err)
