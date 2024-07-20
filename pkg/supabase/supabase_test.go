@@ -896,6 +896,20 @@ func TestDeleteRole_Cloud(t *testing.T) {
 
 	err := supabase.DeleteRole(cfg, objects.Role{})
 	assert.Error(t, err)
+
+	localRole := objects.Role{
+		Name: "some-role",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteRoleWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteRole(cfg, localRole)
+	assert.NoError(t, err1)
 }
 
 func TestDeleteRole_SelfHosted(t *testing.T) {
@@ -903,6 +917,20 @@ func TestDeleteRole_SelfHosted(t *testing.T) {
 
 	err := supabase.DeleteRole(cfg, objects.Role{})
 	assert.Error(t, err)
+
+	localRole := objects.Role{
+		Name: "some-role",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteRoleWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteRole(cfg, localRole)
+	assert.NoError(t, err1)
 }
 
 func TestGetPolicies_Cloud(t *testing.T) {
