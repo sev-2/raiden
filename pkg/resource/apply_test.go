@@ -209,6 +209,7 @@ func TestMigrate(t *testing.T) {
 			{
 				Type: migrator.MigrateTypeCreate,
 				NewData: objects.Policy{
+					Name:   "test_policy",
 					Schema: "public",
 					Table:  "test_table",
 				},
@@ -216,10 +217,12 @@ func TestMigrate(t *testing.T) {
 			{
 				Type: migrator.MigrateTypeUpdate,
 				OldData: objects.Policy{
+					Name:   "test_policy1",
 					Schema: "public",
 					Table:  "test_table",
 				},
 				NewData: objects.Policy{
+					Name:   "test_policy1",
 					Schema: "public",
 					Table:  "test_table",
 					Action: "SELECT",
@@ -228,6 +231,7 @@ func TestMigrate(t *testing.T) {
 			{
 				Type: migrator.MigrateTypeDelete,
 				OldData: objects.Policy{
+					Name:   "test_deleted_policy",
 					Schema: "public",
 					Table:  "test_table_deleted",
 				},
