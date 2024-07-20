@@ -225,6 +225,11 @@ func TestMigrate(t *testing.T) {
 			},
 			{
 				Type: migrator.MigrateTypeCreate,
+				OldData: objects.Policy{
+					Name:   "test_policy_created",
+					Schema: "public",
+					Table:  "test_table",
+				},
 				NewData: objects.Policy{
 					Name:   "storage test_bucket_policy",
 					Schema: supabase.DefaultStorageSchema,
