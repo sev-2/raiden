@@ -156,7 +156,7 @@ func TestApply(t *testing.T) {
 
 	err0 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
 		{
-			Name: "test_role",
+			Name: "test_other_role",
 		},
 	})
 	assert.NoError(t, err0)
