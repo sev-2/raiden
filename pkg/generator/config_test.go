@@ -17,4 +17,7 @@ func TestGenerateConfig(t *testing.T) {
 	err1 := generator.GenerateConfig(dir, conf, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err1)
 	assert.FileExists(t, dir+"/configs/app.yaml")
+
+	err2 := generator.CreateInternalFolder(dir)
+	assert.NoError(t, err2)
 }
