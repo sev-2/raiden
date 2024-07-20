@@ -22,4 +22,27 @@ func TestGenerateJobRegister(t *testing.T) {
 	assert.NoError(t, err2)
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/bootstrap"))
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/jobs"))
+
+	sampleJobFile, err3 := utils.CreateFile(dir+"/internal/jobs/sample_job.go", true)
+	assert.NoError(t, err3)
+
+	configContent := `
+package jobs
+
+
+type NiceJob struct {
+	raiden.JobBase
+}
+
+func (j *NiceJob) Name() string {
+	return "some-nice-job"
+}
+`
+	_, err4 := sampleJobFile.WriteString(configContent)
+	assert.NoError(t, err4)
+	sampleJobFile.Close()
+
+	foundFiles, err5 := generator.WalkScanJob(dir + "/internal/jobs")
+	assert.NoError(t, err5)
+	assert.NotEmpty(t, foundFiles)
 }
