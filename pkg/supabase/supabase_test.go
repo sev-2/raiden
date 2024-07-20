@@ -188,10 +188,14 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		Name:   "some-table",
 		Columns: []objects.Column{
 			{
-				Name: "some-column",
+				Name:         "some-column",
+				DataType:     "json",
+				IsNullable:   true,
+				DefaultValue: "[{}]",
 			},
 			{
-				Name: "another-column",
+				Name:     "another-column",
+				DataType: "json",
 			},
 		},
 		Relationships: []objects.TablesRelationship{
@@ -215,10 +219,12 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		Name: "some-table",
 		Columns: []objects.Column{
 			{
-				Name: "some-column",
+				Name:     "some-column",
+				DataType: "text",
 			},
 			{
-				Name: "another-column",
+				Name:     "another-column",
+				DataType: "text",
 			},
 		},
 		Relationships: []objects.TablesRelationship{
@@ -274,6 +280,10 @@ func TestUpdateTable_Cloud(t *testing.T) {
 				Name: "some-column",
 				UpdateItems: []objects.UpdateColumnType{
 					objects.UpdateColumnName,
+					objects.UpdateColumnDataType,
+					objects.UpdateColumnUnique,
+					objects.UpdateColumnNullable,
+					objects.UpdateColumnDefaultValue,
 				},
 			},
 		},
@@ -459,10 +469,14 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 		Name:   "some-table",
 		Columns: []objects.Column{
 			{
-				Name: "some-column",
+				Name:         "some-column",
+				DataType:     "json",
+				IsNullable:   true,
+				DefaultValue: "[{}]",
 			},
 			{
-				Name: "another-column",
+				Name:     "another-column",
+				DataType: "json",
 			},
 		},
 		Relationships: []objects.TablesRelationship{
@@ -486,10 +500,12 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 		Name: "some-table",
 		Columns: []objects.Column{
 			{
-				Name: "some-column",
+				Name:     "some-column",
+				DataType: "text",
 			},
 			{
-				Name: "another-column",
+				Name:     "another-column",
+				DataType: "text",
 			},
 		},
 		Relationships: []objects.TablesRelationship{
@@ -545,6 +561,10 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 				Name: "some-column",
 				UpdateItems: []objects.UpdateColumnType{
 					objects.UpdateColumnName,
+					objects.UpdateColumnDataType,
+					objects.UpdateColumnUnique,
+					objects.UpdateColumnNullable,
+					objects.UpdateColumnDefaultValue,
 				},
 			},
 		},
