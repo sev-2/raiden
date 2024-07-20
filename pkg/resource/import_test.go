@@ -60,6 +60,52 @@ func TestImport(t *testing.T) {
 	assert.NoError(t, errDir)
 	flags.ProjectPath = dir
 
+	importState := &state.LocalState{
+		State: state.State{
+			Tables: []state.TableState{
+				{
+					Table: objects.Table{
+						Name:        "test_local_table",
+						PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+						Columns: []objects.Column{
+							{Name: "id", DataType: "uuid"},
+							{Name: "name", DataType: "text"},
+						},
+						Relationships: []objects.TablesRelationship{
+							{
+								ConstraintName:    "test_local_constraint",
+								SourceSchema:      "public",
+								SourceTableName:   "test_local_table",
+								SourceColumnName:  "id",
+								TargetTableSchema: "public",
+								TargetTableName:   "test_table",
+								TargetColumnName:  "id",
+							},
+						},
+					},
+				},
+			},
+			Storage: []state.StorageState{
+				{
+					Storage: objects.Bucket{
+						Name:   "test_bucket_policy",
+						Public: true,
+					},
+				},
+			},
+			Roles: []state.RoleState{
+				{
+					Role: objects.Role{
+						Name: "test_role_local",
+					},
+				},
+			},
+		},
+	}
+
+	errSaveState := state.Save(&importState.State)
+	assert.NoError(t, errSaveState)
+
 	resource.RegisterModels(MockNewTable{})
 	resource.RegisterModels(MockOtherTable{})
 	resource.RegisterRole(MockNewRole{})
@@ -71,6 +117,9 @@ func TestImport(t *testing.T) {
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/storages"))
 
 	defer os.RemoveAll(dir)
+
+	errReset := state.Save(&state.State{})
+	assert.NoError(t, errReset)
 }
 
 func TestUpdateLocalStateFromImport(t *testing.T) {
