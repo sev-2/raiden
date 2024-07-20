@@ -213,6 +213,19 @@ func GetPolicies(cfg *raiden.Config) (objects.Policies, error) {
 	})
 }
 
+func GetPolicyByName(cfg *raiden.Config, name string) (objects.Policy, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get policy by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "policy", func() (objects.Policy, error) {
+			return cloud.GetPolicyByName(cfg, name)
+		})
+	}
+	SupabaseLogger.Debug("Get policy by name from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "policy", func() (objects.Policy, error) {
+		return meta.GetPolicyByName(cfg, name)
+	})
+}
+
 func CreatePolicy(cfg *raiden.Config, policy objects.Policy) (objects.Policy, error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Create policy from supabase cloud ", "name", policy.Name, "project-id", cfg.ProjectId)

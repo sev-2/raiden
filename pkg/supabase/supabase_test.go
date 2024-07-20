@@ -991,6 +991,52 @@ func TestGetPolicies_SelfHosted(t *testing.T) {
 	assert.Equal(t, len(remotePolicies), len(policies))
 }
 
+func TestGetPolicyByName_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetPolicyByName(cfg, "some-policy")
+	assert.Error(t, err)
+
+	remotePolicy := objects.Policy{
+		ID:   1,
+		Name: "some-policy",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetPolicyByNameWithExpectedResponse(200, remotePolicy)
+	assert.NoError(t, err0)
+
+	policy, err1 := supabase.GetPolicyByName(cfg, "some-policy")
+	assert.NoError(t, err1)
+	assert.Equal(t, remotePolicy.Name, policy.Name)
+}
+
+func TestGetPolicyByName_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetPolicyByName(cfg, "some-policy")
+	assert.Error(t, err)
+
+	remotePolicy := objects.Policy{
+		ID:   1,
+		Name: "some-policy",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetPolicyByNameWithExpectedResponse(200, remotePolicy)
+	assert.NoError(t, err0)
+
+	policy, err1 := supabase.GetPolicyByName(cfg, "some-policy")
+	assert.NoError(t, err1)
+	assert.Equal(t, remotePolicy.Name, policy.Name)
+}
+
 func TestCreatePolicy_Cloud(t *testing.T) {
 	cfg := loadCloudConfig()
 

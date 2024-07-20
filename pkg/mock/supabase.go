@@ -99,6 +99,12 @@ func (m *MockSupabase) MockGetPoliciesWithExpectedResponse(httpCode int, policie
 	return registerMock(method, url, httpCode, policies)
 }
 
+func (m *MockSupabase) MockGetPolicyByNameWithExpectedResponse(httpCode int, policy objects.Policy) error {
+	method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(method, url, httpCode, []objects.Policy{policy})
+}
+
 func (m *MockSupabase) MockCreatePolicyWithExpectedResponse(httpCode int, policy objects.Policy) error {
 	method, url := getMethodAndUrl(m.Cfg, "common")
 
