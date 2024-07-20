@@ -111,6 +111,12 @@ func (m *MockSupabase) MockUpdatePolicyWithExpectedResponse(httpCode int) error 
 	return registerMock(method, url, httpCode, objects.Policy{})
 }
 
+func (m *MockSupabase) MockDeletePolicyWithExpectedResponse(httpCode int) error {
+	method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(method, url, httpCode, objects.Policy{})
+}
+
 func registerMock(method, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {

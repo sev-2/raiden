@@ -1088,6 +1088,20 @@ func TestDeletePolicy_Cloud(t *testing.T) {
 
 	err := supabase.DeletePolicy(cfg, objects.Policy{})
 	assert.Error(t, err)
+
+	localPolicy := objects.Policy{
+		Name: "some-policy",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeletePolicyWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeletePolicy(cfg, localPolicy)
+	assert.NoError(t, err1)
 }
 
 func TestDeletePolicy_SelfHosted(t *testing.T) {
@@ -1095,6 +1109,20 @@ func TestDeletePolicy_SelfHosted(t *testing.T) {
 
 	err := supabase.DeletePolicy(cfg, objects.Policy{})
 	assert.Error(t, err)
+
+	localPolicy := objects.Policy{
+		Name: "some-policy",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeletePolicyWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeletePolicy(cfg, localPolicy)
+	assert.NoError(t, err1)
 }
 
 func TestGetFunctions_Cloud(t *testing.T) {
