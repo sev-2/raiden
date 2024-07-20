@@ -16,8 +16,8 @@ import (
 
 func TestImport(t *testing.T) {
 	flags := &resource.Flags{
-		ProjectPath:   "test_project",
-		AllowedSchema: "public",
+		ProjectPath: "test_project",
+		DryRun:      false,
 	}
 	config := loadConfig()
 	resource.ImportLogger = logger.HcLog().Named("import")
@@ -28,33 +28,6 @@ func TestImport(t *testing.T) {
 	mock := &mock.MockSupabase{Cfg: config}
 	mock.Activate()
 	defer mock.Deactivate()
-
-	err0 := mock.MockFindProjectWithExpectedResponse(200, objects.Project{})
-	assert.NoError(t, err0)
-
-	err1 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
-		{Name: "some_table"},
-		{Name: "other_table"},
-	})
-	assert.NoError(t, err1)
-
-	err2 := mock.MockGetFunctionsWithExpectedResponse(200, []objects.Function{
-		{Name: "some_function"},
-		{Name: "other_function"},
-	})
-	assert.NoError(t, err2)
-
-	err3 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
-		{Name: "some_role"},
-		{Name: "other_role"},
-	})
-	assert.NoError(t, err3)
-
-	err4 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{
-		{Name: "some_bucket"},
-		{Name: "other_bucket"},
-	})
-	assert.NoError(t, err4)
 
 	dir, errDir := os.MkdirTemp("", "import")
 	assert.NoError(t, errDir)
@@ -110,10 +83,45 @@ func TestImport(t *testing.T) {
 	resource.RegisterModels(MockOtherTable{})
 	resource.RegisterRole(MockNewRole{})
 
-	errFinal := resource.Import(flags, config)
-	assert.NoError(t, errFinal)
+	// err0 := mock.MockFindProjectWithExpectedResponse(200, objects.Project{})
+	// assert.NoError(t, err0)
+
+	err0 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{
+		{Name: "some_bucket"},
+		{Name: "other_bucket"},
+	})
+	assert.NoError(t, err0)
+
+	err1 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
+		{Name: "some_table", Schema: "public"},
+		{Name: "other_table", Schema: "private"},
+		{Name: "other_table_again", Schema: "public"},
+	})
+	assert.NoError(t, err1)
+
+	err2 := mock.MockGetFunctionsWithExpectedResponse(200, []objects.Function{
+		{Name: "some_function"},
+		{Name: "other_function"},
+	})
+	assert.NoError(t, err2)
+
+	errImport1 := resource.Import(flags, config)
+	assert.NoError(t, errImport1)
+
+	err3 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
+		{Name: "some_role"},
+		{Name: "other_role"},
+	})
+	assert.NoError(t, err3)
+
+	errImport3 := resource.Import(flags, config)
+	assert.NoError(t, errImport3)
+
+	errImport4 := resource.Import(flags, config)
+	assert.NoError(t, errImport4)
 
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/roles"))
+	assert.Equal(t, false, utils.IsFolderExists(dir+"/internal/models"))
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/storages"))
 
 	defer os.RemoveAll(dir)
