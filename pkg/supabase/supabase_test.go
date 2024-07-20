@@ -183,6 +183,34 @@ func TestUpdateTable_Cloud(t *testing.T) {
 	err := supabase.UpdateTable(cfg, objects.Table{}, objects.UpdateTableParam{})
 	assert.Error(t, err)
 
+	newTable := objects.Table{
+		Schema: "some-schema",
+		Name:   "some-table",
+		Columns: []objects.Column{
+			{
+				Name: "some-column",
+			},
+			{
+				Name: "another-column",
+			},
+		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "some-constraint",
+				SourceSchema:      "some-schema",
+				SourceColumnName:  "some-column",
+				TargetTableSchema: "other-schema",
+			},
+		},
+		RLSEnabled: true,
+		RLSForced:  true,
+		PrimaryKeys: []objects.PrimaryKey{
+			{
+				Name: "some-pk",
+			},
+		},
+	}
+
 	localTable := objects.Table{
 		Name: "some-table",
 		Columns: []objects.Column{
@@ -201,6 +229,11 @@ func TestUpdateTable_Cloud(t *testing.T) {
 				TargetTableSchema: "other-schema",
 			},
 		},
+		PrimaryKeys: []objects.PrimaryKey{
+			{
+				Name: "old-pk",
+			},
+		},
 	}
 
 	updateParam := objects.UpdateTableParam{
@@ -214,7 +247,11 @@ func TestUpdateTable_Cloud(t *testing.T) {
 			},
 		},
 		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableSchema,
 			objects.UpdateTableName,
+			objects.UpdateTableRlsEnable,
+			objects.UpdateTableRlsForced,
+			objects.UpdateTablePrimaryKey,
 		},
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
@@ -392,7 +429,7 @@ func TestUpdateTable_Cloud(t *testing.T) {
 	err0 := mock.MockUpdateTableWithExpectedResponse(200)
 	assert.NoError(t, err0)
 
-	err1 := supabase.UpdateTable(cfg, localTable, updateParam)
+	err1 := supabase.UpdateTable(cfg, newTable, updateParam)
 	assert.NoError(t, err1)
 
 	err2 := supabase.UpdateTable(cfg, localTable, updateParam1)
@@ -417,6 +454,34 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 	err := supabase.UpdateTable(cfg, objects.Table{}, objects.UpdateTableParam{})
 	assert.Error(t, err)
 
+	newTable := objects.Table{
+		Schema: "some-schema",
+		Name:   "some-table",
+		Columns: []objects.Column{
+			{
+				Name: "some-column",
+			},
+			{
+				Name: "another-column",
+			},
+		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "some-constraint",
+				SourceSchema:      "some-schema",
+				SourceColumnName:  "some-column",
+				TargetTableSchema: "other-schema",
+			},
+		},
+		RLSEnabled: true,
+		RLSForced:  true,
+		PrimaryKeys: []objects.PrimaryKey{
+			{
+				Name: "some-pk",
+			},
+		},
+	}
+
 	localTable := objects.Table{
 		Name: "some-table",
 		Columns: []objects.Column{
@@ -435,6 +500,11 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 				TargetTableSchema: "other-schema",
 			},
 		},
+		PrimaryKeys: []objects.PrimaryKey{
+			{
+				Name: "old-pk",
+			},
+		},
 	}
 
 	updateParam := objects.UpdateTableParam{
@@ -448,7 +518,11 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 			},
 		},
 		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableSchema,
 			objects.UpdateTableName,
+			objects.UpdateTableRlsEnable,
+			objects.UpdateTableRlsForced,
+			objects.UpdateTablePrimaryKey,
 		},
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
@@ -626,7 +700,7 @@ func TestUpdateTable_SelfHosted(t *testing.T) {
 	err0 := mock.MockUpdateTableWithExpectedResponse(200)
 	assert.NoError(t, err0)
 
-	err1 := supabase.UpdateTable(cfg, localTable, updateParam)
+	err1 := supabase.UpdateTable(cfg, newTable, updateParam)
 	assert.NoError(t, err1)
 
 	err2 := supabase.UpdateTable(cfg, localTable, updateParam1)
