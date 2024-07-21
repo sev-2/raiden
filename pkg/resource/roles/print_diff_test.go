@@ -56,6 +56,20 @@ func TestPrintDiff(t *testing.T) {
 	assert.NoError(t, err1)
 
 	assert.Contains(t, outb.String(), "PASS")
+
+	migratedItems := objects.UpdateRoleParam{
+		OldData:     objects.Role{Name: "source_role"},
+		ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleCanBypassRls},
+	}
+
+	successDiffData := roles.CompareDiffResult{
+		IsConflict:     false,
+		SourceResource: objects.Role{Name: "source_role"},
+		TargetResource: objects.Role{Name: "target_role"},
+		DiffItems:      migratedItems,
+	}
+
+	roles.PrintDiff(successDiffData)
 }
 
 // TestGetDiffChangeMessage tests the GetDiffChangeMessage role
