@@ -233,7 +233,7 @@ func TestImport(t *testing.T) {
 	err3 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
 		{
 			ID:              1,
-			ConnectionLimit: 9,
+			ConnectionLimit: 10,
 			Name:            "mock_other_role",
 			InheritRole:     true,
 			CanLogin:        true,
@@ -243,7 +243,7 @@ func TestImport(t *testing.T) {
 		},
 		{
 			ID:              2,
-			ConnectionLimit: 10,
+			ConnectionLimit: 9,
 			Name:            "other_role",
 			InheritRole:     true,
 			CanLogin:        true,
