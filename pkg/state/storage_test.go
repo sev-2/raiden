@@ -16,6 +16,8 @@ type MockBucket struct {
 	allowedMimeTypes  []string
 	avifAutoDetection bool
 	fileSizeLimit     int
+
+	Acl string `json:"-" read:"authenticated,sc" write:"authenticated,sc" readUsing:"true" writeCheck:"true" writeUsing:"true"`
 }
 
 func (m MockBucket) Name() string               { return m.name }
@@ -75,7 +77,9 @@ func TestBuildStorageFromApp(t *testing.T) {
 func TestBuildStorageFromState(t *testing.T) {
 	mockStorage := MockBucket{name: "storage1"}
 	storageState := state.StorageState{
-		Storage: objects.Bucket{Name: "storage1"},
+		Storage: objects.Bucket{
+			Name: "storage1",
+		},
 	}
 	result := state.BuildStorageFromState(storageState, mockStorage)
 	assert.Equal(t, "storage1", result.Storage.Name)
