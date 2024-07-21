@@ -170,7 +170,7 @@ func TestImport(t *testing.T) {
 		Roles: []state.RoleState{
 			{
 				Role: objects.Role{
-					Name: "test_role_local",
+					Name: "some_role",
 				},
 			},
 			{
