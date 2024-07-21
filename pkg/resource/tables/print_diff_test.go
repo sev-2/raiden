@@ -186,8 +186,9 @@ func TestPrintDiffResult(t *testing.T) {
 		{
 			Name:           "test_table",
 			IsConflict:     true,
-			SourceResource: objects.Table{Name: "source_table"},
-			TargetResource: objects.Table{Name: "target_table"},
+			SourceResource: SourceTable,
+			TargetResource: TargetTable,
+			DiffItems:      MigratedItems,
 		},
 	}
 
@@ -255,8 +256,24 @@ func TestPrintDiff(t *testing.T) {
 		DiffItems:      MigratedItems,
 	}
 
-	sRelation := tables.MapRelations{}
-	tRelation := tables.MapRelations{}
+	sRelation := tables.MapRelations{
+		"public.table1": []*state.Relation{
+			{
+				Table:        "table1",
+				Type:         "some_type",
+				RelationType: raiden.RelationTypeHasOne,
+			},
+		},
+	}
+	tRelation := tables.MapRelations{
+		"public.table1_updated": []*state.Relation{
+			{
+				Table:        "table1_updated",
+				Type:         "some_type",
+				RelationType: raiden.RelationTypeHasOne,
+			},
+		},
+	}
 
 	tables.PrintDiff(successDiffData, sRelation, tRelation)
 }
