@@ -37,7 +37,8 @@ func TestCompareList(t *testing.T) {
 			ValidUntil:      &objects.SupabaseTime{},
 		},
 		{
-			Name: "role2",
+			Name:   "role2",
+			Config: map[string]interface{}{"not-key": "value"},
 		},
 	}
 
@@ -54,7 +55,8 @@ func TestCompareList(t *testing.T) {
 			ValidUntil:      &objects.SupabaseTime{},
 		},
 		{
-			Name: "role2",
+			Name:   "role2",
+			Config: map[string]interface{}{"key": "value"},
 		},
 	}
 
