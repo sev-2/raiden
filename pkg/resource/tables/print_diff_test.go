@@ -424,6 +424,7 @@ func TestGenerateDiffChangeUpdateMessage(t *testing.T) {
 		OldData: objects.Table{ReplicaIdentity: "NOTHING"},
 		MigrationItems: objects.UpdateTableParam{
 			ChangeColumnItems: MigratedItems.ChangeColumnItems,
+			ChangeRelationItems: MigratedItems.ChangeRelationItems,
 		},
 	}
 
