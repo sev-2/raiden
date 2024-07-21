@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/resource/tables"
+	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,6 +30,39 @@ var (
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
 				Type: objects.UpdateRelationCreate,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+				},
+			},
+			{
+				Type: objects.UpdateRelationUpdate,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+				},
+			},
+			{
+				Type: objects.UpdateRelationDelete,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+				},
 			},
 		},
 		ChangeColumnItems: []objects.UpdateColumnItem{
@@ -156,8 +191,24 @@ func TestPrintDiffResult(t *testing.T) {
 		},
 	}
 
-	sRelation := tables.MapRelations{}
-	tRelation := tables.MapRelations{}
+	sRelation := tables.MapRelations{
+		"public.table1": []*state.Relation{
+			{
+				Table:        "table1",
+				Type:         "some_type",
+				RelationType: raiden.RelationTypeHasOne,
+			},
+		},
+	}
+	tRelation := tables.MapRelations{
+		"public.table1_updated": []*state.Relation{
+			{
+				Table:        "table1_updated",
+				Type:         "some_type",
+				RelationType: raiden.RelationTypeHasOne,
+			},
+		},
+	}
 
 	err := tables.PrintDiffResult(diffResult, sRelation, tRelation)
 	assert.EqualError(t, err, "canceled import process, you have conflict table. please fix it first")
