@@ -76,6 +76,16 @@ func (b MockOtherBucket) AvifAutoDetection() bool {
 	return false
 }
 
+type MockGetVoteByParams struct{}
+
+type MockGetVoteByResult any
+
+type MockGetVoteBy struct {
+	raiden.RpcBase
+	Params *MockGetVoteByParams `json:"-"`
+	Return MockGetVoteByResult  `json:"-"`
+}
+
 func TestImport(t *testing.T) {
 	flags := &resource.Flags{
 		ProjectPath: "test_project",
@@ -170,6 +180,7 @@ func TestImport(t *testing.T) {
 	resource.RegisterModels(MockNewTable{}, MockOtherTable{})
 	resource.RegisterRole(MockNewRole{}, MockOtherRole{})
 	resource.RegisterStorages(MockOtherBucket{})
+	resource.RegisterRpc(&MockGetVoteBy{})
 
 	errSaveState := state.Save(&testState)
 	assert.NoError(t, errSaveState)
