@@ -64,6 +64,34 @@ func TestPrintDiff(t *testing.T) {
 
 	assert.Contains(t, outb.String(), "Found diff")
 	assert.Contains(t, outb.String(), "End found diff")
+
+	migratedItems := objects.UpdateTableParam{
+		OldData:             objects.Table{Name: "old_table"},
+		ChangeRelationItems: []objects.UpdateRelationItem{{Type: objects.UpdateRelationCreate}},
+		ChangeColumnItems: []objects.UpdateColumnItem{{UpdateItems: []objects.UpdateColumnType{
+			objects.UpdateColumnNew,
+			objects.UpdateColumnDelete,
+			objects.UpdateColumnName,
+			objects.UpdateColumnDataType,
+			objects.UpdateColumnUnique,
+			objects.UpdateColumnNullable,
+			objects.UpdateColumnIdentity,
+			objects.UpdateColumnDefaultValue,
+		}}},
+	}
+
+	successDiffData := tables.CompareDiffResult{
+		Name:           "test_table",
+		IsConflict:     false,
+		SourceResource: objects.Table{Name: "source_table"},
+		TargetResource: objects.Table{Name: "target_table"},
+		DiffItems:      migratedItems,
+	}
+
+	sRelation := tables.MapRelations{}
+	tRelation := tables.MapRelations{}
+
+	tables.PrintDiff(successDiffData, sRelation, tRelation)
 }
 
 // TestGetDiffChangeMessage tests the GetDiffChangeMessage function
