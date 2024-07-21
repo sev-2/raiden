@@ -38,7 +38,7 @@ func TestCompareList(t *testing.T) {
 		},
 		{
 			Name:   "role2",
-			Config: map[string]interface{}{"not-key": "value", "other-key": true},
+			Config: map[string]interface{}{"not-key": "value"},
 		},
 	}
 
@@ -56,7 +56,7 @@ func TestCompareList(t *testing.T) {
 		},
 		{
 			Name:   "role2",
-			Config: map[string]interface{}{"key": "value", "some-other-key": "true"},
+			Config: map[string]interface{}{"key": "value"},
 		},
 	}
 
