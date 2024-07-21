@@ -418,4 +418,22 @@ func TestGenerateDiffChangeUpdateMessage(t *testing.T) {
 	diffMessage, err = tables.GenerateDiffChangeUpdateMessage("test_table", item)
 	assert.NoError(t, err)
 	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %s >>> %s", "replica identity", item.OldData.ReplicaIdentity, item.NewData.ReplicaIdentity))
+
+	item = tables.MigrateItem{
+		NewData: objects.Table{ReplicaIdentity: "FULL"},
+		OldData: objects.Table{ReplicaIdentity: "NOTHING"},
+		MigrationItems: objects.UpdateTableParam{
+			ChangeColumnItems: MigratedItems.ChangeColumnItems,
+		},
+	}
+
+	diffMessage, err = tables.GenerateDiffChangeUpdateMessage("test_table", item)
+	assert.NoError(t, err)
+	assert.Contains(t, diffMessage, "create new column")
+	assert.Contains(t, diffMessage, "delete column")
+	assert.Contains(t, diffMessage, "default value")
+	assert.Contains(t, diffMessage, "data type")
+	assert.Contains(t, diffMessage, "is unique")
+	assert.Contains(t, diffMessage, "is nullable")
+	assert.Contains(t, diffMessage, "is identity")
 }
