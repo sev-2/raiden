@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/mock"
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
 )
 
 type Scouter struct{}
@@ -63,6 +65,36 @@ func TestCreateQuery(t *testing.T) {
 
 	expectedCompleteQuery := "create or replace function public.get_submissions(scouter_name character varying, candidate_name text) returns table(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying) language plpgsql as $function$ begin return query select s.id, s.created_at, sc.name as sc_name, c.name as c_name from submission s inner join scouter sc on s.scouter_id = sc.scouter_id inner join candidate c on s.candidate_id = c.candidate_id where sc.name = scouter_name and c.name = candidate_name ; end; $function$"
 	assert.Equal(t, expectedCompleteQuery, rpc.GetCompleteStmt())
+}
+
+func TestExecuteRpc(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockExecuteRpcWithExpectedResponse(200, "get_submissions", GetSubmissionsResult{})
+	assert.NoError(t, err)
+
+	rpc := &GetSubmissions{}
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
 }
 
 func TestRpcParamToGoType(t *testing.T) {

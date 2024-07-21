@@ -34,6 +34,12 @@ func (m *MockSupabase) MockFindProjectWithExpectedResponse(httpCode int, project
 	return registerMock(m.Cfg, "findProject", method, url, httpCode, projects)
 }
 
+func (m *MockSupabase) MockExecuteRpcWithExpectedResponse(httpCode int, rpcName string, data interface{}) error {
+	actionType, method, url := getMethodAndUrl(m.Cfg, "executeRpc")
+
+	return registerMock(m.Cfg, actionType, method, url+rpcName, httpCode, data)
+}
+
 func (m *MockSupabase) MockGetTablesWithExpectedResponse(httpCode int, tables []objects.Table) error {
 	actionType, method, url := getMethodAndUrl(m.Cfg, "getTables")
 
@@ -235,6 +241,9 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 		case "deleteBucket":
 			method = "DELETE"
 			url = fmt.Sprintf("%s/storage/v1/bucket/", cfg.SupabaseApiUrl)
+		case "executeRpc":
+			method = "POST"
+			url = fmt.Sprintf("%s/rest/v1/rpc/", cfg.SupabasePublicUrl)
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s/v1/projects/%s/database/query", cfg.SupabaseApiUrl, cfg.ProjectId)
@@ -265,6 +274,9 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 		case "deleteBucket":
 			method = "DELETE"
 			url = fmt.Sprintf("%s/bucket", cfg.SupabaseApiUrl)
+		case "executeRpc":
+			method = "POST"
+			url = fmt.Sprintf("%s/rest/v1/rpc/", cfg.SupabasePublicUrl)
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
