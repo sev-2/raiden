@@ -33,6 +33,8 @@ func TestCompareList(t *testing.T) {
 			CanCreateDB:     false,
 			CanCreateRole:   false,
 			Config:          map[string]interface{}{"key": "value"},
+			InheritRole:     true,
+			ValidUntil:      nil,
 		},
 		{
 			Name: "role2",
@@ -48,6 +50,8 @@ func TestCompareList(t *testing.T) {
 			CanCreateDB:     true,
 			CanCreateRole:   true,
 			Config:          map[string]interface{}{"other-key": "other-value", "key": "new-value"},
+			InheritRole:     false,
+			ValidUntil:      &objects.SupabaseTime{},
 		},
 		{
 			Name: "role2",
