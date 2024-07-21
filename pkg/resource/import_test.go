@@ -243,13 +243,23 @@ func TestImport(t *testing.T) {
 		},
 		{
 			ID:              2,
-			ConnectionLimit: 9,
+			ConnectionLimit: 10,
 			Name:            "other_role",
 			InheritRole:     true,
 			CanLogin:        true,
 			CanCreateDB:     true,
 			CanCreateRole:   true,
 			CanBypassRLS:    true,
+		},
+		{
+			ID:              3,
+			ConnectionLimit: 100,
+			Name:            "completely_new_role",
+			InheritRole:     false,
+			CanLogin:        false,
+			CanCreateDB:     false,
+			CanCreateRole:   false,
+			CanBypassRLS:    false,
 		},
 	})
 	assert.NoError(t, err3)
