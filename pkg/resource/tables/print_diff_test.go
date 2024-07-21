@@ -32,15 +32,46 @@ var (
 		},
 		ChangeColumnItems: []objects.UpdateColumnItem{
 			{
+				Name: "name",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnNullable,
+				},
+			},
+			{
+				Name: "old",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnDelete,
+				},
+			},
+			{
+				Name: "description",
 				UpdateItems: []objects.UpdateColumnType{
 					objects.UpdateColumnNew,
-					objects.UpdateColumnDelete,
-					objects.UpdateColumnName,
-					objects.UpdateColumnDataType,
-					objects.UpdateColumnUnique,
+				},
+			},
+			{
+				Name: "nullable",
+				UpdateItems: []objects.UpdateColumnType{
 					objects.UpdateColumnNullable,
-					objects.UpdateColumnIdentity,
+				},
+			},
+			{
+				Name: "uniqueness",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnUnique,
+				},
+			},
+			{
+				Name: "changeable",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnDataType,
 					objects.UpdateColumnDefaultValue,
+				},
+			},
+			{
+				Name: "identity",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnIdentity,
 				},
 			},
 		},
@@ -56,6 +87,7 @@ var (
 		Columns: []objects.Column{
 			{Name: "id", DataType: "int", IsNullable: false},
 			{Name: "name", DataType: "varchar", IsNullable: true},
+			{Name: "old", DataType: "varchar", IsNullable: true},
 			{Name: "nullable", DataType: "varchar", IsNullable: true},
 			{Name: "changeable", DataType: "varchar", IsNullable: true},
 			{Name: "uniqueness", DataType: "varchar", IsNullable: false, IsUnique: true},
