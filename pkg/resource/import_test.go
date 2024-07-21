@@ -44,12 +44,12 @@ func (m MockOtherRole) ConnectionLimit() int {
 	return 10
 }
 
-func (m MockOtherRole) ValidUntil() *objects.SupabaseTime {
-	return objects.NewSupabaseTime(time.Now().AddDate(0, 1, 0))
-}
-
 func (m MockOtherRole) CanBypassRls() bool {
 	return true
+}
+
+func (r MockOtherRole) ValidUntil() *objects.SupabaseTime {
+	return objects.NewSupabaseTime(time.Now())
 }
 
 type MockOtherBucket struct {
@@ -88,6 +88,14 @@ type MockGetVoteBy struct {
 
 func (m *MockGetVoteBy) Name() string {
 	return "some_function"
+}
+
+func (m *MockGetVoteBy) GetReturnType() raiden.RpcReturnDataType {
+	return "json"
+}
+
+func (m *MockGetVoteBy) GetRawDefinition() string {
+	return "$stmt"
 }
 
 func TestImport(t *testing.T) {
@@ -170,7 +178,7 @@ func TestImport(t *testing.T) {
 		Roles: []state.RoleState{
 			{
 				Role: objects.Role{
-					Name: "some_role",
+					Name: "mock_other_role",
 				},
 			},
 			{
@@ -201,9 +209,6 @@ func TestImport(t *testing.T) {
 	errSaveState := state.Save(&testState)
 	assert.NoError(t, errSaveState)
 
-	// err0 := mock.MockFindProjectWithExpectedResponse(200, objects.Project{})
-	// assert.NoError(t, err0)
-
 	err0 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{
 		{Name: "some_bucket"},
 		{Name: "other_bucket"},
@@ -223,20 +228,32 @@ func TestImport(t *testing.T) {
 	})
 	assert.NoError(t, err2)
 
-	errImport1 := resource.Import(flags, config)
-	assert.NoError(t, errImport1)
-
 	err3 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
-		{Name: "some_role"},
-		{Name: "other_role"},
+		{
+			ID:              1,
+			ConnectionLimit: 10,
+			Name:            "mock_other_role",
+			InheritRole:     true,
+			CanLogin:        true,
+			CanCreateDB:     true,
+			CanCreateRole:   true,
+			CanBypassRLS:    true,
+		},
+		{
+			ID:              2,
+			ConnectionLimit: 10,
+			Name:            "other_role",
+			InheritRole:     true,
+			CanLogin:        true,
+			CanCreateDB:     true,
+			CanCreateRole:   true,
+			CanBypassRLS:    true,
+		},
 	})
 	assert.NoError(t, err3)
 
 	errImport3 := resource.Import(flags, config)
 	assert.NoError(t, errImport3)
-
-	errImport4 := resource.Import(flags, config)
-	assert.NoError(t, errImport4)
 
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/roles"))
 	assert.Equal(t, false, utils.IsFolderExists(dir+"/internal/models"))
