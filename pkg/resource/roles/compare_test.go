@@ -49,7 +49,7 @@ func TestCompareList(t *testing.T) {
 			ConnectionLimit: 20,
 			CanCreateDB:     true,
 			CanCreateRole:   true,
-			Config:          map[string]interface{}{"other-key": "other-value", "key": "new-value"},
+			Config:          map[string]interface{}{"key": "new-value"},
 			InheritRole:     false,
 			ValidUntil:      &objects.SupabaseTime{},
 		},
