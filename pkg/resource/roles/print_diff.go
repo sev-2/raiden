@@ -200,7 +200,7 @@ func PrintDiff(diffData CompareDiffResult) {
 
 			if diffData.TargetResource.ValidUntil != nil && diffData.SourceResource.ValidUntil == nil {
 				diffType = DiffTypeDelete
-				value = diffData.SourceResource.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
+				value = diffData.TargetResource.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
 			}
 
 			if diffData.TargetResource.ValidUntil != nil && diffData.SourceResource.ValidUntil != nil && diffData.TargetResource.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout) != diffData.SourceResource.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout) {
