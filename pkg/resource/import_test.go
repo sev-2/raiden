@@ -86,6 +86,10 @@ type MockGetVoteBy struct {
 	Return MockGetVoteByResult  `json:"-"`
 }
 
+func (m *MockGetVoteBy) Name() string {
+	return "test_rpc"
+}
+
 func TestImport(t *testing.T) {
 	flags := &resource.Flags{
 		ProjectPath: "test_project",
@@ -172,6 +176,18 @@ func TestImport(t *testing.T) {
 			{
 				Role: objects.Role{
 					Name: "test_other_role",
+				},
+			},
+		},
+		Rpc: []state.RpcState{
+			{
+				Function: objects.Function{
+					Name: "test_rpc",
+				},
+			},
+			{
+				Function: objects.Function{
+					Name: "test_other_rpc",
 				},
 			},
 		},
