@@ -58,15 +58,51 @@ func TestPrintDiff(t *testing.T) {
 	assert.Contains(t, outb.String(), "PASS")
 
 	migratedItems := objects.UpdateRoleParam{
-		OldData:     objects.Role{Name: "source_role"},
-		ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleCanBypassRls},
+		OldData: objects.Role{Name: "source_role"},
+		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateRoleName,
+			objects.UpdateRoleCanBypassRls,
+			objects.UpdateRoleCanCreateDb,
+			objects.UpdateRoleCanCreateRole,
+			objects.UpdateRoleCanLogin,
+			objects.UpdateRoleConfig,
+			objects.UpdateConnectionLimit,
+			objects.UpdateRoleInheritRole,
+			objects.UpdateRoleIsReplication,
+			objects.UpdateRoleIsSuperUser,
+			objects.UpdateRoleValidUntil,
+		},
 	}
 
 	successDiffData := roles.CompareDiffResult{
-		IsConflict:     false,
-		SourceResource: objects.Role{Name: "source_role"},
-		TargetResource: objects.Role{Name: "target_role"},
-		DiffItems:      migratedItems,
+		IsConflict: false,
+		SourceResource: objects.Role{
+			Name:              "source_role",
+			CanBypassRLS:      true,
+			CanCreateDB:       true,
+			CanCreateRole:     true,
+			CanLogin:          true,
+			Config:            map[string]interface{}{"key": "value"},
+			ConnectionLimit:   10,
+			InheritRole:       true,
+			IsReplicationRole: true,
+			IsSuperuser:       true,
+			ValidUntil:        &objects.SupabaseTime{},
+		},
+		TargetResource: objects.Role{
+			Name:              "target_role",
+			CanBypassRLS:      false,
+			CanCreateDB:       false,
+			CanCreateRole:     false,
+			CanLogin:          false,
+			Config:            map[string]interface{}{"key": "new-value"},
+			ConnectionLimit:   20,
+			InheritRole:       false,
+			IsReplicationRole: false,
+			IsSuperuser:       false,
+			ValidUntil:        &objects.SupabaseTime{},
+		},
+		DiffItems: migratedItems,
 	}
 
 	roles.PrintDiff(successDiffData)
