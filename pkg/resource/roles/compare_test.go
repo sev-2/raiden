@@ -26,9 +26,13 @@ func TestCompare(t *testing.T) {
 func TestCompareList(t *testing.T) {
 	source := []objects.Role{
 		{
-			Name:         "role1",
-			CanBypassRLS: true,
-			CanLogin:     true,
+			Name:            "role1",
+			CanBypassRLS:    true,
+			CanLogin:        true,
+			ConnectionLimit: 10,
+			CanCreateDB:     false,
+			CanCreateRole:   false,
+			Config:          map[string]interface{}{"key": "value"},
 		},
 		{
 			Name: "role2",
@@ -37,9 +41,13 @@ func TestCompareList(t *testing.T) {
 
 	target := []objects.Role{
 		{
-			Name:         "role1_updated",
-			CanBypassRLS: false,
-			CanLogin:     false,
+			Name:            "role1_updated",
+			CanBypassRLS:    false,
+			CanLogin:        false,
+			ConnectionLimit: 20,
+			CanCreateDB:     true,
+			CanCreateRole:   true,
+			Config:          map[string]interface{}{"other-key": "other-value", "key": "new-value"},
 		},
 		{
 			Name: "role2",
