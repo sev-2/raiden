@@ -37,7 +37,7 @@ type MockNewTable struct {
 	TableID   int64      `json:"table_id,omitempty" column:"name:table_id;type:bigint;"`
 
 	// Table information
-	Metadata string `json:"-" schema:"private" tableName:"test_table" rlsEnable:"false" rlsForced:"false"`
+	Metadata string `json:"-" schema:"public" tableName:"test_table" rlsEnable:"false" rlsForced:"false"`
 
 	// Access control
 	Acl string `json:"-" read:"" write:""`

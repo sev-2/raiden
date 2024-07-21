@@ -33,55 +33,73 @@ func TestImport(t *testing.T) {
 	assert.NoError(t, errDir)
 	flags.ProjectPath = dir
 
-	importState := &state.LocalState{
-		State: state.State{
-			Tables: []state.TableState{
-				{
-					Table: objects.Table{
-						Name:        "test_local_table",
-						PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
-						Columns: []objects.Column{
-							{Name: "id", DataType: "uuid"},
-							{Name: "name", DataType: "text"},
-						},
-						Relationships: []objects.TablesRelationship{
-							{
-								ConstraintName:    "test_local_constraint",
-								SourceSchema:      "public",
-								SourceTableName:   "test_local_table",
-								SourceColumnName:  "id",
-								TargetTableSchema: "public",
-								TargetTableName:   "test_table",
-								TargetColumnName:  "id",
-							},
+	testState := state.State{
+		Tables: []state.TableState{
+			{
+				Table: objects.Table{
+					Name:        "test_local_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+					},
+					Relationships: []objects.TablesRelationship{
+						{
+							ConstraintName:    "test_local_constraint",
+							SourceSchema:      "public",
+							SourceTableName:   "test_local_table",
+							SourceColumnName:  "id",
+							TargetTableSchema: "public",
+							TargetTableName:   "test_table",
+							TargetColumnName:  "id",
 						},
 					},
 				},
 			},
-			Storage: []state.StorageState{
-				{
-					Storage: objects.Bucket{
-						Name:   "test_bucket_policy",
-						Public: true,
+			{
+				Table: objects.Table{
+					Name:        "test_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+					},
+					Relationships: []objects.TablesRelationship{
+						{
+							ConstraintName:    "test_constraint",
+							SourceSchema:      "public",
+							SourceTableName:   "test_table",
+							SourceColumnName:  "id",
+							TargetTableSchema: "public",
+							TargetTableName:   "test_other_table",
+							TargetColumnName:  "id",
+						},
 					},
 				},
 			},
-			Roles: []state.RoleState{
-				{
-					Role: objects.Role{
-						Name: "test_role_local",
-					},
+		},
+		Storage: []state.StorageState{
+			{
+				Storage: objects.Bucket{
+					Name:   "test_bucket_policy",
+					Public: true,
+				},
+			},
+		},
+		Roles: []state.RoleState{
+			{
+				Role: objects.Role{
+					Name: "test_role_local",
 				},
 			},
 		},
 	}
 
-	errSaveState := state.Save(&importState.State)
-	assert.NoError(t, errSaveState)
-
 	resource.RegisterModels(MockNewTable{})
 	resource.RegisterModels(MockOtherTable{})
 	resource.RegisterRole(MockNewRole{})
+
+	errSaveState := state.Save(&testState)
+	assert.NoError(t, errSaveState)
 
 	// err0 := mock.MockFindProjectWithExpectedResponse(200, objects.Project{})
 	// assert.NoError(t, err0)
