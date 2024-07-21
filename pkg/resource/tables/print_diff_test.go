@@ -263,14 +263,38 @@ func TestPrintDiff(t *testing.T) {
 				Type:         "some_type",
 				RelationType: raiden.RelationTypeHasOne,
 			},
+			{
+				Table:        "table1",
+				Type:         "some_type",
+				RelationType: raiden.RelationTypeManyToMany,
+				JoinRelation: &state.JoinRelation{
+					SourcePrimaryKey:      "id",
+					JoinsSourceForeignKey: "id",
+					TargetPrimaryKey:      "id",
+					JoinTargetForeignKey:  "id",
+					Through:               "table2",
+				},
+			},
 		},
 	}
 	tRelation := tables.MapRelations{
-		"public.table1_updated": []*state.Relation{
+		"private.table1_updated": []*state.Relation{
 			{
 				Table:        "table1_updated",
 				Type:         "some_type",
 				RelationType: raiden.RelationTypeHasOne,
+			},
+			{
+				Table:        "table1_updated",
+				Type:         "some_type",
+				RelationType: raiden.RelationTypeManyToMany,
+				JoinRelation: &state.JoinRelation{
+					SourcePrimaryKey:      "id",
+					JoinsSourceForeignKey: "id",
+					TargetPrimaryKey:      "id",
+					JoinTargetForeignKey:  "id",
+					Through:               "table2",
+				},
 			},
 		},
 	}
