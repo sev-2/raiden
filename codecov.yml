@@ -3,3 +3,9 @@ ignore:
   - "pkg/cli"     # ignore the CLI package related for now
   - "pkg/mock"
   - "pkg/suparest" # to be removed (or replaced)
+coverage:
+  status:
+    project:
+      default:
+        target: 75%
+        threshold: 1%
