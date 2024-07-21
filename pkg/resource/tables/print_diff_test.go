@@ -406,4 +406,16 @@ func TestGenerateDiffChangeUpdateMessage(t *testing.T) {
 	diffMessage, err = tables.GenerateDiffChangeUpdateMessage("test_table", item)
 	assert.NoError(t, err)
 	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %t >>> %t", "rls forced", item.OldData.RLSForced, item.NewData.RLSForced))
+
+	item = tables.MigrateItem{
+		NewData: objects.Table{ReplicaIdentity: "FULL"},
+		OldData: objects.Table{ReplicaIdentity: "NOTHING"},
+		MigrationItems: objects.UpdateTableParam{
+			ChangeItems: []objects.UpdateTableType{objects.UpdateTableReplicaIdentity},
+		},
+	}
+
+	diffMessage, err = tables.GenerateDiffChangeUpdateMessage("test_table", item)
+	assert.NoError(t, err)
+	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %s >>> %s", "replica identity", item.OldData.ReplicaIdentity, item.NewData.ReplicaIdentity))
 }
