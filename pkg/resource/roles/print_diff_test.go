@@ -143,6 +143,22 @@ func TestGetDiffChangeMessage(t *testing.T) {
 				IsSuperuser:       false,
 				ValidUntil:        &objects.SupabaseTime{},
 			},
+			MigrationItems: objects.UpdateRoleParam{
+				OldData: objects.Role{Name: "source_role"},
+				ChangeItems: []objects.UpdateRoleType{
+					objects.UpdateRoleName,
+					objects.UpdateRoleCanBypassRls,
+					objects.UpdateRoleCanCreateDb,
+					objects.UpdateRoleCanCreateRole,
+					objects.UpdateRoleCanLogin,
+					objects.UpdateRoleConfig,
+					objects.UpdateConnectionLimit,
+					objects.UpdateRoleInheritRole,
+					objects.UpdateRoleIsReplication,
+					objects.UpdateRoleIsSuperUser,
+					objects.UpdateRoleValidUntil,
+				},
+			},
 		},
 		{
 			Type:    migrator.MigrateTypeDelete,
