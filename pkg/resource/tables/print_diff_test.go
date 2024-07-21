@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -368,5 +369,41 @@ func TestGenerateDiffChangeUpdateMessage(t *testing.T) {
 
 	diffMessage, err := tables.GenerateDiffChangeUpdateMessage("test_table", item)
 	assert.NoError(t, err)
-	assert.Contains(t, diffMessage, "Update Table test_table")
+	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %s >>> %s", "name", item.OldData.Name, item.NewData.Name))
+
+	item = tables.MigrateItem{
+		NewData: objects.Table{Schema: "private"},
+		OldData: objects.Table{Schema: "public"},
+		MigrationItems: objects.UpdateTableParam{
+			ChangeItems: []objects.UpdateTableType{objects.UpdateTableSchema},
+		},
+	}
+
+	diffMessage, err = tables.GenerateDiffChangeUpdateMessage("test_table", item)
+	assert.NoError(t, err)
+	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %s >>> %s", "schema", item.OldData.Schema, item.NewData.Schema))
+
+	item = tables.MigrateItem{
+		NewData: objects.Table{RLSEnabled: true},
+		OldData: objects.Table{RLSEnabled: false},
+		MigrationItems: objects.UpdateTableParam{
+			ChangeItems: []objects.UpdateTableType{objects.UpdateTableRlsEnable},
+		},
+	}
+
+	diffMessage, err = tables.GenerateDiffChangeUpdateMessage("test_table", item)
+	assert.NoError(t, err)
+	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %t >>> %t", "rls enable", item.OldData.RLSEnabled, item.NewData.RLSEnabled))
+
+	item = tables.MigrateItem{
+		NewData: objects.Table{RLSForced: true},
+		OldData: objects.Table{RLSForced: false},
+		MigrationItems: objects.UpdateTableParam{
+			ChangeItems: []objects.UpdateTableType{objects.UpdateTableRlsForced},
+		},
+	}
+
+	diffMessage, err = tables.GenerateDiffChangeUpdateMessage("test_table", item)
+	assert.NoError(t, err)
+	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %t >>> %t", "rls forced", item.OldData.RLSForced, item.NewData.RLSForced))
 }
