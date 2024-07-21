@@ -26,19 +26,23 @@ func TestCompare(t *testing.T) {
 func TestCompareList(t *testing.T) {
 	source := []objects.Role{
 		{
-			Name: "role1"
+			Name:         "role1",
+			CanBypassRLS: true,
+			CanLogin:     true,
 		},
 		{
-			Name: "role2"
+			Name: "role2",
 		},
 	}
 
 	target := []objects.Role{
 		{
-			Name: "role1_updated"
+			Name:         "role1_updated",
+			CanBypassRLS: false,
+			CanLogin:     false,
 		},
 		{
-			Name: "role2"
+			Name: "role2",
 		},
 	}
 
