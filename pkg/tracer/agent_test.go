@@ -38,3 +38,16 @@ func TestStartAgent(t *testing.T) {
 	err = shutdown(context.Background())
 	assert.NoError(t, err)
 }
+
+func TestStartAgentNonHttp(t *testing.T) {
+	agentConfig := tracer.AgentConfig{
+		Collector:   tracer.OtplCollector,
+		Endpoint:    "tcp://localhost:4317",
+		Environment: "test",
+		Name:        "test-service",
+		Version:     "1.0.0",
+	}
+
+	_, err := tracer.StartAgent(agentConfig)
+	assert.Error(t, err)
+}
