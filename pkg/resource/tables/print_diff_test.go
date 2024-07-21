@@ -17,6 +17,14 @@ import (
 var (
 	MigratedItems = objects.UpdateTableParam{
 		OldData: objects.Table{Name: "old_table"},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+			objects.UpdateTableSchema,
+			objects.UpdateTableRlsEnable,
+			objects.UpdateTableRlsForced,
+			objects.UpdateTablePrimaryKey,
+			objects.UpdateTableReplicaIdentity,
+		},
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
 				Type: objects.UpdateRelationCreate,
