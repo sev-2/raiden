@@ -87,7 +87,7 @@ type MockGetVoteBy struct {
 }
 
 func (m *MockGetVoteBy) Name() string {
-	return "test_rpc"
+	return "some_function"
 }
 
 func TestImport(t *testing.T) {
@@ -182,7 +182,7 @@ func TestImport(t *testing.T) {
 		Rpc: []state.RpcState{
 			{
 				Function: objects.Function{
-					Name: "test_rpc",
+					Name: "some_function",
 				},
 			},
 			{
