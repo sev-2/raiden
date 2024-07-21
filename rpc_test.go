@@ -130,8 +130,14 @@ func TestGetValidRpcParamType(t *testing.T) {
 		expectErr   bool
 	}{
 		{"integer", false, raiden.RpcParamDataTypeInteger, false},
+		{"bigint", false, raiden.RpcParamDataTypeBigInt, false},
+		{"real", false, raiden.RpcParamDataTypeReal, false},
+		{"double precision", false, raiden.RpcParamDataTypeDoublePreci, false},
 		{"varchar", false, raiden.RpcParamDataTypeVarchar, false},
 		{"varchar", true, raiden.RpcParamDataTypeVarcharAlias, false},
+		{"boolean", true, raiden.RpcParamDataTypeBoolean, false},
+		{"bytea", true, raiden.RpcParamDataTypeBytea, false},
+		{"timestamp", true, raiden.RpcParamDataTypeTimestampAlias, false},
 		{"unsupported", false, "", true},
 	}
 
@@ -178,8 +184,14 @@ func TestGetValidRpcReturnType(t *testing.T) {
 		expectErr   bool
 	}{
 		{"integer", false, raiden.RpcReturnDataTypeInteger, false},
+		{"bigint", false, raiden.RpcReturnDataTypeBigInt, false},
+		{"real", false, raiden.RpcReturnDataTypeReal, false},
+		{"double precision", false, raiden.RpcReturnDataTypeDoublePreci, false},
 		{"varchar", false, raiden.RpcReturnDataTypeVarchar, false},
 		{"varchar", true, raiden.RpcReturnDataTypeVarcharAlias, false},
+		{"boolean", true, raiden.RpcReturnDataTypeBoolean, false},
+		{"bytea", true, raiden.RpcReturnDataTypeBytea, false},
+		{"timestamp", true, raiden.RpcReturnDataTypeTimestampAlias, false},
 		{"unsupported", false, "", true},
 	}
 
