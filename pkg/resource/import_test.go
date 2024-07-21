@@ -3,7 +3,9 @@ package resource_test
 import (
 	"os"
 	"testing"
+	"time"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/mock"
@@ -13,6 +15,66 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
+
+type MockOtherRole struct {
+	raiden.Role
+}
+
+func (m MockOtherRole) Name() string {
+	return "mock_other_role"
+}
+
+func (m MockOtherRole) CanLogin() bool {
+	return true
+}
+
+func (m MockOtherRole) CanCreateDB() bool {
+	return true
+}
+
+func (m MockOtherRole) CanCreateRole() bool {
+	return true
+}
+
+func (m MockOtherRole) InheritRole() bool {
+	return true
+}
+
+func (m MockOtherRole) ConnectionLimit() int {
+	return 10
+}
+
+func (m MockOtherRole) ValidUntil() *objects.SupabaseTime {
+	return objects.NewSupabaseTime(time.Now().AddDate(0, 1, 0))
+}
+
+func (m MockOtherRole) CanBypassRls() bool {
+	return true
+}
+
+type MockOtherBucket struct {
+	raiden.BucketBase
+}
+
+func (b MockOtherBucket) Name() string {
+	return "test_other_bucket"
+}
+
+func (b MockOtherBucket) Public() bool {
+	return false
+}
+
+func (b MockOtherBucket) AllowedMimeTypes() []string {
+	return nil
+}
+
+func (b MockOtherBucket) FileSizeLimit() int {
+	return 0
+}
+
+func (b MockOtherBucket) AvifAutoDetection() bool {
+	return false
+}
 
 func TestImport(t *testing.T) {
 	flags := &resource.Flags{
@@ -84,6 +146,12 @@ func TestImport(t *testing.T) {
 					Public: true,
 				},
 			},
+			{
+				Storage: objects.Bucket{
+					Name:   "test_other_bucket",
+					Public: true,
+				},
+			},
 		},
 		Roles: []state.RoleState{
 			{
@@ -91,12 +159,17 @@ func TestImport(t *testing.T) {
 					Name: "test_role_local",
 				},
 			},
+			{
+				Role: objects.Role{
+					Name: "test_other_role",
+				},
+			},
 		},
 	}
 
-	resource.RegisterModels(MockNewTable{})
-	resource.RegisterModels(MockOtherTable{})
-	resource.RegisterRole(MockNewRole{})
+	resource.RegisterModels(MockNewTable{}, MockOtherTable{})
+	resource.RegisterRole(MockNewRole{}, MockOtherRole{})
+	resource.RegisterStorages(MockOtherBucket{})
 
 	errSaveState := state.Save(&testState)
 	assert.NoError(t, errSaveState)
