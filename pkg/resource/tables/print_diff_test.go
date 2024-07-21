@@ -14,6 +14,97 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	MigratedItems = objects.UpdateTableParam{
+		OldData: objects.Table{Name: "old_table"},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Type: objects.UpdateRelationCreate,
+			},
+		},
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnNew,
+					objects.UpdateColumnDelete,
+					objects.UpdateColumnName,
+					objects.UpdateColumnDataType,
+					objects.UpdateColumnUnique,
+					objects.UpdateColumnNullable,
+					objects.UpdateColumnIdentity,
+					objects.UpdateColumnDefaultValue,
+				},
+			},
+		},
+	}
+
+	SourceTable = objects.Table{
+		ID:          1,
+		Name:        "table1",
+		Schema:      "public",
+		RLSEnabled:  true,
+		RLSForced:   true,
+		PrimaryKeys: []objects.PrimaryKey{{Name: "id", Schema: "public", TableName: "table1"}},
+		Columns: []objects.Column{
+			{Name: "id", DataType: "int", IsNullable: false},
+			{Name: "name", DataType: "varchar", IsNullable: true},
+			{Name: "nullable", DataType: "varchar", IsNullable: true},
+			{Name: "changeable", DataType: "varchar", IsNullable: true},
+			{Name: "uniqueness", DataType: "varchar", IsNullable: false, IsUnique: true},
+			{Name: "identity", DataType: "varchar", IsNullable: false, IsIdentity: true},
+		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "constraint1",
+				SourceSchema:      "public",
+				SourceTableName:   "table1",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "table2",
+				TargetColumnName:  "id",
+			},
+		},
+	}
+
+	TargetTable = objects.Table{
+		ID:          1,
+		Name:        "table1_updated",
+		Schema:      "private",
+		RLSEnabled:  false,
+		RLSForced:   false,
+		PrimaryKeys: []objects.PrimaryKey{{Name: "id", Schema: "public", TableName: "table1"}},
+		Columns: []objects.Column{
+			{Name: "id", DataType: "int", IsNullable: false},
+			{Name: "name", DataType: "varchar", IsNullable: false},
+			{Name: "description", DataType: "text", IsNullable: true},
+			{Name: "nullable", DataType: "varchar", IsNullable: false},
+			{Name: "changeable", DataType: "json", IsNullable: true},
+			{Name: "uniqueness", DataType: "varchar", IsNullable: false, IsUnique: false},
+			{Name: "identity", DataType: "varchar", IsNullable: false, IsIdentity: false},
+		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "constraint1",
+				SourceSchema:      "public",
+				SourceTableName:   "table1",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "table2",
+				TargetColumnName:  "id",
+			},
+			{
+				ConstraintName:    "constraint2",
+				SourceSchema:      "public",
+				SourceTableName:   "table1",
+				SourceColumnName:  "name",
+				TargetTableSchema: "public",
+				TargetTableName:   "table2",
+				TargetColumnName:  "name",
+			},
+		},
+	}
+)
+
 // TestPrintDiffResult tests the PrintDiffResult function
 func TestPrintDiffResult(t *testing.T) {
 	diffResult := []tables.CompareDiffResult{
@@ -65,101 +156,12 @@ func TestPrintDiff(t *testing.T) {
 	assert.Contains(t, outb.String(), "Found diff")
 	assert.Contains(t, outb.String(), "End found diff")
 
-	migratedItems := objects.UpdateTableParam{
-		OldData: objects.Table{Name: "old_table"},
-		ChangeRelationItems: []objects.UpdateRelationItem{
-			{
-				Type: objects.UpdateRelationCreate,
-			},
-		},
-		ChangeColumnItems: []objects.UpdateColumnItem{
-			{
-				UpdateItems: []objects.UpdateColumnType{
-					objects.UpdateColumnNew,
-					objects.UpdateColumnDelete,
-					objects.UpdateColumnName,
-					objects.UpdateColumnDataType,
-					objects.UpdateColumnUnique,
-					objects.UpdateColumnNullable,
-					objects.UpdateColumnIdentity,
-					objects.UpdateColumnDefaultValue,
-				},
-			},
-		},
-	}
-
-	source := objects.Table{
-		ID:          1,
-		Name:        "table1",
-		Schema:      "public",
-		RLSEnabled:  true,
-		RLSForced:   true,
-		PrimaryKeys: []objects.PrimaryKey{{Name: "id", Schema: "public", TableName: "table1"}},
-		Columns: []objects.Column{
-			{Name: "id", DataType: "int", IsNullable: false},
-			{Name: "name", DataType: "varchar", IsNullable: true},
-			{Name: "nullable", DataType: "varchar", IsNullable: true},
-			{Name: "changeable", DataType: "varchar", IsNullable: true},
-			{Name: "uniqueness", DataType: "varchar", IsNullable: false, IsUnique: true},
-			{Name: "identity", DataType: "varchar", IsNullable: false, IsIdentity: true},
-		},
-		Relationships: []objects.TablesRelationship{
-			{
-				ConstraintName:    "constraint1",
-				SourceSchema:      "public",
-				SourceTableName:   "table1",
-				SourceColumnName:  "id",
-				TargetTableSchema: "public",
-				TargetTableName:   "table2",
-				TargetColumnName:  "id",
-			},
-		},
-	}
-
-	target := objects.Table{
-		ID:          1,
-		Name:        "table1_updated",
-		Schema:      "private",
-		RLSEnabled:  false,
-		RLSForced:   false,
-		PrimaryKeys: []objects.PrimaryKey{{Name: "id", Schema: "public", TableName: "table1"}},
-		Columns: []objects.Column{
-			{Name: "id", DataType: "int", IsNullable: false},
-			{Name: "name", DataType: "varchar", IsNullable: false},
-			{Name: "description", DataType: "text", IsNullable: true},
-			{Name: "nullable", DataType: "varchar", IsNullable: false},
-			{Name: "changeable", DataType: "json", IsNullable: true},
-			{Name: "uniqueness", DataType: "varchar", IsNullable: false, IsUnique: false},
-			{Name: "identity", DataType: "varchar", IsNullable: false, IsIdentity: false},
-		},
-		Relationships: []objects.TablesRelationship{
-			{
-				ConstraintName:    "constraint1",
-				SourceSchema:      "public",
-				SourceTableName:   "table1",
-				SourceColumnName:  "id",
-				TargetTableSchema: "public",
-				TargetTableName:   "table2",
-				TargetColumnName:  "id",
-			},
-			{
-				ConstraintName:    "constraint2",
-				SourceSchema:      "public",
-				SourceTableName:   "table1",
-				SourceColumnName:  "name",
-				TargetTableSchema: "public",
-				TargetTableName:   "table2",
-				TargetColumnName:  "name",
-			},
-		},
-	}
-
 	successDiffData := tables.CompareDiffResult{
 		Name:           "test_table",
 		IsConflict:     false,
-		SourceResource: source,
-		TargetResource: target,
-		DiffItems:      migratedItems,
+		SourceResource: SourceTable,
+		TargetResource: TargetTable,
+		DiffItems:      MigratedItems,
 	}
 
 	sRelation := tables.MapRelations{}
@@ -195,15 +197,10 @@ func TestGetDiffChangeMessage(t *testing.T) {
 func TestGenerateDiffMessage(t *testing.T) {
 	diffData := tables.CompareDiffResult{
 		Name:           "test_table",
-		IsConflict:     true,
-		SourceResource: objects.Table{Name: "source_table"},
-		TargetResource: objects.Table{Name: "target_table"},
-		DiffItems: objects.UpdateTableParam{
-			ChangeItems:         []objects.UpdateTableType{objects.UpdateTableName},
-			ChangeColumnItems:   []objects.UpdateColumnItem{{UpdateItems: []objects.UpdateColumnType{objects.UpdateColumnDataType}}},
-			ChangeRelationItems: []objects.UpdateRelationItem{{Type: objects.UpdateRelationCreate}},
-			OldData:             objects.Table{Name: "old_table"},
-		},
+		IsConflict:     false,
+		SourceResource: SourceTable,
+		TargetResource: TargetTable,
+		DiffItems:      MigratedItems,
 	}
 
 	sRelation := tables.MapRelations{}
