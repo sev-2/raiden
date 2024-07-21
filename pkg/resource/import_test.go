@@ -250,7 +250,7 @@ func TestImport(t *testing.T) {
 			CanCreateDB:     true,
 			CanCreateRole:   true,
 			CanBypassRLS:    true,
-		}
+		},
 	})
 	assert.NoError(t, err3)
 
