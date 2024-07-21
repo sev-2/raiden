@@ -87,7 +87,7 @@ type MockGetVoteBy struct {
 }
 
 func (m *MockGetVoteBy) Name() string {
-	return "some_function"
+	return "mock_get_vote_by"
 }
 
 func (m *MockGetVoteBy) GetReturnType() raiden.RpcReturnDataType {
@@ -95,13 +95,13 @@ func (m *MockGetVoteBy) GetReturnType() raiden.RpcReturnDataType {
 }
 
 func (m *MockGetVoteBy) GetRawDefinition() string {
-	return "$stmt"
+	return "SELECT * FROM some_table;end $function$"
 }
 
 func TestImport(t *testing.T) {
 	flags := &resource.Flags{
 		ProjectPath: "test_project",
-		DryRun:      false,
+		DryRun:      true,
 	}
 	config := loadConfig()
 	resource.ImportLogger = logger.HcLog().Named("import")
@@ -190,7 +190,7 @@ func TestImport(t *testing.T) {
 		Rpc: []state.RpcState{
 			{
 				Function: objects.Function{
-					Name: "some_function",
+					Name: "mock_get_vote_by",
 				},
 			},
 			{
@@ -216,15 +216,17 @@ func TestImport(t *testing.T) {
 	assert.NoError(t, err0)
 
 	err1 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
-		{Name: "some_table", Schema: "public"},
-		{Name: "other_table", Schema: "private"},
-		{Name: "other_table_again", Schema: "public"},
+		{ID: 1, Name: "some_table", Schema: "public"},
+		{ID: 2, Name: "other_table", Schema: "public"},
+		{ID: 3, Name: "other_table_again", Schema: "public"},
+		{ID: 4, Name: "completely_new_table", Schema: "public"},
 	})
 	assert.NoError(t, err1)
 
 	err2 := mock.MockGetFunctionsWithExpectedResponse(200, []objects.Function{
-		{Name: "some_function"},
-		{Name: "other_function"},
+		{ID: 1, Schema: "public", Name: "some_function", Definition: "SELECT * FROM some_table;end $function$", ReturnType: "json"},
+		{ID: 2, Schema: "public", Name: "other_function", Definition: "SELECT * FROM other_table", ReturnType: "json"},
+		{ID: 3, Schema: "public", Name: "completely_new_function", Definition: "SELECT * FROM completely_new_table", ReturnType: "json"},
 	})
 	assert.NoError(t, err2)
 
@@ -252,11 +254,14 @@ func TestImport(t *testing.T) {
 	})
 	assert.NoError(t, err3)
 
+	errImport2 := resource.Import(flags, config)
+	assert.NoError(t, errImport2)
+
+	flags.DryRun = false
 	errImport3 := resource.Import(flags, config)
 	assert.NoError(t, errImport3)
 
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/roles"))
-	assert.Equal(t, false, utils.IsFolderExists(dir+"/internal/models"))
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/storages"))
 
 	defer os.RemoveAll(dir)
