@@ -99,6 +99,13 @@ func Test_Tracer(t *testing.T) {
 
 	res := tracedChain(mockCtx)
 	assert.Nil(t, res)
+
+	corsFn := raiden.CorsMiddleware(mockCtx.Config())
+	corsFn(&fasthttp.RequestCtx{
+		Request: fasthttp.Request{
+			Header: fasthttp.RequestHeader{},
+		},
+	})
 }
 
 func m1(next raiden.RouteHandlerFn) raiden.RouteHandlerFn {
