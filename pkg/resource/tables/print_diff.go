@@ -442,7 +442,7 @@ func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, err
 		case objects.UpdateTableRlsEnable:
 			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "rls enable", item.OldData.RLSEnabled, item.NewData.RLSEnabled))
 		case objects.UpdateTableRlsForced:
-			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "rls forced", item.OldData.RLSEnabled, item.NewData.RLSEnabled))
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %t >>> %t", "rls forced", item.OldData.RLSForced, item.NewData.RLSForced))
 		case objects.UpdateTableReplicaIdentity:
 			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "replica identity", item.OldData.ReplicaIdentity, item.NewData.ReplicaIdentity))
 		}

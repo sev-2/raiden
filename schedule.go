@@ -190,6 +190,10 @@ func (s *SchedulerServer) SetTracer(tracer trace.Tracer) {
 }
 
 func (s *SchedulerServer) RegisterJob(job Job) error {
+	if job == nil {
+		return fmt.Errorf("Could not register nil job")
+	}
+
 	s.jobs = append(s.jobs, job)
 
 	if job.Duration() != nil {

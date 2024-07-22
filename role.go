@@ -56,14 +56,6 @@ func (r *RoleBase) InheritRole() bool {
 	return true
 }
 
-// func (r *RoleBase) IsReplicationRole() bool {
-// 	return false
-// }
-
-// func (r *RoleBase) IsSuperuser() bool {
-// 	return false
-// }
-
 func (r *RoleBase) CanBypassRls() bool {
 	return false
 }

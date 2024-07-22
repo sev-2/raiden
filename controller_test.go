@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/sev-2/raiden"
@@ -31,6 +32,11 @@ type Controller struct {
 
 func (h *Controller) Get(ctx raiden.Context) error {
 	h.Result.Message = fmt.Sprintf("%s - hello %s", h.Payload.Type, h.Payload.Name)
+	return ctx.SendJson(h.Result)
+}
+
+func (h *Controller) Post(ctx raiden.Context) error {
+	h.Result.Message = fmt.Sprintf("Data: %v", ctx.RequestContext().Request.String())
 	return ctx.SendJson(h.Result)
 }
 
@@ -74,6 +80,43 @@ func (h *DataController) AfterGet(ctx raiden.Context) error {
 
 	if msg != "from get handler" {
 		return ctx.SendErrorWithCode(500, errors.New("after get - invalid message value"))
+	}
+
+	return nil
+}
+
+func (h *DataController) BeforePost(ctx raiden.Context) error {
+	ctx.Set("message", "from before post middleware")
+	return nil
+}
+
+func (h *DataController) Post(ctx raiden.Context) error {
+	msg := ctx.Get("message")
+	msg, isString := msg.(string)
+	if !isString {
+		return ctx.SendErrorWithCode(500, errors.New("post - invalid message type"))
+	}
+
+	if msg != "from before post middleware" {
+		return ctx.SendErrorWithCode(500, errors.New("post - invalid message value"))
+	}
+
+	h.Result = map[string]any{
+		"message": msg,
+	}
+	ctx.Set("message", "from post handler")
+	return ctx.SendJson(h.Result)
+}
+
+func (h *DataController) AfterPost(ctx raiden.Context) error {
+	msg := ctx.Get("message")
+	msg, isString := msg.(string)
+	if !isString {
+		return ctx.SendErrorWithCode(500, errors.New("after post - invalid message type"))
+	}
+
+	if msg != "from post handler" {
+		return ctx.SendErrorWithCode(500, errors.New("after post - invalid message value"))
 	}
 
 	return nil
@@ -141,4 +184,190 @@ func TestController_PassData(t *testing.T) {
 	message, isMessageExist := mapData["message"]
 	assert.True(t, isMessageExist)
 	assert.Equal(t, "from before get middleware", message)
+}
+
+func newMockCtx() *raiden.Ctx {
+	ctx := &raiden.Ctx{
+		Context:    mockCtx,
+		RequestCtx: &fasthttp.RequestCtx{},
+	}
+
+	ctx.SetSpan(mockSpan)
+
+	return ctx
+}
+
+// Test ControllerBase methods
+func TestControllerBase(t *testing.T) {
+	ctx := newMockCtx()
+	base := &raiden.ControllerBase{}
+
+	// Test all ControllerBase methods
+	assert.NoError(t, base.BeforeAll(ctx))
+	assert.NoError(t, base.AfterAll(ctx))
+
+	assert.NoError(t, base.BeforeGet(ctx))
+	assert.Error(t, base.Get(ctx))
+	assert.NoError(t, base.AfterGet(ctx))
+
+	assert.NoError(t, base.BeforePost(ctx))
+	assert.Error(t, base.Post(ctx))
+	assert.NoError(t, base.AfterPost(ctx))
+
+	assert.NoError(t, base.BeforePut(ctx))
+	assert.Error(t, base.Put(ctx))
+	assert.NoError(t, base.AfterPut(ctx))
+
+	assert.NoError(t, base.BeforePatch(ctx))
+	assert.Error(t, base.Patch(ctx))
+	assert.NoError(t, base.AfterPatch(ctx))
+
+	assert.NoError(t, base.BeforeDelete(ctx))
+	assert.Error(t, base.Delete(ctx))
+	assert.NoError(t, base.AfterDelete(ctx))
+
+	assert.NoError(t, base.BeforeOptions(ctx))
+	assert.Error(t, base.Options(ctx))
+	assert.NoError(t, base.AfterOptions(ctx))
+
+	assert.NoError(t, base.BeforeHead(ctx))
+	assert.Error(t, base.Head(ctx))
+	assert.NoError(t, base.AfterHead(ctx))
+}
+
+// Test RestController methods
+func TestRestController(t *testing.T) {
+	ctx := newMockCtx()
+	rest := raiden.RestController{Controller: &raiden.ControllerBase{}, TableName: "test_table"}
+
+	// Test RestController methods
+	assert.NoError(t, rest.BeforeAll(ctx))
+	assert.NoError(t, rest.AfterAll(ctx))
+
+	assert.NoError(t, rest.BeforeGet(ctx))
+	assert.NoError(t, rest.AfterGet(ctx))
+
+	assert.NoError(t, rest.BeforePost(ctx))
+	assert.NoError(t, rest.AfterPost(ctx))
+
+	assert.NoError(t, rest.BeforePut(ctx))
+	assert.NoError(t, rest.AfterPut(ctx))
+
+	assert.NoError(t, rest.BeforePatch(ctx))
+	assert.NoError(t, rest.AfterPatch(ctx))
+
+	assert.NoError(t, rest.BeforeDelete(ctx))
+	assert.NoError(t, rest.AfterDelete(ctx))
+
+	assert.NoError(t, rest.BeforeOptions(ctx))
+	assert.NoError(t, rest.AfterOptions(ctx))
+
+	assert.NoError(t, rest.BeforeHead(ctx))
+	assert.NoError(t, rest.AfterHead(ctx))
+}
+
+// Test StorageController methods
+func TestStorageController(t *testing.T) {
+	ctx := newMockCtx()
+	storage := raiden.StorageController{Controller: &raiden.ControllerBase{}, BucketName: "test_bucket"}
+
+	// Test StorageController methods
+	assert.NoError(t, storage.BeforeAll(ctx))
+	assert.NoError(t, storage.AfterAll(ctx))
+
+	assert.NoError(t, storage.BeforeGet(ctx))
+	assert.Error(t, storage.Get(ctx))
+	assert.NoError(t, storage.AfterGet(ctx))
+
+	assert.NoError(t, storage.BeforePost(ctx))
+	assert.Error(t, storage.Post(ctx))
+	assert.NoError(t, storage.AfterPost(ctx))
+
+	assert.NoError(t, storage.BeforePut(ctx))
+	assert.Error(t, storage.Put(ctx))
+	assert.NoError(t, storage.AfterPut(ctx))
+
+	assert.NoError(t, storage.BeforePatch(ctx))
+	assert.Error(t, storage.Patch(ctx))
+	assert.NoError(t, storage.AfterPatch(ctx))
+
+	assert.NoError(t, storage.BeforeDelete(ctx))
+	assert.Error(t, storage.Delete(ctx))
+	assert.NoError(t, storage.AfterDelete(ctx))
+
+	assert.NoError(t, storage.BeforeOptions(ctx))
+	assert.NoError(t, storage.AfterOptions(ctx))
+
+	assert.NoError(t, storage.BeforeHead(ctx))
+	assert.NoError(t, storage.AfterHead(ctx))
+}
+
+// Test ProxyHandler
+func TestProxyHandler(t *testing.T) {
+	ctx := newMockCtx()
+	targetURL, _ := url.Parse("http://example.com")
+
+	handler := raiden.ProxyHandler(
+		targetURL,
+		"/",
+		func(req *fasthttp.Request) {},
+		func(resp *fasthttp.Response) error { return nil },
+	)
+
+	ctx.Request.SetRequestURI("/")
+	handler(ctx.RequestCtx)
+	assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode())
+}
+
+// Test MarshallAndValidate
+func TestMarshallAndValidate(t *testing.T) {
+	ctx := newMockCtx()
+	type Request struct {
+		Search   string `query:"q"`
+		Resource string `path:"resource" validate:"required"`
+	}
+	type Controller struct {
+		raiden.ControllerBase
+		Payload *Request
+	}
+	controller := &Controller{}
+
+	ctx.QueryArgs().Set("q", "search_value")
+	ctx.SetUserValue("resource", "resource_value")
+
+	err := raiden.MarshallAndValidate(ctx.RequestContext(), controller)
+	assert.NoError(t, err)
+	assert.Equal(t, "search_value", controller.Payload.Search)
+	assert.Equal(t, "resource_value", controller.Payload.Resource)
+
+}
+
+func TestController_PassDataRestPost(t *testing.T) {
+	var reqCtx fasthttp.RequestCtx
+	context := raiden.Ctx{
+		RequestCtx: &reqCtx,
+	}
+
+	// setup required data
+	controller := &DataController{}
+
+	err := controller.BeforePost(&context)
+	assert.NoError(t, err)
+
+	err = controller.Post(&context)
+	assert.NoError(t, err)
+
+	err = controller.AfterPost(&context)
+	assert.NoError(t, err)
+
+	response := reqCtx.Response.Body()
+	assert.NotNil(t, response)
+
+	mapData := make(map[string]any)
+	err = json.Unmarshal(response, &mapData)
+	assert.NoError(t, err)
+
+	message, isMessageExist := mapData["message"]
+	assert.True(t, isMessageExist)
+	assert.Equal(t, "from before post middleware", message)
 }
