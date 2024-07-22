@@ -3,6 +3,7 @@ package raiden
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -30,42 +31,64 @@ func Validate(payload any, requestValidators ...ValidatorFunc) error {
 		}
 	}
 
-	if err := validatorInstance.Struct(payload); err != nil {
-		validationError, isValid := err.(validator.ValidationErrors)
-		if !isValid {
-			return err
-		}
-
-		mapErrMessage := make(map[string][]string)
-		for _, err := range validationError {
-			errMessage := getInvalidMessage(err.Field(), err.Tag(), err.Param())
-			errors, isExist := mapErrMessage[err.Field()]
-			if isExist {
-				errors = append(errors, errMessage)
-				mapErrMessage[err.Field()] = errors
-				continue
+	validatePayload := func(payload any) error {
+		if err := validatorInstance.Struct(payload); err != nil {
+			validationError, isValid := err.(validator.ValidationErrors)
+			if !isValid {
+				return err
 			}
-			mapErrMessage[err.Field()] = []string{errMessage}
-		}
 
-		errKeys := make([]string, 0, len(mapErrMessage))
-		for key := range mapErrMessage {
-			errKeys = append(errKeys, key)
-		}
+			mapErrMessage := make(map[string][]string)
+			for _, err := range validationError {
+				errMessage := getInvalidMessage(err.Field(), err.Tag(), err.Param())
+				errors, isExist := mapErrMessage[err.Field()]
+				if isExist {
+					errors = append(errors, errMessage)
+					mapErrMessage[err.Field()] = errors
+					continue
+				}
+				mapErrMessage[err.Field()] = []string{errMessage}
+			}
 
-		errByte, err := json.Marshal(mapErrMessage)
-		if err != nil {
+			errKeys := make([]string, 0, len(mapErrMessage))
+			for key := range mapErrMessage {
+				errKeys = append(errKeys, key)
+			}
+
+			errByte, err := json.Marshal(mapErrMessage)
+			if err != nil {
+				return err
+			}
+
+			err = &ErrorResponse{
+				StatusCode: fasthttp.StatusBadRequest,
+				Code:       "Validation Fail",
+				Details:    string(errByte),
+				Message:    "invalid payload for key : " + strings.Join(errKeys, ","),
+			}
+
 			return err
 		}
 
-		err = &ErrorResponse{
-			StatusCode: fasthttp.StatusBadRequest,
-			Code:       "Validation Fail",
-			Details:    string(errByte),
-			Message:    "invalid payload for key : " + strings.Join(errKeys, ","),
-		}
+		return nil
+	}
 
-		return err
+	// Handle both single struct and slice of structs
+	val := reflect.ValueOf(payload)
+
+	// Take element of pointer
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() == reflect.Slice {
+		for i := 0; i < val.Len(); i++ {
+			if err := validatePayload(val.Index(i).Interface()); err != nil {
+				return err
+			}
+		}
+	} else {
+		return validatePayload(payload)
 	}
 
 	return nil
@@ -78,6 +101,8 @@ func getInvalidMessage(field, tag, param string) (errMessage string) {
 	switch tag {
 	case "required":
 		errMessage = fmt.Sprintf("%s is required", field)
+	case "email":
+		errMessage = fmt.Sprintf("%s should be a valid email address", field)
 	case "min":
 		errMessage = fmt.Sprintf("%s should be at least %s", field, param)
 	case "max":

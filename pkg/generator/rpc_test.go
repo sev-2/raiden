@@ -1,11 +1,14 @@
 package generator_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -260,4 +263,91 @@ func TestExtractQueryWithWrite(t *testing.T) {
 	_, mapTable, err := generator.ExtractRpcTable(definition)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(mapTable))
+}
+
+func TestGenerateRpc(t *testing.T) {
+	fns := []objects.Function{
+		{
+			Schema:   "public",
+			Name:     "get_submissions",
+			Language: "plpgsql",
+			Definition: `begin return query 
+			select s.id, s.created_at, sc.name as sc_name, c.name as c_name 
+			from submission s
+			inner join scouter sc on s.scouter_id = sc.scouter_id 
+			inner join candidate c on s.candidate_id = c.candidate_id 
+			where sc.name = in_scouter_name and c.name = in_candidate_name ; end;
+			`,
+			CompleteStatement: `
+			CREATE OR REPLACE FUNCTION public.get_submissions(in_scouter_name character varying, in_candidate_name character varying)\n 
+			RETURNS TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)\n 
+			LANGUAGE plpgsql\n
+			AS $function$ 
+				begin return query 
+					select s.id, s.created_at, sc.name as sc_name, c.name as c_name from submission s 
+					inner join scouter sc on s.scouter_id = sc.scouter_id 
+					inner join candidate c on s.candidate_id = c.candidate_id 
+					where sc.name = in_scouter_name and c.name = in_candidate_name ; end; 
+			$function$\n
+			`,
+			Args: []objects.FunctionArg{
+				{
+					Mode:       "in",
+					Name:       "in_scouter_name",
+					TypeId:     1043,
+					HasDefault: false,
+				},
+				{
+					Mode:       "in",
+					Name:       "in_candidate_name",
+					TypeId:     1043,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "id",
+					TypeId:     23,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "created_at",
+					TypeId:     23,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "sc_name",
+					TypeId:     23,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "c_name",
+					TypeId:     23,
+					HasDefault: false,
+				},
+			},
+			ArgumentTypes:          "in_scouter_name character varying, in_candidate_name character varying",
+			IdentityArgumentTypes:  "in_scouter_name character varying, in_candidate_name character varying",
+			ReturnTypeID:           2249,
+			ReturnType:             "TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)",
+			ReturnTypeRelationID:   0,
+			IsSetReturningFunction: true,
+			Behavior:               string(raiden.RpcBehaviorVolatile),
+			SecurityDefiner:        false,
+			ConfigParams:           nil,
+		},
+	}
+
+	dir, err := os.MkdirTemp("", "rpc")
+	assert.NoError(t, err)
+
+	rpcPath := filepath.Join(dir, "internal")
+	err1 := utils.CreateFolder(rpcPath)
+	assert.NoError(t, err1)
+
+	err2 := generator.GenerateRpc(dir, "test", fns, generator.GenerateFn(generator.Generate))
+	assert.NoError(t, err2)
+	assert.FileExists(t, dir+"/internal/rpc/get_submissions.go")
 }

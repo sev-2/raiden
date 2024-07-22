@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +21,7 @@ type Submission struct {
 	Metadata string `json:"-" schema:"public"`
 
 	// Access control
-	Acl string `json:"-" read:"" write:""`
+	Acl string `json:"-" read:"anon" write:"anon"`
 
 	// Relations
 	Candidate *Candidate `json:"candidate,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:candidate_id"`
@@ -36,7 +37,7 @@ type Candidate struct {
 	Metadata string `json:"-" schema:"public" replicaIdentity:"DEFAULT"`
 
 	// Access control
-	Acl string `json:"-" read:"" write:""`
+	Acl string `json:"-" read:"anon" write:"authenticated"`
 
 	// Relations
 	Submission []*Submission `json:"submission,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:candidate_id"`
@@ -107,4 +108,86 @@ func TestExtractTable_WithRelation(t *testing.T) {
 	assert.Equal(t, "score", rs.New[0].Table.Columns[3].Name)
 	assert.Equal(t, "note", rs.New[0].Table.Columns[4].Name)
 	assert.Equal(t, "created_at", rs.New[0].Table.Columns[5].Name)
+}
+
+func TestExtractTable(t *testing.T) {
+	tableStates := []state.TableState{
+		{
+			Table: objects.Table{
+				Name: "submission",
+				Relationships: []objects.TablesRelationship{
+					{
+						SourceSchema:      "public",
+						SourceTableName:   "submission",
+						SourceColumnName:  "candidate_id",
+						TargetTableSchema: "public",
+						TargetTableName:   "candidate",
+						TargetColumnName:  "id",
+					},
+				},
+				PrimaryKeys: []objects.PrimaryKey{
+					{
+						Name:      "id",
+						Schema:    "public",
+						TableName: "submission",
+					},
+				},
+				Columns: []objects.Column{
+					{
+						Name: "id",
+					},
+					{
+						Name: "scouter_id",
+					},
+					{
+						Name: "candidate_id",
+					},
+					{
+						Name: "score",
+					},
+				},
+			},
+		},
+	}
+
+	appTable := []any{&Submission{}}
+	result, err := state.ExtractTable(tableStates, appTable)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(result.New))
+	assert.Equal(t, 1, len(result.Existing))
+	assert.Equal(t, 0, len(result.Delete))
+}
+
+func TestToFlatTable(t *testing.T) {
+	items := state.ExtractTableItems{
+		{
+			Table: objects.Table{Name: "table1"},
+		},
+		{
+			Table: objects.Table{Name: "table2"},
+		},
+	}
+
+	tables := items.ToFlatTable()
+	assert.Equal(t, 2, len(tables))
+	assert.Equal(t, "table1", tables[0].Name)
+	assert.Equal(t, "table2", tables[1].Name)
+}
+
+func TestToDeleteFlatMap(t *testing.T) {
+	result := state.ExtractTableResult{
+		Delete: state.ExtractTableItems{
+			{
+				Table: objects.Table{Name: "table1"},
+			},
+			{
+				Table: objects.Table{Name: "table2"},
+			},
+		},
+	}
+
+	mapData := result.ToDeleteFlatMap()
+	assert.Equal(t, 2, len(mapData))
+	assert.Equal(t, "table1", mapData["table1"].Name)
+	assert.Equal(t, "table2", mapData["table2"].Name)
 }
