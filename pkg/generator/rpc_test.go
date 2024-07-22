@@ -374,7 +374,7 @@ func TestGenerateRpc(t *testing.T) {
 	err1 := utils.CreateFolder(rpcPath)
 	assert.NoError(t, err1)
 
-	err2 := generator.GenerateRpc(dir, "test", fns, generator.GenerateFn(generator.Generate))
+	err2 := generator.GenerateRpc(dir, "test", fns, []objects.Table{}, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/rpc/get_submissions.go")
 }
