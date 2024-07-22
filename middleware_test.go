@@ -80,6 +80,9 @@ func Test_Tracer(t *testing.T) {
 				SupabaseApiBasePath: "/v1",
 				SupabaseApiUrl:      "http://supabase.cloud.com",
 				SupabasePublicUrl:   "http://supabase.cloud.com",
+				CorsAllowedOrigins:  "*",
+				CorsAllowedMethods:  "GET, POST, PUT, DELETE, OPTIONS",
+				CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
 			}
 		},
 		RequestContextFn: func() *fasthttp.RequestCtx {
