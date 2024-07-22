@@ -46,6 +46,10 @@ func TestChain_Then(t *testing.T) {
 func Test_Tracer(t *testing.T) {
 	a := raiden.NewChain(m1, m2)
 
+	breakerMiddleware := raiden.BreakerMiddleware("/some-path")
+
+	a.Append(breakerMiddleware)
+
 	controller := &HelloWorldController{}
 
 	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
@@ -82,6 +86,9 @@ func Test_Tracer(t *testing.T) {
 			return &fasthttp.RequestCtx{}
 		},
 	}
+
+	initRes := fn(mockCtx)
+	assert.Nil(t, initRes)
 
 	res := tracedChain(mockCtx)
 	assert.Nil(t, res)
