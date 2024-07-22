@@ -1,6 +1,9 @@
 package supabase
 
 import (
+	"encoding/json"
+	"net/http"
+
 	"errors"
 	"fmt"
 	"reflect"
@@ -9,6 +12,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase/client/net"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/admin"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/local/meta"
@@ -16,6 +20,10 @@ import (
 )
 
 var SupabaseLogger = logger.HcLog().Named("supabase")
+var StorageLogger = logger.HcLog().Named("supabase.storage")
+
+var DefaultStorageSchema = "storage"
+var DefaultObjectTable = "objects"
 
 var (
 	DefaultApiUrl         = "https://api.supabase.com"
@@ -24,17 +32,39 @@ var (
 
 type RlsType string
 
+type CreateBucketSuccessResponse struct {
+	Name string `json:"name"`
+}
+
+type DefaultBucketSuccessResponse struct {
+	Message string `json:"message"`
+}
+
 const (
 	RlsTypeModel   = "table"
 	RlsTypeStorage = "storage"
 )
+
+func DefaultAuthInterceptor(apiKey string, accessToken string) func(req *http.Request) error {
+	return func(req *http.Request) error {
+		req.Header.Set("apiKey", apiKey)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+		return nil
+	}
+}
 
 func GetPolicyName(command objects.PolicyCommand, resource string, name string) string {
 	return strings.ToLower(fmt.Sprintf("enable %s access for %s %s", command, resource, name))
 }
 
 func FindProject(cfg *raiden.Config) (objects.Project, error) {
-	return cloud.FindProject(cfg)
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get project from supabase cloud", "project-id", cfg.ProjectId)
+		return cloud.FindProject(cfg)
+	}
+
+	err := fmt.Errorf("FindProject not implemented for self hosted")
+	return objects.Project{}, err
 }
 
 func GetTables(cfg *raiden.Config, includedSchemas []string) (tables []objects.Table, err error) {
@@ -48,6 +78,20 @@ func GetTables(cfg *raiden.Config, includedSchemas []string) (tables []objects.T
 	SupabaseLogger.Debug("Get all table from supabase pg-meta")
 	return decorateActionWithDataErr("Fetch", "table", func() ([]objects.Table, error) {
 		return meta.GetTables(cfg, includedSchemas, true)
+	})
+}
+
+func GetTableByName(cfg *raiden.Config, name string, schema string, includeColumn bool) (result objects.Table, err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get table by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("Fetch", "table", func() (objects.Table, error) {
+			return cloud.GetTableByName(cfg, name, schema, includeColumn)
+		})
+	}
+
+	SupabaseLogger.Debug("Get table by name from supabase pg-meta")
+	return decorateActionWithDataErr("Fetch", "table", func() (objects.Table, error) {
+		return meta.GetTableByName(cfg, name, schema, includeColumn)
 	})
 }
 
@@ -104,6 +148,19 @@ func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 	})
 }
 
+func GetRoleByName(cfg *raiden.Config, name string) (objects.Role, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get role by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "role", func() (objects.Role, error) {
+			return cloud.GetRoleByName(cfg, name)
+		})
+	}
+	SupabaseLogger.Debug("Get role by name from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "role", func() (objects.Role, error) {
+		return meta.GetRoleByName(cfg, name)
+	})
+}
+
 func CreateRole(cfg *raiden.Config, role objects.Role) (objects.Role, error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Create role from supabase cloud", "project-id", cfg.ProjectId)
@@ -153,6 +210,19 @@ func GetPolicies(cfg *raiden.Config) (objects.Policies, error) {
 	SupabaseLogger.Debug("Get all policy from supabase pg-meta")
 	return decorateActionWithDataErr("fetch", "policy", func() ([]objects.Policy, error) {
 		return meta.GetPolicies(cfg)
+	})
+}
+
+func GetPolicyByName(cfg *raiden.Config, name string) (objects.Policy, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get policy by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "policy", func() (objects.Policy, error) {
+			return cloud.GetPolicyByName(cfg, name)
+		})
+	}
+	SupabaseLogger.Debug("Get policy by name from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "policy", func() (objects.Policy, error) {
+		return meta.GetPolicyByName(cfg, name)
 	})
 }
 
@@ -208,6 +278,19 @@ func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
 	})
 }
 
+func GetFunctionByName(cfg *raiden.Config, schema string, name string) (objects.Function, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get function by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "rpc", func() (objects.Function, error) {
+			return cloud.GetFunctionByName(cfg, schema, name)
+		})
+	}
+	SupabaseLogger.Debug("Get function by name from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "rpc", func() (objects.Function, error) {
+		return meta.GetFunctionByName(cfg, schema, name)
+	})
+}
+
 func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Create function from supabase cloud", "project-id", cfg.ProjectId)
@@ -258,6 +341,106 @@ func AdminUpdateUserData(cfg *raiden.Config, userId string, data objects.User) (
 	return objects.User{}, errors.New("update user data in self hosted in not implemented, stay update :)")
 }
 
+func GetBuckets(cfg *raiden.Config) (buckets []objects.Bucket, err error) {
+	return decorateActionWithDataErr("fetch", "storage", func() ([]objects.Bucket, error) {
+		StorageLogger.Debug("fetch all bucket")
+		return net.Get[[]objects.Bucket](getBucketUrl(cfg), net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil)
+	})
+}
+
+func GetBucket(cfg *raiden.Config, name string) (buckets objects.Bucket, err error) {
+	return decorateActionWithDataErr("fetch", "storage", func() (objects.Bucket, error) {
+		StorageLogger.Debug("fetch bucket")
+		url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), name)
+		return net.Get[objects.Bucket](url, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil)
+	})
+
+}
+
+func CreateBucket(cfg *raiden.Config, param objects.Bucket) (bucket objects.Bucket, err error) {
+	return decorateActionWithDataErr("create", "storage", func() (objects.Bucket, error) {
+		StorageLogger.Debug("start create storage", "name", param.Name)
+		byteData, err := json.Marshal(param)
+		if err != nil {
+			return bucket, err
+		}
+
+		res, err := net.Post[CreateBucketSuccessResponse](
+			getBucketUrl(cfg), byteData, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
+		)
+
+		if err != nil {
+			return bucket, err
+		}
+		StorageLogger.Debug("finish create storage", "name", param.Name)
+		return GetBucket(cfg, res.Name)
+	})
+}
+
+func UpdateBucket(cfg *raiden.Config, param objects.Bucket, updateItem objects.UpdateBucketParam) error {
+	return decorateActionErr("update", "storage", func() error {
+		StorageLogger.Debug("start update storage", "name", param.Name)
+
+		// just return, nothing to be processed
+		if len(updateItem.ChangeItems) == 0 {
+			return nil
+		}
+
+		// build update payload
+		updateBucket := objects.Bucket{}
+		for i := range updateItem.ChangeItems {
+			u := updateItem.ChangeItems[i]
+			switch u {
+			case objects.UpdateBucketIsPublic:
+				updateBucket.Public = param.Public
+			case objects.UpdateBucketFileSizeLimit:
+				updateBucket.FileSizeLimit = param.FileSizeLimit
+			case objects.UpdateBucketAllowedMimeTypes:
+				updateBucket.AllowedMimeTypes = param.AllowedMimeTypes
+			}
+		}
+
+		// build request
+		byteData, err := json.Marshal(updateBucket)
+		if err != nil {
+			return err
+		}
+
+		url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), param.ID)
+		_, err = net.Put[DefaultBucketSuccessResponse](
+			url, byteData, net.DefaultTimeout, DefaultAuthInterceptor(cfg.ServiceKey, cfg.ServiceKey), nil,
+		)
+		StorageLogger.Debug("finish update storage", "name", param.Name)
+		return err
+	})
+}
+
+func DeleteBucket(cfg *raiden.Config, param objects.Bucket) (err error) {
+	return decorateActionErr("delete", "storage", func() error {
+		StorageLogger.Debug("start delete storage", "name", param.Name)
+
+		deleteReqInterceptor := func(req *http.Request) error {
+			req.Header.Set("apiKey", cfg.ServiceKey)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.ServiceKey))
+			req.Header.Set("Content-Type", "")
+			return nil
+		}
+
+		url := fmt.Sprintf("%s/%s", getBucketUrl(cfg), param.ID)
+		_, err = net.Delete[DefaultBucketSuccessResponse](
+			url, nil, net.DefaultTimeout, deleteReqInterceptor, nil,
+		)
+
+		StorageLogger.Debug("finish delete storage", "name", param.Name)
+		return err
+	})
+}
+
+func getBucketUrl(cfg *raiden.Config) string {
+	publicUrl := strings.TrimSuffix(cfg.SupabasePublicUrl, "/")
+	return fmt.Sprintf("%s/storage/v1/bucket", publicUrl)
+}
+
 func decorateActionWithDataErr[T any](action, resource string, fetchFn func() (T, error)) (T, error) {
 	data, err := fetchFn()
 	if err != nil && (StorageLogger.GetLevel() != hclog.Trace && StorageLogger.GetLevel() != hclog.Debug) {
@@ -268,9 +451,9 @@ func decorateActionWithDataErr[T any](action, resource string, fetchFn func() (T
 
 		switch rv.Kind() {
 		case reflect.Array, reflect.Slice:
-			err = fmt.Errorf("failed %s list of %s", action, resource)
+			err = fmt.Errorf("failed %s list of %s. Reason: %v", action, resource, err)
 		default:
-			err = fmt.Errorf("failed %s data %s", action, resource)
+			err = fmt.Errorf("failed %s data %s. Reason: %v", action, resource, err)
 		}
 	}
 	return data, err
@@ -279,7 +462,7 @@ func decorateActionWithDataErr[T any](action, resource string, fetchFn func() (T
 func decorateActionErr(action, resource string, fetchFn func() error) error {
 	err := fetchFn()
 	if err != nil && (StorageLogger.GetLevel() != hclog.Trace && StorageLogger.GetLevel() != hclog.Debug) {
-		err = fmt.Errorf("failed %s list of %s", action, resource)
+		err = fmt.Errorf("failed %s list of %s. Reason: %v", action, resource, err)
 	}
 	return err
 }

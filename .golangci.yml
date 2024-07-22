@@ -60,4 +60,6 @@ issues:
     - path: websocket.go
       linters:
         - gosimple # Not that simple :)
-
+    - path: context_test.go
+      linters:
+        - staticcheck

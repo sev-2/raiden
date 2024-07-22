@@ -101,6 +101,8 @@ func getInvalidMessage(field, tag, param string) (errMessage string) {
 	switch tag {
 	case "required":
 		errMessage = fmt.Sprintf("%s is required", field)
+	case "email":
+		errMessage = fmt.Sprintf("%s should be a valid email address", field)
 	case "min":
 		errMessage = fmt.Sprintf("%s should be at least %s", field, param)
 	case "max":
