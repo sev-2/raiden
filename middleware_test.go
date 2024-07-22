@@ -30,13 +30,25 @@ func TestChain_Then(t *testing.T) {
 	c := raiden.NewChain(m1, m2)
 
 	// setup required data
-	controller := &Controller{}
+	controller := &HelloWorldController{}
 
 	// Call Then
 	fn := c.Then("GET", raiden.RouteTypeCustom, controller)
 
 	// Test the returned function
 	assert.NotNil(t, fn)
+}
+
+func TestNTracer(t *testing.T) {
+	a := raiden.NewChain(m1, m2)
+
+	controller := &HelloWorldController{}
+
+	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
+
+	tracedChain := raiden.TraceMiddleware(fn)
+
+	assert.NotNil(t, tracedChain)
 }
 
 func m1(next raiden.RouteHandlerFn) raiden.RouteHandlerFn {
