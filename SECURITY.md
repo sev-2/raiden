@@ -14,7 +14,7 @@
 If you discover a security vulnerability within Raiden, please report it as soon as possible. We take all security vulnerabilities seriously and will work to resolve them swiftly.
 
 ### How to Report
-- **Email:** Send an email to [admin@refactory.id](mailto:admin@refactory.id) with the details of the vulnerability.
+- **Security Advisory or Email:** Draft an [Security Advisories](https://github.com/sev-2/raiden/security/advisories) or send an email to [admin@refactory.id](mailto:admin@refactory.id) with the details of the vulnerability 
 - **Include:** A clear and concise description of the vulnerability, steps to reproduce, and any relevant screenshots or logs.
 
 ### What to Expect
