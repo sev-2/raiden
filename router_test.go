@@ -48,6 +48,9 @@ func loadConfig() *raiden.Config {
 		ProjectName:         "My Great Project",
 		SupabaseApiBasePath: "/v1",
 		SupabaseApiUrl:      "http://supabase.cloud.com",
+		CorsAllowedOrigins:  "*",
+		CorsAllowedMethods:  "GET, POST, PUT, DELETE, OPTIONS",
+		CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
 	}
 }
 
