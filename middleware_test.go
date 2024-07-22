@@ -1,10 +1,14 @@
 package raiden_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/mock"
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestNewChain(t *testing.T) {
@@ -39,7 +43,7 @@ func TestChain_Then(t *testing.T) {
 	assert.NotNil(t, fn)
 }
 
-func TestNTracer(t *testing.T) {
+func Test_Tracer(t *testing.T) {
 	a := raiden.NewChain(m1, m2)
 
 	controller := &HelloWorldController{}
@@ -49,6 +53,38 @@ func TestNTracer(t *testing.T) {
 	tracedChain := raiden.TraceMiddleware(fn)
 
 	assert.NotNil(t, tracedChain)
+
+	mockCtx := &mock.MockContext{
+		CtxFn: func() context.Context {
+			return context.Background()
+		},
+		SetCtxFn:  func(ctx context.Context) {},
+		SetSpanFn: func(span trace.Span) {},
+		SendErrorWithCodeFn: func(statusCode int, err error) error {
+			return nil
+		},
+		TracerFn: func() trace.Tracer {
+			noopProvider := trace.NewNoopTracerProvider()
+			tracer := noopProvider.Tracer("test")
+			return tracer
+		},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+	}
+
+	res := tracedChain(mockCtx)
+	assert.Nil(t, res)
 }
 
 func m1(next raiden.RouteHandlerFn) raiden.RouteHandlerFn {
