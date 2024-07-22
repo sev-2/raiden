@@ -3,6 +3,7 @@ package raiden_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-co-op/gocron/v2"
 	"github.com/sev-2/raiden"
@@ -15,6 +16,10 @@ type SampleJob struct {
 
 func (j *SampleJob) Name() string {
 	return "SampleJob"
+}
+
+func (j *SampleJob) Duration() raiden.JobDuration {
+	return gocron.DurationRandomJob(4*time.Minute, 6*time.Minute)
 }
 
 func TestScheduler_SetTracer(t *testing.T) {
