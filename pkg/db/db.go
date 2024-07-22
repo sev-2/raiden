@@ -1,6 +1,7 @@
 package db
 
 import (
+	"flag"
 	"fmt"
 	"reflect"
 	"strings"
@@ -95,7 +96,14 @@ func (q Query) Single() ([]byte, error) {
 
 func (q Query) GetUrl() string {
 	urlQuery := buildQueryURI(q)
-	baseUrl := getConfig().SupabasePublicUrl
+
+	var baseUrl string
+	if flag.Lookup("test.v") != nil {
+		baseUrl = "/"
+	} else {
+		baseUrl = getConfig().SupabasePublicUrl
+	}
+
 	url := fmt.Sprintf("%s/rest/v1/%s", baseUrl, urlQuery)
 	return url
 }

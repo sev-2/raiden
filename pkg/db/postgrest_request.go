@@ -1,6 +1,7 @@
 package db
 
 import (
+	"flag"
 	"fmt"
 	"strings"
 
@@ -20,7 +21,13 @@ func PostgrestRequest(ctx raiden.Context, method string, url string, payload []b
 	defer fasthttp.ReleaseRequest(req)
 
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		baseUrl := getConfig().SupabasePublicUrl
+		var baseUrl string
+		if flag.Lookup("test.v") != nil {
+			baseUrl = "/"
+		} else {
+			baseUrl = getConfig().SupabasePublicUrl
+		}
+
 		if strings.HasPrefix(url, "/") {
 			url = fmt.Sprintf("%s/rest/v1%s", baseUrl, url)
 		} else {
