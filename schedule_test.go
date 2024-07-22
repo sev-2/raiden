@@ -9,6 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type SampleJob struct {
+	raiden.JobBase
+}
+
+func (j *SampleJob) Name() string {
+	return "SampleJob"
+}
+
 func TestScheduler_SetTracer(t *testing.T) {
 	conf := loadConfig()
 	ss, err := raiden.NewSchedulerServer(conf, gocron.WithLimitConcurrentJobs(2, gocron.LimitModeReschedule))
@@ -21,8 +29,8 @@ func TestScheduler_RegisterJob(t *testing.T) {
 	ss, err := raiden.NewSchedulerServer(conf, gocron.WithLimitConcurrentJobs(2, gocron.LimitModeReschedule))
 	assert.NoError(t, err)
 
-	err1 := ss.RegisterJob(nil)
-	assert.Error(t, err1)
+	err1 := ss.RegisterJob(&SampleJob{})
+	assert.NoError(t, err1)
 }
 
 func TestScheduler_Start(t *testing.T) {
