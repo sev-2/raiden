@@ -90,6 +90,10 @@ func Test_Tracer(t *testing.T) {
 		},
 	}
 
+	breakerFn := breakerMiddleware(fn)
+	breakerRes := breakerFn(mockCtx)
+	assert.Nil(t, breakerRes)
+
 	initRes := fn(mockCtx)
 	assert.Nil(t, initRes)
 
