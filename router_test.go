@@ -18,6 +18,14 @@ type SomeModel struct {
 	Metadata string `tableName:"some_model"`
 }
 
+type SomeBucket struct {
+	raiden.BucketBase
+}
+
+func (m *SomeBucket) Name() string {
+	return "some_bucket"
+}
+
 type HelloWorldRequest struct {
 }
 
@@ -134,9 +142,25 @@ func TestRouter_BuildHandler(t *testing.T) {
 		Model:      &SomeModel{},
 	}
 
+	storageRoute := raiden.Route{
+		Type:       raiden.RouteTypeStorage,
+		Path:       "/some_bucket/",
+		Methods:    []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
+		Controller: &HelloWorldController{},
+		Storage:    &SomeBucket{},
+	}
+
+	customRoute := raiden.Route{
+		Type:    raiden.RouteTypeCustom,
+		Path:    "/some_custom/",
+		Methods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
+	}
+
 	routes := []*raiden.Route{
 		&rpcRoute,
 		&restRoute,
+		&storageRoute,
+		&customRoute,
 	}
 	router.Register(routes)
 
