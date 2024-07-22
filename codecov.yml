@@ -1,0 +1,12 @@
+ignore:
+  - "cmd"         # @TODO: build testing facility for CMD
+  - "pkg/cli"     # ignore the CLI package related for now
+  - "pkg/mock"
+  - "pkg/suparest" # to be removed (or replaced)
+coverage:
+  range: 60..70
+  status:
+    project:
+      default:
+        target: 71%
+        threshold: 1%

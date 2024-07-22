@@ -29,10 +29,6 @@ func GetAvailableRole() (roles []objects.Role, err error) {
 	return
 }
 
-func GetUserRole() (roleName string, err error) {
-	return
-}
-
 func validateRole(roleName string) (err error) {
 	avRoles, err := GetAvailableRole()
 	if err != nil {
