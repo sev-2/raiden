@@ -774,12 +774,14 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 
 	mapParams := map[string]any{}
 	for i := 0; i < paramsType.NumField(); i++ {
-		fieldType, fieldValue := paramsType.Field(i), paramValue.Field(i)
-		key := utils.SnakeCaseToPascalCase(fieldType.Name)
-		if rpc.UseParamPrefix() {
-			key = fmt.Sprintf("%s%s", DefaultRpcParamPrefix, key)
+		if paramValue.IsValid() {
+			fieldType, fieldValue := paramsType.Field(i), paramValue.Field(i)
+			key := utils.SnakeCaseToPascalCase(fieldType.Name)
+			if rpc.UseParamPrefix() {
+				key = fmt.Sprintf("%s%s", DefaultRpcParamPrefix, key)
+			}
+			mapParams[strings.ToLower(key)] = fieldValue.Interface()
 		}
-		mapParams[strings.ToLower(key)] = fieldValue.Interface()
 	}
 
 	pByte, err := json.Marshal(mapParams)
@@ -857,7 +859,7 @@ func rpcSendRequest(apiUrl string, body []byte, reqInterceptor net.RequestInterc
 		return nil, &ErrorResponse{
 			StatusCode: fasthttp.StatusInternalServerError,
 			Details:    err.Error(),
-			Message:    "fail request to upstream",
+			Message:    fmt.Sprintf("fail request to upstream. Reason: %v", err),
 		}
 	}
 	return resData, nil
