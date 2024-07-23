@@ -1,6 +1,7 @@
 package raiden_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -55,6 +56,11 @@ func (r *GetSubmissions) GetRawDefinition() string {
 	return `BEGIN RETURN QUERY SELECT s.id, s.created_at, sc.name as sc_name, c.name as c_name FROM :s s INNER JOIN :sc sc ON s.scouter_id = sc.scouter_id INNER JOIN :c c ON s.candidate_id = c.candidate_id WHERE sc.name = :scouter_name AND c.name = :candidate_name; END;`
 }
 
+type RpcWithMissingReturn struct {
+	raiden.RpcBase
+	Params *GetSubmissionsParams `json:"-"`
+}
+
 func TestCreateQuery(t *testing.T) {
 	rpc := &GetSubmissions{}
 	e := raiden.BuildRpc(rpc)
@@ -95,6 +101,38 @@ func TestExecuteRpc(t *testing.T) {
 	res, err := raiden.ExecuteRpc(mockCtx, rpc)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
+}
+
+func TestExecuteRpcErrWithMissingReturn(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+	}
+
+	rpc := &RpcWithMissingReturn{}
+	_, err := raiden.ExecuteRpc(mockCtx, rpc)
+
+	expectedErr := &raiden.ErrorResponse{
+		StatusCode: fasthttp.StatusInternalServerError,
+		Details:    fmt.Sprintf("Struct %s doesn`t have Return field, define first because this attribute need for receive data from server", "RpcWithMissingReturn"),
+		Message:    fmt.Sprintf("Undefined field Return in struct %s", "RpcWithMissingReturn"),
+		Hint:       "Invalid Rpc",
+		Code:       fasthttp.StatusMessage(fasthttp.StatusInternalServerError),
+	}
+
+	assert.Error(t, err)
+	assert.EqualError(t, expectedErr, err.Error())
 }
 
 func TestRpcParamToGoType(t *testing.T) {

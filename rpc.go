@@ -735,10 +735,6 @@ func findStruct(returnReflectType reflect.Type) (reflect.Type, error) {
 
 // ----- Execute Rpc -----
 func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
-	if err := BuildRpc(rpc); err != nil {
-		return nil, err
-	}
-
 	rpcType := reflect.TypeOf(rpc).Elem()
 	rpcValue := reflect.ValueOf(rpc).Elem()
 	if rpcType.Kind() == reflect.Pointer {
@@ -751,7 +747,7 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 	if !found {
 		return nil, &ErrorResponse{
 			StatusCode: fasthttp.StatusInternalServerError,
-			Details:    fmt.Sprintf("Struct %s doesn`t have Param field, define first because this attribute need for send parameter to server", rpcType.Name()),
+			Details:    fmt.Sprintf("Struct %s doesn`t have Params field, define first because this attribute need for send parameter to server", rpcType.Name()),
 			Message:    fmt.Sprintf("Undefined field Params in struct %s", rpcType.Name()),
 			Hint:       "Invalid Rpc",
 			Code:       fasthttp.StatusMessage(fasthttp.StatusInternalServerError),
@@ -773,6 +769,10 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 			Hint:       "Invalid Rpc",
 			Code:       fasthttp.StatusMessage(fasthttp.StatusInternalServerError),
 		}
+	}
+
+	if err := BuildRpc(rpc); err != nil {
+		return nil, err
 	}
 
 	mapParams := map[string]any{}

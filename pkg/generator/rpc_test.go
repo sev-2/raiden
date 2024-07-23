@@ -1,6 +1,7 @@
 package generator_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -290,6 +291,144 @@ func TestExtractQueryWithWrite(t *testing.T) {
 	_, mapTable, err := generator.ExtractRpcTable(definition)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(mapTable))
+}
+
+func TestExtractRpcWithActualModel(t *testing.T) {
+	fn := objects.Function{
+		Schema:   "public",
+		Name:     "get_food_like_count",
+		Language: "plpgsql",
+		Definition: `BEGIN
+			RETURN QUERY
+				WITH recent_likes AS (
+					SELECT
+						fl1.food_id,
+						COUNT(*) AS recent_like_count
+					FROM
+						food_likes fl1
+					WHERE
+						fl1.food_id = ANY (string_to_array(food_ids, ',')::INT[]) AND
+						fl1.created_at >= NOW() - INTERVAL '30 days'
+					GROUP BY fl1.food_id
+				), previous_likes AS (
+					SELECT
+						fl2.food_id,
+						COUNT(*) AS previous_like_count
+					FROM
+						food_likes fl2
+					WHERE
+						fl2.food_id = ANY (string_to_array(food_ids, ',')::INT[]) AND
+						fl2.created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days'
+					GROUP BY fl2.food_id
+				)
+				SELECT
+					rci.food_id,
+					COALESCE(rci.recent_like_count, 0) - COALESCE(p.previous_like_count, 0) AS likes_count_diff
+				FROM
+					recent_likes rci
+				LEFT JOIN previous_likes p ON rci.food_id = p.food_id
+				ORDER BY likes_count_diff DESC;
+			END;
+		`,
+		CompleteStatement: `
+		CREATE OR REPLACE FUNCTION public.get_food_like_count()\n 
+		RETURNS JSON\n 
+		LANGUAGE plpgsql\n
+		AS $function$ 
+			BEGIN
+			RETURN QUERY
+				WITH recent_likes AS (
+					SELECT
+						fl1.food_id,
+						COUNT(*) AS recent_like_count
+					FROM
+						food_likes fl1
+					WHERE
+						fl1.food_id = ANY (string_to_array(food_ids, ',')::INT[]) AND
+						fl1.created_at >= NOW() - INTERVAL '30 days'
+					GROUP BY fl1.food_id
+				), previous_likes AS (
+					SELECT
+						fl2.food_id,
+						COUNT(*) AS previous_like_count
+					FROM
+						food_likes fl2
+					WHERE
+						fl2.food_id = ANY (string_to_array(food_ids, ',')::INT[]) AND
+						fl2.created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days'
+					GROUP BY fl2.food_id
+				)
+				SELECT
+					rci.food_id,
+					COALESCE(rci.recent_like_count, 0) - COALESCE(p.previous_like_count, 0) AS likes_count_diff
+				FROM
+					recent_likes rci
+				LEFT JOIN previous_likes p ON rci.food_id = p.food_id
+				ORDER BY likes_count_diff DESC;
+			END;
+		$function$\n
+		`,
+		Args:                   []objects.FunctionArg{},
+		ArgumentTypes:          "",
+		IdentityArgumentTypes:  "",
+		ReturnTypeID:           2249,
+		ReturnType:             "JSON",
+		ReturnTypeRelationID:   0,
+		IsSetReturningFunction: true,
+		Behavior:               string(raiden.RpcBehaviorVolatile),
+		SecurityDefiner:        true,
+		ConfigParams:           nil,
+	}
+
+	result, err := generator.ExtractRpcFunction(&fn, []objects.Table{
+		{Name: "food_likes"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(result.MapScannedTable))
+
+	_, exist := result.MapScannedTable["food_likes"]
+	assert.True(t, exist)
+}
+
+func TestExtractRpcWithReturnTypeSetOf(t *testing.T) {
+	fn := objects.Function{
+		ID:                30369,
+		Schema:            "public",
+		Name:              "get_places",
+		Language:          "plpgsql",
+		Definition:        "\nBEGIN\n    RETURN QUERY\n    SELECT * FROM places;\nEND\n",
+		CompleteStatement: "CREATE OR REPLACE FUNCTION public.get_places()\n RETURNS SETOF places\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n    RETURN QUERY\n    SELECT * FROM places;\nEND\n$function$\n",
+		ReturnTypeID:      29827,
+		ReturnType:        "SETOF places",
+		Behavior:          string(raiden.RpcBehaviorVolatile),
+		SecurityDefiner:   true,
+	}
+
+	result, err := generator.ExtractRpcFunction(&fn, []objects.Table{
+		{Name: "places"},
+	})
+
+	// assert models
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(result.MapScannedTable))
+
+	_, exist := result.MapScannedTable["places"]
+	assert.True(t, exist)
+
+	// assert return type
+	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
+	importsMap := map[string]bool{
+		raidenPath: true,
+	}
+	returnDecl, returnColumns, IsReturnArr, err := result.GetReturn(importsMap)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "models.Places", returnDecl)
+	assert.Equal(t, 0, len(returnColumns))
+	assert.True(t, IsReturnArr)
+
+	// assert security type
+	assert.Equal(t, "RpcSecurityTypeDefiner", result.GetSecurity())
 }
 
 func TestGenerateRpc(t *testing.T) {
