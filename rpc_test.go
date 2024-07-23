@@ -86,7 +86,15 @@ func TestExecuteRpc(t *testing.T) {
 			}
 		},
 		RequestContextFn: func() *fasthttp.RequestCtx {
-			return &fasthttp.RequestCtx{}
+			rCtx := &fasthttp.RequestCtx{
+				Request: fasthttp.Request{
+					Header: fasthttp.RequestHeader{},
+				},
+			}
+
+			rCtx.Request.Header.Set("Authorization", "Bearer some token")
+			rCtx.Request.Header.Set("apiKey", "some api key")
+			return rCtx
 		},
 	}
 
@@ -97,10 +105,62 @@ func TestExecuteRpc(t *testing.T) {
 	err := mock.MockExecuteRpcWithExpectedResponse(200, "get_submissions", GetSubmissionsResult{})
 	assert.NoError(t, err)
 
-	rpc := &GetSubmissions{}
+	rpc := &GetSubmissions{
+		Params: &GetSubmissionsParams{
+			ScouterName:   "test_1",
+			CandidateName: "test_2",
+		},
+	}
 	res, err := raiden.ExecuteRpc(mockCtx, rpc)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
+}
+
+func TestExecuteRpcErrResponse(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			rCtx := &fasthttp.RequestCtx{
+				Request: fasthttp.Request{
+					Header: fasthttp.RequestHeader{},
+				},
+			}
+
+			rCtx.Request.Header.Set("Authorization", "Bearer some token")
+			rCtx.Request.Header.Set("apiKey", "some api key")
+			return rCtx
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockExecuteRpcWithExpectedResponse(401, "get_submissions", map[string]interface{}{
+		"message": "Invalid API key",
+		"status":  401,
+		"code":    "invalid_auth",
+	})
+	assert.NoError(t, err)
+
+	rpc := &GetSubmissions{
+		Params: &GetSubmissionsParams{
+			ScouterName:   "test_1",
+			CandidateName: "test_2",
+		},
+	}
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.Error(t, err)
+	assert.Nil(t, res)
 }
 
 func TestExecuteRpcErrWithMissingReturn(t *testing.T) {
