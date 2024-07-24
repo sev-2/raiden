@@ -2,6 +2,7 @@
 [![Build Status](https://github.com/sev-2/raiden/actions/workflows/raiden.yaml/badge.svg?branch=main)](https://github.com/sev-2/raiden/actions?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/sev-2/raiden/branch/main/graph/badge.svg)](https://codecov.io/gh/sev-2/raiden)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sev-2/raiden)](https://goreportcard.com/report/github.com/sev-2/raiden)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9207/badge)](https://www.bestpractices.dev/projects/9207)
 
 ## Introduction
 Raiden is a cutting-edge framework designed for seamless integration with Supabase, focusing on enhancing security, streamlining backend processes, and providing consistent schema management. It specifically addresses the need to avoid direct client-side calls to the database, ensuring more secure and efficient data handling.
