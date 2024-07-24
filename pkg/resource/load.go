@@ -110,6 +110,14 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 	}
 
 	if flags.All() || flags.RpcOnly {
+		if flags.RpcOnly {
+			wg.Add(1)
+			LoadLogger.Debug("Get Table From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
+				return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
+			})
+		}
+
 		wg.Add(1)
 		LoadLogger.Debug("Get Function From Supabase")
 		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {

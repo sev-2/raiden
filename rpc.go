@@ -26,6 +26,7 @@ type RpcReturnDataType string
 // Define constants for rpc input data type
 const (
 	RpcParamDataTypeInteger          RpcParamDataType = "INTEGER"
+	RpcParamDataTypeNumeric          RpcParamDataType = "NUMERIC"
 	RpcParamDataTypeBigInt           RpcParamDataType = "BIGINT"
 	RpcParamDataTypeReal             RpcParamDataType = "REAL"
 	RpcParamDataTypeDoublePreci      RpcParamDataType = "DOUBLE PRECISION"
@@ -71,7 +72,7 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "int64"
 	case RpcParamDataTypeReal:
 		return "float32"
-	case RpcParamDataTypeDoublePreci:
+	case RpcParamDataTypeDoublePreci, RpcParamDataTypeNumeric:
 		return "float64"
 	case RpcParamDataTypeText, RpcParamDataTypeVarchar, RpcParamDataTypeVarcharAlias:
 		return "string"
@@ -99,6 +100,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeReal, nil
 	case RpcParamDataTypeDoublePreci:
 		return RpcParamDataTypeDoublePreci, nil
+	case RpcParamDataTypeNumeric:
+		return RpcParamDataTypeNumeric, nil
 	case RpcParamDataTypeText:
 		return RpcParamDataTypeText, nil
 	case RpcParamDataTypeVarchar, RpcParamDataTypeVarcharAlias:
@@ -732,10 +735,6 @@ func findStruct(returnReflectType reflect.Type) (reflect.Type, error) {
 
 // ----- Execute Rpc -----
 func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
-	if err := BuildRpc(rpc); err != nil {
-		return nil, err
-	}
-
 	rpcType := reflect.TypeOf(rpc).Elem()
 	rpcValue := reflect.ValueOf(rpc).Elem()
 	if rpcType.Kind() == reflect.Pointer {
@@ -748,7 +747,7 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 	if !found {
 		return nil, &ErrorResponse{
 			StatusCode: fasthttp.StatusInternalServerError,
-			Details:    fmt.Sprintf("Struct %s doesn`t have Param field, define first because this attribute need for send parameter to server", rpcType.Name()),
+			Details:    fmt.Sprintf("Struct %s doesn`t have Params field, define first because this attribute need for send parameter to server", rpcType.Name()),
 			Message:    fmt.Sprintf("Undefined field Params in struct %s", rpcType.Name()),
 			Hint:       "Invalid Rpc",
 			Code:       fasthttp.StatusMessage(fasthttp.StatusInternalServerError),
@@ -770,6 +769,10 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 			Hint:       "Invalid Rpc",
 			Code:       fasthttp.StatusMessage(fasthttp.StatusInternalServerError),
 		}
+	}
+
+	if err := BuildRpc(rpc); err != nil {
+		return nil, err
 	}
 
 	mapParams := map[string]any{}
