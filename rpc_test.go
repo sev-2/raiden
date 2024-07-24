@@ -198,7 +198,10 @@ func TestExecuteRpcErrWithMissingReturn(t *testing.T) {
 	assert.Error(t, err)
 	assert.EqualError(t, expectedErr, err.Error())
   
-	err := mock.MockExecuteRpcWithExpectedResponse(200, "get_submissions", GetSubmissionsResult{})
+	mock := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mock.Activate()
+	defer mock.Deactivate()
+	err = mock.MockExecuteRpcWithExpectedResponse(200, "get_submissions", GetSubmissionsResult{})
 	assert.NoError(t, err)
 
 	rpc := &GetSubmissions{}
