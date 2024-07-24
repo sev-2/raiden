@@ -23,7 +23,7 @@ func PostgrestRequest(ctx raiden.Context, method string, url string, payload []b
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		var baseUrl string
 		if flag.Lookup("test.v") != nil {
-			baseUrl = ""
+			baseUrl = "https://api.supabase.co"
 		} else {
 			baseUrl = getConfig().SupabasePublicUrl
 		}

@@ -2,30 +2,11 @@ package db
 
 import (
 	"testing"
-	"time"
-
-	"github.com/sev-2/raiden"
 )
 
-type ArticleMockModel struct {
-	ModelBase
-
-	Id        int64     `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false"`
-	UserId    int64     `json:"user_id,omitempty" column:"name:user_id;type:bigint;nullable:false"`
-	Title     string    `json:"title,omitempty" column:"name:title;type:text;nullable:false"`
-	Body      string    `json:"body,omitempty" column:"name:body;type:text;nullable:true"`
-	CreatedAt time.Time `json:"created_at,omitempty" column:"name:created_at;type:timestampz;nullable:false;default:now()"`
-
-	Metadata string `json:"-" schema:"public" tableName:"articles" rlsEnable:"true" rlsForced:"false"`
-}
-
-var articleMockModel = ArticleMockModel{}
-
 func TestSelect(t *testing.T) {
-	ctx := raiden.Ctx{}
-
 	t.Run("Test nil select", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).Select(nil, nil)
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Select(nil, nil)
 
 		if q.Columns != nil {
 			t.Fatal("Expected no column on select clause.")
@@ -33,7 +14,7 @@ func TestSelect(t *testing.T) {
 	})
 
 	t.Run("Test select all columns", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).Select([]string{"*"}, nil)
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Select([]string{"*"}, nil)
 
 		if q.Columns[0] != "*" {
 			t.Fatal("Expected select *.")
@@ -43,7 +24,7 @@ func TestSelect(t *testing.T) {
 	t.Run("Test select id and title", func(t *testing.T) {
 		columns := []string{"id", "title"}
 
-		q := NewQuery(&ctx).Model(articleMockModel).Select(columns, nil)
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Select(columns, nil)
 
 		if len(q.Columns) != 2 {
 			t.Fatal("Expected 2 columns on select clause.")
@@ -53,7 +34,7 @@ func TestSelect(t *testing.T) {
 	t.Run("Test select unknown columns", func(t *testing.T) {
 		columns := []string{"none", "unknown"}
 
-		q := NewQuery(&ctx).Model(articleMockModel).Select(columns, nil)
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Select(columns, nil)
 
 		if !q.HasError() {
 			t.Fatalf("Expector error because \"%s\" and \"%s\" columns is not exists", "none", "unknown")

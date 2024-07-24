@@ -18,7 +18,3 @@ func (q *Query) Delete() ([]byte, error) {
 
 	return resp, nil
 }
-
-func (m ModelBase) ForceDelete() (model ModelBase) {
-	return m
-}

@@ -3,14 +3,11 @@ package db
 import (
 	"testing"
 
-	"github.com/sev-2/raiden"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEq(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Eq("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Eq("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -20,9 +17,7 @@ func TestEq(t *testing.T) {
 }
 
 func TestOrEq(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrEq("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrEq("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -32,9 +27,7 @@ func TestOrEq(t *testing.T) {
 }
 
 func TestNeq(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Neq("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Neq("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -44,9 +37,7 @@ func TestNeq(t *testing.T) {
 }
 
 func TestOrNeq(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrNeq("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrNeq("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -56,9 +47,7 @@ func TestOrNeq(t *testing.T) {
 }
 
 func TestLt(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Lt("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Lt("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -68,9 +57,7 @@ func TestLt(t *testing.T) {
 }
 
 func TestOrLt(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrLt("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrLt("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -80,9 +67,7 @@ func TestOrLt(t *testing.T) {
 }
 
 func TestLte(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Lte("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Lte("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -92,9 +77,7 @@ func TestLte(t *testing.T) {
 }
 
 func TestOrLte(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrLte("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrLte("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -104,9 +87,7 @@ func TestOrLte(t *testing.T) {
 }
 
 func TestGt(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Gt("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Gt("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -116,9 +97,7 @@ func TestGt(t *testing.T) {
 }
 
 func TestOrGt(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrGt("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrGt("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -128,9 +107,7 @@ func TestOrGt(t *testing.T) {
 }
 
 func TestGte(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Gte("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Gte("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -140,9 +117,7 @@ func TestGte(t *testing.T) {
 }
 
 func TestOrGte(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrGte("id", 1)
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrGte("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -152,10 +127,8 @@ func TestOrGte(t *testing.T) {
 }
 
 func TestIn(t *testing.T) {
-	ctx := raiden.Ctx{}
-
 	t.Run("where in int", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).In("popularity", []int{-5, 0, 7})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).In("popularity", []int{-5, 0, 7})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -165,7 +138,7 @@ func TestIn(t *testing.T) {
 	})
 
 	t.Run("where in uint", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).In("id", []uint{1, 2, 3})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).In("id", []uint{1, 2, 3})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -175,7 +148,7 @@ func TestIn(t *testing.T) {
 	})
 
 	t.Run("where in float", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).In("price", []float64{0.25, 10.5, 7.75})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).In("price", []float64{0.25, 10.5, 7.75})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -185,7 +158,7 @@ func TestIn(t *testing.T) {
 	})
 
 	t.Run("where in string", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).In("username", []string{"a", "b", "c"})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).In("username", []string{"a", "b", "c"})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -195,7 +168,7 @@ func TestIn(t *testing.T) {
 	})
 
 	t.Run("where in bool", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).In("is_allowed", []bool{true})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).In("is_allowed", []bool{true})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -206,10 +179,8 @@ func TestIn(t *testing.T) {
 }
 
 func TestOrIn(t *testing.T) {
-	ctx := raiden.Ctx{}
-
 	t.Run("where in int", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).OrIn("popularity", []int{-5, 0, 7})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrIn("popularity", []int{-5, 0, 7})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -219,7 +190,7 @@ func TestOrIn(t *testing.T) {
 	})
 
 	t.Run("where in uint", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).OrIn("id", []uint{1, 2, 3})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrIn("id", []uint{1, 2, 3})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -229,7 +200,7 @@ func TestOrIn(t *testing.T) {
 	})
 
 	t.Run("where in float", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).OrIn("price", []float64{0.25, 10.5, 7.75})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrIn("price", []float64{0.25, 10.5, 7.75})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -239,7 +210,7 @@ func TestOrIn(t *testing.T) {
 	})
 
 	t.Run("where in string", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).OrIn("username", []string{"a", "b", "c"})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrIn("username", []string{"a", "b", "c"})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -249,7 +220,7 @@ func TestOrIn(t *testing.T) {
 	})
 
 	t.Run("where in bool", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(articleMockModel).OrIn("is_allowed", []bool{true})
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrIn("is_allowed", []bool{true})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
@@ -260,9 +231,7 @@ func TestOrIn(t *testing.T) {
 }
 
 func TestLike(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Like("name", "%supa%")
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Like("name", "%supa%")
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -272,9 +241,7 @@ func TestLike(t *testing.T) {
 }
 
 func TestOrLike(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrLike("name", "%supa%")
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrLike("name", "%supa%")
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -284,9 +251,7 @@ func TestOrLike(t *testing.T) {
 }
 
 func TestIlike(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).Ilike("name", "%supa%")
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Ilike("name", "%supa%")
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
@@ -296,9 +261,7 @@ func TestIlike(t *testing.T) {
 }
 
 func TestOrIlike(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).Model(articleMockModel).OrIlike("name", "%supa%")
+	q := NewQuery(&mockRaidenContext).Model(articleMockModel).OrIlike("name", "%supa%")
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")

@@ -2,14 +2,10 @@ package db
 
 import (
 	"testing"
-
-	"github.com/sev-2/raiden"
 )
 
 func TestOrderAsc(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).OrderAsc("age").OrderAsc("name")
+	q := NewQuery(&mockRaidenContext).OrderAsc("age").OrderAsc("name")
 
 	orderList := *q.OrderList
 
@@ -31,9 +27,7 @@ func TestOrderAsc(t *testing.T) {
 }
 
 func TestOrderDesc(t *testing.T) {
-	ctx := raiden.Ctx{}
-
-	q := NewQuery(&ctx).OrderDesc("age").OrderDesc("name")
+	q := NewQuery(&mockRaidenContext).OrderDesc("age").OrderDesc("name")
 
 	orderList := *q.OrderList
 
