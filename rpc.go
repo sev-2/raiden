@@ -799,6 +799,10 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 	}
 
 	apiUrl := fmt.Sprintf("%s/%s/%s", ctx.Config().SupabasePublicUrl, "rest/v1/rpc", rpc.GetName())
+	if string(ctx.RequestContext().QueryArgs().QueryString()) != "" {
+		apiUrl = fmt.Sprintf("%s?%s", apiUrl, string(ctx.RequestContext().QueryArgs().QueryString()))
+	}
+
 	httpReq, err := ConvertRequestCtxToHTTPRequest(ctx.RequestContext())
 	if err != nil {
 		return nil, err

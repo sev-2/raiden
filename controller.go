@@ -710,9 +710,32 @@ func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 // Default Proxy Handler
 var proxyLogger = logger.HcLog().Named("raiden.controller.proxy")
 
-func ProxyHandler(
-	targetURL *url.URL,
-	basePath string,
+// reference path from https://github.com/supabase/auth/blob/master/openapi.yaml
+var allowedAuthPathMap = map[string]bool{
+	"token":          true,
+	"logout":         true,
+	"verify":         true,
+	"signup":         true,
+	"recover":        true,
+	"resend":         true,
+	"magiclink":      true,
+	"otp":            true,
+	"user":           true,
+	"reauthenticate": true,
+	"factors":        true,
+	"authorize":      true,
+	"callback":       true,
+	"sso":            true,
+	"saml":           true,
+	"invite":         true,
+	"generate_link":  true,
+	"admin":          true,
+	"settings":       true,
+	"health":         true,
+}
+
+func AuthProxy(
+	config *Config,
 	requestInterceptor func(req *fasthttp.Request),
 	responseInterceptor func(resp *fasthttp.Response) error,
 ) fasthttp.RequestHandler {
@@ -723,15 +746,24 @@ func ProxyHandler(
 
 		// Copy the original request to the new request object
 		ctx.Request.CopyTo(req)
-
-		paths := strings.Split(req.URI().String(), basePath)
+		paths := strings.Split(req.URI().String(), "/auth/v1")
 		if len(paths) < 2 {
 			ctx.Request.Header.SetContentType("application/json")
 			ctx.SetBodyString("{ \"message\" : \"invalid path\"}")
 			return
 		}
 
-		proxyUrl := fmt.Sprintf("%s%s%s", targetURL.String(), basePath, paths[1])
+		// validate sub path
+		forwardedPath := paths[1]
+		subPath := strings.Split(forwardedPath, "/")
+		if _, exist := allowedAuthPathMap[subPath[1]]; !exist {
+			ctx.Response.SetStatusCode(fasthttp.StatusNotFound)
+			errResponse := "{ \"messages\": \"resource not found\"}"
+			ctx.Response.SetBodyString(errResponse)
+			return
+		}
+
+		proxyUrl := fmt.Sprintf("%s/auth/v1%s", config.SupabasePublicUrl, forwardedPath)
 		req.SetRequestURI(proxyUrl)
 
 		resp := fasthttp.AcquireResponse()
