@@ -260,7 +260,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 				}
 				return false
 			}, stateChan)
-			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, captureFunc); errGenRpc != nil {
+			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, resource.Tables, captureFunc); errGenRpc != nil {
 				errChan <- errGenRpc
 			}
 			ImportLogger.Info("finish generate roles")
