@@ -4,169 +4,204 @@ import (
 	"testing"
 
 	"github.com/sev-2/raiden"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEq(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Eq("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).Eq("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&id=eq.1", q.GetUrl(), "the url should match")
 }
 
 func TestOrEq(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrEq("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).OrEq("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(id.eq.1)", q.GetUrl(), "the url should match")
 }
 
 func TestNeq(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Neq("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).Neq("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&id=neq.1", q.GetUrl(), "the url should match")
 }
 
 func TestOrNeq(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrNeq("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).OrNeq("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(id.neq.1)", q.GetUrl(), "the url should match")
 }
 
 func TestLt(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Lt("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).Lt("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&id=lt.1", q.GetUrl(), "the url should match")
 }
 
 func TestOrLt(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrLt("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).OrLt("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(id.lt.1)", q.GetUrl(), "the url should match")
 }
 
 func TestLte(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Lte("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).Lte("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&id=lte.1", q.GetUrl(), "the url should match")
 }
 
 func TestOrLte(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrLte("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).OrLte("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(id.lte.1)", q.GetUrl(), "the url should match")
 }
 
 func TestGt(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Gt("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).Gt("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&id=gt.1", q.GetUrl(), "the url should match")
 }
 
 func TestOrGt(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrGt("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).OrGt("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(id.gt.1)", q.GetUrl(), "the url should match")
 }
 
 func TestGte(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Gte("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).Gte("id", 1)
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&id=gte.1", q.GetUrl(), "the url should match")
 }
 
 func TestOrGte(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrGte("id", 1)
+	q := NewQuery(&ctx).Model(articleMockModel).OrGte("id", 1)
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(id.gte.1)", q.GetUrl(), "the url should match")
 }
 
 func TestIn(t *testing.T) {
 	ctx := raiden.Ctx{}
 
 	t.Run("where in int", func(t *testing.T) {
-		q := NewQuery(&ctx).In("popularity", []int{-5, 0, 7})
+		q := NewQuery(&ctx).Model(articleMockModel).In("popularity", []int{-5, 0, 7})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&popularity=in.(-5,0,7)", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in uint", func(t *testing.T) {
-		q := NewQuery(&ctx).In("id", []uint{1, 2, 3})
+		q := NewQuery(&ctx).Model(articleMockModel).In("id", []uint{1, 2, 3})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&id=in.(1,2,3)", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in float", func(t *testing.T) {
-		q := NewQuery(&ctx).In("price", []float64{0.25, 10.5, 7.75})
+		q := NewQuery(&ctx).Model(articleMockModel).In("price", []float64{0.25, 10.5, 7.75})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&price=in.(0.25,10.5,7.75)", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in string", func(t *testing.T) {
-		q := NewQuery(&ctx).In("username", []string{"a", "b", "c"})
+		q := NewQuery(&ctx).Model(articleMockModel).In("username", []string{"a", "b", "c"})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&username=in.(a,b,c)", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in bool", func(t *testing.T) {
-		q := NewQuery(&ctx).In("is_allowed", []bool{true})
+		q := NewQuery(&ctx).Model(articleMockModel).In("is_allowed", []bool{true})
 
 		if q.WhereAndList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_allowed=in.(true)", q.GetUrl(), "the url should match")
 	})
 }
 
@@ -174,82 +209,100 @@ func TestOrIn(t *testing.T) {
 	ctx := raiden.Ctx{}
 
 	t.Run("where in int", func(t *testing.T) {
-		q := NewQuery(&ctx).OrIn("popularity", []int{-5, 0, 7})
+		q := NewQuery(&ctx).Model(articleMockModel).OrIn("popularity", []int{-5, 0, 7})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&or=(popularity.in.(-5,0,7))", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in uint", func(t *testing.T) {
-		q := NewQuery(&ctx).OrIn("id", []uint{1, 2, 3})
+		q := NewQuery(&ctx).Model(articleMockModel).OrIn("id", []uint{1, 2, 3})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&or=(id.in.(1,2,3))", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in float", func(t *testing.T) {
-		q := NewQuery(&ctx).OrIn("price", []float64{0.25, 10.5, 7.75})
+		q := NewQuery(&ctx).Model(articleMockModel).OrIn("price", []float64{0.25, 10.5, 7.75})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&or=(price.in.(0.25,10.5,7.75))", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in string", func(t *testing.T) {
-		q := NewQuery(&ctx).OrIn("username", []string{"a", "b", "c"})
+		q := NewQuery(&ctx).Model(articleMockModel).OrIn("username", []string{"a", "b", "c"})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&or=(username.in.(a,b,c))", q.GetUrl(), "the url should match")
 	})
 
 	t.Run("where in bool", func(t *testing.T) {
-		q := NewQuery(&ctx).OrIn("is_allowed", []bool{true})
+		q := NewQuery(&ctx).Model(articleMockModel).OrIn("is_allowed", []bool{true})
 
 		if q.WhereOrList == nil {
 			t.Error("Expected where clause not to be nil")
 		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&or=(is_allowed.in.(true))", q.GetUrl(), "the url should match")
 	})
 }
 
 func TestLike(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Like("name", "%supa%")
+	q := NewQuery(&ctx).Model(articleMockModel).Like("name", "%supa%")
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&name=like.*supa*", q.GetUrl(), "the url should match")
 }
 
 func TestOrLike(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrLike("name", "%supa%")
+	q := NewQuery(&ctx).Model(articleMockModel).OrLike("name", "%supa%")
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(name.like.*supa*)", q.GetUrl(), "the url should match")
 }
 
 func TestIlike(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).Ilike("name", "%supa%")
+	q := NewQuery(&ctx).Model(articleMockModel).Ilike("name", "%supa%")
 
 	if q.WhereAndList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&name=ilike.*supa*", q.GetUrl(), "the url should match")
 }
 
 func TestOrIlike(t *testing.T) {
 	ctx := raiden.Ctx{}
 
-	q := NewQuery(&ctx).OrIlike("name", "%supa%")
+	q := NewQuery(&ctx).Model(articleMockModel).OrIlike("name", "%supa%")
 
 	if q.WhereOrList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
+
+	assert.Equalf(t, "/rest/v1/articles?select=*&or=(name.ilike.*supa*)", q.GetUrl(), "the url should match")
 }

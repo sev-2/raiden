@@ -7,7 +7,7 @@ import (
 	"github.com/sev-2/raiden"
 )
 
-type Article struct {
+type ArticleMockModel struct {
 	ModelBase
 
 	Id        int64     `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false"`
@@ -19,13 +19,13 @@ type Article struct {
 	Metadata string `json:"-" schema:"public" tableName:"articles" rlsEnable:"true" rlsForced:"false"`
 }
 
-var model = Article{}
+var articleMockModel = ArticleMockModel{}
 
 func TestSelect(t *testing.T) {
 	ctx := raiden.Ctx{}
 
 	t.Run("Test nil select", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(model).Select(nil, nil)
+		q := NewQuery(&ctx).Model(articleMockModel).Select(nil, nil)
 
 		if q.Columns != nil {
 			t.Fatal("Expected no column on select clause.")
@@ -33,7 +33,7 @@ func TestSelect(t *testing.T) {
 	})
 
 	t.Run("Test select all columns", func(t *testing.T) {
-		q := NewQuery(&ctx).Model(model).Select([]string{"*"}, nil)
+		q := NewQuery(&ctx).Model(articleMockModel).Select([]string{"*"}, nil)
 
 		if q.Columns[0] != "*" {
 			t.Fatal("Expected select *.")
@@ -43,7 +43,7 @@ func TestSelect(t *testing.T) {
 	t.Run("Test select id and title", func(t *testing.T) {
 		columns := []string{"id", "title"}
 
-		q := NewQuery(&ctx).Model(model).Select(columns, nil)
+		q := NewQuery(&ctx).Model(articleMockModel).Select(columns, nil)
 
 		if len(q.Columns) != 2 {
 			t.Fatal("Expected 2 columns on select clause.")
@@ -53,7 +53,7 @@ func TestSelect(t *testing.T) {
 	t.Run("Test select unknown columns", func(t *testing.T) {
 		columns := []string{"none", "unknown"}
 
-		q := NewQuery(&ctx).Model(model).Select(columns, nil)
+		q := NewQuery(&ctx).Model(articleMockModel).Select(columns, nil)
 
 		if !q.HasError() {
 			t.Fatalf("Expector error because \"%s\" and \"%s\" columns is not exists", "none", "unknown")

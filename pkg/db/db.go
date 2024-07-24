@@ -99,7 +99,7 @@ func (q Query) GetUrl() string {
 
 	var baseUrl string
 	if flag.Lookup("test.v") != nil {
-		baseUrl = "/"
+		baseUrl = ""
 	} else {
 		baseUrl = getConfig().SupabasePublicUrl
 	}
