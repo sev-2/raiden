@@ -711,7 +711,7 @@ func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 var proxyLogger = logger.HcLog().Named("raiden.controller.proxy")
 
 // reference path from https://github.com/supabase/auth/blob/master/openapi.yaml
-var allowedPathMap = map[string]bool{
+var allowedAuthPathMap = map[string]bool{
 	"token":          true,
 	"logout":         true,
 	"verify":         true,
@@ -756,7 +756,7 @@ func AuthProxy(
 		// validate sub path
 		forwardedPath := paths[1]
 		subPath := strings.Split(forwardedPath, "/")
-		if _, exist := allowedPathMap[subPath[1]]; !exist {
+		if _, exist := allowedAuthPathMap[subPath[1]]; !exist {
 			ctx.Response.SetStatusCode(fasthttp.StatusNotFound)
 			errResponse := "{ \"messages\": \"resource not found\"}"
 			ctx.Response.SetBodyString(errResponse)
