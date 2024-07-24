@@ -341,6 +341,44 @@ func TestAuthProxy_ActualCallWithoutMock(t *testing.T) {
 	assert.Equal(t, fasthttp.StatusInternalServerError, ctx.Response.StatusCode())
 }
 
+func TestAuthProxy_NotAllowedPath(t *testing.T) {
+	ctx := &mock.MockContext{
+		RequestCtx: &fasthttp.RequestCtx{},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{SupabasePublicUrl: "/"}
+		},
+	}
+
+	handler := raiden.AuthProxy(
+		ctx.Config(),
+		func(req *fasthttp.Request) {},
+		func(resp *fasthttp.Response) error { return nil },
+	)
+
+	ctx.Request.SetRequestURI("/auth/v1/anymore")
+	handler(ctx.RequestCtx)
+	assert.Equal(t, fasthttp.StatusNotFound, ctx.Response.StatusCode())
+}
+
+func TestAuthProxy_NotAllowedWithSpecificPath(t *testing.T) {
+	ctx := &mock.MockContext{
+		RequestCtx: &fasthttp.RequestCtx{},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{SupabasePublicUrl: "/"}
+		},
+	}
+
+	handler := raiden.AuthProxy(
+		ctx.Config(),
+		func(req *fasthttp.Request) {},
+		func(resp *fasthttp.Response) error { return nil },
+	)
+
+	ctx.Request.SetRequestURI("/auth/v1/saml/metadata")
+	handler(ctx.RequestCtx)
+	assert.Equal(t, fasthttp.StatusInternalServerError, ctx.Response.StatusCode())
+}
+
 // Test MarshallAndValidate
 func TestMarshallAndValidate(t *testing.T) {
 	ctx := newMockCtx()
