@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"testing"
 
 	"github.com/sev-2/raiden"
@@ -302,14 +301,17 @@ func TestStorageController(t *testing.T) {
 	assert.NoError(t, storage.AfterHead(ctx))
 }
 
-// Test ProxyHandler
-func TestProxyHandler(t *testing.T) {
-	ctx := newMockCtx()
-	targetURL, _ := url.Parse("http://example.com")
+// Test AuthProxy
+func TestAuthProxy(t *testing.T) {
+	ctx := &mock.MockContext{
+		RequestCtx: &fasthttp.RequestCtx{},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{SupabasePublicUrl: "/"}
+		},
+	}
 
-	handler := raiden.ProxyHandler(
-		targetURL,
-		"/",
+	handler := raiden.AuthProxy(
+		ctx.Config(),
 		func(req *fasthttp.Request) {},
 		func(resp *fasthttp.Response) error { return nil },
 	)
@@ -317,6 +319,26 @@ func TestProxyHandler(t *testing.T) {
 	ctx.Request.SetRequestURI("/")
 	handler(ctx.RequestCtx)
 	assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode())
+}
+
+// Test AuthProxy
+func TestAuthProxy_ActualCallWithoutMock(t *testing.T) {
+	ctx := &mock.MockContext{
+		RequestCtx: &fasthttp.RequestCtx{},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{SupabasePublicUrl: "/"}
+		},
+	}
+
+	handler := raiden.AuthProxy(
+		ctx.Config(),
+		func(req *fasthttp.Request) {},
+		func(resp *fasthttp.Response) error { return nil },
+	)
+
+	ctx.Request.SetRequestURI("/auth/v1/signup")
+	handler(ctx.RequestCtx)
+	assert.Equal(t, fasthttp.StatusInternalServerError, ctx.Response.StatusCode())
 }
 
 // Test MarshallAndValidate

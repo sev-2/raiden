@@ -126,7 +126,7 @@ func (r *router) BuildHandler() {
 	// Proxy auth url
 	u, err := url.Parse(r.config.SupabasePublicUrl)
 	if err == nil {
-		r.engine.ANY("/auth/v1/{path:*}", ProxyHandler(u, "/auth/v1", nil, nil))
+		r.engine.ANY("/auth/v1/{path:*}", AuthProxy(r.config, nil, nil))
 
 		r.engine.GET("/realtime/v1/websocket", func(ctx *fasthttp.RequestCtx) {
 			WebSocketHandler(ctx, u)

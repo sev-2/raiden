@@ -710,9 +710,8 @@ func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 // Default Proxy Handler
 var proxyLogger = logger.HcLog().Named("raiden.controller.proxy")
 
-func ProxyHandler(
-	targetURL *url.URL,
-	basePath string,
+func AuthProxy(
+	config *Config,
 	requestInterceptor func(req *fasthttp.Request),
 	responseInterceptor func(resp *fasthttp.Response) error,
 ) fasthttp.RequestHandler {
@@ -721,17 +720,17 @@ func ProxyHandler(
 		req := fasthttp.AcquireRequest()
 		defer fasthttp.ReleaseRequest(req)
 
+		authBasePath := "/auth/v1"
 		// Copy the original request to the new request object
 		ctx.Request.CopyTo(req)
-
-		paths := strings.Split(req.URI().String(), basePath)
+		paths := strings.Split(req.URI().String(), authBasePath)
 		if len(paths) < 2 {
 			ctx.Request.Header.SetContentType("application/json")
 			ctx.SetBodyString("{ \"message\" : \"invalid path\"}")
 			return
 		}
 
-		proxyUrl := fmt.Sprintf("%s%s%s", targetURL.String(), basePath, paths[1])
+		proxyUrl := fmt.Sprintf("%s%s%s", config.SupabasePublicUrl, authBasePath, paths[1])
 		req.SetRequestURI(proxyUrl)
 
 		resp := fasthttp.AcquireResponse()
