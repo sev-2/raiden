@@ -709,11 +709,12 @@ func StorageProxy(appCtx Context, bucketName string, routePath string) error {
 
 // Default Proxy Handler
 var proxyLogger = logger.HcLog().Named("raiden.controller.proxy")
+
+// reference path from https://github.com/supabase/auth/blob/master/openapi.yaml
 var allowedPathMap = map[string]bool{
 	"token":          true,
 	"logout":         true,
 	"verify":         true,
-	"authorize":      true,
 	"signup":         true,
 	"recover":        true,
 	"resend":         true,
@@ -722,6 +723,7 @@ var allowedPathMap = map[string]bool{
 	"user":           true,
 	"reauthenticate": true,
 	"factors":        true,
+	"authorize":      true,
 	"callback":       true,
 	"sso":            true,
 	"saml":           true,
@@ -729,6 +731,7 @@ var allowedPathMap = map[string]bool{
 	"generate_link":  true,
 	"admin":          true,
 	"settings":       true,
+	"health":         true,
 }
 
 func AuthProxy(
