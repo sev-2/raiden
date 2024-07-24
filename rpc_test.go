@@ -97,6 +97,41 @@ func TestExecuteRpc(t *testing.T) {
 	assert.NotNil(t, res)
 }
 
+func TestExecuteRpcWithParams(t *testing.T) {
+	requestCtx := &fasthttp.RequestCtx{
+		Request: fasthttp.Request{},
+	}
+	requestCtx.Request.URI().QueryArgs().Set("limit", "10")
+
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return requestCtx
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockExecuteRpcWithExpectedResponse(200, "get_submissions", GetSubmissionsResult{})
+	assert.NoError(t, err)
+
+	rpc := &GetSubmissions{}
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+}
+
 func TestRpcParamToGoType(t *testing.T) {
 	tests := []struct {
 		input    raiden.RpcParamDataType
