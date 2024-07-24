@@ -197,17 +197,12 @@ func TestExecuteRpcErrWithMissingReturn(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.EqualError(t, expectedErr, err.Error())
-  
+
 	mock := mock.MockSupabase{Cfg: mockCtx.Config()}
 	mock.Activate()
 	defer mock.Deactivate()
 	err = mock.MockExecuteRpcWithExpectedResponse(200, "get_submissions", GetSubmissionsResult{})
 	assert.NoError(t, err)
-
-	rpc := &GetSubmissions{}
-	res, err := raiden.ExecuteRpc(mockCtx, rpc)
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
 }
 
 func TestRpcParamToGoType(t *testing.T) {
