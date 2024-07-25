@@ -62,13 +62,28 @@ func BindRpcFunction(rpc raiden.Rpc, fn *objects.Function) (err error) {
 	fn.CompleteStatement = rpc.GetCompleteStmt()
 
 	// validate definition query
-	matches := regexp.MustCompile(`:\w+`).FindAllString(fn.CompleteStatement, -1)
-	if len(matches) > 0 {
+	allMatches := regexp.MustCompile(`:\w+`).FindAllString(fn.CompleteStatement, -1)
+	allExcludes := regexp.MustCompile(`::\w+`).FindAllString(fn.CompleteStatement, -1)
+
+	// Filter out double colon string that work as postgre typecast
+	validMatches := []string{}
+	excludeSet := make(map[string]bool)
+	for _, exclude := range allExcludes {
+		excludeSet[exclude] = true
+	}
+
+	for _, match := range allMatches {
+		if !excludeSet[fmt.Sprintf(":%s", match)] {
+			validMatches = append(validMatches, match)
+		}
+	}
+
+	if len(validMatches) > 0 {
 		var errMsg string
-		if len(matches) > 1 {
-			errMsg = fmt.Sprintf("rpc %q is invalid, There are %q keys that are not mapped with any parameters or models.", rpc.GetName(), strings.Join(matches, ","))
+		if len(validMatches) > 1 {
+			errMsg = fmt.Sprintf("rpc %q is invalid, There are %q keys that are not mapped with any parameters or models.", rpc.GetName(), strings.Join(validMatches, ","))
 		} else {
-			errMsg = fmt.Sprintf("rpc %q is invalid, There is %q key that is not mapped with any parameters or models.", rpc.GetName(), matches[0])
+			errMsg = fmt.Sprintf("rpc %q is invalid, There is %q key that is not mapped with any parameters or models.", rpc.GetName(), validMatches[0])
 		}
 		return errors.New(errMsg)
 	}
@@ -87,4 +102,20 @@ func (er ExtractRpcResult) ToDeleteFlatMap() map[string]*objects.Function {
 	}
 
 	return mapData
+}
+
+// Helper function to check if the index is inside a string literal
+func isInsideStringLiteral(s string, index int) bool {
+	inSingleQuote := false
+	inDoubleQuote := false
+
+	for i := 0; i < index; i++ {
+		if s[i] == '\'' && !inDoubleQuote {
+			inSingleQuote = !inSingleQuote
+		}
+		if s[i] == '"' && !inSingleQuote {
+			inDoubleQuote = !inDoubleQuote
+		}
+	}
+	return inSingleQuote || inDoubleQuote
 }
