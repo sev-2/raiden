@@ -30,7 +30,6 @@ const (
 	RpcParamDataTypeBigInt           RpcParamDataType = "BIGINT"
 	RpcParamDataTypeReal             RpcParamDataType = "REAL"
 	RpcParamDataTypeDoublePreci      RpcParamDataType = "DOUBLE PRECISION"
-	RpcParamDataTypeNumeric          RpcParamDataType = "NUMERIC"
 	RpcParamDataTypeText             RpcParamDataType = "TEXT"
 	RpcParamDataTypeVarchar          RpcParamDataType = "CHARACTER VARYING"
 	RpcParamDataTypeVarcharAlias     RpcParamDataType = "VARCHAR"
