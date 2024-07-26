@@ -9,10 +9,10 @@ import (
 
 func TestWith(t *testing.T) {
 	resource.RegisterModels(
-		&ArticleMockModel{},
-		&UsersMockModel{},
-		&TeamsMockModel{},
-		&OrganizationsMockModel{},
+		ArticleMockModel{},
+		UsersMockModel{},
+		TeamsMockModel{},
+		OrganizationsMockModel{},
 	)
 
 	t.Run("match url query for single relation", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestWith(t *testing.T) {
 				With(
 					"UsersMockModel",
 					map[string][]string{
-						"UsersMockModel": {"id", "username"},
+						"users": {"id", "username"},
 					},
 				).
 				GetUrl()
@@ -45,7 +45,7 @@ func TestWith(t *testing.T) {
 				With(
 					"UsersMockModel",
 					map[string][]string{
-						"UsersMockModel": {"id", "userid:username"},
+						"users": {"id", "userid:username"},
 					},
 				).
 				GetUrl()
@@ -70,8 +70,8 @@ func TestWith(t *testing.T) {
 				With(
 					"UsersMockModel.TeamsMockModel",
 					map[string][]string{
-						"UsersMockModel": {"id", "username"},
-						"TeamsMockModel": {"id", "name"},
+						"users": {"id", "username"},
+						"teams": {"id", "name"},
 					},
 				).
 				GetUrl()
@@ -85,8 +85,8 @@ func TestWith(t *testing.T) {
 				With(
 					"UsersMockModel.TeamsMockModel",
 					map[string][]string{
-						"UsersMockModel": {"id", "userid:username"},
-						"TeamsMockModel": {"id", "team_name:name"},
+						"users": {"id", "userid:username"},
+						"teams": {"id", "team_name:name"},
 					},
 				).
 				GetUrl()
@@ -111,9 +111,9 @@ func TestWith(t *testing.T) {
 				With(
 					"UsersMockModel.TeamsMockModel.OrganizationsMockModel",
 					map[string][]string{
-						"UsersMockModel":         {"id", "username"},
-						"TeamsMockModel":         {"id", "name"},
-						"OrganizationsMockModel": {"id", "name"},
+						"users":         {"id", "username"},
+						"teams":         {"id", "name"},
+						"organizations": {"id", "name"},
 					},
 				).
 				GetUrl()
@@ -127,9 +127,9 @@ func TestWith(t *testing.T) {
 				With(
 					"UsersMockModel.TeamsMockModel.OrganizationsMockModel",
 					map[string][]string{
-						"UsersMockModel":         {"id", "userid:username"},
-						"TeamsMockModel":         {"id", "team_name:name"},
-						"OrganizationsMockModel": {"id", "org_name:name"},
+						"users":         {"id", "userid:username"},
+						"teams":         {"id", "team_name:name"},
+						"organizations": {"id", "org_name:name"},
 					},
 				).
 				GetUrl()
@@ -139,16 +139,47 @@ func TestWith(t *testing.T) {
 	})
 
 	t.Run("match url query with foreign key", func(t *testing.T) {
-		url := NewQuery(&mockRaidenContext).
-			Model(OrdersMockModel{}).
-			With(
-				"UsersMockModel",
-				map[string][]string{
-					"UsersMockModel!address_id": {},
-				},
-			).
-			GetUrl()
 
-		assert.Equal(t, "/rest/v1/orders?select=*,users!address_id(*)", url)
+		t.Run("without selected column", func(t *testing.T) {
+			url := NewQuery(&mockRaidenContext).
+				Model(OrdersMockModel{}).
+				With(
+					"UsersMockModel",
+					map[string][]string{
+						"users!address_id": {},
+					},
+				).
+				GetUrl()
+
+			assert.Equal(t, "/rest/v1/orders?select=*,users!address_id(*)", url)
+		})
+
+		t.Run("with all columns", func(t *testing.T) {
+			url := NewQuery(&mockRaidenContext).
+				Model(OrdersMockModel{}).
+				With(
+					"UsersMockModel",
+					map[string][]string{
+						"users!address_id": {"*"},
+					},
+				).
+				GetUrl()
+
+			assert.Equal(t, "/rest/v1/orders?select=*,users!address_id(*)", url)
+		})
+
+		t.Run("with selected id", func(t *testing.T) {
+			url := NewQuery(&mockRaidenContext).
+				Model(OrdersMockModel{}).
+				With(
+					"UsersMockModel",
+					map[string][]string{
+						"users!address_id": {"id", "username"},
+					},
+				).
+				GetUrl()
+
+			assert.Equal(t, "/rest/v1/orders?select=*,users!address_id(id,username)", url)
+		})
 	})
 }

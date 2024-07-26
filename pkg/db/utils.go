@@ -13,12 +13,42 @@ import (
 
 func findModel(targetName string) interface{} {
 	for _, m := range resource.RegisteredModels {
-		if reflect.TypeOf(m).Elem().Name() == targetName {
+		t := reflect.TypeOf(m)
+
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+
+		if t.Name() == targetName {
 			return m
 		}
 	}
 
 	return nil
+}
+
+func findModelByTable(table string) string {
+	for _, m := range resource.RegisteredModels {
+
+		t := reflect.TypeOf(m)
+
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			if field.Name == "Metadata" {
+				tableName := field.Tag.Get("tableName")
+				if tableName == table {
+					parts := strings.Split(t.String(), ".")
+					return parts[len(parts)-1]
+				}
+			}
+		}
+	}
+
+	return ""
 }
 
 func getConfig() *raiden.Config {

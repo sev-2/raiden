@@ -30,8 +30,9 @@ func (q *Query) With(r string, columns map[string][]string) *Query {
 		for k := range columns {
 			if strings.Contains(k, "!") {
 				split := strings.Split(k, "!")
-				m := findModel(split[0])
-				if !isForeignKeyExist(m, split[1]) {
+				m := findModelByTable(split[0])
+				c := findModel(m)
+				if !isForeignKeyExist(c, split[1]) {
 					err := fmt.Sprintf("invalid foreign key: \"%s\" key is not exist.", split[1])
 					raiden.Fatal(err)
 				} else {
@@ -41,9 +42,12 @@ func (q *Query) With(r string, columns map[string][]string) *Query {
 		}
 
 		// Columns validations
-		for _, c := range columns[r] {
-
+		for _, c := range columns[table] {
 			var column = c
+
+			if column == "*" {
+				continue
+			}
 
 			if strings.Contains(c, ":") {
 				split := strings.Split(c, ":")
@@ -66,7 +70,7 @@ func (q *Query) With(r string, columns map[string][]string) *Query {
 			}
 		}
 
-		cols := strings.Join(columns[r], ",")
+		cols := strings.Join(columns[table], ",")
 
 		if len(cols) == 0 {
 			cols = "*"
