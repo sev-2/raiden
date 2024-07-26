@@ -8,10 +8,11 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/resource"
 )
 
-func findModel(models []interface{}, targetName string) interface{} {
-	for _, m := range models {
+func findModel(targetName string) interface{} {
+	for _, m := range resource.RegisteredModels {
 		if reflect.TypeOf(m).Elem().Name() == targetName {
 			return m
 		}

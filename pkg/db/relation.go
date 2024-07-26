@@ -2,14 +2,12 @@ package db
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/resource"
 )
 
-func (q *Query) With(r string, columns map[string][]string, fkeys map[string]string) *Query {
+func (q *Query) With(r string, columns map[string][]string) *Query {
 
 	relations := strings.Split(r, ".")
 
@@ -17,15 +15,8 @@ func (q *Query) With(r string, columns map[string][]string, fkeys map[string]str
 		raiden.Fatal("unsupported nested relations more than 3 levels")
 	}
 
-	regs := make(map[string]bool)
-
-	for _, m := range resource.RegisteredModels {
-		registeredModel := reflect.TypeOf(m).Elem().Name()
-		regs[registeredModel] = true
-	}
-
 	for _, m := range relations {
-		if !regs[m] {
+		if findModel(m) == nil {
 			raiden.Fatal(fmt.Sprintf("invalid model name: %s", m))
 		}
 	}
@@ -33,28 +24,44 @@ func (q *Query) With(r string, columns map[string][]string, fkeys map[string]str
 	var selects []string
 
 	for _, r := range reverseSortString(relations) {
-		model := findModel(resource.RegisteredModels, r)
+		model := findModel(r)
 		table := GetTable(model)
 
-		if fkeys[r] != "inner" {
-			if !isValidColumnName(fkeys[r]) {
-				err := fmt.Sprintf("invalid column: \"%s\" name is invalid.", fkeys[r])
-				raiden.Fatal(err)
+		for k := range columns {
+			if strings.Contains(k, "!") {
+				split := strings.Split(k, "!")
+				m := findModel(split[0])
+				if !isForeignKeyExist(m, split[1]) {
+					err := fmt.Sprintf("invalid foreign key: \"%s\" key is not exist.", split[1])
+					raiden.Fatal(err)
+				} else {
+					table = fmt.Sprintf("%s!%s", table, split[1])
+				}
 			}
 		}
 
-		if keyExist(fkeys, r) {
-			table = table + "!" + fkeys[r]
-		}
-
+		// Columns validations
 		for _, c := range columns[r] {
-			if !isColumnExist(model, c) {
-				err := fmt.Sprintf("invalid column: \"%s\" is not available on \"%s\" table.", c, table)
+
+			var column = c
+
+			if strings.Contains(c, ":") {
+				split := strings.Split(c, ":")
+				alias := split[0]
+				column = split[1]
+				if !isValidColumnName(alias) {
+					err := fmt.Sprintf("invalid alias column name: \"%s\" name is invalid.", alias)
+					raiden.Fatal(err)
+				}
+			}
+
+			if !isColumnExist(model, column) {
+				err := fmt.Sprintf("invalid column: \"%s\" is not available on \"%s\" table.", column, table)
 				raiden.Fatal(err)
 			}
 
-			if !isValidColumnName(c) {
-				err := fmt.Sprintf("invalid column: \"%s\" name is invalid.", c)
+			if !isValidColumnName(column) {
+				err := fmt.Sprintf("invalid column: \"%s\" name is invalid.", column)
 				raiden.Fatal(err)
 			}
 		}
@@ -73,7 +80,7 @@ func (q *Query) With(r string, columns map[string][]string, fkeys map[string]str
 		}
 	}
 
-	q.Columns = append(q.Columns, selects...)
+	q.Relations = append(q.Relations, selects...)
 
 	return q
 }

@@ -5,13 +5,30 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/sev-2/raiden"
 )
 
-func (q Query) Select(columns []string, aliases map[string]string) (model *Query) {
+func (q Query) Select(columns []string) (model *Query) {
 
 	table := GetTable(q.model)
 
-	for _, column := range columns {
+	for _, c := range columns {
+
+		var column string
+
+		if strings.Contains(c, ":") {
+			split := strings.Split(c, ":")
+			alias := split[0]
+			column = split[1]
+			if !isValidColumnName(alias) {
+				err := fmt.Sprintf("invalid alias column name: \"%s\" name is invalid.", alias)
+				raiden.Fatal(err)
+			}
+		} else {
+			column = c
+		}
+
 		if !isColumnExist(q.model, column) {
 			err := fmt.Errorf("invalid column: \"%s\" is not available on \"%s\" table", column, table)
 			q.Errors = append(q.Errors, err)
@@ -20,24 +37,6 @@ func (q Query) Select(columns []string, aliases map[string]string) (model *Query
 		if !isValidColumnName(column) {
 			err := fmt.Errorf("invalid column: \"%s\" name is invalid", column)
 			q.Errors = append(q.Errors, err)
-		}
-	}
-
-	for column := range aliases {
-		if !isColumnExist(q.model, column) {
-			err := fmt.Errorf("invalid alias column: \"%s\" is invalid or not available on \"%s\" table", column, table)
-			q.Errors = append(q.Errors, err)
-		}
-
-		if !isValidColumnName(column) {
-			err := fmt.Errorf("invalid alias column: \"%s\" name is invalid", column)
-			q.Errors = append(q.Errors, err)
-		}
-	}
-
-	for i, column := range columns {
-		if aliases[column] != "" {
-			columns[i] = aliases[column] + ":" + column
 		}
 	}
 
@@ -88,4 +87,33 @@ func isValidColumnName(column string) bool {
 	isAllowed, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]{1,59}`, column)
 
 	return isAllowed
+}
+
+func isForeignKeyExist(m interface{}, column string) bool {
+	if column == "inner" {
+		return true
+	}
+
+	t := reflect.TypeOf(m)
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+
+		if tagValue := field.Tag.Get("join"); tagValue != "" {
+			for _, part := range strings.Split(tagValue, ";") {
+				kv := strings.SplitN(part, ":", 2)
+				if len(kv) == 2 && kv[0] == "targetForeign" {
+					if kv[1] == column {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }

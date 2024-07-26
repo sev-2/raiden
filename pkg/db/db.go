@@ -14,6 +14,7 @@ type Query struct {
 	Context      raiden.Context
 	model        interface{}
 	Columns      []string
+	Relations    []string
 	WhereAndList *[]string
 	WhereOrList  *[]string
 	OrderList    *[]string
@@ -36,7 +37,12 @@ func NewQuery(ctx raiden.Context) *Query {
 	}
 }
 
+// Model is the From alias
 func (q *Query) Model(m interface{}) *Query {
+	return q.From(m)
+}
+
+func (q *Query) From(m interface{}) *Query {
 	q.model = m
 	return q
 }
@@ -118,6 +124,10 @@ func buildQueryURI(q Query) string {
 		output += fmt.Sprintf("select=%s", columns)
 	} else {
 		output += "select=*"
+	}
+
+	if len(q.Relations) > 0 {
+		output += "," + strings.Join(q.Relations, ",")
 	}
 
 	if q.WhereAndList != nil && len(*q.WhereAndList) > 0 {
