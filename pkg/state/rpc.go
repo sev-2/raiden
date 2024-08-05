@@ -103,19 +103,3 @@ func (er ExtractRpcResult) ToDeleteFlatMap() map[string]*objects.Function {
 
 	return mapData
 }
-
-// Helper function to check if the index is inside a string literal
-func isInsideStringLiteral(s string, index int) bool {
-	inSingleQuote := false
-	inDoubleQuote := false
-
-	for i := 0; i < index; i++ {
-		if s[i] == '\'' && !inDoubleQuote {
-			inSingleQuote = !inSingleQuote
-		}
-		if s[i] == '"' && !inSingleQuote {
-			inDoubleQuote = !inDoubleQuote
-		}
-	}
-	return inSingleQuote || inDoubleQuote
-}
