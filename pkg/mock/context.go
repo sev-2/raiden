@@ -9,6 +9,7 @@ import (
 )
 
 type MockContext struct {
+	*fasthttp.RequestCtx
 	CtxFn               func() context.Context
 	SetCtxFn            func(ctx context.Context)
 	ConfigFn            func() *raiden.Config

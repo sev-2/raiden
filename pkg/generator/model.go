@@ -119,49 +119,8 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", input.Table.Name, "go"))
 
-	// build relation tag
-	mapRelationName := make(map[string]bool)
-	relation := make([]state.Relation, 0)
-
-	for i := range input.Relations {
-		r := input.Relations[i]
-
-		if r.RelationType == raiden.RelationTypeManyToMany {
-			key := fmt.Sprintf("%s_%s", input.Table.Name, r.Table)
-			_, exist := mapRelationName[key]
-			if exist {
-				r.Table = inflection.Plural(r.Through)
-				key = fmt.Sprintf("%s_%s", input.Table.Name, r.Table)
-				mapRelationName[key] = true
-			} else {
-				mapRelationName[key] = true
-			}
-		}
-
-		if r.RelationType == raiden.RelationTypeHasOne {
-			snakeFk := utils.ToSnakeCase(r.ForeignKey)
-			fkTableSplit := strings.Split(snakeFk, "_")
-			fkName := inflection.Singular(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
-
-			r.Table = inflection.Singular(utils.SnakeCaseToPascalCase(r.Table))
-			if fkName != r.Table {
-				r.Table = fmt.Sprintf("%s%s", r.Table, fkName)
-			}
-		}
-
-		if r.RelationType == raiden.RelationTypeHasMany {
-			snakeFk := utils.ToSnakeCase(r.ForeignKey)
-			fkTableSplit := strings.Split(snakeFk, "_")
-			fkName := inflection.Plural(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
-			r.Table = inflection.Plural(utils.SnakeCaseToPascalCase(r.Table))
-			if fkName != r.Table {
-				r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
-			}
-		}
-
-		r.Tag = BuildJoinTag(&r)
-		relation = append(relation, r)
-	}
+	// build relation field
+	relations := BuildRelationFields(input.Table, input.Relations)
 
 	// set data
 	data := GenerateModelData{
@@ -174,7 +133,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 		RlsTag:     rlsTag,
 		RlsEnable:  input.Table.RLSEnabled,
 		RlsForced:  input.Table.RLSForced,
-		Relations:  relation,
+		Relations:  relations,
 	}
 
 	// setup generate input param
@@ -338,4 +297,60 @@ func BuildJoinTag(r *state.Relation) string {
 	tags = append(tags, fmt.Sprintf("join:%q", strings.Join(joinTags, ";")))
 
 	return strings.Join(tags, " ")
+}
+
+func BuildRelationFields(table objects.Table, relations []state.Relation) (mappedRelations []state.Relation) {
+	mapRelationName := make(map[string]bool)
+
+	for i := range relations {
+		r := relations[i]
+
+		if r.RelationType == raiden.RelationTypeHasOne {
+			snakeFk := utils.ToSnakeCase(r.ForeignKey)
+			fkTableSplit := strings.Split(snakeFk, "_")
+			fkName := inflection.Singular(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
+
+			r.Table = inflection.Singular(utils.SnakeCaseToPascalCase(r.Table))
+			if fkName != r.Table {
+				r.Table = fmt.Sprintf("%s%s", r.Table, fkName)
+			}
+			mapRelationName[r.Table] = true
+		}
+
+		if r.RelationType == raiden.RelationTypeHasMany {
+			snakeFk := utils.ToSnakeCase(r.ForeignKey)
+			fkTableSplit := strings.Split(snakeFk, "_")
+			fkName := inflection.Plural(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
+			r.Table = inflection.Plural(utils.SnakeCaseToPascalCase(r.Table))
+			if fkName != r.Table {
+				r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
+			}
+			mapRelationName[r.Table] = true
+		}
+
+		if r.RelationType == raiden.RelationTypeManyToMany {
+			r.Table = inflection.Plural(r.Table)
+			_, exist := mapRelationName[r.Table]
+			if exist {
+				r.Table = inflection.Plural(r.Through)
+			}
+
+			_, exist = mapRelationName[r.Table]
+			if exist {
+				snakeFk := utils.ToSnakeCase(r.ForeignKey)
+				fkTableSplit := strings.Split(snakeFk, "_")
+				fkName := inflection.Plural(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
+				r.Table = inflection.Plural(utils.SnakeCaseToPascalCase(r.Table))
+				if fkName != r.Table {
+					r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
+				}
+			}
+			mapRelationName[r.Table] = true
+		}
+
+		r.Tag = BuildJoinTag(&r)
+		mappedRelations = append(mappedRelations, r)
+	}
+
+	return
 }

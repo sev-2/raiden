@@ -200,7 +200,7 @@ func extractAppResource(f *Flags, latestState *state.State) (
 		if err != nil {
 			return
 		}
-		ImportLogger.Debug("FInish extract rpc")
+		ImportLogger.Debug("Finish extract rpc")
 	}
 
 	if f.All() || f.StoragesOnly {
