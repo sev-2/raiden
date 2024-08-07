@@ -1,4 +1,4 @@
-package suparest
+package db
 
 func (q *Query) Limit(value int) *Query {
 	q.LimitValue = value
