@@ -113,16 +113,20 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 	statusCode := resp.StatusCode()
 
 	if !strings.HasPrefix(strconv.Itoa(statusCode), "2") {
-		err = fmt.Errorf("invalid HTTP response code: %d", statusCode)
-		if resp.Body() != nil && len(resp.Body()) > 0 {
-			Logger.Error(string(resp.Body()))
-			sendErr := ReqError{
-				Message: err.Error(),
-				Body:    resp.Body(),
+		// Allow redirect for GET Method
+		if method != fasthttp.MethodGet && !strings.HasPrefix(strconv.Itoa(statusCode), "3") {
+			err = fmt.Errorf("invalid HTTP response code: %d", statusCode)
+			if resp.Body() != nil && len(resp.Body()) > 0 {
+				Logger.Error(string(resp.Body()))
+				sendErr := ReqError{
+					Message: err.Error(),
+					Body:    resp.Body(),
+				}
+				return nil, sendErr
 			}
-			return nil, sendErr
+			return nil, err
 		}
-		return nil, err
+
 	}
 
 	if resInterceptor != nil {
