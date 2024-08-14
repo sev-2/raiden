@@ -113,8 +113,8 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 	// map column data
 	columns, importsPath := MapTableAttributes(input.Table, input.ValidationTags)
 	rlsTag := BuildRlsTag(input.Policies, input.Table.Name, supabase.RlsTypeModel)
-	raidenPath := "github.com/sev-2/raiden"
-	importsPath = append(importsPath, raidenPath)
+	raidenPkgDbPath := "github.com/sev-2/raiden/pkg/db"
+	importsPath = append(importsPath, raidenPkgDbPath)
 
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", input.Table.Name, "go"))
