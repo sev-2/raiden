@@ -34,9 +34,11 @@ type Server struct {
 
 func NewServer(config *Config) *Server {
 	return &Server{
-		Config:     config,
-		Router:     NewRouter(config),
-		HttpServer: &fasthttp.Server{},
+		Config: config,
+		Router: NewRouter(config),
+		HttpServer: &fasthttp.Server{
+			MaxRequestBodySize: config.MaxServerRequestBodySize,
+		},
 	}
 }
 
