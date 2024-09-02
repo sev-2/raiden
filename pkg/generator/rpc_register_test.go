@@ -21,6 +21,15 @@ func TestWalkRpcDir(t *testing.T) {
 	assert.Equal(t, "GetVoteBy", rs[0])
 }
 
+func TestScanRpcAndExclude(t *testing.T) {
+	testPath, err := utils.GetAbsolutePath("/testdata")
+	assert.NoError(t, err)
+
+	rs, err := generator.WalkScanRpc(testPath)
+	assert.NoError(t, err)
+	assert.Len(t, rs, 1)
+}
+
 func TestGenerateRpcRegister(t *testing.T) {
 	dir, err := os.MkdirTemp("", "rpc_register")
 	assert.NoError(t, err)
