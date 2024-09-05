@@ -107,3 +107,43 @@ func TestExtractRpcResult_ToDeleteFlatMap(t *testing.T) {
 	assert.Equal(t, "rpc1", mapData["rpc1"].Name)
 	assert.Equal(t, "rpc2", mapData["rpc2"].Name)
 }
+
+// Test declaration query with return trigger
+
+type CreateProfileParams struct{}
+type CreateProfileResult interface{}
+
+type CreateProfile struct {
+	raiden.RpcBase
+	Params *CreateProfileParams `json:"-"`
+	Return CreateProfileResult  `json:"-"`
+}
+
+func (r *CreateProfile) GetName() string {
+	return "create_profile"
+}
+
+func (r *CreateProfile) GetSecurity() raiden.RpcSecurityType {
+	return raiden.RpcSecurityTypeDefiner
+}
+
+func (r *CreateProfile) GetReturnType() raiden.RpcReturnDataType {
+	return raiden.RpcReturnDataTypeTrigger
+}
+
+func (r *CreateProfile) GetRawDefinition() string {
+	return `BEGIN INSERT INTO public.users (firstname,lastname, email) VALUES ( NEW.raw_user_meta_data ->> 'name', NEW.raw_user_meta_data ->> 'name', NEW.raw_user_meta_data ->> 'email' ); RETURN NEW; END;`
+}
+
+func TestRpcFunction_ReturnTrigger(t *testing.T) {
+	rpc := &CreateProfile{}
+	e := raiden.BuildRpc(rpc)
+	assert.NoError(t, e)
+	fn := objects.Function{}
+
+	err := state.BindRpcFunction(rpc, &fn)
+	assert.NoError(t, err)
+	assert.Equal(t, "create_profile", fn.Name)
+	assert.Equal(t, "public", fn.Schema)
+	assert.Equal(t, "create or replace function public.create_profile() returns trigger language plpgsql security definer as $function$ begin insert into public.users (firstname,lastname, email) values ( new.raw_user_meta_data ->> 'name', new.raw_user_meta_data ->> 'name', new.raw_user_meta_data ->> 'email' ) ; return new ; end; $function$", fn.CompleteStatement)
+}

@@ -41,6 +41,7 @@ const (
 	RpcParamDataTypeTimestampTZAlias RpcParamDataType = "TIMESTAMPZ"
 	RpcParamDataTypeJSON             RpcParamDataType = "JSON"
 	RpcParamDataTypeJSONB            RpcParamDataType = "JSONB"
+	RpcParamDataTypeUuid             RpcParamDataType = "UUID"
 )
 
 // Define constants for rpc return data type
@@ -64,6 +65,7 @@ const (
 	RpcReturnDataTypeTable            RpcReturnDataType = "TABLE"
 	RpcReturnDataTypeSetOf            RpcReturnDataType = "SETOF"
 	RpcReturnDataTypeVoid             RpcReturnDataType = "VOID"
+	RpcReturnDataTypeTrigger          RpcReturnDataType = "TRIGGER"
 )
 
 func RpcParamToGoType(dataType RpcParamDataType) string {
@@ -84,6 +86,8 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "time.Time"
 	case RpcParamDataTypeJSON, RpcParamDataTypeJSONB:
 		return "map[string]interface{}"
+	case RpcParamDataTypeUuid:
+		return "uuid.UUID"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -127,6 +131,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeJSON, nil
 	case RpcParamDataTypeJSONB:
 		return RpcParamDataTypeJSONB, nil
+	case RpcParamDataTypeUuid:
+		return RpcParamDataTypeUuid, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc param type  : %s", pCheckType)
 	}
@@ -197,6 +203,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeTable, nil
 	case RpcReturnDataTypeVoid:
 		return RpcReturnDataTypeVoid, nil
+	case RpcReturnDataTypeTrigger:
+		return RpcReturnDataTypeTrigger, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return type  : %s", pCheckType)
 	}
@@ -243,6 +251,8 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeTable", nil
 	case RpcReturnDataTypeVoid:
 		return "RpcReturnDataTypeVoid", nil
+	case RpcReturnDataTypeTrigger:
+		return "RpcReturnDataTypeTrigger", nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}
