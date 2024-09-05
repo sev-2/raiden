@@ -62,26 +62,16 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
-      contents: write
-    steps:
-      - name: Checkout target repo
-        run: |
-          git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/sev-2/docs.git docs
-
-      - name: Write JSON file
-        run: |
-          echo "{\"version\": \"$GITHUB_REF_NAME\"}" > docs/public/latest.json
-
-      - name: Commit and push changes
-        run: |
-          cd docs
-          git config --global user.name "raiden-ci"
-          git config --global user.email "raiden-ci@sev-2.com"
-          git remote set-url origin https://$GITHUB_USER:$GITHUB_TOKEN@github.com/sev-2/docs.git
-          git add .
-          git commit -m "Update to version $GITHUB_REF_NAME"
-          git push
-
+      actions: write
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_USER: ${{ secrets.TARGET_USERNAME }}
+      GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+    steps:
+      - name: Dispatch the action to "sev-2/docs"
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Content-Type: application/json" \
+            --data '{"event_type": "update-repo", "client_payload": {"RAIDEN_VERSION": "$GITHUB_REF_NAME"}}' \
+            https://api.github.com/repos/sev-2/docs/dispatches
