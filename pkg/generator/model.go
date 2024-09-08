@@ -3,9 +3,9 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
-	"sort"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/jinzhu/inflection"
