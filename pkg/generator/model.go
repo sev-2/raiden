@@ -190,6 +190,7 @@ func MapTableAttributes(table objects.Table, validationTags state.ModelValidatio
 	for key := range importsMap {
 		importsPath = append(importsPath, key)
 	}
+	sort.Strings(importsPath)
 
 	return
 }
@@ -305,6 +306,8 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 
 	for i := range relations {
 		r := relations[i]
+		ModelLogger.Debug("generate model relation", "GoIdentifier", r.Table)
+		ModelLogger.Debug("generate model relation", "RaidenRelatedModel", r.Type)
 
 		if r.RelationType == raiden.RelationTypeHasOne {
 			snakeFk := utils.ToSnakeCase(r.ForeignKey)
