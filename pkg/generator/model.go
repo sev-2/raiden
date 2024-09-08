@@ -332,7 +332,7 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 		}
 
 		if r.JoinRelation != nil {
-			throughSuffix := fmt.Sprintf("%s_%s_%s_%s", r.Through, r.SourcePrimaryKey, r.TargetPrimaryKey, r.JoinsSourceForeignKey)
+			throughSuffix := fmt.Sprintf("%s_%s", r.Through, strings.Replace(r.JoinsSourceForeignKey, "_id", "", -1)))
 			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), utils.SnakeCaseToPascalCase(inflection.Singular(throughSuffix)))
 		}
 
