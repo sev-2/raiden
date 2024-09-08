@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"sort"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/jinzhu/inflection"
@@ -351,6 +352,10 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 		r.Tag = BuildJoinTag(&r)
 		mappedRelations = append(mappedRelations, r)
 	}
+
+	sort.Slice(mappedRelations, func(i, j int) bool {
+		return len(mappedRelations[i].Table) < len(mappedRelations[j].Table)
+	})
 
 	return
 }
