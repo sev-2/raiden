@@ -332,7 +332,8 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 		}
 
 		if r.JoinRelation != nil {
-			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), utils.SnakeCaseToPascalCase(inflection.Singular(r.Through)))
+			throughSuffix := fmt.Sprintf("%s_%s_%s_%s", r.Through, r.SourcePrimaryKey, r.TargetPrimaryKey, r.JoinsSourceForeignKey)
+			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), utils.SnakeCaseToPascalCase(inflection.Singular(throughSuffix)))
 		}
 
 		r.Tag = BuildJoinTag(&r)
