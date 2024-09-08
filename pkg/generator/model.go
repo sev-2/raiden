@@ -354,7 +354,7 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 	}
 
 	sort.Slice(mappedRelations, func(i, j int) bool {
-		return len(mappedRelations[i].Table) < len(mappedRelations[j].Table)
+		return (len(mappedRelations[i].Table) + len(mappedRelations[i].Tag)) < (len(mappedRelations[j].Table) + len(mappedRelations[j].Tag))
 	})
 
 	return
