@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -351,6 +352,10 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 		r.Tag = BuildJoinTag(&r)
 		mappedRelations = append(mappedRelations, r)
 	}
+
+	sort.Slice(mappedRelations, func(i, j int) bool {
+		return len(mappedRelations[i].Table) < len(mappedRelations[j].Table)
+	})
 
 	return
 }
