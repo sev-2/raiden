@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -208,6 +209,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 	for key := range importsMap {
 		importsPath = append(importsPath, key)
 	}
+	sort.Strings(importsPath)
 
 	// set data
 	data := GenerateRpcData{
