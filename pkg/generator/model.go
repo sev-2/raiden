@@ -302,8 +302,6 @@ func BuildJoinTag(r *state.Relation) string {
 }
 
 func BuildRelationFields(table objects.Table, relations []state.Relation) (mappedRelations []state.Relation) {
-	mapRelationName := make(map[string]bool)
-
 	for i := range relations {
 		r := relations[i]
 		ModelLogger.Debug("generate model relation", "GoIdentifier", fmt.Sprintf("%s_%s_%s", r.Table, r.PrimaryKey, r.ForeignKey))
@@ -321,7 +319,6 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 			if fkName != r.Table {
 				r.Table = fmt.Sprintf("%s%s", r.Table, fkName)
 			}
-			mapRelationName[r.Table] = true
 		}
 
 		if r.RelationType == raiden.RelationTypeHasMany {
@@ -332,27 +329,10 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 			if fkName != r.Table {
 				r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
 			}
-			mapRelationName[r.Table] = true
 		}
 
-		if r.RelationType == raiden.RelationTypeManyToMany {
-			r.Table = inflection.Plural(r.Table)
-			_, exist := mapRelationName[r.Table]
-			if exist {
-				r.Table = inflection.Plural(r.Through)
-			}
-
-			_, exist = mapRelationName[r.Table]
-			if exist {
-				snakeFk := utils.ToSnakeCase(r.ForeignKey)
-				fkTableSplit := strings.Split(snakeFk, "_")
-				fkName := inflection.Plural(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
-				r.Table = inflection.Plural(utils.SnakeCaseToPascalCase(r.Table))
-				if fkName != r.Table {
-					r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
-				}
-			}
-			mapRelationName[r.Table] = true
+		if r.JoinRelation != nil {
+			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), inflection.Singular(r.Through))
 		}
 
 		r.Tag = BuildJoinTag(&r)
