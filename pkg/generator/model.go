@@ -306,7 +306,10 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 
 	for i := range relations {
 		r := relations[i]
-		ModelLogger.Debug("generate model relation", "GoIdentifier", r.Table)
+		ModelLogger.Debug("generate model relation", "GoIdentifier", fmt.Sprintf("%s_%s_%s", r.Table, r.PrimaryKey, r.ForeignKey))
+		if r.RelationType == raiden.RelationTypeManyToMany && r.JoinRelation != nil {
+			ModelLogger.Debug("generate model relation", "RaidenJoin", fmt.Sprintf("%s_%s_%s_%s", r.Through, r.SourcePrimaryKey, r.TargetPrimaryKey, r.JoinsSourceForeignKey))
+		}
 		ModelLogger.Debug("generate model relation", "RaidenRelatedModel", r.Type)
 
 		if r.RelationType == raiden.RelationTypeHasOne {
