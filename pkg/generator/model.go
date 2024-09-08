@@ -3,7 +3,6 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 	"text/template"
@@ -255,7 +254,7 @@ func buildColumnTag(c objects.Column, mapPk map[string]bool, validationTags stat
 
 func containsRelation(relations []state.Relation, r state.Relation) bool {
 	for _, rel := range relations {
-		if reflect.DeepEqual(rel, r) {
+		if rel.Tag == r.Tag {
 			return true
 		}
 	}
