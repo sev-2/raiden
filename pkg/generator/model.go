@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"text/template"
@@ -252,6 +253,16 @@ func buildColumnTag(c objects.Column, mapPk map[string]bool, validationTags stat
 	return strings.Join(tags, " ")
 }
 
+func containsRelation(relations []state.Relation, r state.Relation) bool {
+	for _, rel := range relations {
+		if reflect.DeepEqual(rel, r) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func BuildJoinTag(r *state.Relation) string {
 	var tags []string
 	var joinTags []string
@@ -337,7 +348,10 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 		}
 
 		r.Tag = BuildJoinTag(&r)
-		mappedRelations = append(mappedRelations, r)
+
+		if !containsRelation(mappedRelations, r) {
+			mappedRelations = append(mappedRelations, r)
+		}
 	}
 
 	sort.Slice(mappedRelations, func(i, j int) bool {
