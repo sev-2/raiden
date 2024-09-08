@@ -304,11 +304,11 @@ func BuildJoinTag(r *state.Relation) string {
 func BuildRelationFields(table objects.Table, relations []state.Relation) (mappedRelations []state.Relation) {
 	for i := range relations {
 		r := relations[i]
-		ModelLogger.Debug("generate model relation", "GoIdentifier", fmt.Sprintf("%s_%s_%s", r.Table, r.PrimaryKey, r.ForeignKey))
+		ModelLogger.Trace("generate model relation", "identifier", fmt.Sprintf("%s_%s_%s", r.Table, r.PrimaryKey, r.ForeignKey))
 		if r.RelationType == raiden.RelationTypeManyToMany && r.JoinRelation != nil {
-			ModelLogger.Debug("generate model relation", "RaidenJoin", fmt.Sprintf("%s_%s_%s_%s", r.Through, r.SourcePrimaryKey, r.TargetPrimaryKey, r.JoinsSourceForeignKey))
+			ModelLogger.Trace("generate model relation", "join", fmt.Sprintf("%s_%s_%s_%s", r.Through, r.SourcePrimaryKey, r.TargetPrimaryKey, r.JoinsSourceForeignKey))
 		}
-		ModelLogger.Debug("generate model relation", "RaidenRelatedModel", r.Type)
+		ModelLogger.Trace("generate model relation", "related", r.Type)
 
 		if r.RelationType == raiden.RelationTypeHasOne {
 			snakeFk := utils.ToSnakeCase(r.ForeignKey)
@@ -332,7 +332,7 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 		}
 
 		if r.JoinRelation != nil {
-			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), inflection.Singular(r.Through))
+			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), utils.SnakeCaseToPascalCase(inflection.Singular(r.Through)))
 		}
 
 		r.Tag = BuildJoinTag(&r)
