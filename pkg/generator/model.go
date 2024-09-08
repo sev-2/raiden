@@ -190,6 +190,7 @@ func MapTableAttributes(table objects.Table, validationTags state.ModelValidatio
 	for key := range importsMap {
 		importsPath = append(importsPath, key)
 	}
+	sort.Strings(importsPath)
 
 	return
 }
@@ -301,10 +302,13 @@ func BuildJoinTag(r *state.Relation) string {
 }
 
 func BuildRelationFields(table objects.Table, relations []state.Relation) (mappedRelations []state.Relation) {
-	mapRelationName := make(map[string]bool)
-
 	for i := range relations {
 		r := relations[i]
+		ModelLogger.Trace("generate model relation", "identifier", fmt.Sprintf("%s_%s_%s", r.Table, r.PrimaryKey, r.ForeignKey))
+		if r.RelationType == raiden.RelationTypeManyToMany && r.JoinRelation != nil {
+			ModelLogger.Trace("generate model relation", "join", fmt.Sprintf("%s_%s_%s_%s", r.Through, r.SourcePrimaryKey, r.TargetPrimaryKey, r.JoinsSourceForeignKey))
+		}
+		ModelLogger.Trace("generate model relation", "related", r.Type)
 
 		if r.RelationType == raiden.RelationTypeHasOne {
 			snakeFk := utils.ToSnakeCase(r.ForeignKey)
@@ -315,7 +319,6 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 			if fkName != r.Table {
 				r.Table = fmt.Sprintf("%s%s", r.Table, fkName)
 			}
-			mapRelationName[r.Table] = true
 		}
 
 		if r.RelationType == raiden.RelationTypeHasMany {
@@ -326,27 +329,10 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 			if fkName != r.Table {
 				r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
 			}
-			mapRelationName[r.Table] = true
 		}
 
-		if r.RelationType == raiden.RelationTypeManyToMany {
-			r.Table = inflection.Plural(r.Table)
-			_, exist := mapRelationName[r.Table]
-			if exist {
-				r.Table = inflection.Plural(r.Through)
-			}
-
-			_, exist = mapRelationName[r.Table]
-			if exist {
-				snakeFk := utils.ToSnakeCase(r.ForeignKey)
-				fkTableSplit := strings.Split(snakeFk, "_")
-				fkName := inflection.Plural(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
-				r.Table = inflection.Plural(utils.SnakeCaseToPascalCase(r.Table))
-				if fkName != r.Table {
-					r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
-				}
-			}
-			mapRelationName[r.Table] = true
+		if r.JoinRelation != nil {
+			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), utils.SnakeCaseToPascalCase(inflection.Singular(r.Through)))
 		}
 
 		r.Tag = BuildJoinTag(&r)
