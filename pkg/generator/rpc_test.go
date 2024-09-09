@@ -520,11 +520,11 @@ func TestGenerateRpc(t *testing.T) {
 
 func TestRpcWithTrigger(t *testing.T) {
 	fn := objects.Function{
-		Schema:                 "public",
-		Name:                   "create_profile",
-		Language:               "plpgsql",
-		Definition:             `BEGIN INSERT INTO public.users (firstname,lastname, email) \nVALUES \n  (\n    NEW.raw_user_meta_data ->> 'name', \n        NEW.raw_user_meta_data ->> 'name', \n    NEW.raw_user_meta_data ->> 'email'\n  );\nRETURN NEW;\nEND;`,
-		CompleteStatement:      `
+		Schema:     "public",
+		Name:       "create_profile",
+		Language:   "plpgsql",
+		Definition: `BEGIN INSERT INTO public.users (firstname,lastname, email) \nVALUES \n  (\n    NEW.raw_user_meta_data ->> 'name', \n        NEW.raw_user_meta_data ->> 'name', \n    NEW.raw_user_meta_data ->> 'email'\n  );\nRETURN NEW;\nEND;`,
+		CompleteStatement: `
 		CREATE OR REPLACE FUNCTION public.create_profile()\n
 		RETURNS trigger\n
 		set search_path = ''\n
