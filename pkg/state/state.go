@@ -378,6 +378,7 @@ func Save(state *State) error {
 	StateLogger.Debug("generate local state", "path", filePath)
 	encoder := gob.NewEncoder(file)
 	if err := encoder.Encode(state); err != nil {
+		StateLogger.Debug("encoding failed", "state", state)
 		RestoreFromTmp(tmpFilePath)
 		return err
 	}
