@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
@@ -389,6 +390,35 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	}
 
 	// set passed parameter
+	sort.Strings(imports)
+	sort.Slice(routes, func(i, j int) bool {
+		iRunes := []rune(routes[i].Path)
+		jRunes := []rune(routes[j].Path)
+
+		max := len(iRunes)
+		if max > len(jRunes) {
+			max = len(jRunes)
+		}
+
+		for idx := 0; idx < max; idx++ {
+			ir := iRunes[idx]
+			jr := jRunes[idx]
+
+			lir := unicode.ToLower(ir)
+			ljr := unicode.ToLower(jr)
+
+			if lir != ljr {
+				return lir < ljr
+			}
+
+			if ir != jr {
+				return ir < jr
+			}
+		}
+
+		return len(iRunes) < len(jRunes)
+	})
+
 	data := GenerateRouterData{
 		Package: "bootstrap",
 		Imports: imports,

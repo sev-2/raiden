@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"text/template"
 
 	"github.com/hashicorp/go-hclog"
