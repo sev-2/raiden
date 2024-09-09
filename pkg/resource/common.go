@@ -123,7 +123,6 @@ func filterFunctionBySchema(input []objects.Function, allowedSchema ...string) (
 		t := input[i]
 
 		if _, exist := mapSchema[t.Schema]; exist {
-			t.CompleteStatement = strings.Replace(t.CompleteStatement, "set search_path = ''", "", -1)
 			output = append(output, t)
 		}
 	}

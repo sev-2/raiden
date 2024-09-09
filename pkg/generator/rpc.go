@@ -154,6 +154,7 @@ func GenerateRpc(basePath string, projectName string, functions []objects.Functi
 
 	for i := range functions {
 		f := functions[i]
+		f.CompleteStatement = strings.Replace(f.CompleteStatement, "set search_path = ''", "", -1)
 		if err := generateRpcItem(folderPath, projectName, &f, tables, generateFn); err != nil {
 			return err
 		}
@@ -163,6 +164,9 @@ func GenerateRpc(basePath string, projectName string, functions []objects.Functi
 }
 
 func generateRpcItem(folderPath string, projectName string, function *objects.Function, tables []objects.Table, generateFn GenerateFn) error {
+
+	function.CompleteStatement = strings.Replace(function.CompleteStatement, "set search_path = ''", "", -1)
+
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToSnakeCase": utils.ToSnakeCase},
