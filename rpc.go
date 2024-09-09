@@ -335,7 +335,7 @@ const (
 	RpcSecurityTypeDefiner RpcSecurityType = "DEFINER"
 	RpcSecurityTypeInvoker RpcSecurityType = "INVOKER"
 
-	RpcTemplate = `CREATE OR REPLACE FUNCTION :function_name(:params) RETURNS :return_type LANGUAGE plpgsql :behavior :security AS $function$ :definition $function$`
+	RpcTemplate = `CREATE OR REPLACE FUNCTION :function_name(:params) RETURNS :return_type LANGUAGE plpgsql :behavior :security set search_path = '' AS $function$ :definition $function$`
 )
 
 func MarshalRpcParamTag(paramTag *RpcParamTag) (string, error) {

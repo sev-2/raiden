@@ -524,7 +524,13 @@ func TestRpcWithTrigger(t *testing.T) {
 		Name:                   "create_profile",
 		Language:               "plpgsql",
 		Definition:             `BEGIN INSERT INTO public.users (firstname,lastname, email) \nVALUES \n  (\n    NEW.raw_user_meta_data ->> 'name', \n        NEW.raw_user_meta_data ->> 'name', \n    NEW.raw_user_meta_data ->> 'email'\n  );\nRETURN NEW;\nEND;`,
-		CompleteStatement:      `CREATE OR REPLACE FUNCTION public.create_profile()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$BEGIN INSERT INTO public.users (firstname,lastname, email) \nVALUES \n  (\n    NEW.raw_user_meta_data ->> 'name', \n        NEW.raw_user_meta_data ->> 'name', \n    NEW.raw_user_meta_data ->> 'email'\n  );\nRETURN NEW;\nEND;$function$\n`,
+		CompleteStatement:      `
+		CREATE OR REPLACE FUNCTION public.create_profile()\n
+		RETURNS trigger\n
+		set search_path = ''\n
+		LANGUAGE plpgsql\n
+		SECURITY DEFINER\n
+		AS $function$BEGIN INSERT INTO public.users (firstname,lastname, email) \nVALUES \n  (\n    NEW.raw_user_meta_data ->> 'name', \n        NEW.raw_user_meta_data ->> 'name', \n    NEW.raw_user_meta_data ->> 'email'\n  );\nRETURN NEW;\nEND;$function$\n`,
 		Args:                   []objects.FunctionArg{},
 		ReturnTypeID:           2279,
 		ReturnType:             "trigger",
