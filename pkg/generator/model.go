@@ -354,7 +354,33 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 	}
 
 	sort.Slice(mappedRelations, func(i, j int) bool {
-		return (len(mappedRelations[i].Table) + len(mappedRelations[i].Type) + len(mappedRelations[i].Tag)) < (len(mappedRelations[j].Table) + len(mappedRelations[j].Type) + len(mappedRelations[j].Tag))
+		iToken := mappedRelations[i].Table + mappedRelations[i].Tag + mappedRelations[i].Type
+		jToken := mappedRelations[j].Table + mappedRelations[j].Tag + mappedRelations[j].Type
+		iRunes := []rune(iToken)
+		jRunes := []rune(jToken)
+
+		max := len(iRunes)
+		if max > len(jRunes) {
+			max = len(jRunes)
+		}
+
+		for idx := 0; idx < max; idx++ {
+			ir := iRunes[idx]
+			jr := jRunes[idx]
+
+			lir := unicode.ToLower(ir)
+			ljr := unicode.ToLower(jr)
+
+			if lir != ljr {
+				return lir < ljr
+			}
+
+			if ir != jr {
+				return ir < jr
+			}
+		}
+
+		return len(iRunes) < len(jRunes)
 	})
 
 	return
