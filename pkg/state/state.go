@@ -376,6 +376,7 @@ func Save(state *State) error {
 	defer file.Close()
 
 	StateLogger.Debug("generate local state", "path", filePath)
+	gob.Register(map[string]interface{}{})
 	encoder := gob.NewEncoder(file)
 	if err := encoder.Encode(state); err != nil {
 		RestoreFromTmp(tmpFilePath)
@@ -451,6 +452,7 @@ func Load() (*State, error) {
 	defer file.Close()
 
 	state := &State{}
+	gob.Register(map[string]interface{}{})
 	decoder := gob.NewDecoder(file)
 	if err := decoder.Decode(state); err != nil {
 		return nil, err

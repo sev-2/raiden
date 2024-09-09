@@ -89,7 +89,7 @@ func TestBindRpcFunction(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "get_submissions", fn.Name)
 	assert.Equal(t, "public", fn.Schema)
-	assert.Equal(t, "create or replace function public.get_submissions(scouter_name character varying, candidate_name text) returns table(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying) language plpgsql as $function$ begin return query select s.id, s.created_at, sc.name as sc_name, c.name as c_name from submission s inner join scouter sc on s.scouter_id = sc.scouter_id inner join candidate c on s.candidate_id = c.candidate_id where sc.name = scouter_name and c.name = candidate_name ; end; $function$", fn.CompleteStatement)
+	assert.Equal(t, "create or replace function public.get_submissions(scouter_name character varying, candidate_name text) returns table(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying) language plpgsql set search_path = '' as $function$ begin return query select s.id, s.created_at, sc.name as sc_name, c.name as c_name from submission s inner join scouter sc on s.scouter_id = sc.scouter_id inner join candidate c on s.candidate_id = c.candidate_id where sc.name = scouter_name and c.name = candidate_name ; end; $function$", fn.CompleteStatement)
 }
 
 func TestExtractRpcResult_ToDeleteFlatMap(t *testing.T) {
@@ -145,5 +145,5 @@ func TestRpcFunction_ReturnTrigger(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "create_profile", fn.Name)
 	assert.Equal(t, "public", fn.Schema)
-	assert.Equal(t, "create or replace function public.create_profile() returns trigger language plpgsql security definer as $function$ begin insert into public.users (firstname,lastname, email) values ( new.raw_user_meta_data ->> 'name', new.raw_user_meta_data ->> 'name', new.raw_user_meta_data ->> 'email' ) ; return new ; end; $function$", fn.CompleteStatement)
+	assert.Equal(t, "create or replace function public.create_profile() returns trigger language plpgsql security definer set search_path = '' as $function$ begin insert into public.users (firstname,lastname, email) values ( new.raw_user_meta_data ->> 'name', new.raw_user_meta_data ->> 'name', new.raw_user_meta_data ->> 'email' ) ; return new ; end; $function$", fn.CompleteStatement)
 }
