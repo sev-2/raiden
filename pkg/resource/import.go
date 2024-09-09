@@ -369,6 +369,7 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 					}
 					localState.AddRole(roleState)
 				case objects.Function:
+					parseItem.CompleteStatement = strings.Replace(parseItem.CompleteStatement, "SET search_path TO ''\n", "", -1)
 					rpcState := state.RpcState{
 						Function:   parseItem,
 						RpcPath:    genInput.OutputPath,

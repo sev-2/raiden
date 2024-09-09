@@ -154,9 +154,6 @@ func GenerateRpc(basePath string, projectName string, functions []objects.Functi
 
 	for i := range functions {
 		f := functions[i]
-		RpcLogger.Trace("original", "complete_stmt", f.CompleteStatement)
-		f.CompleteStatement = strings.Replace(f.CompleteStatement, "SET search_path TO ''\n", "", -1)
-		RpcLogger.Trace("after_cleanup", "complete_stmt", f.CompleteStatement)
 		if err := generateRpcItem(folderPath, projectName, &f, tables, generateFn); err != nil {
 			return err
 		}
@@ -166,10 +163,6 @@ func GenerateRpc(basePath string, projectName string, functions []objects.Functi
 }
 
 func generateRpcItem(folderPath string, projectName string, function *objects.Function, tables []objects.Table, generateFn GenerateFn) error {
-	RpcLogger.Trace("original_item", "complete_stmt", function.CompleteStatement)
-	function.CompleteStatement = strings.Replace(function.CompleteStatement, "SET search_path TO ''\n", "", -1)
-	RpcLogger.Trace("after_cleanup_item", "complete_stmt", function.CompleteStatement)
-
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToSnakeCase": utils.ToSnakeCase},
