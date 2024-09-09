@@ -376,6 +376,7 @@ func Save(state *State) error {
 	defer file.Close()
 
 	StateLogger.Debug("generate local state", "path", filePath)
+	gob.Register(map[string]interface{}{})
 	encoder := gob.NewEncoder(file)
 	if err := encoder.Encode(state); err != nil {
 		StateLogger.Debug("encoding failed", "state", state)
