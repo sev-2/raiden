@@ -2,7 +2,6 @@ package resource
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
