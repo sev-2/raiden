@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"unicode"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/jinzhu/inflection"
