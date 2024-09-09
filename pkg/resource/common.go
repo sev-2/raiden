@@ -2,6 +2,7 @@ package resource
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -122,6 +123,7 @@ func filterFunctionBySchema(input []objects.Function, allowedSchema ...string) (
 		t := input[i]
 
 		if _, exist := mapSchema[t.Schema]; exist {
+			t.CompleteStatement = strings.Replace(t.CompleteStatement, "SET search_path TO ''\n", "", -1)
 			output = append(output, t)
 		}
 	}
