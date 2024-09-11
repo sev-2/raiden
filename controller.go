@@ -755,13 +755,13 @@ func AuthProxy(
 
 		// validate sub path
 		forwardedPath := paths[1]
-		subPath := strings.Split(forwardedPath, "/")
-		if _, exist := allowedAuthPathMap[subPath[1]]; !exist {
-			ctx.Response.SetStatusCode(fasthttp.StatusNotFound)
-			errResponse := "{ \"messages\": \"resource not found\"}"
-			ctx.Response.SetBodyString(errResponse)
-			return
-		}
+		// subPath := strings.Split(forwardedPath, "/")
+		// if _, exist := allowedAuthPathMap[subPath[1]]; !exist {
+		// 	ctx.Response.SetStatusCode(fasthttp.StatusNotFound)
+		// 	errResponse := "{ \"messages\": \"resource not found\"}"
+		// 	ctx.Response.SetBodyString(errResponse)
+		// 	return
+		// }
 
 		proxyUrl := fmt.Sprintf("%s/auth/v1%s", config.SupabasePublicUrl, forwardedPath)
 		req.SetRequestURI(proxyUrl)
