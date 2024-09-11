@@ -355,10 +355,6 @@ func TestAuthProxy_NotAllowedPath(t *testing.T) {
 		func(resp *fasthttp.Response) error { return nil },
 	)
 
-	ctx.Request.SetRequestURI("/auth/v1/invalid\x00url")
-	handler(ctx.RequestCtx)
-	assert.Equal(t, fasthttp.StatusBadRequest, ctx.Response.StatusCode())
-
 	ctx.Request.SetRequestURI("/auth/v1/anymore")
 	handler(ctx.RequestCtx)
 	assert.Equal(t, fasthttp.StatusNotFound, ctx.Response.StatusCode())

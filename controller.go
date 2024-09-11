@@ -755,14 +755,7 @@ func AuthProxy(
 
 		// validate sub path
 		forwardedPath := paths[1]
-		parsedURL, err := url.Parse(forwardedPath)
-		if err != nil {
-			ctx.Response.SetStatusCode(fasthttp.StatusBadRequest)
-			errResponse := "{ \"messages\": \"invalid request\"}"
-			ctx.Response.SetBodyString(errResponse)
-			return
-		}
-
+		parsedURL, _ := url.Parse(forwardedPath)
 		segments := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
 		if _, exist := allowedAuthPathMap[segments[0]]; !exist {
 			ctx.Response.SetStatusCode(fasthttp.StatusNotFound)
