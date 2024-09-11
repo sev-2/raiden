@@ -764,13 +764,11 @@ func AuthProxy(
 		}
 
 		segments := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
-		if _, exist0 := allowedAuthPathMap[segments[0]]; !exist0 {
-			if _, exist1 := allowedAuthPathMap[segments[1]]; !exist1 {
-				ctx.Response.SetStatusCode(fasthttp.StatusNotFound)
-				errResponse := "{ \"messages\": \"resource not found\"}"
-				ctx.Response.SetBodyString(errResponse)
-				return
-			}
+		if _, exist := allowedAuthPathMap[segments[0]]; !exist {
+			ctx.Response.SetStatusCode(fasthttp.StatusNotFound)
+			errResponse := "{ \"messages\": \"resource not found\"}"
+			ctx.Response.SetBodyString(errResponse)
+			return
 		}
 
 		proxyUrl := fmt.Sprintf("%s/auth/v1%s", config.SupabasePublicUrl, forwardedPath)
