@@ -364,8 +364,6 @@ func TestAuthProxy_NotAllowedPath(t *testing.T) {
 	assert.Equal(t, fasthttp.StatusNotFound, ctx.Response.StatusCode())
 }
 
-
-
 func TestAuthProxy_AllowedWithSpecificPath(t *testing.T) {
 	ctx := &mock.MockContext{
 		RequestCtx: &fasthttp.RequestCtx{},
