@@ -122,6 +122,7 @@ func filterFunctionBySchema(input []objects.Function, allowedSchema ...string) (
 		t := input[i]
 
 		if _, exist := mapSchema[t.Schema]; exist {
+			ImportLogger.Debug("spFunction", "append", t)
 			output = append(output, t)
 		}
 	}
