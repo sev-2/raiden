@@ -103,6 +103,9 @@ func CompareItem(source, target objects.Table) (diffResult CompareDiffResult) {
 	if len(updateItem.ChangeItems) == 0 && len(updateItem.ChangeColumnItems) == 0 && len(updateItem.ChangeRelationItems) == 0 {
 		diffResult.IsConflict = false
 	} else {
+		Logger.Debug("changeItems", "conflict-check", updateItem.ChangeItems)
+		Logger.Debug("changeColumnItems", "conflict-check", updateItem.ChangeColumnItems)
+		Logger.Debug("changeRelationItems", "conflict-check", updateItem.ChangeRelationItems)
 		diffResult.IsConflict = true
 	}
 
