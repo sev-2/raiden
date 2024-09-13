@@ -225,7 +225,7 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 		}
 
 		if !strings.HasPrefix(sc.ConstraintName, fmt.Sprintf("%s_", sc.SourceSchema)) {
-			Logger.Info("constrain name update", "from", sc.ConstraintName, "to", fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName))
+			Logger.Debug("constrain name update", "from", sc.ConstraintName, "to", fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName))
 			sc.ConstraintName = fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName)
 		}
 
