@@ -492,7 +492,7 @@ func (r *RpcBase) SetCompleteStmt(stmt string) {
 }
 
 func (r *RpcBase) GetCompleteStmt() string {
-	return strings.replace(r.CompleteStatement, "search_path to ", "search_path = ")
+	return strings.ReplaceAll(r.CompleteStatement, "search_path to ", "search_path = ")
 }
 
 // ----- Rpc Param Functionality -----
