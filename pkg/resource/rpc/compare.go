@@ -32,6 +32,7 @@ func CompareList(sourceFn []objects.Function, targetFn []objects.Function) (diff
 
 	for i := range sourceFn {
 		s := sourceFn[i]
+		s.CompleteStatement = strings.ReplaceAll(s.CompleteStatement, "search_path TO", "SET search_path =")
 		Logger.Debug("SourceFn", "source-name", s)
 
 		t, isExist := mapTargetFn[s.Name]
