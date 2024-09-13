@@ -103,6 +103,9 @@ func CompareItem(source, target objects.Table) (diffResult CompareDiffResult) {
 	if len(updateItem.ChangeItems) == 0 && len(updateItem.ChangeColumnItems) == 0 && len(updateItem.ChangeRelationItems) == 0 {
 		diffResult.IsConflict = false
 	} else {
+		Logger.Debug("changeItems", "conflict-check", updateItem.ChangeItems)
+		Logger.Debug("changeColumnItems", "conflict-check", updateItem.ChangeColumnItems)
+		Logger.Debug("changeRelationItems", "conflict-check", updateItem.ChangeRelationItems)
 		diffResult.IsConflict = true
 	}
 
@@ -222,7 +225,7 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 		}
 
 		if !strings.HasPrefix(sc.ConstraintName, fmt.Sprintf("%s_", sc.SourceSchema)) {
-			Logger.Info("constrain name update", "from", sc.ConstraintName, "to", fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName))
+			Logger.Debug("constrain name update", "from", sc.ConstraintName, "to", fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName))
 			sc.ConstraintName = fmt.Sprintf("%s_%s", sc.SourceSchema, sc.ConstraintName)
 		}
 
