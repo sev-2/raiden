@@ -1,8 +1,10 @@
 package generator
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"io"
@@ -40,6 +42,31 @@ func DefaultWriter(filePath string) (*os.File, error) {
 	return file, nil
 }
 
+type FileWriter struct {
+	FilePath string
+	file     *os.File
+}
+
+func (fw *FileWriter) Write(p []byte) (int, error) {
+	if fw.file == nil {
+		file, err := utils.CreateFile(fw.FilePath, true)
+		if err != nil {
+			return 0, fmt.Errorf("failed create file %s : %v", fw.FilePath, err)
+		}
+		fw.file = file
+
+	}
+	return fw.file.Write(p)
+}
+
+// Close closes the underlying file
+func (fw *FileWriter) Close() error {
+	if fw.file != nil {
+		return fw.file.Close()
+	}
+	return nil
+}
+
 func Generate(input GenerateInput, writer io.Writer) error {
 	// set default writer
 	if writer == nil {
@@ -61,7 +88,24 @@ func Generate(input GenerateInput, writer io.Writer) error {
 		return fmt.Errorf("error parsing : %v", err)
 	}
 
-	return tmpl.Execute(writer, input.BindData)
+	var renderedCode bytes.Buffer
+	err = tmpl.Execute(&renderedCode, input.BindData)
+	if err != nil {
+		return fmt.Errorf("error execute template : %v", err)
+	}
+
+	// Step 2: Format the rendered code
+	formattedCode, err := format.Source(renderedCode.Bytes())
+	if err != nil {
+		return fmt.Errorf("error format code : %v", err)
+	}
+
+	_, err = writer.Write(formattedCode)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func CreateInternalFolder(basePath string) (err error) {

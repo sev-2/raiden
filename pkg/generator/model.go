@@ -147,8 +147,11 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 		OutputPath:   filePath,
 	}
 
+	// setup writer
+	writer := FileWriter{FilePath: filePath}
+
 	ModelLogger.Debug("generate model", "path", generateInput.OutputPath)
-	return generateFn(generateInput, nil)
+	return generateFn(generateInput, &writer)
 }
 
 // map table to column, map pg type to go type and get dependency import path
