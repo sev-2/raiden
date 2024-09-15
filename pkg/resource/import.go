@@ -305,7 +305,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 
 func ImportDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
 	return func(input generator.GenerateInput, writer io.Writer) error {
-		if err := generator.Generate(input, nil); err != nil {
+		if err := generator.Generate(input, writer); err != nil {
 			return err
 		}
 		if rs, found := FindImportResource(data, input, findFunc); found {

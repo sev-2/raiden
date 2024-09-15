@@ -55,8 +55,15 @@ func (fw *FileWriter) Write(p []byte) (int, error) {
 		}
 		fw.file = file
 
+		defer fw.file.Close()
 	}
-	return fw.file.Write(p)
+
+	formattedCode, err := format.Source(p)
+	if err != nil {
+		return 0, fmt.Errorf("error format code : %v", err)
+	}
+
+	return fw.file.Write(formattedCode)
 }
 
 // Close closes the underlying file
@@ -74,7 +81,6 @@ func Generate(input GenerateInput, writer io.Writer) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
 		writer = file
 	}
 
@@ -94,13 +100,7 @@ func Generate(input GenerateInput, writer io.Writer) error {
 		return fmt.Errorf("error execute template : %v", err)
 	}
 
-	// Step 2: Format the rendered code
-	formattedCode, err := format.Source(renderedCode.Bytes())
-	if err != nil {
-		return fmt.Errorf("error format code : %v", err)
-	}
-
-	_, err = writer.Write(formattedCode)
+	_, err = writer.Write(renderedCode.Bytes())
 	if err != nil {
 		return err
 	}
