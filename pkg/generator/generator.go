@@ -54,8 +54,7 @@ func (fw *FileWriter) Write(p []byte) (int, error) {
 			return 0, fmt.Errorf("failed create file %s : %v", fw.FilePath, err)
 		}
 		fw.file = file
-
-		defer fw.file.Close()
+		defer fw.Close()
 	}
 
 	formattedCode, err := format.Source(p)
