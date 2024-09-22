@@ -88,6 +88,9 @@ func Test_Tracer(t *testing.T) {
 		RequestContextFn: func() *fasthttp.RequestCtx {
 			return &fasthttp.RequestCtx{}
 		},
+		SendJsonFn: func(data any) error {
+			return nil
+		},
 	}
 
 	breakerFn := breakerMiddleware(fn)

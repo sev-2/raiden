@@ -439,16 +439,12 @@ func RestoreFromTmp(tmpFile string) {
 }
 
 func Load() (*State, error) {
-	StateLogger.Info("GetStateFilePath")
 	filePath, err := GetStateFilePath()
 	if err != nil {
 		return nil, err
 	}
-	StateLogger.Info("state path", "path", filePath)
 
 	if !utils.IsFileExists(filePath) {
-		StateLogger.Info("state not exist", "path", filePath)
-
 		initialState := &State{}
 		// save empty state
 		err := Save(initialState)
@@ -458,7 +454,6 @@ func Load() (*State, error) {
 		return initialState, nil
 	}
 
-	StateLogger.Info("open state file", "path", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
