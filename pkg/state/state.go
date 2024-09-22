@@ -358,14 +358,18 @@ func (s *LocalState) Persist() error {
 }
 
 func Save(state *State) error {
+	StateLogger.Debug("save - start save state")
 	filePath, err := GetStateFilePath()
 	if err != nil {
 		return err
 	}
+	StateLogger.Debug("save - state path ", "path", filePath)
 
+	StateLogger.Debug("save - check state file exist and create temporary state")
 	var tmpFilePath string
 	if exist := utils.IsFileExists(filePath); exist {
 		tmpFilePath = CreateTmpState(filePath)
+		StateLogger.Debug("save - create temporary state", "path", tmpFilePath)
 	}
 
 	file, err := createOrLoadFile(filePath)
@@ -375,7 +379,7 @@ func Save(state *State) error {
 
 	defer file.Close()
 
-	StateLogger.Debug("generate local state", "path", filePath)
+	StateLogger.Debug("save -generate local state", "path", filePath)
 	gob.Register(map[string]interface{}{})
 	encoder := gob.NewEncoder(file)
 	if err := encoder.Encode(state); err != nil {
@@ -383,10 +387,15 @@ func Save(state *State) error {
 		return err
 	}
 
-	if err := utils.DeleteFile(tmpFilePath); err != nil {
-		return err
+	if len(tmpFilePath) > 0 {
+		StateLogger.Debug("save - delete temporary state state", "path", tmpFilePath)
+		if err := utils.DeleteFile(tmpFilePath); err != nil {
+			StateLogger.Error("save -err delete tmp state", "err", err.Error())
+			return err
+		}
 	}
 
+	StateLogger.Debug("save - success save state")
 	return nil
 }
 
@@ -430,21 +439,26 @@ func RestoreFromTmp(tmpFile string) {
 }
 
 func Load() (*State, error) {
+	StateLogger.Info("GetStateFilePath")
 	filePath, err := GetStateFilePath()
 	if err != nil {
 		return nil, err
 	}
+	StateLogger.Info("state path", "path", filePath)
 
 	if !utils.IsFileExists(filePath) {
+		StateLogger.Info("state not exist", "path", filePath)
+
+		initialState := &State{}
 		// save empty state
-		err := Save(&State{})
+		err := Save(initialState)
 		if err != nil {
 			return nil, err
-		} else {
-			return nil, nil
 		}
+		return initialState, nil
 	}
 
+	StateLogger.Info("open state file", "path", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err

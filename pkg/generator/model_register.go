@@ -72,8 +72,10 @@ func GenerateModelRegister(basePath string, projectName string, generateFn Gener
 		return err
 	}
 
+	writer := &FileWriter{FilePath: input.OutputPath}
+
 	ModelRegisterLogger.Debug("generate model register", "path", input.OutputPath)
-	return generateFn(input, nil)
+	return generateFn(input, writer)
 }
 
 func createModelRegisterInput(projectName string, modelRegisterDir string, modelList []string) (input GenerateInput, err error) {
