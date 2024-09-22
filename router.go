@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/sev-2/raiden/pkg/logger"
@@ -428,4 +429,65 @@ func createHandleFunc(httpMethod string, routeType RouteType, c Controller) Rout
 
 		return nil
 	}
+}
+
+func NewRouteFromController(controller Controller, methods []string) *Route {
+	r := &Route{Controller: controller, Methods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}}
+	rv := reflect.ValueOf(controller)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+
+	if len(methods) > 0 {
+		r.Methods = methods
+	}
+
+	// check route type and path
+	if sf, exist := rv.Type().FieldByName("Http"); exist {
+		// find and assign route type
+		rType := sf.Tag.Get("type")
+		switch rType {
+		case string(RouteTypeFunction):
+			r.Type = RouteTypeFunction
+		case string(RouteTypeCustom):
+			r.Type = RouteTypeCustom
+		case string(RouteTypeRpc):
+			r.Type = RouteTypeRpc
+		case string(RouteTypeRest):
+			r.Type = RouteTypeRest
+		case string(RouteTypeRealtime):
+			r.Type = RouteTypeRealtime
+		case string(RouteTypeStorage):
+			r.Type = RouteTypeStorage
+		}
+
+		// find and assign tag name
+		if rPath := sf.Tag.Get("path"); rPath != "" {
+			r.Path = rPath
+		}
+	}
+
+	// // find and assign model
+	if modelField, ok := rv.Type().FieldByName("Model"); ok {
+		modelType := modelField.Type
+		newModel := reflect.New(modelType).Elem()
+
+		r.Model = newModel.Interface()
+	}
+
+	// find and assign storage
+	if storageField, ok := rv.Type().FieldByName("Storage"); ok {
+		storageType := storageField.Type
+
+		if reflect.TypeOf(storageType).Kind() == reflect.Pointer {
+			storageType = storageType.Elem()
+		}
+		newStorage := reflect.New(storageType)
+		bucketInterface := reflect.TypeOf((*Bucket)(nil)).Elem()
+		if newStorage.Type().Implements(bucketInterface) {
+			r.Storage = newStorage.Interface().(Bucket)
+		}
+	}
+
+	return r
 }

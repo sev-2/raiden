@@ -75,8 +75,11 @@ func GenerateRpcRegister(basePath string, projectName string, generateFn Generat
 		return err
 	}
 
+	// setup writer
+	writer := &FileWriter{FilePath: input.OutputPath}
+
 	RpcRegisterLogger.Debug("generate rpc", "path", input.OutputPath)
-	return generateFn(input, nil)
+	return generateFn(input, writer)
 }
 
 func createRegisterRpcInput(projectName string, rpcRegisterDir string, rpcList []string) (input GenerateInput, err error) {

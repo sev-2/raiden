@@ -62,6 +62,7 @@ import (
 {{end }}
 func RegisterRoute(server *raiden.Server) {
 	server.RegisterRoute([]*raiden.Route{
+		raiden.NewRouteFromController(&raiden_controllers.StateReadyController{}, []string{fasthttp.MethodPost}),
 		{{- range .Routes}}
 		{
 			Type:       {{ .Type }},
@@ -106,8 +107,11 @@ func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) e
 		return err
 	}
 
+	// setup writer
+	writer := &FileWriter{FilePath: input.OutputPath}
+
 	RouterLogger.Debug("generate route", "path", input.OutputPath)
-	return generateFn(input, nil)
+	return generateFn(input, writer)
 }
 
 func WalkScanControllers(controllerPath string) ([]GenerateRouteItem, error) {
@@ -350,6 +354,8 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	// set imports path
 	imports := []string{
 		fmt.Sprintf("%q", "github.com/sev-2/raiden"),
+		fmt.Sprintf("%q", "github.com/valyala/fasthttp"),
+		fmt.Sprintf("%s %q", "raiden_controllers", "github.com/sev-2/raiden/pkg/controllers"),
 	}
 
 	if len(routes) > 0 {
@@ -358,17 +364,12 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	}
 
 	isHaveModel := false
-	isHaveMethods := false
 	isHaveStorage := false
 	for i := range routes {
 		r := routes[i]
 
 		if r.Model != "" && !isHaveModel {
 			isHaveModel = true
-		}
-
-		if r.Methods != "" && r.Methods != "[]string{}" && !isHaveMethods {
-			isHaveMethods = true
 		}
 
 		if r.Storage != "" && !isHaveStorage {
@@ -379,10 +380,6 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	if isHaveModel {
 		modelImportPath := fmt.Sprintf("%s/internal/models", utils.ToGoModuleName(projectName))
 		imports = append(imports, fmt.Sprintf("%q", modelImportPath))
-	}
-
-	if isHaveMethods {
-		imports = append(imports, fmt.Sprintf("%q", "github.com/valyala/fasthttp"))
 	}
 
 	if isHaveStorage {
