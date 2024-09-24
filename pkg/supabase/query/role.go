@@ -180,5 +180,12 @@ func BuildUpdateRoleQuery(newRole objects.Role, updateRoleParam objects.UpdateRo
 }
 
 func BuildDeleteRoleQuery(role objects.Role) string {
-	return fmt.Sprintf("DROP ROLE %s;", role.Name)
+	return fmt.Sprintf(`
+		REVOKE %s FROM authenticator;
+		REVOKE anon FROM %s;
+		DROP ROLE %s;`,
+		role.Name,
+		role.Name,
+		role.Name,
+	)
 }
