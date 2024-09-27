@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"strings"
@@ -9,10 +10,10 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func PostgrestRequest(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string) ([]byte, *fasthttp.Response, error) {
+func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
 
 	if !isAllowedMethod(method) {
-		return nil, nil, fmt.Errorf("method %s is not allowed", method)
+		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
 
 	client := &fasthttp.Client{}
@@ -38,15 +39,20 @@ func PostgrestRequest(ctx raiden.Context, method string, url string, payload []b
 	req.SetRequestURI(url)
 	req.Header.SetMethod(method)
 
-	apikey := string(ctx.RequestContext().Request.Header.Peek("apikey"))
-	if apikey != "" {
-		req.Header.Set("apikey", apikey)
-	}
-
-	bearerToken := string(ctx.RequestContext().Request.Header.Peek("Authorization"))
-	if bearerToken != "" && strings.HasPrefix(bearerToken, "Bearer ") {
-		bearerToken = strings.TrimSpace(strings.TrimPrefix(bearerToken, "Bearer "))
-		req.Header.Set("Authorization", bearerToken)
+	if bypass {
+		if flag.Lookup("test.v") == nil {
+			req.Header.Set("apikey", getConfig().ServiceKey)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+		}
+	} else {
+		apikey := string(ctx.RequestContext().Request.Header.Peek("apikey"))
+		if apikey != "" {
+			req.Header.Set("apikey", apikey)
+		}
+		bearerToken := string(ctx.RequestContext().Request.Header.Peek("Authorization"))
+		if bearerToken != "" && strings.HasPrefix(bearerToken, "Bearer ") {
+			req.Header.Set("Authorization", bearerToken)
+		}
 	}
 
 	for key, value := range headers {
@@ -61,12 +67,18 @@ func PostgrestRequest(ctx raiden.Context, method string, url string, payload []b
 	defer fasthttp.ReleaseResponse(res)
 
 	if err := client.Do(req, res); err != nil {
-		return nil, res, err
+		return res, err
 	}
 
 	body := res.Body()
 
-	return body, res, nil
+	if result != nil {
+		if err := json.Unmarshal(body, result); err != nil {
+			return res, fmt.Errorf("failed to unmarshal response body: %w", err)
+		}
+	}
+
+	return res, nil
 }
 
 func isAllowedMethod(method string) bool {

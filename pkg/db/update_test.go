@@ -14,10 +14,10 @@ func TestUpdate(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	_, err := NewQuery(&mockRaidenContext).
+	err := NewQuery(&mockRaidenContext).
 		Model(articleMockModel).
 		Eq("id", 1).
-		Update(article)
+		Update(article, &articleMockModel)
 
 	assert.NoError(t, err)
 }
