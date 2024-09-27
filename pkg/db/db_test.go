@@ -112,13 +112,15 @@ func TestGetTable(t *testing.T) {
 }
 
 func TestSingle(t *testing.T) {
-	_, err := NewQuery(&mockRaidenContext).Model(articleMockModel).Single()
+	var articleMockModel = ArticleMockModel{}
+	_, err := NewQuery(&mockRaidenContext).Model(articleMockModel).Single(&articleMockModel)
 
 	assert.NoError(t, err)
 }
 
 func TestGet(t *testing.T) {
-	_, err := NewQuery(&mockRaidenContext).Model(articleMockModel).Get()
+	var collection []ArticleMockModel
+	_, err := NewQuery(&mockRaidenContext).Model(articleMockModel).Get(&collection)
 
 	assert.NoError(t, err)
 }
