@@ -35,7 +35,7 @@ func (q *Query) HasError() bool {
 func NewQuery(ctx raiden.Context) *Query {
 	return &Query{
 		Context: ctx,
-		bypass:  false,
+		ByPass:  false,
 	}
 }
 
@@ -49,8 +49,8 @@ func (q *Query) From(m interface{}) *Query {
 	return q
 }
 
-func (q *Query) ByPass() *Query {
-	q.bypass = true
+func (q *Query) AsSystem() *Query {
+	q.ByPass = true
 	return q
 }
 
