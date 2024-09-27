@@ -40,8 +40,10 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	req.Header.SetMethod(method)
 
 	if bypass {
-		req.Header.Set("apikey", getConfig().ServiceKey)
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+		if flag.Lookup("test.v") == nil {
+			req.Header.Set("apikey", getConfig().ServiceKey)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+		}
 	} else {
 		apikey := string(ctx.RequestContext().Request.Header.Peek("apikey"))
 		if apikey != "" {
