@@ -121,7 +121,7 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	defer fasthttp.ReleaseResponse(res)
 
 	if err := client.Do(req, res); err != nil {
-		return nil, res, err
+		return res, err
 	}
 
 	body := res.Body()
