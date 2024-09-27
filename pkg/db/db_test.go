@@ -119,7 +119,7 @@ func TestSingle(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	var collection []interface{}
+	var collection interface{}
 	err := NewQuery(&mockRaidenContext).Model(articleMockModel).Get(&collection)
 
 	assert.NoError(t, err)
