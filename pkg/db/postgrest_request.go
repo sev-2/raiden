@@ -72,7 +72,7 @@ func PostgrestRequest(ctx raiden.Context, method string, url string, payload []b
 func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string, result interface{}) (*fasthttp.Response, error) {
 
 	if !isAllowedMethod(method) {
-		return nil, nil, fmt.Errorf("method %s is not allowed", method)
+		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
 
 	client := &fasthttp.Client{}
