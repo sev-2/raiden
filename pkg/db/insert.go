@@ -6,7 +6,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func (q *Query) Insert(payload interface{}) ([]byte, error) {
+func (q *Query) Insert(payload interface{}, model interface{}) error {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -18,10 +18,10 @@ func (q *Query) Insert(payload interface{}) ([]byte, error) {
 	headers["Content-Type"] = "application/json"
 	headers["Prefer"] = "return=representation"
 
-	body, _, err := PostgrestRequest(q.Context, fasthttp.MethodPost, url, jsonData, headers)
+	_, err := PostgrestRequestBind(q.Context, fasthttp.MethodPost, url, jsonData, headers, q.ByPass, model)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return body, nil
+	return nil
 }

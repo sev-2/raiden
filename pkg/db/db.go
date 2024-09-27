@@ -21,6 +21,7 @@ type Query struct {
 	LimitValue   int
 	OffsetValue  int
 	Errors       []error
+	ByPass       bool
 }
 
 type ModelBase struct {
@@ -34,6 +35,7 @@ func (q *Query) HasError() bool {
 func NewQuery(ctx raiden.Context) *Query {
 	return &Query{
 		Context: ctx,
+		bypass:  false,
 	}
 }
 
@@ -44,6 +46,11 @@ func (q *Query) Model(m interface{}) *Query {
 
 func (q *Query) From(m interface{}) *Query {
 	q.model = m
+	return q
+}
+
+func (q *Query) ByPass() *Query {
+	q.bypass = true
 	return q
 }
 
@@ -69,7 +76,7 @@ func (m *ModelBase) Execute() (model *ModelBase) {
 	return m
 }
 
-func (q Query) Get() ([]byte, error) {
+func (q Query) Get(collection interface{}) error {
 
 	url := q.GetUrl()
 
@@ -77,27 +84,27 @@ func (q Query) Get() ([]byte, error) {
 	headers["Content-Type"] = "application/json"
 	headers["Prefer"] = "return=representation"
 
-	resp, _, err := PostgrestRequest(q.Context, fasthttp.MethodGet, url, nil, headers)
+	_, err := PostgrestRequestBind(q.Context, fasthttp.MethodGet, url, nil, headers, q.ByPass, collection)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return resp, nil
+	return nil
 }
 
-func (q Query) Single() ([]byte, error) {
+func (q Query) Single(model interface{}) error {
 	url := q.Limit(1).GetUrl()
 
 	headers := make(map[string]string)
 
 	headers["Accept"] = "application/vnd.pgrst.object+json"
 
-	res, _, err := PostgrestRequest(q.Context, "GET", url, nil, headers)
+	_, err := PostgrestRequestBind(q.Context, "GET", url, nil, headers, q.ByPass, model)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return res, nil
+	return nil
 }
 
 func (q Query) GetUrl() string {

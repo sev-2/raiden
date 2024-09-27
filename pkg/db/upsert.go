@@ -15,7 +15,7 @@ const (
 	IgnoreDuplicates = "ignore-duplicates"
 )
 
-func (q *Query) Upsert(payload []interface{}, opt UpsertOptions) ([]byte, error) {
+func (q *Query) Upsert(payload []interface{}, opt UpsertOptions) error {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -27,10 +27,11 @@ func (q *Query) Upsert(payload []interface{}, opt UpsertOptions) ([]byte, error)
 	headers["Content-Type"] = "application/json"
 	headers["Prefer"] = "resolution=" + opt.OnConflict
 
-	resp, _, err := PostgrestRequest(q.Context, fasthttp.MethodPost, url, jsonData, headers)
+	var a interface{}
+	_, err := PostgrestRequestBind(q.Context, fasthttp.MethodPost, url, jsonData, headers, q.ByPass, &a)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return resp, nil
+	return nil
 }
