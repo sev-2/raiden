@@ -124,3 +124,10 @@ func TestGet(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+func TestByPass(t *testing.T) {
+	var collection interface{}
+	err := NewQuery(&mockRaidenContext).Model(articleMockModel).AsSystem().Get(&collection)
+
+	assert.NoError(t, err)
+}
