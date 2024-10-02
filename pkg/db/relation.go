@@ -31,8 +31,6 @@ func (q *Query) Preload(table string, args ...string) *Query {
 
 	relations := strings.Split(table, ".")
 
-	fmt.Printf("Preloading table: %s, field: %s, operator: %s, value: %s\n", table, field, operator, value)
-
 	if len(relations) > 3 {
 		raiden.Fatal("unsupported nested relations more than 3 levels")
 	}
@@ -53,7 +51,6 @@ func (q *Query) Preload(table string, args ...string) *Query {
 			raiden.Fatal("could not find related model.")
 		}
 
-		fmt.Printf("Related model: %v\n", relatedModel)
 		relatedModelStruct := reflect.TypeOf(relatedModel)
 		if relatedModelStruct.Kind() == reflect.Ptr {
 			relatedModelStruct = relatedModelStruct.Elem()
@@ -127,9 +124,6 @@ func (q *Query) Preload(table string, args ...string) *Query {
 		}
 	}
 
-	fmt.Println("Relations: ", relationMap)
-	fmt.Println("Selects: ", selects)
-	fmt.Println("Prefix: ", relatedFieldPrefix)
 	q.Relations = append(q.Relations, selects...)
 
 	if field != "" && operator != "" && value != "" {
