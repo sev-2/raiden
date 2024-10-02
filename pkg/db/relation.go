@@ -120,7 +120,7 @@ func (q *Query) Preload(table string, args ...string) *Query {
 			selects = append(selects, fmt.Sprintf("%s(%s)", related, "*"))
 		}
 
-		if (relatedFieldPrefix == "") {
+		if relatedFieldPrefix == "" {
 			relatedFieldPrefix = table
 		} else {
 			relatedFieldPrefix = fmt.Sprintf("%s.%s", relatedFieldPrefix, table)
