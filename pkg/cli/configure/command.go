@@ -58,7 +58,13 @@ func Run(f *Flags, projectPath string) (*Config, error) {
 		}
 
 		if !isReconfigure {
-			return nil, nil
+			path := GetConfigFilePath(projectPath)
+			raidenCfg, err1 := raiden.LoadConfig(&path)
+			if err1 != nil {
+				return nil, err1
+			}
+
+			return &Config{*raidenCfg}, nil
 		}
 	}
 
