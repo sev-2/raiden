@@ -32,7 +32,7 @@ func (q *Query) Preload(table string, args ...string) *Query {
 	relations := strings.Split(table, ".")
 
 	if len(relations) > 3 {
-		raiden.Fatal("unsupported nested relations more than 3 levels")
+		raiden.Panic("unsupported nested relations more than 3 levels")
 	}
 
 	for i, relation := range relations {
@@ -48,7 +48,7 @@ func (q *Query) Preload(table string, args ...string) *Query {
 		}
 
 		if err != nil {
-			raiden.Fatal("could not find related model.")
+			raiden.Panic("could not find related model.")
 		}
 
 		relatedModelStruct := reflect.TypeOf(relatedModel)
@@ -80,7 +80,7 @@ func (q *Query) Preload(table string, args ...string) *Query {
 				relatedForeignKey, err = getTagValue(join, "foreignKey")
 
 				if err != nil {
-					raiden.Fatal("could not find foreign key in join tag.")
+					raiden.Panic("could not find foreign key in join tag.")
 				}
 			}
 		}
