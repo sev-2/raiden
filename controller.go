@@ -353,6 +353,9 @@ func (rc RestController) Put(ctx Context) error {
 		return err1
 	}
 
+	// Set prefer representation header as default
+	ctx.RequestContext().Request.Header.Add("Prefer", "return=representation")
+
 	return RestProxy(ctx, rc.TableName)
 }
 
