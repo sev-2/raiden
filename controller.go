@@ -309,6 +309,9 @@ func (rc RestController) Patch(ctx Context) error {
 		return err1
 	}
 
+	// Set prefer representation header as default
+	ctx.RequestContext().Request.Header.Add("Prefer", "return=representation")
+
 	return RestProxy(ctx, rc.TableName)
 }
 
@@ -331,6 +334,9 @@ func (rc RestController) Post(ctx Context) error {
 	if err1 := Validate(model); err1 != nil {
 		return err1
 	}
+
+	// Set prefer representation header as default
+	ctx.RequestContext().Request.Header.Add("Prefer", "return=representation")
 
 	return RestProxy(ctx, rc.TableName)
 }
