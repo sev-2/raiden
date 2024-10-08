@@ -23,7 +23,7 @@ func (q Query) Select(columns []string) (model *Query) {
 			column = split[1]
 			if !isValidColumnName(alias) {
 				err := fmt.Sprintf("invalid alias column name: \"%s\" name is invalid.", alias)
-				raiden.Fatal(err)
+				raiden.Panic(err)
 			}
 		} else {
 			column = c
