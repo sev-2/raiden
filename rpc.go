@@ -227,7 +227,7 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 	case RpcParamDataTypeArrayJSONB:
 		return RpcParamDataTypeArrayJSONB, nil
 	case RpcParamDataTypeArrayUuid:
-		return RpcParamDataTypeArrayUuid
+		return RpcParamDataTypeArrayUuid, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc param type  : %s", pCheckType)
 	}
