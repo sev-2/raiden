@@ -44,6 +44,7 @@ TRACE_COLLECTOR: {{ .TraceCollector}}
 TRACE_COLLECTOR_ENDPOINT: {{ .TraceCollectorEndpoint }}
 
 MAX_SERVER_REQUEST_BODY_SIZE: {{ .MaxServerRequestBodySize }}
+MAX_SERVER_READ_BUFFER_SIZE: {{ .MaxServerReadBufferSize }}
 
 CORS_ALLOWED_ORIGINS:
 CORS_ALLOWED_METHODS:
@@ -73,6 +74,10 @@ func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateF
 
 	if config.MaxServerRequestBodySize == 0 {
 		config.MaxServerRequestBodySize = 8 * 1024 * 1024
+	}
+
+	if config.MaxServerReadBufferSize == 0 {
+		config.MaxServerReadBufferSize = 8 * 1024 * 1024
 	}
 
 	input := GenerateInput{
