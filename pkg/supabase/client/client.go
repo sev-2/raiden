@@ -57,6 +57,7 @@ func getClient() Client {
 			Concurrency:      4096,
 			DNSCacheDuration: time.Hour,
 		}).Dial,
+		ReadBufferSize: 8192,
 	}
 }
 
