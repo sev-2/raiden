@@ -21,6 +21,20 @@ func (q *Query) Eq(column string, value any) *Query {
 	return q
 }
 
+func (q *Query) NotEq(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.eq.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
 func (q *Query) OrEq(column string, value any) *Query {
 
 	if q.WhereOrList == nil {
@@ -44,6 +58,20 @@ func (q *Query) Neq(column string, value any) *Query {
 	*q.WhereAndList = append(
 		*q.WhereAndList,
 		fmt.Sprintf("%s=neq.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) NotNeq(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.neq.%s", column, getStringValue(value)),
 	)
 
 	return q
@@ -77,6 +105,20 @@ func (q *Query) Lt(column string, value any) *Query {
 	return q
 }
 
+func (q *Query) NotLt(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.lt.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
 func (q *Query) OrLt(column string, value any) *Query {
 
 	if q.WhereOrList == nil {
@@ -100,6 +142,20 @@ func (q *Query) Lte(column string, value any) *Query {
 	*q.WhereAndList = append(
 		*q.WhereAndList,
 		fmt.Sprintf("%s=lte.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) NotLte(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.lte.%s", column, getStringValue(value)),
 	)
 
 	return q
@@ -133,6 +189,20 @@ func (q *Query) Gt(column string, value int) *Query {
 	return q
 }
 
+func (q *Query) NotGt(column string, value int) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.gt.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
 func (q *Query) OrGt(column string, value int) *Query {
 
 	if q.WhereOrList == nil {
@@ -156,6 +226,20 @@ func (q *Query) Gte(column string, value any) *Query {
 	*q.WhereAndList = append(
 		*q.WhereAndList,
 		fmt.Sprintf("%s=gte.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) NotGte(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.gte.%s", column, getStringValue(value)),
 	)
 
 	return q
@@ -186,6 +270,22 @@ func (q *Query) In(column string, value any) *Query {
 	*q.WhereAndList = append(
 		*q.WhereAndList,
 		fmt.Sprintf("%s=in.(%s)", column, strValues),
+	)
+
+	return q
+}
+
+func (q *Query) NotIn(column string, value any) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	strValues := strings.Join(SliceToStringSlice(value), ",")
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.in.(%s)", column, strValues),
 	)
 
 	return q
@@ -223,6 +323,22 @@ func (q *Query) Like(column string, value string) *Query {
 	return q
 }
 
+func (q *Query) NotLike(column string, value string) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	value = strings.ReplaceAll(value, "%", "*")
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.like.%s", column, getStringWithSpace(value)),
+	)
+
+	return q
+}
+
 func (q *Query) OrLike(column string, value string) *Query {
 
 	if q.WhereOrList == nil {
@@ -255,6 +371,22 @@ func (q *Query) Ilike(column string, value string) *Query {
 	return q
 }
 
+func (q *Query) NotIlike(column string, value string) *Query {
+
+	if q.WhereAndList == nil {
+		q.WhereAndList = &[]string{}
+	}
+
+	value = strings.ReplaceAll(value, "%", "*")
+
+	*q.WhereAndList = append(
+		*q.WhereAndList,
+		fmt.Sprintf("%s=not.ilike.%s", column, getStringWithSpace(value)),
+	)
+
+	return q
+}
+
 func (q *Query) OrIlike(column string, value string) *Query {
 
 	if q.WhereOrList == nil {
@@ -266,6 +398,38 @@ func (q *Query) OrIlike(column string, value string) *Query {
 	*q.WhereOrList = append(
 		*q.WhereOrList,
 		fmt.Sprintf("%s.ilike.%s", column, getStringWithSpace(value)),
+	)
+
+	return q
+}
+
+func (q *Query) Is(column string, value any) *Query {
+
+	isValueWhitelist(value)
+
+	if q.IsList == nil {
+		q.IsList = &[]string{}
+	}
+
+	*q.IsList = append(
+		*q.IsList,
+		fmt.Sprintf("%s=is.%s", column, getStringValue(value)),
+	)
+
+	return q
+}
+
+func (q *Query) NotIs(column string, value string) *Query {
+
+	isValueWhitelist(value)
+
+	if q.IsList == nil {
+		q.IsList = &[]string{}
+	}
+
+	*q.IsList = append(
+		*q.IsList,
+		fmt.Sprintf("%s=not.is.%s", column, getStringValue(value)),
 	)
 
 	return q
@@ -303,4 +467,16 @@ func SliceToStringSlice(slice interface{}) []string {
 		}
 	}
 	return stringSlice
+}
+
+func isValueWhitelist(value any) bool {
+	switch getStringValue(value) {
+	case "true":
+	case "false":
+	case "null":
+	case "unknown":
+		return true
+	}
+
+	panic("isValueWhitelist: only \"true\", \"false\", \"null\", or \"unknown\" are allowed")
 }
