@@ -2,6 +2,9 @@ package generator
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -72,8 +75,11 @@ func GenerateRpcRegister(basePath string, projectName string, generateFn Generat
 		return err
 	}
 
+	// setup writer
+	writer := &FileWriter{FilePath: input.OutputPath}
+
 	RpcRegisterLogger.Debug("generate rpc", "path", input.OutputPath)
-	return generateFn(input, nil)
+	return generateFn(input, writer)
 }
 
 func createRegisterRpcInput(projectName string, rpcRegisterDir string, rpcList []string) (input GenerateInput, err error) {
@@ -114,7 +120,7 @@ func WalkScanRpc(rpcDir string) ([]string, error) {
 	err := filepath.Walk(rpcDir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
 			RpcRegisterLogger.Trace("collect rpc", "path", path)
-			rs, e := getStructByBaseName(path, "RpcBase")
+			rs, e := getStructByBaseAndExcludeReturnType(path, "RpcBase", map[string]bool{"RpcReturnDataTypeTrigger": true})
 			if e != nil {
 				return e
 			}
@@ -129,4 +135,109 @@ func WalkScanRpc(rpcDir string) ([]string, error) {
 	}
 
 	return rpc, nil
+}
+
+func getStructByBaseAndExcludeReturnType(filePath string, baseStructName string, returnTypes map[string]bool) (r []string, err error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
+	if err != nil {
+		return r, err
+	}
+
+	mapRpc := map[string]struct {
+		IsFoundBaseStruct bool
+		IsExclude         bool
+	}{}
+
+	// Traverse the AST to find the struct with the Http attribute
+	for _, decl := range file.Decls {
+
+		ft, fok := decl.(*ast.FuncDecl)
+		if fok {
+			if ft.Name == nil || (ft.Name != nil && ft.Name.Name != "GetReturnType") {
+				continue
+			}
+
+			startExp, isStartExp := ft.Recv.List[0].Type.(*ast.StarExpr)
+			if !isStartExp {
+				continue
+			}
+			stName := fmt.Sprintf("%s", startExp.X)
+
+			// Iterate over the statements in the function body
+			for _, stmt := range ft.Body.List {
+				// Check if the statement is a return statement
+				retStmt, isReturn := stmt.(*ast.ReturnStmt)
+				if isReturn {
+					// Iterate over the results in the return statement
+					for _, result := range retStmt.Results {
+						switch expr := result.(type) {
+						case *ast.SelectorExpr:
+							if returnTypes[expr.Sel.Name] {
+								// isExclude = true
+								if v, exist := mapRpc[stName]; exist {
+									mapRpc[stName] = struct {
+										IsFoundBaseStruct bool
+										IsExclude         bool
+									}{
+										IsFoundBaseStruct: v.IsFoundBaseStruct,
+										IsExclude:         true,
+									}
+								}
+							}
+						default:
+							continue
+						}
+					}
+				}
+			}
+			continue
+		}
+
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			st, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+
+			if len(st.Fields.List) == 0 {
+				continue
+			}
+
+			for _, f := range st.Fields.List {
+				if se, isSe := f.Type.(*ast.SelectorExpr); isSe && se.Sel.Name == baseStructName {
+					if _, exist := mapRpc[typeSpec.Name.Name]; !exist {
+						mapRpc[typeSpec.Name.Name] = struct {
+							IsFoundBaseStruct bool
+							IsExclude         bool
+						}{
+							IsFoundBaseStruct: true,
+							IsExclude:         false,
+						}
+					}
+					continue
+				}
+			}
+
+		}
+	}
+
+	for structName, checkValue := range mapRpc {
+		if checkValue.IsFoundBaseStruct && checkValue.IsExclude {
+			continue
+		}
+		r = append(r, structName)
+	}
+
+	return
 }

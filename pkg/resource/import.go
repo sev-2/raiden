@@ -185,12 +185,18 @@ func Import(flags *Flags, config *raiden.Config) error {
 		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
 	}
 	if !flags.DryRun {
-		// generate resource
-		if err := generateImportResource(config, &importState, flags.ProjectPath, spResource, mapModelValidationTags); err != nil {
-			return err
+		if flags.UpdateStateOnly {
+			return updateStateOnly(&importState, spResource, mapModelValidationTags)
+		} else {
+			// generate resource
+			if err := generateImportResource(config, &importState, flags.ProjectPath, spResource, mapModelValidationTags); err != nil {
+				return err
+			}
+			PrintImportReport(importReport, false)
 		}
-		PrintImportReport(importReport, false)
+
 	} else {
+
 		if len(dryRunError) > 0 {
 			errMessage := strings.Join(dryRunError, "\n")
 			ImportLogger.Error("got error", "err-msg", errMessage)
@@ -263,7 +269,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 			if errGenRpc := generator.GenerateRpc(projectPath, config.ProjectName, resource.Functions, resource.Tables, captureFunc); errGenRpc != nil {
 				errChan <- errGenRpc
 			}
-			ImportLogger.Info("finish generate roles")
+			ImportLogger.Info("finish generate functions")
 		}
 
 		if len(resource.Storages) > 0 {
@@ -303,9 +309,62 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 	}
 }
 
+func updateStateOnly(importState *state.LocalState, resource *Resource, mapModelValidationTags map[string]state.ModelValidationTag) error {
+	if len(resource.Tables) > 0 {
+		tableInputs := tables.BuildGenerateModelInputs(resource.Tables, resource.Policies, mapModelValidationTags)
+		for i := range tableInputs {
+			t := tableInputs[i]
+			importState.AddTable(state.TableState{
+				Table:       t.Table,
+				Relation:    t.Relations,
+				Policies:    t.Policies,
+				ModelStruct: utils.SnakeCaseToPascalCase(t.Table.Name),
+				LastUpdate:  time.Now(),
+			})
+		}
+	}
+
+	if len(resource.Roles) > 0 {
+		for i := range resource.Roles {
+			r := resource.Roles[i]
+			importState.AddRole(state.RoleState{
+				Role:       r,
+				IsNative:   false,
+				RoleStruct: utils.SnakeCaseToPascalCase(r.Name),
+				LastUpdate: time.Now(),
+			})
+		}
+	}
+
+	if len(resource.Functions) > 0 {
+		for i := range resource.Functions {
+			f := resource.Functions[i]
+			importState.AddRpc(state.RpcState{
+				Function:   f,
+				RpcStruct:  utils.SnakeCaseToPascalCase(f.Name),
+				LastUpdate: time.Now(),
+			})
+		}
+	}
+
+	if len(resource.Storages) > 0 {
+		storageInputs := storages.BuildGenerateStorageInput(resource.Storages, resource.Policies)
+		for i := range storageInputs {
+			s := storageInputs[i]
+			importState.AddStorage(state.StorageState{
+				Storage:       s.Bucket,
+				StorageStruct: utils.SnakeCaseToPascalCase(s.Bucket.Name),
+				Policies:      s.Policies,
+				LastUpdate:    time.Now(),
+			})
+		}
+	}
+	return importState.Persist()
+}
+
 func ImportDecorateFunc[T any](data []T, findFunc func(T, generator.GenerateInput) bool, stateChan chan any) generator.GenerateFn {
 	return func(input generator.GenerateInput, writer io.Writer) error {
-		if err := generator.Generate(input, nil); err != nil {
+		if err := generator.Generate(input, writer); err != nil {
 			return err
 		}
 		if rs, found := FindImportResource(data, input, findFunc); found {

@@ -95,7 +95,7 @@ func LoadConfig(path *string) (*Config, error) {
 	}
 
 	if config.MaxServerRequestBodySize == 0 {
-		config.MaxServerRequestBodySize = 8 * 1024 * 1024 // Default 8 MB
+		config.MaxServerRequestBodySize = 8 * 1024 * 1024 // Default Max: 8 MB
 	}
 
 	return &config, nil

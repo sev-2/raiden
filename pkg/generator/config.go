@@ -43,6 +43,8 @@ TRACE_ENABLE: {{ .TraceEnable }}
 TRACE_COLLECTOR: {{ .TraceCollector}}
 TRACE_COLLECTOR_ENDPOINT: {{ .TraceCollectorEndpoint }}
 
+MAX_SERVER_REQUEST_BODY_SIZE: {{ .MaxServerRequestBodySize }}
+
 CORS_ALLOWED_ORIGINS:
 CORS_ALLOWED_METHODS:
 CORS_ALLOWED_HEADERS:
@@ -67,6 +69,10 @@ func GenerateConfig(basePath string, config *raiden.Config, generateFn GenerateF
 
 	if config.ServerPort == "" {
 		config.ServerPort = "8002"
+	}
+
+	if config.MaxServerRequestBodySize == 0 {
+		config.MaxServerRequestBodySize = 8 * 1024 * 1024
 	}
 
 	input := GenerateInput{

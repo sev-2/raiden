@@ -36,7 +36,7 @@ func TestUpsert(t *testing.T) {
 		OnConflict: MergeDuplicates,
 	}
 
-	_, err := NewQuery(&mockRaidenContext).
+	err := NewQuery(&mockRaidenContext).
 		Model(articleMockModel).
 		Upsert(payload, opt)
 

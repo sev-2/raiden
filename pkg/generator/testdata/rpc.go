@@ -13,3 +13,29 @@ type GetVoteBy struct {
 	Params *GetVoteByParams `json:"-"`
 	Return GetVoteByResult  `json:"-"`
 }
+
+type CreateProfileParams struct {
+}
+type CreateProfileResult interface{}
+
+type CreateProfile struct {
+	raiden.RpcBase
+	Params *CreateProfileParams `json:"-"`
+	Return CreateProfileResult  `json:"-"`
+}
+
+func (r *CreateProfile) GetName() string {
+	return "create_profile"
+}
+
+func (r *CreateProfile) GetSecurity() raiden.RpcSecurityType {
+	return raiden.RpcSecurityTypeDefiner
+}
+
+func (r *CreateProfile) GetReturnType() raiden.RpcReturnDataType {
+	return raiden.RpcReturnDataTypeTrigger
+}
+
+func (r *CreateProfile) GetRawDefinition() string {
+	return `BEGIN INSERT INTO public.users (firstname,lastname, email) VALUES ( NEW.raw_user_meta_data ->> 'name', NEW.raw_user_meta_data ->> 'name', NEW.raw_user_meta_data ->> 'email' ); RETURN NEW; END;`
+}

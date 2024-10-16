@@ -73,8 +73,11 @@ func GenerateStoragesRegister(basePath string, projectName string, generateFn Ge
 		return err
 	}
 
+	// setup writer
+	writer := &FileWriter{FilePath: input.OutputPath}
+
 	StorageRegisterLogger.Debug("generate storage register", "path", input.OutputPath)
-	return generateFn(input, nil)
+	return generateFn(input, writer)
 }
 
 func createStorageRegisterInput(projectName string, storageRegisterDir string, storageList []string) (input GenerateInput, err error) {

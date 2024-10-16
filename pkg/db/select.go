@@ -23,7 +23,7 @@ func (q Query) Select(columns []string) (model *Query) {
 			column = split[1]
 			if !isValidColumnName(alias) {
 				err := fmt.Sprintf("invalid alias column name: \"%s\" name is invalid.", alias)
-				raiden.Fatal(err)
+				raiden.Panic(err)
 			}
 		} else {
 			column = c
@@ -87,33 +87,4 @@ func isValidColumnName(column string) bool {
 	isAllowed, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]{1,59}`, column)
 
 	return isAllowed
-}
-
-func isForeignKeyExist(m interface{}, column string) bool {
-	if column == "inner" {
-		return true
-	}
-
-	t := reflect.TypeOf(m)
-
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-
-		if tagValue := field.Tag.Get("join"); tagValue != "" {
-			for _, part := range strings.Split(tagValue, ";") {
-				kv := strings.SplitN(part, ":", 2)
-				if len(kv) == 2 && kv[0] == "targetForeign" {
-					if kv[1] == column {
-						return true
-					}
-				}
-			}
-		}
-	}
-
-	return false
 }

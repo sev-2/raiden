@@ -41,6 +41,7 @@ const (
 	RpcParamDataTypeTimestampTZAlias RpcParamDataType = "TIMESTAMPZ"
 	RpcParamDataTypeJSON             RpcParamDataType = "JSON"
 	RpcParamDataTypeJSONB            RpcParamDataType = "JSONB"
+	RpcParamDataTypeUuid             RpcParamDataType = "UUID"
 
 	// ARRAY TYPES
 	RpcParamDataTypeArrayInteger          RpcParamDataType = "INTEGER[]"
@@ -59,6 +60,7 @@ const (
 	RpcParamDataTypeArrayTimestampTZAlias RpcParamDataType = "TIMESTAMPZ[]"
 	RpcParamDataTypeArrayJSON             RpcParamDataType = "JSON[]"
 	RpcParamDataTypeArrayJSONB            RpcParamDataType = "JSONB[]"
+	RpcParamDataTypeArrayUuid             RpcParamDataType = "UUID[]"
 )
 
 // Define constants for rpc return data type
@@ -83,6 +85,7 @@ const (
 	RpcReturnDataTypeTable            RpcReturnDataType = "TABLE"
 	RpcReturnDataTypeSetOf            RpcReturnDataType = "SETOF"
 	RpcReturnDataTypeVoid             RpcReturnDataType = "VOID"
+	RpcReturnDataTypeTrigger          RpcReturnDataType = "TRIGGER"
 
 	// ARRAY TYPES
 	RpcReturnDataTypeArrayInteger          RpcReturnDataType = "INTEGER[]"
@@ -121,6 +124,8 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "time.Time"
 	case RpcParamDataTypeJSON, RpcParamDataTypeJSONB:
 		return "map[string]interface{}"
+	case RpcParamDataTypeUuid:
+		return "uuid.UUID"
 	// ARRAY TYPES
 	case RpcParamDataTypeArrayInteger, RpcParamDataTypeArrayBigInt:
 		return "[]int64"
@@ -138,6 +143,8 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "[]time.Time"
 	case RpcParamDataTypeArrayJSON, RpcParamDataTypeArrayJSONB:
 		return "[]map[string]interface{}"
+	case RpcParamDataTypeArrayUuid:
+		return "[]uuid.UUID"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -181,6 +188,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeJSON, nil
 	case RpcParamDataTypeJSONB:
 		return RpcParamDataTypeJSONB, nil
+	case RpcParamDataTypeUuid:
+		return RpcParamDataTypeUuid, nil
 	// ARRAY TYPES
 	case RpcParamDataTypeArrayInteger:
 		return RpcParamDataTypeArrayInteger, nil
@@ -217,6 +226,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeArrayJSON, nil
 	case RpcParamDataTypeArrayJSONB:
 		return RpcParamDataTypeArrayJSONB, nil
+	case RpcParamDataTypeArrayUuid:
+		return RpcParamDataTypeArrayUuid
 	default:
 		return "", fmt.Errorf("unsupported rpc param type  : %s", pCheckType)
 	}
@@ -306,6 +317,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeTable, nil
 	case RpcReturnDataTypeVoid:
 		return RpcReturnDataTypeVoid, nil
+	case RpcReturnDataTypeTrigger:
+		return RpcReturnDataTypeTrigger, nil
 		// ARRAY TYPES
 	case RpcReturnDataTypeArrayInteger:
 		return RpcReturnDataTypeArrayInteger, nil
@@ -390,6 +403,8 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeTable", nil
 	case RpcReturnDataTypeVoid:
 		return "RpcReturnDataTypeVoid", nil
+	case RpcReturnDataTypeTrigger:
+		return "RpcReturnDataTypeTrigger", nil
 	// ARRAY TYPES
 	case RpcReturnDataTypeArrayInteger:
 		return "RpcReturnDataTypeArrayInteger", nil
@@ -508,7 +523,7 @@ const (
 	RpcSecurityTypeDefiner RpcSecurityType = "DEFINER"
 	RpcSecurityTypeInvoker RpcSecurityType = "INVOKER"
 
-	RpcTemplate = `CREATE OR REPLACE FUNCTION :function_name(:params) RETURNS :return_type LANGUAGE plpgsql :behavior :security AS $function$ :definition $function$`
+	RpcTemplate = `CREATE OR REPLACE FUNCTION :function_name(:params) RETURNS :return_type LANGUAGE plpgsql :behavior :security set search_path = '' AS $function$ :definition $function$`
 )
 
 func MarshalRpcParamTag(paramTag *RpcParamTag) (string, error) {
@@ -665,7 +680,7 @@ func (r *RpcBase) SetCompleteStmt(stmt string) {
 }
 
 func (r *RpcBase) GetCompleteStmt() string {
-	return r.CompleteStatement
+	return strings.ReplaceAll(r.CompleteStatement, "search_path to ", "search_path = ")
 }
 
 // ----- Rpc Param Functionality -----

@@ -517,3 +517,45 @@ func TestGenerateRpc(t *testing.T) {
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/rpc/get_submissions.go")
 }
+
+func TestRpcWithTrigger(t *testing.T) {
+	fn := objects.Function{
+		Schema:     "public",
+		Name:       "create_profile",
+		Language:   "plpgsql",
+		Definition: `BEGIN INSERT INTO public.users (firstname,lastname, email) \nVALUES \n  (\n    NEW.raw_user_meta_data ->> 'name', \n        NEW.raw_user_meta_data ->> 'name', \n    NEW.raw_user_meta_data ->> 'email'\n  );\nRETURN NEW;\nEND;`,
+		CompleteStatement: `
+		CREATE OR REPLACE FUNCTION public.create_profile()\n
+		RETURNS trigger\n
+		set search_path = ''\n
+		LANGUAGE plpgsql\n
+		SECURITY DEFINER\n
+		AS $function$BEGIN INSERT INTO public.users (firstname,lastname, email) \nVALUES \n  (\n    NEW.raw_user_meta_data ->> 'name', \n        NEW.raw_user_meta_data ->> 'name', \n    NEW.raw_user_meta_data ->> 'email'\n  );\nRETURN NEW;\nEND;$function$\n`,
+		Args:                   []objects.FunctionArg{},
+		ReturnTypeID:           2279,
+		ReturnType:             "trigger",
+		IsSetReturningFunction: false,
+		Behavior:               string(raiden.RpcBehaviorVolatile),
+		SecurityDefiner:        true,
+		ConfigParams:           nil,
+	}
+
+	result, err := generator.ExtractRpcFunction(&fn, []objects.Table{
+		{Name: "users"},
+	})
+	assert.NoError(t, err)
+
+	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
+	importsMap := map[string]bool{
+		raidenPath: true,
+	}
+	returnDecl, returnColumns, IsReturnArr, err := result.GetReturn(importsMap)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "interface{}", returnDecl)
+	assert.Equal(t, 0, len(returnColumns))
+	assert.False(t, IsReturnArr)
+
+	// assert security type
+	assert.Equal(t, "RpcSecurityTypeDefiner", result.GetSecurity())
+}

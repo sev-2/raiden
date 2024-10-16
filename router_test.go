@@ -10,6 +10,7 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -35,10 +36,26 @@ type HelloWorldResponse struct {
 
 type HelloWorldController struct {
 	raiden.ControllerBase
-	Http    string `path:"/hello/{name}" type:"rest"`
+	Http    string `path:"/hello" type:"custom"`
 	Payload *HelloWorldRequest
 	Result  HelloWorldResponse
 	Model   SomeModel
+}
+
+func (c *HelloWorldController) Get(ctx raiden.Context) error {
+	c.Result.Message = "success get data"
+	return ctx.SendJson(c.Result)
+}
+
+func (c *HelloWorldController) Post(ctx raiden.Context) error {
+	c.Result.Message = "success post data"
+	return ctx.SendJson(c.Result)
+}
+
+type StorageController struct {
+	raiden.ControllerBase
+	Http    string `path:"/assets" type:"storage"`
+	Storage *SomeBucket
 }
 
 func loadConfig() *raiden.Config {
@@ -172,4 +189,33 @@ func TestRouter_BuildHandler(t *testing.T) {
 	registeredRoutes := router.GetRegisteredRoutes()
 	log.Printf("REGISTERED_ROUTES: %v", registeredRoutes)
 	assert.NotNil(t, registeredRoutes)
+}
+
+func TestRouter_NewRouteFromCustomController(t *testing.T) {
+	methods := []string{fasthttp.MethodGet}
+	r := raiden.NewRouteFromController(&HelloWorldController{}, methods)
+
+	assert.Equal(t, raiden.RouteTypeCustom, r.Type)
+	assert.Equal(t, "/hello", r.Path)
+	assert.Implements(t, (*raiden.Controller)(nil), r.Controller)
+	assert.IsType(t, SomeModel{}, r.Model)
+
+	for _, v := range r.Methods {
+		assert.Equal(t, methods[0], v)
+	}
+}
+
+func TestRouter_NewRouteFromStorageController(t *testing.T) {
+	methods := []string{fasthttp.MethodGet, fasthttp.MethodPost}
+	r := raiden.NewRouteFromController(&StorageController{}, methods)
+
+	assert.Equal(t, raiden.RouteTypeStorage, r.Type)
+	assert.Equal(t, "/assets", r.Path)
+	assert.Implements(t, (*raiden.Controller)(nil), r.Controller)
+	assert.Implements(t, (*raiden.Bucket)(nil), r.Storage)
+
+	assert.Len(t, r.Methods, 2)
+
+	assert.Equal(t, methods[0], r.Methods[0])
+	assert.Equal(t, methods[1], r.Methods[1])
 }

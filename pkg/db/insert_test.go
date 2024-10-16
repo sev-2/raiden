@@ -16,9 +16,9 @@ func TestInsert(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	_, err := NewQuery(&mockRaidenContext).
+	err := NewQuery(&mockRaidenContext).
 		Model(articleMockModel).
-		Insert(article)
+		Insert(article, &articleMockModel)
 
 	assert.NoError(t, err)
 }

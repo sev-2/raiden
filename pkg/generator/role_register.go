@@ -72,8 +72,11 @@ func GenerateRoleRegister(basePath string, projectName string, generateFn Genera
 		return err
 	}
 
+	// setup writer
+	writer := &FileWriter{FilePath: input.OutputPath}
+
 	RoleRegisterLogger.Debug("generate role register", "path", input.OutputPath)
-	return generateFn(input, nil)
+	return generateFn(input, writer)
 }
 
 func createRoleRegisterInput(projectName string, roleRegisterDir string, roleList []string) (input GenerateInput, err error) {

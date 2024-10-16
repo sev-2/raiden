@@ -83,13 +83,20 @@ func BuildCreateRoleQuery(role objects.Role) string {
 	BEGIN
 		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%s') THEN
 			CREATE ROLE %s WITH %s;
+			GRANT %s TO authenticator;
+			GRANT anon TO %s;
 		END IF;
 	END $$;
 	%s
 	GRANT %s TO authenticator;
 	COMMIT;`,
-		role.Name, role.Name, strings.Join(createRolClauses, "\n"),
-		configClause, role.Name,
+		role.Name,
+		role.Name,
+		strings.Join(createRolClauses, "\n"),
+		role.Name,
+		role.Name,
+		configClause,
+		role.Name,
 	)
 }
 
@@ -173,5 +180,12 @@ func BuildUpdateRoleQuery(newRole objects.Role, updateRoleParam objects.UpdateRo
 }
 
 func BuildDeleteRoleQuery(role objects.Role) string {
-	return fmt.Sprintf("DROP ROLE %s;", role.Name)
+	return fmt.Sprintf(`
+		REVOKE %s FROM authenticator;
+		REVOKE anon FROM %s;
+		DROP ROLE %s;`,
+		role.Name,
+		role.Name,
+		role.Name,
+	)
 }

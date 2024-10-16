@@ -3,8 +3,10 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
+	"unicode"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/jinzhu/inflection"
@@ -145,8 +147,11 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 		OutputPath:   filePath,
 	}
 
+	// setup writer
+	writer := FileWriter{FilePath: filePath}
+
 	ModelLogger.Debug("generate model", "path", generateInput.OutputPath)
-	return generateFn(generateInput, nil)
+	return generateFn(generateInput, &writer)
 }
 
 // map table to column, map pg type to go type and get dependency import path
@@ -189,6 +194,7 @@ func MapTableAttributes(table objects.Table, validationTags state.ModelValidatio
 	for key := range importsMap {
 		importsPath = append(importsPath, key)
 	}
+	sort.Strings(importsPath)
 
 	return
 }
@@ -250,6 +256,16 @@ func buildColumnTag(c objects.Column, mapPk map[string]bool, validationTags stat
 	return strings.Join(tags, " ")
 }
 
+func containsRelation(relations []state.Relation, r state.Relation) bool {
+	for _, rel := range relations {
+		if rel.Tag == r.Tag {
+			return true
+		}
+	}
+
+	return false
+}
+
 func BuildJoinTag(r *state.Relation) string {
 	var tags []string
 	var joinTags []string
@@ -300,10 +316,13 @@ func BuildJoinTag(r *state.Relation) string {
 }
 
 func BuildRelationFields(table objects.Table, relations []state.Relation) (mappedRelations []state.Relation) {
-	mapRelationName := make(map[string]bool)
-
 	for i := range relations {
 		r := relations[i]
+		ModelLogger.Trace("generate model relation", "identifier", fmt.Sprintf("%s_%s_%s", r.Table, r.PrimaryKey, r.ForeignKey))
+		if r.RelationType == raiden.RelationTypeManyToMany && r.JoinRelation != nil {
+			ModelLogger.Trace("generate model relation", "join", fmt.Sprintf("%s_%s_%s_%s", r.Through, r.SourcePrimaryKey, r.TargetPrimaryKey, r.JoinsSourceForeignKey))
+		}
+		ModelLogger.Trace("generate model relation", "related", r.Type)
 
 		if r.RelationType == raiden.RelationTypeHasOne {
 			snakeFk := utils.ToSnakeCase(r.ForeignKey)
@@ -314,7 +333,6 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 			if fkName != r.Table {
 				r.Table = fmt.Sprintf("%s%s", r.Table, fkName)
 			}
-			mapRelationName[r.Table] = true
 		}
 
 		if r.RelationType == raiden.RelationTypeHasMany {
@@ -325,32 +343,49 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 			if fkName != r.Table {
 				r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
 			}
-			mapRelationName[r.Table] = true
 		}
 
-		if r.RelationType == raiden.RelationTypeManyToMany {
-			r.Table = inflection.Plural(r.Table)
-			_, exist := mapRelationName[r.Table]
-			if exist {
-				r.Table = inflection.Plural(r.Through)
-			}
-
-			_, exist = mapRelationName[r.Table]
-			if exist {
-				snakeFk := utils.ToSnakeCase(r.ForeignKey)
-				fkTableSplit := strings.Split(snakeFk, "_")
-				fkName := inflection.Plural(utils.SnakeCaseToPascalCase(fkTableSplit[0]))
-				r.Table = inflection.Plural(utils.SnakeCaseToPascalCase(r.Table))
-				if fkName != r.Table {
-					r.Table = fmt.Sprintf("%s%s", inflection.Singular(r.Table), fkName)
-				}
-			}
-			mapRelationName[r.Table] = true
+		if r.JoinRelation != nil {
+			throughSuffix := fmt.Sprintf("%s_%s", r.Through, strings.Replace(r.JoinsSourceForeignKey, "_id", "", -1))
+			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), utils.SnakeCaseToPascalCase(inflection.Singular(throughSuffix)))
 		}
 
 		r.Tag = BuildJoinTag(&r)
-		mappedRelations = append(mappedRelations, r)
+
+		if !containsRelation(mappedRelations, r) {
+			mappedRelations = append(mappedRelations, r)
+		}
 	}
+
+	sort.Slice(mappedRelations, func(i, j int) bool {
+		iToken := mappedRelations[i].Table + mappedRelations[i].Tag + mappedRelations[i].Type
+		jToken := mappedRelations[j].Table + mappedRelations[j].Tag + mappedRelations[j].Type
+		iRunes := []rune(iToken)
+		jRunes := []rune(jToken)
+
+		max := len(iRunes)
+		if max > len(jRunes) {
+			max = len(jRunes)
+		}
+
+		for idx := 0; idx < max; idx++ {
+			ir := iRunes[idx]
+			jr := jRunes[idx]
+
+			lir := unicode.ToLower(ir)
+			ljr := unicode.ToLower(jr)
+
+			if lir != ljr {
+				return lir < ljr
+			}
+
+			if ir != jr {
+				return ir < jr
+			}
+		}
+
+		return len(iRunes) < len(jRunes)
+	})
 
 	return
 }
