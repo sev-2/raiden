@@ -472,8 +472,11 @@ func SliceToStringSlice(slice interface{}) []string {
 func isValueWhitelist(value any) bool {
 	switch getStringValue(value) {
 	case "true":
+		return true
 	case "false":
+		return true
 	case "null":
+		return true
 	case "unknown":
 		return true
 	}
