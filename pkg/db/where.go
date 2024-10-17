@@ -405,8 +405,8 @@ func (q *Query) OrIlike(column string, value string) *Query {
 
 func (q *Query) Is(column string, value any) *Query {
 
-	if !isValueWhitelist(value) {
-		panic("isValueWhitelist: only \"true\", \"false\", \"null\", or \"unknown\" are allowed")
+	if getWhitelistIsValue(value) == "" {
+		panic("getWhitelistIsValue: only \"true\", \"false\", \"nil\", \"null\", or \"unknown\" are allowed")
 	}
 
 	if q.IsList == nil {
@@ -415,7 +415,7 @@ func (q *Query) Is(column string, value any) *Query {
 
 	*q.IsList = append(
 		*q.IsList,
-		fmt.Sprintf("%s=is.%s", column, getStringValue(value)),
+		fmt.Sprintf("%s=is.%s", column, getWhitelistIsValue(value)),
 	)
 
 	return q
@@ -423,8 +423,8 @@ func (q *Query) Is(column string, value any) *Query {
 
 func (q *Query) NotIs(column string, value any) *Query {
 
-	if !isValueWhitelist(value) {
-		panic("isValueWhitelist: only \"true\", \"false\", \"null\", or \"unknown\" are allowed")
+	if getWhitelistIsValue(value) == "" {
+		panic("getWhitelistIsValue: only \"true\", \"false\", \"nil\", \"null\", or \"unknown\" are allowed")
 	}
 
 	if q.IsList == nil {
@@ -433,7 +433,7 @@ func (q *Query) NotIs(column string, value any) *Query {
 
 	*q.IsList = append(
 		*q.IsList,
-		fmt.Sprintf("%s=not.is.%s", column, getStringValue(value)),
+		fmt.Sprintf("%s=not.is.%s", column, getWhitelistIsValue(value)),
 	)
 
 	return q
@@ -473,17 +473,22 @@ func SliceToStringSlice(slice interface{}) []string {
 	return stringSlice
 }
 
-func isValueWhitelist(value any) bool {
-	switch getStringValue(value) {
-	case "true":
-		return true
-	case "false":
-		return true
-	case "null":
-		return true
-	case "unknown":
-		return true
-	default:
-		return false
+func getWhitelistIsValue(value any) string {
+	if getStringValue(value) == "true" {
+		return "true"
 	}
+
+	if getStringValue(value) == "false" {
+		return "false"
+	}
+
+	if value == nil || getStringValue(value) == "null" {
+		return "null"
+	}
+
+	if getStringValue(value) == "unknown" {
+		return "unknown"
+	}
+
+	return ""
 }

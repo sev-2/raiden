@@ -361,21 +361,85 @@ func TestOrIlike(t *testing.T) {
 }
 
 func TestIs(t *testing.T) {
-	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Is("is_featured", "true")
+	t.Run("is true", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Is("is_featured", true)
 
-	if q.IsList == nil {
-		t.Error("Expected where clause not to be nil")
-	}
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
 
-	assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.true", q.GetUrl(), "the url should match")
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.true", q.GetUrl(), "the url should match")
+	})
+
+	t.Run("is false", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Is("is_featured", false)
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.false", q.GetUrl(), "the url should match")
+	})
+
+	t.Run("is null", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Is("is_featured", nil)
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.null", q.GetUrl(), "the url should match")
+	})
+
+	t.Run("is unknown", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).Is("is_featured", "unknown")
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.unknown", q.GetUrl(), "the url should match")
+	})
 }
 
 func TestNotIs(t *testing.T) {
-	q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", "true")
+	t.Run("not is true", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", true)
 
-	if q.IsList == nil {
-		t.Error("Expected where clause not to be nil")
-	}
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
 
-	assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=not.is.true", q.GetUrl(), "the url should match")
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=not.is.true", q.GetUrl(), "the url should match")
+	})
+
+	t.Run("not is false", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", "false")
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=not.is.false", q.GetUrl(), "the url should match")
+	})
+
+	t.Run("not is null", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", nil)
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=not.is.null", q.GetUrl(), "the url should match")
+	})
+
+	t.Run("not is unknown", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", "unknown")
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=not.is.unknown", q.GetUrl(), "the url should match")
+	})
 }
