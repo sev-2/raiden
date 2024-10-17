@@ -414,7 +414,7 @@ func TestNotIs(t *testing.T) {
 	})
 
 	t.Run("not is false", func(t *testing.T) {
-		q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", "false")
+		q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", false)
 
 		if q.IsList == nil {
 			t.Error("Expected where clause not to be nil")
