@@ -367,7 +367,7 @@ func TestIs(t *testing.T) {
 		t.Error("Expected where clause not to be nil")
 	}
 
-	assert.Equalf(t, "/rest/v1/articles?select=*is_featured=is.true", q.GetUrl(), "the url should match")
+	assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.true", q.GetUrl(), "the url should match")
 }
 
 func TestNotIs(t *testing.T) {
