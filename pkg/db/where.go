@@ -405,7 +405,9 @@ func (q *Query) OrIlike(column string, value string) *Query {
 
 func (q *Query) Is(column string, value any) *Query {
 
-	isValueWhitelist(value)
+	if !isValueWhitelist(value) {
+		panic("isValueWhitelist: only \"true\", \"false\", \"null\", or \"unknown\" are allowed")
+	}
 
 	if q.IsList == nil {
 		q.IsList = &[]string{}
@@ -421,7 +423,9 @@ func (q *Query) Is(column string, value any) *Query {
 
 func (q *Query) NotIs(column string, value string) *Query {
 
-	isValueWhitelist(value)
+	if !isValueWhitelist(value) {
+		panic("isValueWhitelist: only \"true\", \"false\", \"null\", or \"unknown\" are allowed")
+	}
 
 	if q.IsList == nil {
 		q.IsList = &[]string{}
@@ -479,7 +483,7 @@ func isValueWhitelist(value any) bool {
 		return true
 	case "unknown":
 		return true
+	default:
+		return false
 	}
-
-	panic("isValueWhitelist: only \"true\", \"false\", \"null\", or \"unknown\" are allowed")
 }

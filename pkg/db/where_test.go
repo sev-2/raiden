@@ -363,7 +363,7 @@ func TestOrIlike(t *testing.T) {
 func TestIs(t *testing.T) {
 	q := NewQuery(&mockRaidenContext).Model(articleMockModel).Is("is_featured", "true")
 
-	if q.WhereOrList == nil {
+	if q.IsList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
 
@@ -373,7 +373,7 @@ func TestIs(t *testing.T) {
 func TestNotIs(t *testing.T) {
 	q := NewQuery(&mockRaidenContext).Model(articleMockModel).NotIs("is_featured", "true")
 
-	if q.WhereOrList == nil {
+	if q.IsList == nil {
 		t.Error("Expected where clause not to be nil")
 	}
 
