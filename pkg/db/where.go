@@ -421,7 +421,7 @@ func (q *Query) Is(column string, value any) *Query {
 	return q
 }
 
-func (q *Query) NotIs(column string, value string) *Query {
+func (q *Query) NotIs(column string, value any) *Query {
 
 	if !isValueWhitelist(value) {
 		panic("isValueWhitelist: only \"true\", \"false\", \"null\", or \"unknown\" are allowed")
