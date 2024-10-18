@@ -18,6 +18,67 @@ type TablesRelationship struct {
 	TargetTableSchema string `json:"target_table_schema"`
 	TargetTableName   string `json:"target_table_name"`
 	TargetColumnName  string `json:"target_column_name"`
+
+	// Preload data when import or apply
+	Action *TablesRelationshipAction `json:"action"`
+	Index  *Index                    `json:"index"`
+}
+
+// ----- relation action
+
+// ----- relation action map
+// a: No action
+// r: Restrict
+// c: Cascade
+// n: Set null
+// d: Set default
+
+type RelationAction string
+type RelationActionLabel string
+
+const (
+	RelationActionNoAction RelationAction = "a"
+	RelationActionRestrict RelationAction = "r"
+	RelationActionCascade  RelationAction = "c"
+	RelationActionSetNull  RelationAction = "n"
+	RelationActionDefault  RelationAction = "d"
+
+	RelationActionNoActionLabel RelationActionLabel = "no action"
+	RelationActionRestrictLabel RelationActionLabel = "restrict"
+	RelationActionCascadeLabel  RelationActionLabel = "cascade"
+	RelationActionSetNullLabel  RelationActionLabel = "set null"
+	RelationActionDefaultLabel  RelationActionLabel = "set default"
+)
+
+var RelationActionMapLabel = map[RelationAction]RelationActionLabel{
+	RelationActionNoAction: RelationActionNoActionLabel,
+	RelationActionRestrict: RelationActionRestrictLabel,
+	RelationActionCascade:  RelationActionCascadeLabel,
+	RelationActionSetNull:  RelationActionSetNullLabel,
+	RelationActionDefault:  RelationActionDefaultLabel,
+}
+
+var RelationActionMapCode = map[RelationActionLabel]RelationAction{
+	RelationActionNoActionLabel: RelationActionNoAction,
+	RelationActionRestrictLabel: RelationActionRestrict,
+	RelationActionCascadeLabel:  RelationActionCascade,
+	RelationActionSetNullLabel:  RelationActionSetNull,
+	RelationActionDefaultLabel:  RelationActionDefault,
+}
+
+type TablesRelationshipAction struct {
+	ID             int    `json:"id"`
+	ConstraintName string `json:"constraint_name"`
+	DeletionAction string `json:"deletion_action"`
+	UpdateAction   string `json:"update_action"`
+	SourceID       int    `json:"source_id"`
+	SourceSchema   string `json:"source_schema"`
+	SourceTable    string `json:"source_table"`
+	SourceColumns  string `json:"source_columns"`
+	TargetID       int    `json:"target_id"`
+	TargetSchema   string `json:"target_schema"`
+	TargetTable    string `json:"target_table"`
+	TargetColumns  string `json:"target_columns"`
 }
 
 type Column struct {
@@ -93,9 +154,12 @@ const (
 )
 
 const (
-	UpdateRelationCreate UpdateRelationType = "create"
-	UpdateRelationUpdate UpdateRelationType = "update"
-	UpdateRelationDelete UpdateRelationType = "delete"
+	UpdateRelationCreate         UpdateRelationType = "create"
+	UpdateRelationUpdate         UpdateRelationType = "update"
+	UpdateRelationDelete         UpdateRelationType = "delete"
+	UpdateRelationActionOnUpdate UpdateRelationType = "on_update_action"
+	UpdateRelationActionOnDelete UpdateRelationType = "on_delete_action"
+	UpdateRelationCreateIndex    UpdateRelationType = "index"
 )
 
 type UpdateColumnItem struct {

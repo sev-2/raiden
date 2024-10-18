@@ -121,7 +121,7 @@ func GenerateStorage(folderPath string, storage *GenerateStorageInput, generateF
 	}
 
 	var allowedMimeTypes = ""
-	if storage.Bucket.AllowedMimeTypes != nil && len(storage.Bucket.AllowedMimeTypes) > 0 {
+	if len(storage.Bucket.AllowedMimeTypes) > 0 {
 		allowedMimeTypes = GenerateArrayDeclaration(reflect.ValueOf(storage.Bucket.AllowedMimeTypes), false)
 	}
 

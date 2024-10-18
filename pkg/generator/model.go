@@ -266,13 +266,34 @@ func containsRelation(relations []state.Relation, r state.Relation) bool {
 	return false
 }
 
-func BuildJoinTag(r *state.Relation) string {
+func BuildRelationTag(r *state.Relation) string {
 	var tags []string
 	var joinTags []string
 
 	// append json tag
 	jsonTag := fmt.Sprintf("json:%q", utils.ToSnakeCase(r.Table)+",omitempty")
 	tags = append(tags, jsonTag)
+
+	if r.Action != nil {
+
+		onUpdate, onDelete := objects.RelationActionDefaultLabel, objects.RelationActionDefaultLabel
+		if r.Action.UpdateAction != "" {
+			code := strings.ToLower(r.Action.UpdateAction)
+			if v, ok := objects.RelationActionMapLabel[objects.RelationAction(code)]; ok {
+				onUpdate = v
+			}
+		}
+
+		if r.Action.DeletionAction != "" {
+			code := strings.ToLower(r.Action.DeletionAction)
+			if v, ok := objects.RelationActionMapLabel[objects.RelationAction(code)]; ok {
+				onDelete = v
+			}
+		}
+
+		tags = append(tags, fmt.Sprintf("onUpdate:%q", onUpdate))
+		tags = append(tags, fmt.Sprintf("onDelete:%q", onDelete))
+	}
 
 	// append relation type tag
 	relTypeTag := fmt.Sprintf("joinType:%s", r.RelationType)
@@ -350,7 +371,7 @@ func BuildRelationFields(table objects.Table, relations []state.Relation) (mappe
 			r.Table = fmt.Sprintf("%sThrough%s", inflection.Plural(r.Table), utils.SnakeCaseToPascalCase(inflection.Singular(throughSuffix)))
 		}
 
-		r.Tag = BuildJoinTag(&r)
+		r.Tag = BuildRelationTag(&r)
 
 		if !containsRelation(mappedRelations, r) {
 			mappedRelations = append(mappedRelations, r)

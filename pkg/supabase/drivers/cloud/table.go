@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -81,25 +82,25 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 
 	// execute update column
 	if len(updateItem.ChangeColumnItems) > 0 {
-		errors := updateColumnFromTable(cfg, updateItem.ChangeColumnItems, newTable.Columns, updateItem.OldData.Columns, newTable.PrimaryKeys)
-		if len(errors) > 0 {
+		errorsUpdate := updateColumnFromTable(cfg, updateItem.ChangeColumnItems, newTable.Columns, updateItem.OldData.Columns, newTable.PrimaryKeys)
+		if len(errorsUpdate) > 0 {
 			var errMsg []string
-			for _, e := range errors {
+			for _, e := range errorsUpdate {
 				errMsg = append(errMsg, e.Error())
 			}
-			return fmt.Errorf(strings.Join(errMsg, ";"))
+			return errors.New(strings.Join(errMsg, ";"))
 		}
 	}
 
 	if len(updateItem.ChangeRelationItems) > 0 || updateItem.ForceCreateRelation {
-		errors := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships, updateItem.ForceCreateRelation)
-		if len(errors) > 0 {
+		errorsUpdate := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships, updateItem.ForceCreateRelation)
+		if len(errorsUpdate) > 0 {
 			var errMsg []string
 
-			for _, e := range errors {
+			for _, e := range errorsUpdate {
 				errMsg = append(errMsg, e.Error())
 			}
-			return fmt.Errorf(strings.Join(errMsg, ";"))
+			return errors.New(strings.Join(errMsg, ";"))
 		}
 	}
 	CloudLogger.Trace("finish update table", "name", newTable.Name)
@@ -115,6 +116,20 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 	}
 	CloudLogger.Trace("finish delete table", "name", table.Name)
 	return nil
+}
+
+// ----- relationship action -----
+func GetTableRelationshipActions(cfg *raiden.Config, schema string) ([]objects.TablesRelationshipAction, error) {
+	CloudLogger.Trace("start fetching table relationships from supabase")
+	q := sql.GenerateGetTableRelationshipActionsQuery(schema)
+
+	rs, err := ExecuteQuery[[]objects.TablesRelationshipAction](cfg.SupabaseApiUrl, cfg.ProjectId, q, DefaultAuthInterceptor(cfg.AccessToken), nil)
+	if err != nil {
+		return rs, fmt.Errorf("get tables error : %s", err)
+	}
+
+	CloudLogger.Trace("finish fetching table relationships from supabase")
+	return rs, nil
 }
 
 // ----- update column -----
@@ -295,10 +310,15 @@ func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, rel
 					}
 					eChan <- nil
 				}(&wg, cfg, rel, errChan)
-			case objects.UpdateRelationUpdate:
+			case objects.UpdateRelationUpdate, objects.UpdateRelationActionOnDelete, objects.UpdateRelationActionOnUpdate, objects.UpdateRelationCreateIndex:
 				rel, exist := relationMap[i.Data.ConstraintName]
 				if !exist {
-					continue
+					actionKey := fmt.Sprintf("%s_%s_fkey", i.Data.SourceTableName, i.Data.SourceColumnName)
+					rel2, exist2 := relationMap[actionKey]
+					if !exist2 {
+						continue
+					}
+					rel = rel2
 				}
 
 				wg.Add(1)
@@ -339,7 +359,6 @@ func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, rel
 
 func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) error {
 	CloudLogger.Trace("start create foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
-
 	sql, err := query.BuildFkQuery(objects.UpdateRelationCreate, relation)
 	if err != nil {
 		return err
@@ -348,6 +367,16 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("create foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+	}
+
+	// create FK index
+	if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
+		return err
+	} else if len(indexSql) > 0 {
+		_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, indexSql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+		if err != nil {
+			return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+		}
 	}
 
 	CloudLogger.Trace("finish create foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
@@ -373,6 +402,18 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
 
+	if relation.Index == nil {
+		// create FK index
+		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
+			return err
+		} else if len(indexSql) > 0 {
+			_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, indexSql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+			if err != nil {
+				return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+			}
+		}
+	}
+
 	CloudLogger.Trace("finish update foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)
 	return nil
 }
@@ -388,6 +429,19 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
 	if err != nil {
 		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+	}
+
+	if relation.Index != nil {
+		// create FK index
+		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationDelete, relation); err != nil {
+			return err
+		} else if len(indexSql) > 0 {
+			CloudLogger.Info("deleteForeignKey", "sql", indexSql)
+			_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, indexSql, DefaultAuthInterceptor(cfg.AccessToken), nil)
+			if err != nil {
+				return fmt.Errorf("delete foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+			}
+		}
 	}
 
 	CloudLogger.Trace("finish delete foreign key", "table", relation.SourceTableName, "constrain-name", relation.ConstraintName)

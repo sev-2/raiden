@@ -65,6 +65,9 @@ type (
 		ForeignKey   string
 		Tag          string
 		*JoinRelation
+
+		Action *objects.TablesRelationshipAction
+		Index  *objects.Index
 	}
 
 	JoinRelation struct {

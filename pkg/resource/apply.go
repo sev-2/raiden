@@ -35,7 +35,7 @@ type MigrateData struct {
 
 // Migrate resource :
 //
-// [ ] migrate table
+// [x] migrate table
 //
 //	[x] create table name, schema and columns
 //	[x] create table rls enable
@@ -84,8 +84,8 @@ type MigrateData struct {
 //	[x] create new storage
 //	[x] update storage
 //	[x] delete storage
-//	[ ] add storage acl
-//	[ ] update storage acl
+//	[x] add storage acl
+//	[x] update storage acl
 func Apply(flags *Flags, config *raiden.Config) error {
 	// declare default variable
 	var migrateData MigrateData
@@ -165,6 +165,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	if flags.All() || flags.ModelsOnly {
+		resource.Tables = tables.AttachIndexAndAction(resource.Tables, resource.Indexes, resource.RelationActions)
 		if data, err := tables.BuildMigrateData(appTables, resource.Tables); err != nil {
 			return err
 		} else {
@@ -243,7 +244,6 @@ func Migrate(config *raiden.Config, importState *state.LocalState, projectPath s
 							ForceCreateRelation: true,
 						},
 					})
-					resource.Tables[i].MigrationItems.ChangeRelationItems = make([]objects.UpdateRelationItem, 0)
 				} else {
 					updateTableRelation = append(updateTableRelation, tables.MigrateItem{
 						Type:    t.Type,
@@ -254,7 +254,6 @@ func Migrate(config *raiden.Config, importState *state.LocalState, projectPath s
 							ChangeRelationItems: t.MigrationItems.ChangeRelationItems,
 						},
 					})
-					resource.Tables[i].MigrationItems.ChangeRelationItems = make([]objects.UpdateRelationItem, 0)
 				}
 			}
 		}

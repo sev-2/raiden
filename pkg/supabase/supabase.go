@@ -95,6 +95,20 @@ func GetTableByName(cfg *raiden.Config, name string, schema string, includeColum
 	})
 }
 
+func GetTableRelationshipActions(cfg *raiden.Config, schema string) (result []objects.TablesRelationshipAction, err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get table by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("Fetch", "table", func() ([]objects.TablesRelationshipAction, error) {
+			return cloud.GetTableRelationshipActions(cfg, schema)
+		})
+	}
+
+	SupabaseLogger.Debug("Get table by name from supabase pg-meta")
+	return decorateActionWithDataErr("Fetch", "table", func() ([]objects.TablesRelationshipAction, error) {
+		return meta.GetTableRelationshipActions(cfg, schema)
+	})
+}
+
 func CreateTable(cfg *raiden.Config, table objects.Table) (rs objects.Table, err error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Create new table to supabase cloud", "table", table.Name, "project-id", cfg.ProjectId)
@@ -110,6 +124,7 @@ func CreateTable(cfg *raiden.Config, table objects.Table) (rs objects.Table, err
 }
 
 func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItems objects.UpdateTableParam) (err error) {
+
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Update table in supabase cloud", "name", updateItems.OldData.Name, "project-id", cfg.ProjectId)
 		return decorateActionErr("update", "table", func() error {
@@ -327,6 +342,19 @@ func DeleteFunction(cfg *raiden.Config, fn objects.Function) (err error) {
 	SupabaseLogger.Debug("Delete function in supabase pg-meta", "name", fn.Name)
 	return decorateActionErr("delete", "rpc", func() error {
 		return meta.DeleteFunction(cfg, fn)
+	})
+}
+
+func GetIndexes(cfg *raiden.Config, schema string) ([]objects.Index, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get all index from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "index", func() ([]objects.Index, error) {
+			return cloud.GetIndexes(cfg, schema)
+		})
+	}
+	SupabaseLogger.Debug("Get all index from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "index", func() ([]objects.Index, error) {
+		return meta.GetIndexes(cfg, schema)
 	})
 }
 

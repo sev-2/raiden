@@ -361,18 +361,89 @@ func BuildFkQuery(updateType objects.UpdateRelationType, relation *objects.Table
 		do $$
 		BEGIN
 			IF NOT EXISTS (SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE CONSTRAINT_NAME = '%s' AND TABLE_NAME = '%s') THEN
-				%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s (%s);
+				%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s (%s) %s %s;
 			END IF;
 		END $$;
 		`
 
+		var onUpdate, onDelete string
+
+		if relation.Action != nil {
+			if relation.Action.UpdateAction != "" {
+				action := relation.Action.UpdateAction
+				if len(action) == 1 {
+					action = string(objects.RelationActionMapLabel[objects.RelationAction(action)])
+				}
+
+				onUpdate = fmt.Sprintf("ON UPDATE %s", strings.ToUpper(action))
+			}
+
+			if relation.Action.DeletionAction != "" {
+				action := relation.Action.DeletionAction
+				if len(action) == 1 {
+					action = string(objects.RelationActionMapLabel[objects.RelationAction(action)])
+				}
+
+				onDelete = fmt.Sprintf("ON DELETE %s", strings.ToUpper(action))
+			}
+		}
+
 		return fmt.Sprintf(tmp, relation.ConstraintName, relation.SourceTableName,
 			alter, relation.ConstraintName, relation.SourceColumnName,
-			relation.TargetTableSchema, relation.TargetTableName, relation.TargetColumnName,
+			relation.TargetTableSchema, relation.TargetTableName, relation.TargetColumnName, onUpdate, onDelete,
 		), nil
 	case objects.UpdateRelationDelete:
 		return fmt.Sprintf("%s DROP CONSTRAINT IF EXISTS %s;", alter, relation.ConstraintName), nil
 	default:
 		return "", fmt.Errorf("update relation with type '%s' is not available", updateType)
+	}
+}
+
+func BuildFKIndexQuery(updateType objects.UpdateRelationType, relation *objects.TablesRelationship) (string, error) {
+	if relation == nil {
+		return "", nil
+	}
+
+	indexName := fmt.Sprintf("ix_%s_%s", relation.SourceTableName, relation.SourceColumnName)
+
+	switch updateType {
+	case objects.UpdateRelationCreate:
+		tmp := `
+		DO $$
+		BEGIN
+			-- Check if the index already exists
+			IF NOT EXISTS (
+				SELECT 1 
+				FROM pg_class c
+				JOIN pg_namespace n ON n.oid = c.relnamespace
+				WHERE c.relname = '%s'  -- Replace with your index name
+				AND n.nspname = '%s'  -- Replace with the schema name if necessary
+			) THEN
+				-- Create the index if it does not exist
+				CREATE INDEX %s ON %s.%s (%s);
+			END IF;
+		END $$;
+		`
+		return fmt.Sprintf(tmp, indexName, relation.SourceSchema, indexName, relation.SourceSchema, relation.SourceTableName, relation.SourceColumnName), nil
+	case objects.UpdateRelationDelete:
+		tmp := `
+		DO $$
+		BEGIN
+			-- Check if the index already exists
+			IF NOT EXISTS (
+				SELECT 1 
+				FROM pg_class c
+				JOIN pg_namespace n ON n.oid = c.relnamespace
+				WHERE c.relname = '%s'  -- Replace with your index name
+				AND n.nspname = '%s'  -- Replace with the schema name if necessary
+			) THEN
+			 	-- Drop the index if it exists
+        		EXECUTE 'DROP INDEX %s.%s';  -- Ensure to specify the correct schema
+			END IF;
+		END $$;
+		`
+		return fmt.Sprintf(tmp, indexName, relation.SourceSchema, relation.SourceSchema, indexName), nil
+	default:
+		return "", fmt.Errorf("update index with type '%s' is not available", updateType)
 	}
 }

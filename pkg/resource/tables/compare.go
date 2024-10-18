@@ -238,6 +238,43 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 			continue
 		}
 
+		if t.Index == nil && sc.Index == nil {
+			updateItems = append(updateItems, objects.UpdateRelationItem{
+				Data: sc,
+				Type: objects.UpdateRelationCreateIndex,
+			})
+			Logger.Debug("create new index", "constrain-name", sc.ConstraintName)
+		}
+
+		if t.Action != nil && sc.Action != nil {
+			if t.Action.UpdateAction != sc.Action.UpdateAction {
+				updateItems = append(updateItems, objects.UpdateRelationItem{
+					Data: sc,
+					Type: objects.UpdateRelationActionOnUpdate,
+				})
+				Logger.Debug("check on update", "t-on-update", t.Action.UpdateAction, "sc-on-delete", sc.Action.UpdateAction, "same", t.Action.UpdateAction == sc.Action.UpdateAction)
+			}
+
+			if t.Action.DeletionAction != sc.Action.DeletionAction {
+				updateItems = append(updateItems, objects.UpdateRelationItem{
+					Data: sc,
+					Type: objects.UpdateRelationActionOnDelete,
+				})
+				Logger.Debug("check on delete", "t-on-delete", t.Action.DeletionAction, "sc-on-delete", sc.Action.DeletionAction, "same", t.Action.DeletionAction == sc.Action.DeletionAction)
+			}
+		} else if t.Action != nil && sc.Action == nil {
+			updateItems = append(updateItems, objects.UpdateRelationItem{
+				Data: sc,
+				Type: objects.UpdateRelationActionOnUpdate,
+			})
+
+			updateItems = append(updateItems, objects.UpdateRelationItem{
+				Data: sc,
+				Type: objects.UpdateRelationActionOnDelete,
+			})
+			Logger.Debug("create relation new action", "on-update", sc.Action.UpdateAction, "on-delete", sc.Action.DeletionAction)
+		}
+
 		delete(mapTargetRelation, sc.ConstraintName)
 
 		if (sc.SourceSchema != t.SourceSchema) || (sc.SourceTableName != t.SourceTableName) || (sc.SourceColumnName != t.SourceColumnName) {

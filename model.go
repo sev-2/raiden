@@ -22,6 +22,7 @@ type (
 		Nullable      bool
 		Default       any
 		Unique        bool
+		Index         bool
 	}
 
 	// definition of join tag, example:

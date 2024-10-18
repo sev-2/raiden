@@ -107,6 +107,8 @@ func scanGenerateTableRelation(table *objects.Table) (relations []*state.Relatio
 			RelationType: relationType,
 			PrimaryKey:   primaryKey,
 			ForeignKey:   foreignKey,
+			Action:       r.Action,
+			Index:        r.Index,
 		}
 
 		relations = append(relations, &relation)
@@ -163,6 +165,57 @@ func mergeGenerateManyToManyCandidate(candidates []*ManyToManyTable, mapRelation
 		}
 
 	}
+}
+
+// --- attach index and action to relation
+func AttachIndexAndAction(allTable []objects.Table, allIndex []objects.Index, allAction []objects.TablesRelationshipAction) []objects.Table {
+	// build map index
+	mapIndex := make(map[string]objects.Index)
+	for _, v := range allIndex {
+		mapIndex[v.Name] = v
+	}
+
+	// build map action
+	mapAction := make(map[string]objects.TablesRelationshipAction)
+	for _, v := range allAction {
+		key := fmt.Sprintf("%s_%s", v.SourceSchema, v.ConstraintName)
+		mapAction[key] = v
+	}
+
+	for iTable := range allTable {
+		table := allTable[iTable]
+		for i := range table.Relationships {
+			r := table.Relationships[i]
+
+			// check index
+			indexKey := fmt.Sprintf("ix_%s_%s", r.SourceTableName, r.SourceColumnName)
+			if fIndex, exist := mapIndex[indexKey]; exist && fIndex.Name != "" {
+				r.Index = &fIndex
+			} else {
+				indexKey := fmt.Sprintf("ix_%s_%s_%s", r.SourceSchema, r.SourceTableName, r.SourceColumnName)
+				if fIndex2, exist := mapIndex[indexKey]; exist && fIndex2.Name != "" {
+					r.Index = &fIndex2
+				}
+			}
+
+			// check action
+			if action, exist := mapAction[r.ConstraintName]; exist {
+				r.Action = &action
+			} else {
+				actionKey := fmt.Sprintf("%s_%s", r.SourceSchema, r.ConstraintName)
+				if action2, exist := mapAction[actionKey]; exist && action2.ConstraintName != "" {
+					r.Action = &action2
+				}
+			}
+
+			// replace with new value
+			table.Relationships[i] = r
+		}
+
+		allTable[iTable] = table
+	}
+
+	return allTable
 }
 
 // --- attach relation to table
