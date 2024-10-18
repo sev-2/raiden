@@ -1,5 +1,7 @@
 package sql
 
+import "fmt"
+
 var GetTableRelationshipsQuery = `
 -- Adapted from
 -- https://github.com/PostgREST/postgrest/blob/f9f0f79fa914ac00c11fbf7f4c558e14821e67e2/src/PostgREST/SchemaCache.hs#L722
@@ -46,3 +48,62 @@ LEFT JOIN pks_uniques_cols pks_uqs ON pks_uqs.connamespace = traint.connamespace
 WHERE traint.contype = 'f'
 AND traint.conparentid = 0
 `
+
+var GetTableRelationshipActionsQuery = `
+SELECT 
+  con.oid as id, 
+  con.conname as constraint_name, 
+  con.confdeltype as deletion_action,
+  con.confupdtype as update_action,
+  rel.oid as source_id,
+  nsp.nspname as source_schema, 
+  rel.relname as source_table, 
+  (
+    SELECT 
+      array_agg(
+        att.attname 
+        ORDER BY 
+          un.ord
+      ) 
+    FROM 
+      unnest(con.conkey) WITH ORDINALITY un (attnum, ord) 
+      INNER JOIN pg_attribute att ON att.attnum = un.attnum 
+    WHERE 
+      att.attrelid = rel.oid
+  ) source_columns, 
+  frel.oid as target_id,
+  fnsp.nspname as target_schema, 
+  frel.relname as target_table, 
+  (
+    SELECT 
+      array_agg(
+        att.attname 
+        ORDER BY 
+          un.ord
+      ) 
+    FROM 
+      unnest(con.confkey) WITH ORDINALITY un (attnum, ord) 
+      INNER JOIN pg_attribute att ON att.attnum = un.attnum 
+    WHERE 
+      att.attrelid = frel.oid
+  ) target_columns 
+FROM 
+  pg_constraint con 
+  INNER JOIN pg_class rel ON rel.oid = con.conrelid 
+  INNER JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace 
+  INNER JOIN pg_class frel ON frel.oid = con.confrelid 
+  INNER JOIN pg_namespace fnsp ON fnsp.oid = frel.relnamespace 
+WHERE 
+  con.contype = 'f'
+`
+
+func GenerateGetTableRelationshipActionsQuery(schema string) string {
+	if len(schema) == 0 {
+		schema = "public"
+	}
+
+	filteredSql := GetTableRelationshipActionsQuery + " AND nsp.nspname = %s"
+	schemaFilter := fmt.Sprintf("'%s'", schema)
+
+	return fmt.Sprintf(filteredSql, schemaFilter)
+}

@@ -128,6 +128,20 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 	return nil
 }
 
+// ----- relationship action -----
+func GetTableRelationshipActions(cfg *raiden.Config, schema string) ([]objects.TablesRelationshipAction, error) {
+	MetaLogger.Trace("start fetching table relationships from supabase")
+	q := sql.GenerateGetTableRelationshipActionsQuery(schema)
+
+	rs, err := ExecuteQuery[[]objects.TablesRelationshipAction](getBaseUrl(cfg), q, nil, nil, nil)
+	if err != nil {
+		return rs, fmt.Errorf("get tables error : %s", err)
+	}
+
+	MetaLogger.Trace("finish fetching table relationships from supabase")
+	return rs, nil
+}
+
 // ----- update column -----
 func updateColumnFromTable(
 	cfg *raiden.Config, updateColumns []objects.UpdateColumnItem,
@@ -308,10 +322,15 @@ func updateRelations(cfg *raiden.Config, items []objects.UpdateRelationItem, rel
 					}
 					eChan <- nil
 				}(&wg, cfg, rel, errChan)
-			case objects.UpdateRelationUpdate:
+			case objects.UpdateRelationUpdate, objects.UpdateRelationActionOnDelete, objects.UpdateRelationActionOnUpdate, objects.UpdateRelationCreateIndex:
 				rel, exist := relationMap[i.Data.ConstraintName]
 				if !exist {
-					continue
+					actionKey := fmt.Sprintf("%s_%s_fkey", i.Data.SourceTableName, i.Data.SourceColumnName)
+					rel2, exist2 := relationMap[actionKey]
+					if !exist2 {
+						continue
+					}
+					rel = rel2
 				}
 
 				wg.Add(1)
@@ -360,6 +379,17 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	if err != nil {
 		return fmt.Errorf("create foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
+
+	// create FK index
+	if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
+		return err
+	} else if len(indexSql) > 0 {
+		_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+		if err != nil {
+			return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+		}
+	}
+
 	MetaLogger.Trace("finish create foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
 	return nil
 }
@@ -381,6 +411,19 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	if err != nil {
 		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
+
+	if relation.Action == nil {
+		// create FK index
+		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
+			return err
+		} else if len(indexSql) > 0 {
+			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+			if err != nil {
+				return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+			}
+		}
+	}
+
 	MetaLogger.Trace("finish update foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
 	return nil
 }
@@ -397,6 +440,19 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	if err != nil {
 		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
+
+	if relation.Index != nil {
+		// create FK index
+		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationDelete, relation); err != nil {
+			return err
+		} else if len(indexSql) > 0 {
+			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+			if err != nil {
+				return fmt.Errorf("delete foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
+			}
+		}
+	}
+
 	MetaLogger.Trace("start delete foreign key", "table", relation.TargetTableName, "constrain-name", relation.ConstraintName)
 	return nil
 }
