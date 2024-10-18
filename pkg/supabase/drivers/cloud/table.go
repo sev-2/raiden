@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -81,25 +82,25 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 
 	// execute update column
 	if len(updateItem.ChangeColumnItems) > 0 {
-		errors := updateColumnFromTable(cfg, updateItem.ChangeColumnItems, newTable.Columns, updateItem.OldData.Columns, newTable.PrimaryKeys)
-		if len(errors) > 0 {
+		errorsUpdate := updateColumnFromTable(cfg, updateItem.ChangeColumnItems, newTable.Columns, updateItem.OldData.Columns, newTable.PrimaryKeys)
+		if len(errorsUpdate) > 0 {
 			var errMsg []string
-			for _, e := range errors {
+			for _, e := range errorsUpdate {
 				errMsg = append(errMsg, e.Error())
 			}
-			return fmt.Errorf(strings.Join(errMsg, ";"))
+			return errors.New(strings.Join(errMsg, ";"))
 		}
 	}
 
 	if len(updateItem.ChangeRelationItems) > 0 || updateItem.ForceCreateRelation {
-		errors := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships, updateItem.ForceCreateRelation)
-		if len(errors) > 0 {
+		errorsUpdate := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships, updateItem.ForceCreateRelation)
+		if len(errorsUpdate) > 0 {
 			var errMsg []string
 
-			for _, e := range errors {
+			for _, e := range errorsUpdate {
 				errMsg = append(errMsg, e.Error())
 			}
-			return fmt.Errorf(strings.Join(errMsg, ";"))
+			return errors.New(strings.Join(errMsg, ";"))
 		}
 	}
 	CloudLogger.Trace("finish update table", "name", newTable.Name)
