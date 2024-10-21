@@ -23,6 +23,7 @@ func TestGenerateModels(t *testing.T) {
 
 	relationshipAction := objects.TablesRelationshipAction{
 		UpdateAction: "CASCADE",
+		DeletionAction: "CASCADE",
 	}
 
 	tables := []*generator.GenerateModelInput{
