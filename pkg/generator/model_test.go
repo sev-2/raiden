@@ -22,7 +22,7 @@ func TestGenerateModels(t *testing.T) {
 	assert.NoError(t, err1)
 
 	relationshipAction := objects.TablesRelationshipAction{
-		UpdateAction: "CASCADE",
+		UpdateAction:   "CASCADE",
 		DeletionAction: "CASCADE",
 	}
 
