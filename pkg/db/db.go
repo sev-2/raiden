@@ -17,6 +17,7 @@ type Query struct {
 	Relations    []string
 	WhereAndList *[]string
 	WhereOrList  *[]string
+	IsList       *[]string
 	OrderList    *[]string
 	LimitValue   int
 	OffsetValue  int
@@ -145,6 +146,11 @@ func buildQueryURI(q Query) string {
 	if q.WhereOrList != nil && len(*q.WhereOrList) > 0 {
 		list := strings.Join(*q.WhereOrList, ",")
 		output += fmt.Sprintf("&or=(%s)", list)
+	}
+
+	if q.IsList != nil && len(*q.IsList) > 0 {
+		list := strings.Join(*q.IsList, ",")
+		output += fmt.Sprintf("&%s", list)
 	}
 
 	if q.OrderList != nil && len(*q.OrderList) > 0 {
