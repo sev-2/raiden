@@ -1574,15 +1574,21 @@ func TestDeleteFunction_SelfHosted(t *testing.T) {
 func TestGetIndexes_Cloud(t *testing.T) {
 	cfg := loadCloudConfig()
 
-	_, err := supabase.GetIndexes(cfg, "public")
-	assert.Error(t, err)
+	_, err0 := supabase.GetIndexes(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetIndexes(cfg, "public")
+	assert.Error(t, err1)
 }
 
 func TestGetIndexes_SelfHosted(t *testing.T) {
 	cfg := loadSelfHostedConfig()
 
-	_, err := supabase.GetIndexes(cfg, "public")
-	assert.Error(t, err)
+	_, err0 := supabase.GetIndexes(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetIndexes(cfg, "public")
+	assert.Error(t, err1)
 }
 
 func TestAdminUpdateUser_Cloud(t *testing.T) {
