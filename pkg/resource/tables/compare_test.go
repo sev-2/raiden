@@ -62,8 +62,8 @@ func TestCompareList(t *testing.T) {
 func TestCompareItem(t *testing.T) {
 
 	relationshipAction := objects.TablesRelationshipAction{
-		UpdateAction:   "CASCADE",
-		DeletionAction: "CASCADE",
+		UpdateAction:   objects.RelationActionCascade,
+		DeletionAction: objects.RelationActionCascade,
 	}
 
 	source := objects.Table{

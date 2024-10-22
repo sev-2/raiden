@@ -22,8 +22,8 @@ func TestGenerateModels(t *testing.T) {
 	assert.NoError(t, err1)
 
 	relationshipAction := objects.TablesRelationshipAction{
-		UpdateAction:   "CASCADE",
-		DeletionAction: "CASCADE",
+		UpdateAction:   objects.RelationActionCascade,
+		DeletionAction: objects.RelationActionCascade,
 	}
 
 	tables := []*generator.GenerateModelInput{
