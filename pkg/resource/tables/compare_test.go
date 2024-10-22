@@ -151,6 +151,10 @@ func TestCompareItem(t *testing.T) {
 }
 
 func TestCompareItemWithoutIndex(t *testing.T) {
+	targetRelationshipAction := objects.TablesRelationshipAction{
+		UpdateAction:   "c",
+		DeletionAction: "c",
+	}
 
 	source := objects.Table{
 		ID:          1,
@@ -205,6 +209,7 @@ func TestCompareItemWithoutIndex(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
+				Action:            &targetRelationshipAction,
 			},
 			{
 				ConstraintName:    "constraint2",
