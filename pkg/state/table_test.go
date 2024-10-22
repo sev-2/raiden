@@ -40,7 +40,7 @@ type Candidate struct {
 	Acl string `json:"-" read:"anon" write:"authenticated"`
 
 	// Relations
-	Submission []*Submission `json:"submission,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:candidate_id" action:"onUpdate:CASCADE,onDelete:CASCADE"`
+	Submission []*Submission `json:"submission,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:candidate_id" onUpdate:"CASCADE" onDelete:"CASCADE"`
 }
 
 func TestExtractTable_NoRelation(t *testing.T) {
