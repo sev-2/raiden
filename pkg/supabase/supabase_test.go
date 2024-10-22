@@ -13,6 +13,11 @@ import (
 )
 
 var (
+	relationAction = objects.TablesRelationshipAction{
+		ConstraintName: "constraint1",
+		UpdateAction:   "c",
+		DeletionAction: "c",
+	}
 	sampleUpdateNewTable = objects.Table{
 		Schema: "some-schema",
 		Name:   "some-table",
@@ -38,6 +43,8 @@ var (
 				SourceSchema:      "some-schema",
 				SourceColumnName:  "some-column",
 				TargetTableSchema: "other-schema",
+				Action:            &relationAction,
+				Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
 			},
 		},
 		RLSEnabled: true,
