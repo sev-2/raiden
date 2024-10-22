@@ -15,11 +15,13 @@ import (
 var LoadLogger hclog.Logger = logger.HcLog().Named("import.load")
 
 type Resource struct {
-	Tables    []objects.Table
-	Policies  objects.Policies
-	Roles     []objects.Role
-	Functions []objects.Function
-	Storages  []objects.Bucket
+	Tables          []objects.Table
+	Policies        objects.Policies
+	Roles           []objects.Role
+	Functions       []objects.Function
+	Storages        []objects.Bucket
+	Indexes         []objects.Index
+	RelationActions []objects.TablesRelationshipAction
 }
 
 // The Load function loads resources based on the provided flags and project ID, and returns a resource
@@ -47,6 +49,12 @@ func Load(flags *Flags, cfg *raiden.Config) (*Resource, error) {
 		case []objects.Bucket:
 			resource.Storages = rs
 			LoadLogger.Debug("Finish Get Bucket From Supabase")
+		case []objects.Index:
+			resource.Indexes = rs
+			LoadLogger.Debug("Finish Get Indexes From Supabase")
+		case []objects.TablesRelationshipAction:
+			resource.RelationActions = rs
+			LoadLogger.Debug("Finish Get Relation Action From Supabase")
 		case error:
 			return nil, rs
 		}
@@ -99,6 +107,17 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 			return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
 		})
 
+		wg.Add(1)
+		LoadLogger.Debug("Get Index From Supabase")
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
+			return supabase.GetIndexes(cfg, supabase.DefaultIncludedSchema[0])
+		})
+
+		wg.Add(1)
+		LoadLogger.Debug("Get Table Relation Actions From Supabase")
+		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
+			return supabase.GetTableRelationshipActions(cfg, supabase.DefaultIncludedSchema[0])
+		})
 	}
 
 	if flags.All() || flags.RolesOnly {

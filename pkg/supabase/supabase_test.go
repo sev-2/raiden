@@ -13,6 +13,11 @@ import (
 )
 
 var (
+	relationAction = objects.TablesRelationshipAction{
+		ConstraintName: "constraint1",
+		UpdateAction:   "c",
+		DeletionAction: "c",
+	}
 	sampleUpdateNewTable = objects.Table{
 		Schema: "some-schema",
 		Name:   "some-table",
@@ -38,6 +43,8 @@ var (
 				SourceSchema:      "some-schema",
 				SourceColumnName:  "some-column",
 				TargetTableSchema: "other-schema",
+				Action:            &relationAction,
+				Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
 			},
 		},
 		RLSEnabled: true,
@@ -452,6 +459,77 @@ func TestUpdateTable_Cloud(t *testing.T) {
 		ForceCreateRelation: false,
 	}
 
+	relationAction := objects.TablesRelationshipAction{
+		ConstraintName: "constraint1",
+		UpdateAction:   "c",
+		DeletionAction: "c",
+	}
+	updateParam4 := objects.UpdateTableParam{
+		OldData: sampleUpdateOldTable,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "some-column",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnNew,
+				},
+			},
+		},
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableName,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationDelete,
+			},
+			{
+				Type: objects.UpdateRelationCreateIndex,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+					Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
+				},
+			},
+			{
+				Type: objects.UpdateRelationActionOnUpdate,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+					Action:            &relationAction,
+				},
+			},
+			{
+				Type: objects.UpdateRelationActionOnDelete,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+					Action:            &relationAction,
+				},
+			},
+		},
+		ForceCreateRelation: false,
+	}
+
 	mock := mock.MockSupabase{Cfg: cfg}
 	mock.Activate()
 	defer mock.Deactivate()
@@ -476,6 +554,9 @@ func TestUpdateTable_Cloud(t *testing.T) {
 
 	err4 := supabase.UpdateTable(cfg, sampleUpdateOldTable, updateParam3)
 	assert.NoError(t, err4)
+
+	err5 := supabase.UpdateTable(cfg, sampleUpdateOldTable, updateParam4)
+	assert.NoError(t, err5)
 }
 
 func TestUpdateTable_SelfHosted(t *testing.T) {
@@ -1495,6 +1576,46 @@ func TestDeleteFunction_SelfHosted(t *testing.T) {
 
 	err1 := supabase.DeleteFunction(cfg, localFunction)
 	assert.NoError(t, err1)
+}
+
+func TestGetIndexes_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err0 := supabase.GetIndexes(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetIndexes(cfg, "public")
+	assert.Error(t, err1)
+}
+
+func TestGetIndexes_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err0 := supabase.GetIndexes(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetIndexes(cfg, "public")
+	assert.Error(t, err1)
+}
+
+func TestGetActions_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err0 := supabase.GetTableRelationshipActions(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetTableRelationshipActions(cfg, "public")
+	assert.Error(t, err1)
+}
+
+func TestGetActions_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err0 := supabase.GetTableRelationshipActions(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetTableRelationshipActions(cfg, "public")
+	assert.Error(t, err1)
 }
 
 func TestAdminUpdateUser_Cloud(t *testing.T) {

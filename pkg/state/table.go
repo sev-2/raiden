@@ -40,6 +40,7 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 	for _, t := range appTable {
 		tableName := raiden.GetTableName(t)
 		ts, isExist := mapTableState[tableName]
+
 		if !isExist {
 			nt := buildTableFromModel(t)
 			result.New = append(result.New, nt)
@@ -134,6 +135,42 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 					rel.TargetTableName = utils.ToSnakeCase(field.Name)
 					rel.TargetTableSchema = ei.Table.Schema
 					rel.TargetColumnName = jt.PrimaryKey
+
+					// check action field
+					onUpdate := field.Tag.Get("onUpdate")
+					onDelete := field.Tag.Get("onDelete")
+					if len(onUpdate) > 0 || len(onDelete) > 0 {
+						if len(onUpdate) == 0 {
+							onUpdate = string(objects.RelationActionDefault)
+						} else {
+							v, ok := objects.RelationActionMapCode[objects.RelationActionLabel(onUpdate)]
+							if ok {
+								onUpdate = string(v)
+							}
+						}
+
+						if len(onDelete) == 0 {
+							onDelete = string(objects.RelationActionDefault)
+						} else {
+							v, ok := objects.RelationActionMapCode[objects.RelationActionLabel(onDelete)]
+							if ok {
+								onDelete = string(v)
+							}
+						}
+
+						rel.Action = &objects.TablesRelationshipAction{
+							ConstraintName: fmt.Sprintf("%s_%s_fkey", rel.SourceTableName, rel.SourceColumnName),
+							UpdateAction:   onUpdate,
+							DeletionAction: onDelete,
+							SourceSchema:   rel.SourceSchema,
+							SourceTable:    rel.SourceTableName,
+							SourceColumns:  fmt.Sprintf("{%s}", rel.SourceColumnName),
+
+							TargetSchema:  rel.TargetTableSchema,
+							TargetTable:   rel.SourceTableName,
+							TargetColumns: fmt.Sprintf("{%s}", rel.TargetColumnName),
+						}
+					}
 
 					ei.Table.Relationships = append(ei.Table.Relationships, rel)
 				}
@@ -251,9 +288,26 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 				tableName := findTypeName(field.Type, reflect.Struct, 4)
 				if tableName != "" {
 					if r := buildTableRelation(ei.Table.Name, tableName, ei.Table.Schema, mapRelation, joinTag); r.ConstraintName != "" {
+						if onUpdate := field.Tag.Get("onUpdate"); onUpdate != "" {
+							if r.Action == nil {
+								r.Action = &objects.TablesRelationshipAction{}
+							}
+
+							r.Action.UpdateAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(strings.ToLower(onUpdate))])
+						}
+
+						if onDelete := field.Tag.Get("onDelete"); onDelete != "" {
+							if r.Action == nil {
+								r.Action = &objects.TablesRelationshipAction{}
+							}
+
+							r.Action.DeletionAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(strings.ToLower(onDelete))])
+						}
+
 						relations = append(relations, r)
 					}
 				}
+
 			}
 		}
 	}
@@ -467,6 +521,10 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 	relation.ConstraintName = getRelationConstrainName(schema, sourceTableName, foreignKey)
 	if r, ok := mapRelations[relation.ConstraintName]; ok {
 		relation = r
+	} else {
+		if r, ok := mapRelations[getRelationConstrainNameWithoutSchema(sourceTableName, foreignKey)]; ok {
+			relation = r
+		}
 	}
 
 	relation.SourceSchema = schema
@@ -483,6 +541,10 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 // get relation table name, base on struct type that defined in relation field
 func getRelationConstrainName(schema, table, foreignKey string) string {
 	return fmt.Sprintf("%s_%s_%s_fkey", schema, table, foreignKey)
+}
+
+func getRelationConstrainNameWithoutSchema(table, foreignKey string) string {
+	return fmt.Sprintf("%s_%s_fkey", table, foreignKey)
 }
 
 func (f ExtractTableItems) ToFlatTable() (tables []objects.Table) {

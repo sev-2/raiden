@@ -69,16 +69,12 @@ func GetDiffChangeMessage(items []MigrateItem) string {
 		case migrator.MigrateTypeCreate:
 			newTable = append(newTable, fmt.Sprintf("- %s", name))
 		case migrator.MigrateTypeUpdate:
-			// if Logger.GetLevel() == hclog.Trace {
 			diffMessage, err := GenerateDiffChangeUpdateMessage(name, item)
 			if err != nil {
 				Logger.Error("print change table error", "msg", err.Error())
 				continue
 			}
 			updateTable = append(updateTable, diffMessage)
-			// } else {
-			// 	updateTable = append(updateTable, fmt.Sprintf("- %s", name))
-			// }
 		case migrator.MigrateTypeDelete:
 			deleteTable = append(deleteTable, fmt.Sprintf("- %s", name))
 		}
@@ -228,7 +224,7 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 					}
 				}
 
-				r.Tag = generator.BuildJoinTag(r)
+				r.Tag = generator.BuildRelationTag(r)
 				relations = append(relations, r)
 			}
 			sFoundRelations = relations
@@ -254,7 +250,7 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 					}
 				}
 
-				r.Tag = generator.BuildJoinTag(r)
+				r.Tag = generator.BuildRelationTag(r)
 				relations = append(relations, r)
 			}
 			tFoundRelations = relations
@@ -313,8 +309,8 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 
 			if fSource != nil {
 				sRelationArr = append(sRelationArr, fmt.Sprintf(
-					"%s *%s `json:\"%s,omitempty\" %s",
-					symbol, utils.SnakeCaseToPascalCase(fSource.Table),
+					"%s *%s `%s`",
+					symbol,
 					fSource.Type, fSource.Tag,
 				))
 			} else {
@@ -325,8 +321,8 @@ func GenerateDiffMessage(diffData CompareDiffResult, sRelation MapRelations, tRe
 
 			if fTarget != nil {
 				tRelationArr = append(tRelationArr, fmt.Sprintf(
-					"%s *%s `json:\"%s,omitempty\" %s",
-					symbol, utils.SnakeCaseToPascalCase(fTarget.Table),
+					"%s *%s `%s`",
+					symbol,
 					fTarget.Type, fTarget.Tag,
 				))
 			} else {
@@ -519,6 +515,37 @@ func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, err
 			changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s : %s", "update relation", c.Data.ConstraintName))
 		case objects.UpdateRelationDelete:
 			changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s : %s", "delete relation", c.Data.ConstraintName))
+		case objects.UpdateRelationCreateIndex:
+			changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s : %s", "create new index", c.Data.ConstraintName))
+		case objects.UpdateRelationActionOnUpdate, objects.UpdateRelationActionOnDelete:
+			var oldRelation, newRelation objects.TablesRelationship
+
+			// find old column detail
+			for ii := range item.OldData.Relationships {
+				or := item.OldData.Relationships[ii]
+				if or.ConstraintName == c.Data.Action.ConstraintName {
+					oldRelation = or
+				}
+			}
+
+			for ii := range item.NewData.Relationships {
+				or := item.NewData.Relationships[ii]
+				if or.ConstraintName == c.Data.Action.ConstraintName {
+					newRelation = or
+				}
+			}
+
+			if c.Type == objects.UpdateRelationActionOnUpdate {
+				oldLabel := objects.RelationActionMapLabel[objects.RelationAction(oldRelation.Action.UpdateAction)]
+				newLabel := objects.RelationActionMapLabel[objects.RelationAction(newRelation.Action.UpdateAction)]
+				changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s %s : %s >>> %s", oldRelation.SourceColumnName, "on update", oldLabel, newLabel))
+			}
+
+			if c.Type == objects.UpdateRelationActionOnDelete {
+				oldLabel := objects.RelationActionMapLabel[objects.RelationAction(oldRelation.Action.DeletionAction)]
+				newLable := objects.RelationActionMapLabel[objects.RelationAction(newRelation.Action.DeletionAction)]
+				changeRelationArr = append(changeRelationArr, fmt.Sprintf("- %s %s : %s >>> %s", oldRelation.SourceColumnName, "on delete", oldLabel, newLable))
+			}
 		}
 	}
 

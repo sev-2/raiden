@@ -21,6 +21,11 @@ func TestGenerateModels(t *testing.T) {
 	err1 := utils.CreateFolder(modelPath)
 	assert.NoError(t, err1)
 
+	relationshipAction := objects.TablesRelationshipAction{
+		UpdateAction:   "c",
+		DeletionAction: "c",
+	}
+
 	tables := []*generator.GenerateModelInput{
 		{
 			Table: objects.Table{
@@ -42,6 +47,7 @@ func TestGenerateModels(t *testing.T) {
 					Table:        "related_table",
 					ForeignKey:   "test_table_id",
 					PrimaryKey:   "id",
+					Action:       &relationshipAction,
 				},
 			},
 			Policies: objects.Policies{},
