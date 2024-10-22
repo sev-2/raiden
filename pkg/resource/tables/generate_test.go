@@ -38,11 +38,11 @@ func TestAttachActionAndIndex(t *testing.T) {
 		tbls = append(tbls, r.Table)
 
 		for _, rel := range r.Relations {
-			if (rel.Action != nil) {
+			if rel.Action != nil {
 				actions = append(actions, *rel.Action)
 			}
 
-			if (rel.Index != nil) {
+			if rel.Index != nil {
 				indexes = append(indexes, *rel.Index)
 			}
 		}
