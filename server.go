@@ -38,6 +38,7 @@ func NewServer(config *Config) *Server {
 		Router: NewRouter(config),
 		HttpServer: &fasthttp.Server{
 			MaxRequestBodySize: config.MaxServerRequestBodySize,
+			ReadBufferSize:     config.MaxServerReadBufferSize,
 		},
 	}
 }
