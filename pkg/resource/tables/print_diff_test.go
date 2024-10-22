@@ -18,6 +18,11 @@ import (
 )
 
 var (
+	relationAction = objects.TablesRelationshipAction{
+		ConstraintName: "constraint1",
+		UpdateAction:   "c",
+		DeletionAction: "c",
+	}
 	MigratedItems = objects.UpdateTableParam{
 		OldData: objects.Table{Name: "old_table"},
 		ChangeItems: []objects.UpdateTableType{
@@ -63,6 +68,45 @@ var (
 					TargetTableSchema: "public",
 					TargetTableName:   "table2",
 					TargetColumnName:  "id",
+				},
+			},
+			{
+				Type: objects.UpdateRelationCreateIndex,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+					Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
+				},
+			},
+			{
+				Type: objects.UpdateRelationActionOnUpdate,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+					Action:            &relationAction,
+				},
+			},
+			{
+				Type: objects.UpdateRelationActionOnDelete,
+				Data: objects.TablesRelationship{
+					ConstraintName:    "constraint1",
+					SourceSchema:      "public",
+					SourceTableName:   "table1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table2",
+					TargetColumnName:  "id",
+					Action:            &relationAction,
 				},
 			},
 		},
@@ -138,6 +182,8 @@ var (
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
+				Action:            &relationAction,
+				Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
 			},
 		},
 	}
@@ -167,6 +213,7 @@ var (
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
+				Action:            &relationAction,
 			},
 			{
 				ConstraintName:    "constraint2",
@@ -176,6 +223,7 @@ var (
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "name",
+				Action:            &relationAction,
 			},
 		},
 	}
@@ -420,8 +468,8 @@ func TestGenerateDiffChangeUpdateMessage(t *testing.T) {
 	assert.Contains(t, diffMessage, fmt.Sprintf("- %s : %s >>> %s", "replica identity", item.OldData.ReplicaIdentity, item.NewData.ReplicaIdentity))
 
 	item = tables.MigrateItem{
-		NewData: objects.Table{ReplicaIdentity: "FULL"},
-		OldData: objects.Table{ReplicaIdentity: "NOTHING"},
+		NewData: SourceTable,
+		OldData: TargetTable,
 		MigrationItems: objects.UpdateTableParam{
 			ChangeColumnItems:   MigratedItems.ChangeColumnItems,
 			ChangeRelationItems: MigratedItems.ChangeRelationItems,
