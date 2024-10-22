@@ -24,7 +24,7 @@ type Submission struct {
 	Acl string `json:"-" read:"anon" write:"anon"`
 
 	// Relations
-	Candidate *Candidate `json:"candidate,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:candidate_id"`
+	Candidate *Candidate `json:"candidate,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:candidate_id"  onUpdate:"cascade" onDelete:"cascade"`
 }
 
 type Candidate struct {
@@ -40,7 +40,7 @@ type Candidate struct {
 	Acl string `json:"-" read:"anon" write:"authenticated"`
 
 	// Relations
-	Submission []*Submission `json:"submission,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:candidate_id" onUpdate:"CASCADE" onDelete:"CASCADE"`
+	Submission []*Submission `json:"submission,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:candidate_id"  onUpdate:"cascade" onDelete:"cascade"`
 }
 
 func TestExtractTable_NoRelation(t *testing.T) {
@@ -112,9 +112,10 @@ func TestExtractTable_WithRelation(t *testing.T) {
 
 func TestExtractTable(t *testing.T) {
 	relationAction := objects.TablesRelationshipAction{
-		UpdateAction:   "c",
-		DeletionAction: "c",
+		UpdateAction:   "cascade",
+		DeletionAction: "cascade",
 	}
+
 	tableStates := []state.TableState{
 		{
 			Table: objects.Table{

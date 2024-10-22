@@ -289,11 +289,19 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 				if tableName != "" {
 					if r := buildTableRelation(ei.Table.Name, tableName, ei.Table.Schema, mapRelation, joinTag); r.ConstraintName != "" {
 						if onUpdate := field.Tag.Get("onUpdate"); onUpdate != "" {
-							r.Action.UpdateAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(onUpdate)])
+							if r.Action == nil {
+								r.Action = &objects.TablesRelationshipAction{}
+							}
+
+							r.Action.UpdateAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(strings.ToLower(onUpdate))])
 						}
 
 						if onDelete := field.Tag.Get("onDelete"); onDelete != "" {
-							r.Action.DeletionAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(onDelete)])
+							if r.Action == nil {
+								r.Action = &objects.TablesRelationshipAction{}
+							}
+
+							r.Action.DeletionAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(strings.ToLower(onDelete))])
 						}
 
 						relations = append(relations, r)
