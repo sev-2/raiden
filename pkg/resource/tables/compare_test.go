@@ -60,6 +60,12 @@ func TestCompareList(t *testing.T) {
 }
 
 func TestCompareItem(t *testing.T) {
+
+	relationshipAction := objects.TablesRelationshipAction{
+		UpdateAction:   "CASCADE",
+		DeletionAction: "CASCADE",
+	}
+
 	source := objects.Table{
 		ID:          1,
 		Name:        "table1",
@@ -84,7 +90,8 @@ func TestCompareItem(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
-				Index:             objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
+				Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
+				Action:            &relationshipAction,
 			},
 		},
 	}
@@ -123,6 +130,7 @@ func TestCompareItem(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "name",
+				Action:            &relationshipAction,
 			},
 		},
 	}
