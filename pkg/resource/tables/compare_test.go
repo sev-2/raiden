@@ -180,6 +180,7 @@ func TestCompareItemWithoutIndex(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
+				Action:            nil,
 			},
 		},
 	}

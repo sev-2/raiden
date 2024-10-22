@@ -272,7 +272,7 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 				Data: sc,
 				Type: objects.UpdateRelationActionOnDelete,
 			})
-			Logger.Debug("create relation new action", "on-update", sc.Action.UpdateAction, "on-delete", sc.Action.DeletionAction)
+			Logger.Debug("create relation new action", "on-update", t.Action.UpdateAction, "on-delete", t.Action.DeletionAction)
 		}
 
 		delete(mapTargetRelation, sc.ConstraintName)
