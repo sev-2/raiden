@@ -126,6 +126,7 @@ func TestCompareItem(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
+				Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
 				Action:            &targetRelationshipAction,
 			},
 			{
