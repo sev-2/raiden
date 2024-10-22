@@ -61,9 +61,14 @@ func TestCompareList(t *testing.T) {
 
 func TestCompareItem(t *testing.T) {
 
-	relationshipAction := objects.TablesRelationshipAction{
+	sourceRelationshipAction := objects.TablesRelationshipAction{
 		UpdateAction:   "c",
 		DeletionAction: "c",
+	}
+
+	targetRelationshipAction := objects.TablesRelationshipAction{
+		UpdateAction:   "a",
+		DeletionAction: "a",
 	}
 
 	source := objects.Table{
@@ -91,7 +96,7 @@ func TestCompareItem(t *testing.T) {
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
 				Index:             &objects.Index{Schema: "public", Table: "table1", Name: "index1", Definition: "index1"},
-				Action:            &relationshipAction,
+				Action:            &sourceRelationshipAction,
 			},
 		},
 	}
@@ -121,6 +126,7 @@ func TestCompareItem(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "id",
+				Action:            &targetRelationshipAction,
 			},
 			{
 				ConstraintName:    "constraint2",
@@ -130,7 +136,7 @@ func TestCompareItem(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "table2",
 				TargetColumnName:  "name",
-				Action:            &relationshipAction,
+				Action:            &targetRelationshipAction,
 			},
 		},
 	}
