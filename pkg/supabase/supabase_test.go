@@ -1591,6 +1591,26 @@ func TestGetIndexes_SelfHosted(t *testing.T) {
 	assert.Error(t, err1)
 }
 
+func TestGetActions_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err0 := supabase.GetTableRelationshipActions(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetTableRelationshipActions(cfg, "public")
+	assert.Error(t, err1)
+}
+
+func TestGetActions_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err0 := supabase.GetTableRelationshipActions(cfg, "")
+	assert.Error(t, err0)
+
+	_, err1 := supabase.GetTableRelationshipActions(cfg, "public")
+	assert.Error(t, err1)
+}
+
 func TestAdminUpdateUser_Cloud(t *testing.T) {
 	cfg := loadCloudConfig()
 
