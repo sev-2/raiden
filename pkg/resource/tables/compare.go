@@ -239,10 +239,10 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 		}
 
 		if t.Index == nil && sc.Index == nil {
-		// 	updateItems = append(updateItems, objects.UpdateRelationItem{
-		// 		Data: sc,
-		// 		Type: objects.UpdateRelationCreateIndex,
-		// 	})
+			// 	updateItems = append(updateItems, objects.UpdateRelationItem{
+			// 		Data: sc,
+			// 		Type: objects.UpdateRelationCreateIndex,
+			// 	})
 			Logger.Debug("create new index", "constrain-name", sc.ConstraintName)
 		} else {
 			Logger.Debug("check-index", "t-index", t.Index)
