@@ -238,13 +238,17 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 			continue
 		}
 
-		// if t.Index == nil && sc.Index == nil {
+		if t.Index == nil && sc.Index == nil {
 		// 	updateItems = append(updateItems, objects.UpdateRelationItem{
 		// 		Data: sc,
 		// 		Type: objects.UpdateRelationCreateIndex,
 		// 	})
-		// 	Logger.Debug("create new index", "constrain-name", sc.ConstraintName)
-		// }
+			Logger.Debug("create new index", "constrain-name", sc.ConstraintName)
+		} else {
+			Logger.Debug("check-index", "t-index", t.Index)
+			Logger.Debug("check-index", "sc-index", sc.Index)
+			Logger.Debug("updating index", "constrain-name", sc.ConstraintName)
+		}
 
 		if t.Action != nil && sc.Action != nil {
 			if t.Action.UpdateAction != sc.Action.UpdateAction {
