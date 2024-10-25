@@ -275,7 +275,7 @@ func BuildRelationTag(r *state.Relation) string {
 	tags = append(tags, jsonTag)
 
 	if r.Index != nil {
-		tags = append(tags, "indexed")
+		tags = append(tags, "indexed:true")
 	}
 
 	if r.Action != nil {
