@@ -44,6 +44,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	if err != nil {
 		return err
 	}
+	ImportLogger.Trace("indexes", spResource.Indexes)
 	spResource.Tables = tables.AttachIndexAndAction(spResource.Tables, spResource.Indexes, spResource.RelationActions)
 
 	// create import state

@@ -48,6 +48,7 @@ func TestGenerateModels(t *testing.T) {
 					ForeignKey:   "test_table_id",
 					PrimaryKey:   "id",
 					Action:       &relationshipAction,
+					Index:        &objects.Index{Schema: "public", Table: "related_table", Name: "test_table_id", Definition: "CREATE INDEX test_table_id ON related_table(test_table_id);"},
 				},
 			},
 			Policies: objects.Policies{},

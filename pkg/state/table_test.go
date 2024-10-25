@@ -24,7 +24,7 @@ type Submission struct {
 	Acl string `json:"-" read:"anon" write:"anon"`
 
 	// Relations
-	Candidate *Candidate `json:"candidate,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:candidate_id"  onUpdate:"cascade" onDelete:"cascade"`
+	Candidate *Candidate `json:"candidate,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:candidate_id"  onUpdate:"cascade" onDelete:"cascade" indexed:"true"`
 }
 
 type Candidate struct {

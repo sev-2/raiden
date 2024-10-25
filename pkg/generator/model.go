@@ -274,6 +274,10 @@ func BuildRelationTag(r *state.Relation) string {
 	jsonTag := fmt.Sprintf("json:%q", utils.ToSnakeCase(r.Table)+",omitempty")
 	tags = append(tags, jsonTag)
 
+	if r.Index != nil {
+		tags = append(tags, "indexed:true")
+	}
+
 	if r.Action != nil {
 
 		onUpdate, onDelete := objects.RelationActionDefaultLabel, objects.RelationActionDefaultLabel
