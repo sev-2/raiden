@@ -7,9 +7,12 @@ metadata:
   links:
     - title: Documentation
       url: https://raiden.sev-2.com/
+  tags:
+    - golang
   annotations:
     github.com/project-slug: sev-2/raiden
 spec:
   type: library
   owner: raiden
   lifecycle: production
+  system: refactory
