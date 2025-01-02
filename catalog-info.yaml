@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: raiden
+  description: |
+    A Framework for Supabase
+  links:
+    - title: Documentation
+      url: https://raiden.sev-2.com/
+  tags:
+    - golang
+  annotations:
+    github.com/project-slug: sev-2/raiden
+spec:
+  type: library
+  owner: raiden
+  lifecycle: production
+  system: refactory
