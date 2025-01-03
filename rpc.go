@@ -42,6 +42,25 @@ const (
 	RpcParamDataTypeJSON             RpcParamDataType = "JSON"
 	RpcParamDataTypeJSONB            RpcParamDataType = "JSONB"
 	RpcParamDataTypeUuid             RpcParamDataType = "UUID"
+
+	// ARRAY TYPES
+	RpcParamDataTypeArrayInteger          RpcParamDataType = "INTEGER[]"
+	RpcParamDataTypeArrayBigInt           RpcParamDataType = "BIGINT[]"
+	RpcParamDataTypeArrayReal             RpcParamDataType = "REAL[]"
+	RpcParamDataTypeArrayDoublePreci      RpcParamDataType = "DOUBLE PRECISION[]"
+	RpcParamDataTypeArrayNumeric          RpcParamDataType = "NUMERIC[]"
+	RpcParamDataTypeArrayText             RpcParamDataType = "TEXT[]"
+	RpcParamDataTypeArrayVarchar          RpcParamDataType = "CHARACTER VARYING[]"
+	RpcParamDataTypeArrayVarcharAlias     RpcParamDataType = "VARCHAR[]"
+	RpcParamDataTypeArrayBoolean          RpcParamDataType = "BOOLEAN[]"
+	RpcParamDataTypeArrayBytea            RpcParamDataType = "BYTEA[]"
+	RpcParamDataTypeArrayTimestamp        RpcParamDataType = "TIMESTAMP WITHOUT TIME ZONE[]"
+	RpcParamDataTypeArrayTimestampAlias   RpcParamDataType = "TIMESTAMP[]"
+	RpcParamDataTypeArrayTimestampTZ      RpcParamDataType = "TIMESTAMP WITH TIME ZONE[]"
+	RpcParamDataTypeArrayTimestampTZAlias RpcParamDataType = "TIMESTAMPZ[]"
+	RpcParamDataTypeArrayJSON             RpcParamDataType = "JSON[]"
+	RpcParamDataTypeArrayJSONB            RpcParamDataType = "JSONB[]"
+	RpcParamDataTypeArrayUuid             RpcParamDataType = "UUID[]"
 )
 
 // Define constants for rpc return data type
@@ -50,6 +69,7 @@ const (
 	RpcReturnDataTypeBigInt           RpcReturnDataType = "BIGINT"
 	RpcReturnDataTypeReal             RpcReturnDataType = "REAL"
 	RpcReturnDataTypeDoublePreci      RpcReturnDataType = "DOUBLE PRECISION"
+	RpcReturnDataTypeNumeric          RpcReturnDataType = "NUMERIC"
 	RpcReturnDataTypeText             RpcReturnDataType = "TEXT"
 	RpcReturnDataTypeVarchar          RpcReturnDataType = "CHARACTER VARYING"
 	RpcReturnDataTypeVarcharAlias     RpcReturnDataType = "VARCHAR"
@@ -66,6 +86,24 @@ const (
 	RpcReturnDataTypeSetOf            RpcReturnDataType = "SETOF"
 	RpcReturnDataTypeVoid             RpcReturnDataType = "VOID"
 	RpcReturnDataTypeTrigger          RpcReturnDataType = "TRIGGER"
+
+	// ARRAY TYPES
+	RpcReturnDataTypeArrayInteger          RpcReturnDataType = "INTEGER[]"
+	RpcReturnDataTypeArrayBigInt           RpcReturnDataType = "BIGINT[]"
+	RpcReturnDataTypeArrayReal             RpcReturnDataType = "REAL[]"
+	RpcReturnDataTypeArrayDoublePreci      RpcReturnDataType = "DOUBLE PRECISION[]"
+	RpcReturnDataTypeArrayNumeric          RpcReturnDataType = "NUMERIC[]"
+	RpcReturnDataTypeArrayText             RpcReturnDataType = "TEXT[]"
+	RpcReturnDataTypeArrayVarchar          RpcReturnDataType = "CHARACTER VARYING[]"
+	RpcReturnDataTypeArrayVarcharAlias     RpcReturnDataType = "VARCHAR[]"
+	RpcReturnDataTypeArrayBoolean          RpcReturnDataType = "BOOLEAN[]"
+	RpcReturnDataTypeArrayBytea            RpcReturnDataType = "BYTEA[]"
+	RpcReturnDataTypeArrayTimestamp        RpcReturnDataType = "TIMESTAMP WITHOUT TIME ZONE[]"
+	RpcReturnDataTypeArrayTimestampAlias   RpcReturnDataType = "TIMESTAMP[]"
+	RpcReturnDataTypeArrayTimestampTZ      RpcReturnDataType = "TIMESTAMP WITH TIME ZONE[]"
+	RpcReturnDataTypeArrayTimestampTZAlias RpcReturnDataType = "TIMESTAMPZ[]"
+	RpcReturnDataTypeArrayJSON             RpcReturnDataType = "JSON[]"
+	RpcReturnDataTypeArrayJSONB            RpcReturnDataType = "JSONB[]"
 )
 
 func RpcParamToGoType(dataType RpcParamDataType) string {
@@ -88,6 +126,25 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "map[string]interface{}"
 	case RpcParamDataTypeUuid:
 		return "uuid.UUID"
+	// ARRAY TYPES
+	case RpcParamDataTypeArrayInteger, RpcParamDataTypeArrayBigInt:
+		return "[]int64"
+	case RpcParamDataTypeArrayReal:
+		return "[]float32"
+	case RpcParamDataTypeArrayDoublePreci, RpcParamDataTypeArrayNumeric:
+		return "[]float64"
+	case RpcParamDataTypeArrayText, RpcParamDataTypeArrayVarchar, RpcParamDataTypeArrayVarcharAlias:
+		return "[]string"
+	case RpcParamDataTypeArrayBoolean:
+		return "[]bool"
+	case RpcParamDataTypeArrayBytea:
+		return "[][]byte"
+	case RpcParamDataTypeArrayTimestamp, RpcParamDataTypeArrayTimestampTZ, RpcParamDataTypeArrayTimestampAlias, RpcParamDataTypeArrayTimestampTZAlias:
+		return "[]time.Time"
+	case RpcParamDataTypeArrayJSON, RpcParamDataTypeArrayJSONB:
+		return "[]map[string]interface{}"
+	case RpcParamDataTypeArrayUuid:
+		return "[]uuid.UUID"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -133,6 +190,44 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeJSONB, nil
 	case RpcParamDataTypeUuid:
 		return RpcParamDataTypeUuid, nil
+	// ARRAY TYPES
+	case RpcParamDataTypeArrayInteger:
+		return RpcParamDataTypeArrayInteger, nil
+	case RpcParamDataTypeArrayBigInt:
+		return RpcParamDataTypeArrayBigInt, nil
+	case RpcParamDataTypeArrayReal:
+		return RpcParamDataTypeArrayReal, nil
+	case RpcParamDataTypeArrayDoublePreci:
+		return RpcParamDataTypeArrayDoublePreci, nil
+	case RpcParamDataTypeArrayNumeric:
+		return RpcParamDataTypeArrayNumeric, nil
+	case RpcParamDataTypeArrayText:
+		return RpcParamDataTypeArrayText, nil
+	case RpcParamDataTypeArrayVarchar, RpcParamDataTypeArrayVarcharAlias:
+		if returnAlias {
+			return RpcParamDataTypeArrayVarcharAlias, nil
+		}
+		return RpcParamDataTypeArrayVarchar, nil
+	case RpcParamDataTypeArrayBoolean:
+		return RpcParamDataTypeArrayBoolean, nil
+	case RpcParamDataTypeArrayBytea:
+		return RpcParamDataTypeArrayBytea, nil
+	case RpcParamDataTypeArrayTimestamp, RpcParamDataTypeArrayTimestampAlias:
+		if returnAlias {
+			return RpcParamDataTypeArrayTimestampAlias, nil
+		}
+		return RpcParamDataTypeArrayTimestamp, nil
+	case RpcParamDataTypeArrayTimestampTZ, RpcParamDataTypeArrayTimestampTZAlias:
+		if returnAlias {
+			return RpcParamDataTypeArrayTimestampTZAlias, nil
+		}
+		return RpcParamDataTypeArrayTimestampTZ, nil
+	case RpcParamDataTypeArrayJSON:
+		return RpcParamDataTypeArrayJSON, nil
+	case RpcParamDataTypeArrayJSONB:
+		return RpcParamDataTypeArrayJSONB, nil
+	case RpcParamDataTypeArrayUuid:
+		return RpcParamDataTypeArrayUuid, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc param type  : %s", pCheckType)
 	}
@@ -144,7 +239,7 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 		return "int64"
 	case RpcReturnDataTypeReal:
 		return "float32"
-	case RpcReturnDataTypeDoublePreci:
+	case RpcReturnDataTypeDoublePreci, RpcReturnDataTypeNumeric:
 		return "float64"
 	case RpcReturnDataTypeText, RpcReturnDataTypeVarchar:
 		return "string"
@@ -156,6 +251,23 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 		return "time.Time"
 	case RpcReturnDataTypeJSON, RpcReturnDataTypeJSONB:
 		return "map[string]interface{}"
+	// ARRAY TYPES
+	case RpcReturnDataTypeArrayInteger, RpcReturnDataTypeArrayBigInt:
+		return "[]int64"
+	case RpcReturnDataTypeArrayReal:
+		return "[]float32"
+	case RpcReturnDataTypeArrayDoublePreci, RpcReturnDataTypeArrayNumeric:
+		return "[]float64"
+	case RpcReturnDataTypeArrayText, RpcReturnDataTypeArrayVarchar:
+		return "[]string"
+	case RpcReturnDataTypeArrayBoolean:
+		return "[]bool"
+	case RpcReturnDataTypeArrayBytea:
+		return "[][]byte"
+	case RpcReturnDataTypeArrayTimestamp, RpcReturnDataTypeArrayTimestampTZ:
+		return "[]time.Time"
+	case RpcReturnDataTypeArrayJSON, RpcReturnDataTypeArrayJSONB:
+		return "[]map[string]interface{}"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -172,6 +284,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeReal, nil
 	case RpcReturnDataTypeDoublePreci:
 		return RpcReturnDataTypeDoublePreci, nil
+	case RpcReturnDataTypeNumeric:
+		return RpcReturnDataTypeNumeric, nil
 	case RpcReturnDataTypeText:
 		return RpcReturnDataTypeText, nil
 	case RpcReturnDataTypeVarchar, RpcReturnDataTypeVarcharAlias:
@@ -205,6 +319,42 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeVoid, nil
 	case RpcReturnDataTypeTrigger:
 		return RpcReturnDataTypeTrigger, nil
+		// ARRAY TYPES
+	case RpcReturnDataTypeArrayInteger:
+		return RpcReturnDataTypeArrayInteger, nil
+	case RpcReturnDataTypeArrayBigInt:
+		return RpcReturnDataTypeArrayBigInt, nil
+	case RpcReturnDataTypeArrayReal:
+		return RpcReturnDataTypeArrayReal, nil
+	case RpcReturnDataTypeArrayDoublePreci:
+		return RpcReturnDataTypeArrayDoublePreci, nil
+	case RpcReturnDataTypeArrayNumeric:
+		return RpcReturnDataTypeArrayNumeric, nil
+	case RpcReturnDataTypeArrayText:
+		return RpcReturnDataTypeArrayText, nil
+	case RpcReturnDataTypeArrayVarchar, RpcReturnDataTypeArrayVarcharAlias:
+		if returnAlias {
+			return RpcReturnDataTypeArrayVarcharAlias, nil
+		}
+		return RpcReturnDataTypeArrayVarchar, nil
+	case RpcReturnDataTypeArrayBoolean:
+		return RpcReturnDataTypeArrayBoolean, nil
+	case RpcReturnDataTypeArrayBytea:
+		return RpcReturnDataTypeArrayBytea, nil
+	case RpcReturnDataTypeArrayTimestamp, RpcReturnDataTypeArrayTimestampAlias:
+		if returnAlias {
+			return RpcReturnDataTypeArrayTimestampAlias, nil
+		}
+		return RpcReturnDataTypeArrayTimestamp, nil
+	case RpcReturnDataTypeArrayTimestampTZ, RpcReturnDataTypeArrayTimestampTZAlias:
+		if returnAlias {
+			return RpcReturnDataTypeArrayTimestampTZAlias, nil
+		}
+		return RpcReturnDataTypeArrayTimestampTZ, nil
+	case RpcReturnDataTypeArrayJSON:
+		return RpcReturnDataTypeArrayJSON, nil
+	case RpcReturnDataTypeArrayJSONB:
+		return RpcReturnDataTypeArrayJSONB, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return type  : %s", pCheckType)
 	}
@@ -220,6 +370,8 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeReal", nil
 	case RpcReturnDataTypeDoublePreci:
 		return "RpcReturnDataTypeDoublePreci", nil
+	case RpcReturnDataTypeNumeric:
+		return "RpcReturnDataTypeNumeric", nil
 	case RpcReturnDataTypeText:
 		return "RpcReturnDataTypeText", nil
 	case RpcReturnDataTypeVarchar, RpcReturnDataTypeVarcharAlias:
@@ -253,6 +405,42 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeVoid", nil
 	case RpcReturnDataTypeTrigger:
 		return "RpcReturnDataTypeTrigger", nil
+	// ARRAY TYPES
+	case RpcReturnDataTypeArrayInteger:
+		return "RpcReturnDataTypeArrayInteger", nil
+	case RpcReturnDataTypeArrayBigInt:
+		return "RpcReturnDataTypeArrayBigInt", nil
+	case RpcReturnDataTypeArrayReal:
+		return "RpcReturnDataTypeArrayReal", nil
+	case RpcReturnDataTypeArrayDoublePreci:
+		return "RpcReturnDataTypeArrayDoublePreci", nil
+	case RpcReturnDataTypeArrayNumeric:
+		return "RpcReturnDataTypeArrayNumeric", nil
+	case RpcReturnDataTypeArrayText:
+		return "RpcReturnDataTypeArrayText", nil
+	case RpcReturnDataTypeArrayVarchar, RpcReturnDataTypeArrayVarcharAlias:
+		if returnAlias {
+			return "RpcReturnDataTypeArrayVarcharAlias", nil
+		}
+		return "RpcReturnDataTypeArrayVarchar", nil
+	case RpcReturnDataTypeArrayBoolean:
+		return "RpcReturnDataTypeArrayBoolean", nil
+	case RpcReturnDataTypeArrayBytea:
+		return "RpcReturnDataTypeArrayBytea", nil
+	case RpcReturnDataTypeArrayTimestamp:
+		if returnAlias {
+			return "RpcReturnDataTypeArrayTimestampAlias", nil
+		}
+		return "RpcReturnDataTypeArrayTimestamp", nil
+	case RpcReturnDataTypeArrayTimestampTZ:
+		if returnAlias {
+			return "RpcReturnDataTypeArrayTimestampTZAlias", nil
+		}
+		return "RpcReturnDataTypeArrayTimestampTZ", nil
+	case RpcReturnDataTypeArrayJSON:
+		return "RpcReturnDataTypeArrayJSON", nil
+	case RpcReturnDataTypeArrayJSONB:
+		return "RpcReturnDataTypeArrayJSONB", nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}

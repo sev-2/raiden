@@ -39,6 +39,7 @@ type Config struct {
 	TraceCollectorEndpoint   string           `mapstructure:"TRACE_COLLECTOR_ENDPOINT"`
 	Version                  string           `mapstructure:"VERSION"`
 	MaxServerRequestBodySize int              `mapstructure:"MAX_SERVER_REQUEST_BODY_SIZE"`
+	MaxServerReadBufferSize  int              `mapstructure:"MAX_SERVER_READ_BUFFER_SIZE"`
 }
 
 // The function `LoadConfig` loads a configuration file based on the provided path or uses default
@@ -96,6 +97,10 @@ func LoadConfig(path *string) (*Config, error) {
 
 	if config.MaxServerRequestBodySize == 0 {
 		config.MaxServerRequestBodySize = 8 * 1024 * 1024 // Default Max: 8 MB
+	}
+
+	if config.MaxServerReadBufferSize == 0 {
+		config.MaxServerReadBufferSize = 8 * 1024 * 1024 // Default Max: 8 MB
 	}
 
 	return &config, nil
