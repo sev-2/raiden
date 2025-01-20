@@ -31,7 +31,7 @@ func TestBuildMigrateData(t *testing.T) {
 		{ID: 3, Name: "table3"},
 	}
 
-	migrateData, err := tables.BuildMigrateData(extractedLocalData, supabaseTables)
+	migrateData, err := tables.BuildMigrateData(extractedLocalData, supabaseTables, []string{})
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(migrateData))
 }

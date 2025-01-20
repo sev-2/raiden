@@ -55,6 +55,11 @@ func Import(flags *Flags, config *raiden.Config) error {
 	ImportLogger.Trace("filter table by schema")
 	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
 
+	if config.AllowedTable != "*" {
+		allowedTable := strings.Split(config.AllowedTable, ",")
+		spResource.Tables = filterAllowedTable(spResource.Tables, allowedTable...)
+	}
+
 	ImportLogger.Trace("filter function by schema")
 	spResource.Functions = filterFunctionBySchema(spResource.Functions, strings.Split(flags.AllowedSchema, ",")...)
 	ImportLogger.Debug("finish filter table and function by allowed schema")

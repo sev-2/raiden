@@ -18,6 +18,7 @@ const (
 type Config struct {
 	AccessToken              string           `mapstructure:"ACCESS_TOKEN"`
 	AnonKey                  string           `mapstructure:"ANON_KEY"`
+	AllowedTable             string           `mapstructure:"ALLOWED_TABLE"`
 	BreakerEnable            bool             `mapstructure:"BREAKER_ENABLE"`
 	CorsAllowedOrigins       string           `mapstructure:"CORS_ALLOWED_ORIGINS"`
 	CorsAllowedMethods       string           `mapstructure:"CORS_ALLOWED_METHODS"`
@@ -25,6 +26,7 @@ type Config struct {
 	CorsAllowCredentials     bool             `mapstructure:"CORS_ALLOWED_CREDENTIALS"`
 	DeploymentTarget         DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
 	Environment              string           `mapstructure:"ENVIRONMENT"`
+	MaxServerRequestBodySize int              `mapstructure:"MAX_SERVER_REQUEST_BODY_SIZE"`
 	ProjectId                string           `mapstructure:"PROJECT_ID"`
 	ProjectName              string           `mapstructure:"PROJECT_NAME"`
 	ServiceKey               string           `mapstructure:"SERVICE_KEY"`
@@ -38,7 +40,6 @@ type Config struct {
 	TraceCollector           string           `mapstructure:"TRACE_COLLECTOR"`
 	TraceCollectorEndpoint   string           `mapstructure:"TRACE_COLLECTOR_ENDPOINT"`
 	Version                  string           `mapstructure:"VERSION"`
-	MaxServerRequestBodySize int              `mapstructure:"MAX_SERVER_REQUEST_BODY_SIZE"`
 }
 
 // The function `LoadConfig` loads a configuration file based on the provided path or uses default
@@ -88,6 +89,10 @@ func LoadConfig(path *string) (*Config, error) {
 
 	if config.ScheduleStatus == "" {
 		config.ScheduleStatus = ScheduleStatusOff
+	}
+
+	if config.AllowedTable == "" {
+		config.AllowedTable = "*"
 	}
 
 	if len(config.SupabaseApiBasePath) > 0 && config.SupabaseApiBasePath[0] != '/' {

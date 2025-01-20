@@ -108,6 +108,26 @@ func filterTableBySchema(input []objects.Table, allowedSchema ...string) (output
 	return
 }
 
+// ----- Filter allowed table ------
+func filterAllowedTable(input []objects.Table, allowedTable ...string) (output []objects.Table) {
+	if len(allowedTable) == 0 {
+		return input
+	}
+
+	mapAllowedTable := map[string]bool{}
+	for _, t := range allowedTable {
+		mapAllowedTable[t] = true
+	}
+
+	for i := range input {
+		t := input[i]
+		if _, exist := mapAllowedTable[t.Name]; exist {
+			output = append(output, t)
+		}
+	}
+	return
+}
+
 func filterFunctionBySchema(input []objects.Function, allowedSchema ...string) (output []objects.Function) {
 	filterSchema := []string{"public"}
 	if len(allowedSchema) > 0 && allowedSchema[0] != "" {
