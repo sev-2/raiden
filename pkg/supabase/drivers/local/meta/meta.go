@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/supabase/client/net"
 )
 
 var MetaLogger = logger.HcLog().Named("supabase.meta")

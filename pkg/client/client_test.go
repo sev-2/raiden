@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sev-2/raiden/pkg/supabase/client"
+	"github.com/sev-2/raiden/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 )
