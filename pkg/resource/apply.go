@@ -166,8 +166,8 @@ func Apply(flags *Flags, config *raiden.Config) error {
 
 	if flags.All() || flags.ModelsOnly {
 		allowedTable := []string{}
-		if config.AllowedTable != "*" {
-			allowedTable = strings.Split(config.AllowedTable, ",")
+		if config.AllowedTables != "*" {
+			allowedTable = strings.Split(config.AllowedTables, ",")
 		}
 
 		resource.Tables = tables.AttachIndexAndAction(resource.Tables, resource.Indexes, resource.RelationActions)

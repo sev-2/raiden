@@ -304,7 +304,7 @@ func PromptAllowedTable(c *Config) error {
 		return err
 	}
 
-	c.AllowedTable = inputText
+	c.AllowedTables = inputText
 	return nil
 }
 

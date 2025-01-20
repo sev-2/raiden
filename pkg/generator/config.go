@@ -35,7 +35,7 @@ SERVER_PORT: {{ .ServerPort }}
 ENVIRONMENT: development
 VERSION: 1.0.0
 
-ALLOWED_TABLE: {{ .AllowedTable }}
+ALLOWED_TABLES: {{ .AllowedTables }}
 
 SCHEDULE_STATUS: '{{ .ScheduleStatus }}'
 

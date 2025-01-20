@@ -439,6 +439,7 @@ func TestImportUpdateStateOnly(t *testing.T) {
 		UpdateStateOnly: true,
 	}
 	config := loadConfig()
+	config.AllowedTables = "*"
 
 	resource.ImportLogger = logger.HcLog().Named("import")
 

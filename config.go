@@ -18,7 +18,7 @@ const (
 type Config struct {
 	AccessToken              string           `mapstructure:"ACCESS_TOKEN"`
 	AnonKey                  string           `mapstructure:"ANON_KEY"`
-	AllowedTable             string           `mapstructure:"ALLOWED_TABLE"`
+	AllowedTables            string           `mapstructure:"ALLOWED_TABLES"`
 	BreakerEnable            bool             `mapstructure:"BREAKER_ENABLE"`
 	CorsAllowedOrigins       string           `mapstructure:"CORS_ALLOWED_ORIGINS"`
 	CorsAllowedMethods       string           `mapstructure:"CORS_ALLOWED_METHODS"`
@@ -91,8 +91,8 @@ func LoadConfig(path *string) (*Config, error) {
 		config.ScheduleStatus = ScheduleStatusOff
 	}
 
-	if config.AllowedTable == "" {
-		config.AllowedTable = "*"
+	if config.AllowedTables == "" {
+		config.AllowedTables = "*"
 	}
 
 	if len(config.SupabaseApiBasePath) > 0 && config.SupabaseApiBasePath[0] != '/' {

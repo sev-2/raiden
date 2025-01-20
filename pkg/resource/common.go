@@ -109,7 +109,7 @@ func filterTableBySchema(input []objects.Table, allowedSchema ...string) (output
 }
 
 // ----- Filter allowed table ------
-func filterAllowedTable(input []objects.Table, allowedTable ...string) (output []objects.Table) {
+func filterAllowedTables(input []objects.Table, allowedTable ...string) (output []objects.Table) {
 	if len(allowedTable) == 0 {
 		return input
 	}
