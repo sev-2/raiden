@@ -106,7 +106,7 @@ func TestBuildMigrateDataUpdateTableNotAllowed(t *testing.T) {
 		{ID: 3, Name: "table3"},
 	}
 
-	migrateData, err := tables.BuildMigrateData(extractedLocalData, supabaseTables, []string{"table2", "table3", "table4"})
+	migrateData, err := tables.BuildMigrateData(extractedLocalData, supabaseTables, []string{"table1", "table3", "table4"})
 	assert.Error(t, err)
 	assert.Equal(t, 0, len(migrateData))
 }
