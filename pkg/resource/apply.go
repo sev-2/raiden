@@ -165,8 +165,13 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	if flags.All() || flags.ModelsOnly {
+		allowedTable := []string{}
+		if config.AllowedTables != "*" {
+			allowedTable = strings.Split(config.AllowedTables, ",")
+		}
+
 		resource.Tables = tables.AttachIndexAndAction(resource.Tables, resource.Indexes, resource.RelationActions)
-		if data, err := tables.BuildMigrateData(appTables, resource.Tables); err != nil {
+		if data, err := tables.BuildMigrateData(appTables, resource.Tables, allowedTable); err != nil {
 			return err
 		} else {
 			migrateData.Tables = data

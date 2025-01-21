@@ -79,6 +79,10 @@ func StartCommand() *cobra.Command {
 			}
 
 			// 3. running init
+			if f.Init.Version == "" {
+				f.Init.Version = appVersion
+			}
+
 			if executeErr := init_cmd.Run(&f.Init, projectPath, utils.ToGoModuleName(promptConfig.ProjectName)); executeErr != nil {
 				StartLogger.Error(executeErr.Error())
 				return

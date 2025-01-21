@@ -1,6 +1,8 @@
 package tables
 
 import (
+	"fmt"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/state"
@@ -18,7 +20,7 @@ var ActionFunc = MigrateActionFunc{
 	},
 }
 
-func BuildMigrateData(extractedLocalData state.ExtractTableResult, supabaseData []objects.Table) (migrateData []MigrateItem, err error) {
+func BuildMigrateData(extractedLocalData state.ExtractTableResult, supabaseData []objects.Table, allowedTable []string) (migrateData []MigrateItem, err error) {
 	Logger.Info("start build migrate table data")
 	// compare and bind existing table to migrate data
 	mapSpTable := make(map[int]bool)
@@ -27,11 +29,24 @@ func BuildMigrateData(extractedLocalData state.ExtractTableResult, supabaseData 
 		mapSpTable[t.ID] = true
 	}
 
+	mapAllowedTable := make(map[string]bool)
+	for _, t := range allowedTable {
+		if t == "" {
+			continue
+		}
+		mapAllowedTable[t] = true
+	}
+
 	// filter existing table need compare or move to create new
 	Logger.Debug("filter extracted data for update new local table data")
 	var compareTables []objects.Table
 	for i := range extractedLocalData.Existing {
 		et := extractedLocalData.Existing[i]
+
+		if !isAllowedTable(mapAllowedTable, et.Table.Name) {
+			return migrateData, fmt.Errorf("table %s is not allowed to modify", et.Table.Name)
+		}
+
 		if _, isExist := mapSpTable[et.Table.ID]; isExist {
 			compareTables = append(compareTables, et.Table)
 		} else {
@@ -50,6 +65,9 @@ func BuildMigrateData(extractedLocalData state.ExtractTableResult, supabaseData 
 	if len(extractedLocalData.New) > 0 {
 		for i := range extractedLocalData.New {
 			t := extractedLocalData.New[i]
+			if !isAllowedTable(mapAllowedTable, t.Table.Name) {
+				return migrateData, fmt.Errorf("table %s is not allowed to modify", t.Table.Name)
+			}
 			migrateData = append(migrateData, MigrateItem{
 				Type:    migrator.MigrateTypeCreate,
 				NewData: t.Table,
@@ -62,6 +80,11 @@ func BuildMigrateData(extractedLocalData state.ExtractTableResult, supabaseData 
 	if len(extractedLocalData.Delete) > 0 {
 		for i := range extractedLocalData.Delete {
 			t := extractedLocalData.Delete[i]
+
+			if !isAllowedTable(mapAllowedTable, t.Table.Name) {
+				return migrateData, fmt.Errorf("table %s is not allowed to modify", t.Table.Name)
+			}
+
 			isExist := false
 			for i := range supabaseData {
 				tt := supabaseData[i]
@@ -113,4 +136,16 @@ func BuildMigrateItem(supabaseData, localData []objects.Table) (migratedData []M
 
 func Migrate(config *raiden.Config, tables []MigrateItem, stateChan chan any, actions MigrateActionFunc) []error {
 	return migrator.MigrateResource(config, tables, stateChan, actions, migrator.DefaultMigrator)
+}
+
+func isAllowedTable(mapAllowedTable map[string]bool, table string) bool {
+	if len(mapAllowedTable) == 0 {
+		return true
+	}
+
+	if _, exist := mapAllowedTable[table]; !exist {
+		return false
+	}
+
+	return true
 }

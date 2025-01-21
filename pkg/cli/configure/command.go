@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/erikgeiser/promptkit/confirmation"
 	"github.com/erikgeiser/promptkit/selection"
@@ -130,6 +131,11 @@ func SimpleConfigure() (*Config, error) {
 	}
 
 	if err := PromptServiceKey(config); err != nil {
+		return nil, err
+	}
+
+	// Setup Allowed table
+	if err := PromptAllowedTable(config); err != nil {
 		return nil, err
 	}
 
@@ -279,6 +285,26 @@ func PromptServiceKey(c *Config) error {
 	}
 
 	c.ServiceKey = inputText
+	return nil
+}
+
+// ----- Prompt Allowed Table -----
+func PromptAllowedTable(c *Config) error {
+	input := textinput.New("Allowed table ('*' for all and use coma separated for multiple table)")
+	input.InitialValue = "*"
+	input.Validate = func(s string) error {
+		if strings.Contains(s, "*") && len(s) > 1 {
+			return errors.New("invalid allowed table value use '*' for all and use coma separated for multiple table")
+		}
+		return nil
+	}
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	c.AllowedTables = inputText
 	return nil
 }
 
