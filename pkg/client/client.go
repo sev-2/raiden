@@ -45,7 +45,8 @@ type DefaultResponse struct {
 
 func getClient() Client {
 	maxIdleConnDuration := time.Hour * 1
-	return &fasthttp.Client{
+
+	httpClientInstance = &fasthttp.Client{
 		ReadTimeout:                   DefaultTimeout,
 		WriteTimeout:                  DefaultTimeout,
 		MaxIdleConnDuration:           maxIdleConnDuration,
@@ -58,6 +59,8 @@ func getClient() Client {
 			DNSCacheDuration: time.Hour,
 		}).Dial,
 	}
+
+	return httpClientInstance
 }
 
 func SetClient(c Client) {

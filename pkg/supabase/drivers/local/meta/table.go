@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/supabase/client/net"
+	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/supabase/query"
 	"github.com/sev-2/raiden/pkg/supabase/query/sql"
