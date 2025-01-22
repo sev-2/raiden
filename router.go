@@ -101,7 +101,7 @@ func (r *router) BuildHandler() {
 		}
 
 		if r.config.Mode == SvcMode && route.Type != RouteTypeCustom {
-			RouterLogger.Error("only custom routes are allowed in service mode ", "path", route.Path)
+			RouterLogger.Error("only custom routes are allowed in service mode", "path", route.Path)
 			os.Exit(1)
 		}
 

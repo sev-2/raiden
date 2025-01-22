@@ -156,33 +156,43 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 	go func() {
 		defer wg.Done()
 
-		// generate rpc register
-		GenerateLogger.Debug("start generate rpc register file")
-		if err := generator.GenerateRpcRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
-		}
-		GenerateLogger.Debug("finish generate rpc register file")
+		if config.Mode == raiden.BffMode {
+			// generate rpc register
+			GenerateLogger.Debug("start generate rpc register file")
+			if err := generator.GenerateRpcRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate rpc register file")
 
-		// generate role register
-		GenerateLogger.Debug("start generate role register file")
-		if err := generator.GenerateRoleRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
-		}
-		GenerateLogger.Debug("finish generate role register file")
+			// generate role register
+			GenerateLogger.Debug("start generate role register file")
+			if err := generator.GenerateRoleRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate role register file")
 
-		// generate model register
-		GenerateLogger.Debug("start generate model register file")
-		if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
-		}
-		GenerateLogger.Debug("finish generate role register file")
+			// generate model register
+			GenerateLogger.Debug("start generate model register file")
+			if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate role register file")
 
-		// generate storage register
-		GenerateLogger.Debug("start generate storages register file")
-		if err := generator.GenerateStoragesRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
+			// generate storage register
+			GenerateLogger.Debug("start generate storages register file")
+			if err := generator.GenerateStoragesRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate storages register file")
+		} else {
+			// generate model register
+			GenerateLogger.Debug("start generate model register file")
+			if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate role register file")
+
 		}
-		GenerateLogger.Debug("finish generate storages register file")
 
 		// generate job register
 		GenerateLogger.Debug("start generate job register file")

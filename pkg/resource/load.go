@@ -73,83 +73,85 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 		close(outChan)
 	}()
 
-	if flags.All() || flags.ModelsOnly || flags.StoragesOnly {
-		wg.Add(1)
-		LoadLogger.Debug("Get Policy From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) (objects.Policies, error) {
-			rs, e := supabase.GetPolicies(cfg)
-			if e != nil {
-				return rs, e
-			}
+	if cfg.Mode == raiden.BffMode {
+		if flags.All() || flags.ModelsOnly || flags.StoragesOnly {
+			wg.Add(1)
+			LoadLogger.Debug("Get Policy From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) (objects.Policies, error) {
+				rs, e := supabase.GetPolicies(cfg)
+				if e != nil {
+					return rs, e
+				}
 
-			// cleanup policy expression
-			var cleanedPolicies objects.Policies
-			for i := range rs {
-				p := rs[i]
-				policies.CleanupAclExpression(&p)
-				cleanedPolicies = append(cleanedPolicies, p)
-			}
+				// cleanup policy expression
+				var cleanedPolicies objects.Policies
+				for i := range rs {
+					p := rs[i]
+					policies.CleanupAclExpression(&p)
+					cleanedPolicies = append(cleanedPolicies, p)
+				}
 
-			return cleanedPolicies, nil
-		})
+				return cleanedPolicies, nil
+			})
 
-		wg.Add(1)
-		LoadLogger.Debug("Get Role From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
-			return supabase.GetRoles(cfg)
-		})
-	}
+			wg.Add(1)
+			LoadLogger.Debug("Get Role From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
+				return supabase.GetRoles(cfg)
+			})
+		}
 
-	if flags.All() || flags.ModelsOnly {
-		wg.Add(1)
-		LoadLogger.Debug("Get Table From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
-			return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
-		})
-
-		wg.Add(1)
-		LoadLogger.Debug("Get Index From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
-			return supabase.GetIndexes(cfg, supabase.DefaultIncludedSchema[0])
-		})
-
-		wg.Add(1)
-		LoadLogger.Debug("Get Table Relation Actions From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
-			return supabase.GetTableRelationshipActions(cfg, supabase.DefaultIncludedSchema[0])
-		})
-	}
-
-	if flags.All() || flags.RolesOnly {
-		wg.Add(1)
-		LoadLogger.Debug("Get Role From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
-			return supabase.GetRoles(cfg)
-		})
-	}
-
-	if flags.All() || flags.RpcOnly {
-		if flags.RpcOnly {
+		if flags.All() || flags.ModelsOnly {
 			wg.Add(1)
 			LoadLogger.Debug("Get Table From Supabase")
 			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
 				return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
 			})
+
+			wg.Add(1)
+			LoadLogger.Debug("Get Index From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
+				return supabase.GetIndexes(cfg, supabase.DefaultIncludedSchema[0])
+			})
+
+			wg.Add(1)
+			LoadLogger.Debug("Get Table Relation Actions From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
+				return supabase.GetTableRelationshipActions(cfg, supabase.DefaultIncludedSchema[0])
+			})
 		}
 
-		wg.Add(1)
-		LoadLogger.Debug("Get Function From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
-			return supabase.GetFunctions(cfg)
-		})
-	}
+		if flags.All() || flags.RolesOnly {
+			wg.Add(1)
+			LoadLogger.Debug("Get Role From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
+				return supabase.GetRoles(cfg)
+			})
+		}
 
-	if flags.All() || flags.StoragesOnly {
-		wg.Add(1)
-		LoadLogger.Debug("Get Bucket From Supabase")
-		go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Bucket, error) {
-			return supabase.GetBuckets(cfg)
-		})
+		if flags.All() || flags.RpcOnly {
+			if flags.RpcOnly {
+				wg.Add(1)
+				LoadLogger.Debug("Get Table From Supabase")
+				go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
+					return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
+				})
+			}
+
+			wg.Add(1)
+			LoadLogger.Debug("Get Function From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
+				return supabase.GetFunctions(cfg)
+			})
+		}
+
+		if flags.All() || flags.StoragesOnly {
+			wg.Add(1)
+			LoadLogger.Debug("Get Bucket From Supabase")
+			go loadSupabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Bucket, error) {
+				return supabase.GetBuckets(cfg)
+			})
+		}
 	}
 
 	return outChan

@@ -142,18 +142,20 @@ func SimpleConfigure() (*Config, error) {
 		}
 	}
 
-	// Prompt Key
-	if err := PromptAnonKey(config); err != nil {
-		return nil, err
-	}
+	if config.Mode != raiden.SvcMode {
+		// Prompt Key
+		if err := PromptAnonKey(config); err != nil {
+			return nil, err
+		}
 
-	if err := PromptServiceKey(config); err != nil {
-		return nil, err
-	}
+		if err := PromptServiceKey(config); err != nil {
+			return nil, err
+		}
 
-	// Setup Allowed table
-	if err := PromptAllowedTable(config); err != nil {
-		return nil, err
+		// Setup Allowed table
+		if err := PromptAllowedTable(config); err != nil {
+			return nil, err
+		}
 	}
 
 	// Prompt Job

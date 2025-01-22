@@ -16,6 +16,7 @@ var ImportLogger hclog.Logger = logger.HcLog().Named("generator.import")
 type GenerateImportMainFunctionData struct {
 	Package string
 	Imports []string
+	Mode    raiden.Mode
 }
 
 const (
@@ -54,10 +55,12 @@ func main() {
 			}
 
 			// register app resource
+			bootstrap.RegisterModels()
+			{{if eq .Mode "bff"}}
 			bootstrap.RegisterRpc()
 			bootstrap.RegisterRoles()
-			bootstrap.RegisterModels()
 			bootstrap.RegisterStorages()
+			{{end}}
 
 			if err = generate.Run(&f.Generate, config, f.ProjectPath, false); err != nil {
 				imports.ImportLogger.Error(err.Error())
@@ -131,6 +134,7 @@ func GenerateImportMainFunction(basePath string, config *raiden.Config, generate
 	data := GenerateImportMainFunctionData{
 		Package: "main",
 		Imports: importPaths,
+		Mode:    config.Mode,
 	}
 
 	// setup generate input param
