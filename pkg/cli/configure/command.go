@@ -80,6 +80,7 @@ func SimpleConfigure() (*Config, error) {
 			Version:        "1.0.0",
 			ServerHost:     "127.0.0.1",
 			ServerPort:     "8002",
+			Mode:           raiden.BffMode,
 		},
 	}
 
@@ -112,16 +113,32 @@ func SimpleConfigure() (*Config, error) {
 
 	// Prompt for self host deployment
 	if config.DeploymentTarget == raiden.DeploymentTargetSelfHosted {
-		if err := PromptSupabaseApiUrl(config); err != nil {
+		if err := PromptMode(config); err != nil {
 			return nil, err
 		}
 
-		if err := PromptSupabaseApiPath(config); err != nil {
-			return nil, err
+		if config.Mode == raiden.BffMode {
+			if err := PromptSupabaseApiUrl(config); err != nil {
+				return nil, err
+			}
+
+			if err := PromptSupabaseApiPath(config); err != nil {
+				return nil, err
+			}
+
+			if err := PromptSupabasePublicUrl(config); err != nil {
+				return nil, err
+			}
 		}
 
-		if err := PromptSupabasePublicUrl(config); err != nil {
-			return nil, err
+		if config.Mode == raiden.SvcMode {
+			if err := PromptPostgRest(config); err != nil {
+				return nil, err
+			}
+
+			if err := PromptPgMeta(config); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -421,6 +438,61 @@ func PromptJob(c *Config) error {
 	if inputBool {
 		c.ScheduleStatus = "on"
 	}
+	return nil
+}
+
+// ----- Prompt Mode ----
+func PromptMode(c *Config) error {
+	input := selection.New("Enter your mode", []raiden.Mode{raiden.BffMode, raiden.SvcMode})
+	input.PageSize = 2
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+	c.Mode = raiden.Mode(inputText)
+
+	return nil
+}
+
+// ----- Prompt Service Mode -----
+func PromptPostgRest(c *Config) error {
+	input := textinput.New("Enter postgrest url")
+	input.InitialValue = "http://localhost:3000"
+	input.Validate = func(s string) error {
+		if len(s) == 0 || s == "" {
+			return errors.New("postgrest url is required")
+		}
+
+		return nil
+	}
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	c.PostgRestUrl = inputText
+	return nil
+}
+
+func PromptPgMeta(c *Config) error {
+	input := textinput.New("Enter pg-meta url")
+	input.InitialValue = "http://localhost:8080"
+	input.Validate = func(s string) error {
+		if len(s) == 0 || s == "" {
+			return errors.New("pg-meta url is required")
+		}
+
+		return nil
+	}
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	c.PgMetaUrl = inputText
 	return nil
 }
 

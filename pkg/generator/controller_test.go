@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,7 @@ func TestGenerateController(t *testing.T) {
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/controllers/hello.go")
 
-	err3 := generator.GenerateRoute(dir, "test", generator.GenerateFn(generator.Generate))
+	err3 := generator.GenerateRoute(dir, "test", raiden.BffMode, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err3)
 	assert.FileExists(t, dir+"/internal/bootstrap/route.go")
 }

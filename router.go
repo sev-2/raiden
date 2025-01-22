@@ -100,6 +100,11 @@ func (r *router) BuildHandler() {
 			os.Exit(1)
 		}
 
+		if r.config.Mode == SvcMode && route.Type != RouteTypeCustom {
+			RouterLogger.Error("only custom routes are allowed in service mode ", "path", route.Path)
+			os.Exit(1)
+		}
+
 		if route == nil {
 			continue
 		}
@@ -125,17 +130,19 @@ func (r *router) BuildHandler() {
 	}
 
 	// Proxy auth url
-	u, err := url.Parse(r.config.SupabasePublicUrl)
-	if err == nil {
-		r.engine.ANY("/auth/v1/{path:*}", AuthProxy(r.config, nil, nil))
+	if r.config.Mode == BffMode {
+		u, err := url.Parse(r.config.SupabasePublicUrl)
+		if err == nil {
+			r.engine.ANY("/auth/v1/{path:*}", AuthProxy(r.config, nil, nil))
 
-		r.engine.GET("/realtime/v1/websocket", func(ctx *fasthttp.RequestCtx) {
-			WebSocketHandler(ctx, u)
-		})
+			r.engine.GET("/realtime/v1/websocket", func(ctx *fasthttp.RequestCtx) {
+				WebSocketHandler(ctx, u)
+			})
 
-		r.engine.POST("/realtime/v1/api/broadcast", func(ctx *fasthttp.RequestCtx) {
-			RealtimeBroadcastHandler(ctx, u)
-		})
+			r.engine.POST("/realtime/v1/api/broadcast", func(ctx *fasthttp.RequestCtx) {
+				RealtimeBroadcastHandler(ctx, u)
+			})
+		}
 	}
 }
 

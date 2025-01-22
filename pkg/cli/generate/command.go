@@ -127,7 +127,7 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			}
 
 			// generate route base on controllers
-			if err := generator.GenerateRoute(projectPath, config.ProjectName, generator.Generate); err != nil {
+			if err := generator.GenerateRoute(projectPath, config.ProjectName, config.Mode, generator.Generate); err != nil {
 				errChan <- err
 				return
 			}
