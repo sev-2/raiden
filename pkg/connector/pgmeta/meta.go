@@ -1,6 +1,7 @@
-package meta
+package pgmeta
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,14 +11,35 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/client/net"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/supabase/query"
 	"github.com/sev-2/raiden/pkg/supabase/query/sql"
 )
 
+var MetaLogger = logger.HcLog().Named("connector.meta")
+
+// ----- Execute Query -----
+type ExecuteQueryParam struct {
+	Query     string `json:"query"`
+	Variables any    `json:"variables"`
+}
+
+func ExecuteQuery[T any](baseUrl, query string, variables any, reqInterceptor net.RequestInterceptor, resInterceptor net.ResponseInterceptor) (result T, err error) {
+	url := fmt.Sprintf("%s/query", baseUrl)
+	p := ExecuteQueryParam{Query: query, Variables: variables}
+	pByte, err := json.Marshal(p)
+	if err != nil {
+		MetaLogger.Error("error execute query", "query", query)
+		return result, err
+	}
+	return net.Post[T](url, pByte, net.DefaultTimeout, reqInterceptor, resInterceptor)
+}
+
 func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool) ([]objects.Table, error) {
 	MetaLogger.Trace("start fetching tables from meta")
-	url := fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+	url := fmt.Sprintf("%s/tables", cfg.PgMetaUrl)
+
 	reqInterceptor := func(req *http.Request) error {
 		if len(includedSchemas) > 0 {
 			req.URL.Query().Set("included_schemas", strings.Join(includedSchemas, ","))
@@ -46,7 +68,7 @@ func GetTableByName(cfg *raiden.Config, name, schema string, includeColumn bool)
 		return result, err
 	}
 
-	rs, err := ExecuteQuery[[]objects.Table](getBaseUrl(cfg), q, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Table](cfg.PgMetaUrl, q, nil, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get tables error : %s", err)
 		return
@@ -73,7 +95,7 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 	}
 
 	// execute update
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return result, fmt.Errorf("create new table %s error : %s", newTable.Name, err)
 	}
@@ -85,7 +107,7 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 	MetaLogger.Trace("start update table", "name", newTable.Name)
 	sql := query.BuildUpdateTableQuery(newTable, updateItem)
 	// execute update
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update tables error : %s", err)
 	}
@@ -121,7 +143,7 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 	MetaLogger.Trace("start delete table", "name", table.Name)
 	sql := query.BuildDeleteTableQuery(table, true)
 	// execute delete
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete table %s error : %s", table.Name, err)
 	}
@@ -131,15 +153,15 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 
 // ----- relationship action -----
 func GetTableRelationshipActions(cfg *raiden.Config, schema string) ([]objects.TablesRelationshipAction, error) {
-	MetaLogger.Trace("start fetching table relationships from supabase")
+	MetaLogger.Trace("start fetching table relationships from pg-meta")
 	q := sql.GenerateGetTableRelationshipActionsQuery(schema)
 
-	rs, err := ExecuteQuery[[]objects.TablesRelationshipAction](getBaseUrl(cfg), q, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.TablesRelationshipAction](cfg.PgMetaUrl, q, nil, nil, nil)
 	if err != nil {
-		return rs, fmt.Errorf("get table relationships error : %s", err)
+		return rs, fmt.Errorf("get tables relation from pg-meta error : %s", err)
 	}
 
-	MetaLogger.Trace("finish fetching table relationships from supabase")
+	MetaLogger.Trace("finish fetching table relationships from pg-meta")
 	return rs, nil
 }
 
@@ -244,7 +266,7 @@ func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) err
 	}
 
 	// Execute SQL Query
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("create column %s.%s error : %s", column.Table, column.Name, err)
 	}
@@ -258,7 +280,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 	sql := query.BuildUpdateColumnQuery(oldColumn, newColumn, updateItem)
 
 	// Execute SQL Query
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update column %s.%s error : %s", newColumn.Table, newColumn.Name, err)
 	}
@@ -269,7 +291,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 func DeleteColumn(cfg *raiden.Config, column objects.Column) error {
 	MetaLogger.Trace("start delete column", "table", column.Table, "name", column.Name)
 	sql := query.BuildDeleteColumnQuery(column)
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete column %s.%s error : %s", column.Table, column.Name, err)
 	}
@@ -376,7 +398,7 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return err
 	}
 
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("create foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -385,7 +407,7 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
 		return err
 	} else if len(indexSql) > 0 {
-		_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+		_, err = ExecuteQuery[any](cfg.PgMetaUrl, indexSql, nil, nil, nil)
 		if err != nil {
 			return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 		}
@@ -408,7 +430,7 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	}
 
 	sql := deleteSql + createSql
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -418,7 +440,7 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
 			return err
 		} else if len(indexSql) > 0 {
-			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+			_, err = ExecuteQuery[any](cfg.PgMetaUrl, indexSql, nil, nil, nil)
 			if err != nil {
 				return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 			}
@@ -437,7 +459,7 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return err
 	}
 
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -447,7 +469,7 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationDelete, relation); err != nil {
 			return err
 		} else if len(indexSql) > 0 {
-			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+			_, err = ExecuteQuery[any](cfg.PgMetaUrl, indexSql, nil, nil, nil)
 			if err != nil {
 				return fmt.Errorf("delete foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 			}
@@ -461,4 +483,16 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 // get relation table name, base on struct type that defined in relation field
 func getRelationConstrainName(schema, table, foreignKey string) string {
 	return fmt.Sprintf("%s_%s_%s_fkey", schema, table, foreignKey)
+}
+
+// ---- Index -----
+func GetIndexes(cfg *raiden.Config, schema string) ([]objects.Index, error) {
+	MetaLogger.Trace("start fetching indexes from meta")
+	rs, err := ExecuteQuery[[]objects.Index](cfg.PgMetaUrl, sql.GenerateGetIndexQuery(schema), nil, nil, nil)
+	if err != nil {
+		err = fmt.Errorf("get indexes error : %s", err)
+		return []objects.Index{}, err
+	}
+	MetaLogger.Trace("finish fetching policy by name from meta")
+	return rs, nil
 }

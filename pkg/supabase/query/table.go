@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/supabase/query/sql"
 )
 
 func BuildCreateTableQuery(newTable objects.Table) (string, error) {
@@ -318,6 +319,7 @@ func buildColumnDef(column objects.Column) (string, error) {
 
 		if value != "" {
 			defaultValue := fmt.Sprintf("'%v'", value)
+
 			if _, e := strconv.ParseInt(value, 10, 64); e == nil {
 				defaultValue = value
 			} else if _, e := strconv.ParseUint(value, 10, 64); e == nil {
@@ -327,6 +329,11 @@ func buildColumnDef(column objects.Column) (string, error) {
 			} else if _, e := strconv.ParseFloat(value, 64); e == nil {
 				defaultValue = value
 			} else if strings.Contains(value, "()") {
+				defaultValue = value
+			}
+
+			// handle reserved default value keyword
+			if _, exist := sql.MapDefaultFunctionValue[value]; exist {
 				defaultValue = value
 			}
 

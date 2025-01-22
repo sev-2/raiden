@@ -27,13 +27,26 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 			baseUrl = "https://api.supabase.co"
 		} else {
 			baseUrl = getConfig().SupabasePublicUrl
+
+			if getConfig().Mode == raiden.SvcMode {
+				baseUrl = getConfig().PostgRestUrl
+			}
 		}
 
-		if strings.HasPrefix(url, "/") {
-			url = fmt.Sprintf("%s/rest/v1%s", baseUrl, url)
+		if getConfig().Mode == raiden.SvcMode {
+			if strings.HasPrefix(url, "/") {
+				url = fmt.Sprintf("%s%s", baseUrl, url)
+			} else {
+				url = fmt.Sprintf("%s/%s", baseUrl, url)
+			}
 		} else {
-			url = fmt.Sprintf("%s/rest/v1/%s", baseUrl, url)
+			if strings.HasPrefix(url, "/") {
+				url = fmt.Sprintf("%s/rest/v1%s", baseUrl, url)
+			} else {
+				url = fmt.Sprintf("%s/rest/v1/%s", baseUrl, url)
+			}
 		}
+
 	}
 
 	req.SetRequestURI(url)

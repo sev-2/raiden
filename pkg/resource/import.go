@@ -39,7 +39,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	// load supabase resource
-	ImportLogger.Info("load resource from supabase")
+	ImportLogger.Info("load resource from database")
 	spResource, err := Load(flags, config)
 	if err != nil {
 		return err

@@ -116,9 +116,18 @@ func (q Query) GetUrl() string {
 		baseUrl = ""
 	} else {
 		baseUrl = getConfig().SupabasePublicUrl
+
+		if getConfig().Mode == raiden.SvcMode {
+			baseUrl = getConfig().PostgRestUrl
+		}
 	}
 
 	url := fmt.Sprintf("%s/rest/v1/%s", baseUrl, urlQuery)
+
+	if getConfig().Mode == raiden.SvcMode {
+		url = fmt.Sprintf("%s/%s", baseUrl, urlQuery)
+	}
+
 	return url
 }
 
