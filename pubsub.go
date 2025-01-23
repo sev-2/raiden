@@ -87,7 +87,7 @@ type PubSub interface {
 }
 
 func NewPubsub(config *Config, tracer trace.Tracer) PubSub {
-	return &pubSub{
+	return &PubSubManager{
 		config: config,
 		provider: pubSubProvider{
 			google: &googlePubSubProvider{
@@ -99,7 +99,7 @@ func NewPubsub(config *Config, tracer trace.Tracer) PubSub {
 
 }
 
-type pubSub struct {
+type PubSubManager struct {
 	config   *Config
 	handlers []SubscriberHandler
 	provider pubSubProvider
@@ -111,12 +111,27 @@ type pubSubProvider struct {
 }
 
 // Register implements Subscriber.
-func (s *pubSub) Register(handler SubscriberHandler) {
+func (s *PubSubManager) Register(handler SubscriberHandler) {
 	s.handlers = append(s.handlers, handler)
 }
 
+func (s *PubSubManager) GetHandlerCount() int {
+	return len(s.handlers)
+}
+
+func (s *PubSubManager) SetConfig(cfg *Config) {
+	s.config = cfg
+}
+
+func (s *PubSubManager) SetProvider(providerType PubSubProviderType, provider PubSubProvider) {
+	switch providerType {
+	case PubSubProviderGoogle:
+		s.provider.google = provider
+	}
+}
+
 // StartListen implements Subscriber.
-func (s *pubSub) Listen() {
+func (s *PubSubManager) Listen() {
 	var g run.Group
 
 	var googleHandlers []SubscriberHandler
@@ -139,7 +154,7 @@ func (s *pubSub) Listen() {
 	}
 }
 
-func (s *pubSub) Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error {
+func (s *PubSubManager) Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error {
 	switch provider {
 	case PubSubProviderGoogle:
 		return s.provider.google.Publish(ctx, topic, message)
