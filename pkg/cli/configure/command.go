@@ -163,6 +163,30 @@ func SimpleConfigure() (*Config, error) {
 		return nil, err
 	}
 
+	// Prompt Pubsub
+	isUsePubsub, err := PromptPubsub()
+	if err != nil {
+		return nil, err
+	}
+
+	if isUsePubsub {
+		provider, err := PromptPubsubOptions()
+		if err != nil {
+			return nil, err
+		}
+
+		switch provider {
+		case string(raiden.PubSubProviderGoogle):
+			if err := PromptGoogleProjectID(config); err != nil {
+				return nil, err
+			}
+
+			if err := PromptGoogleSaPath(config); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return config, nil
 }
 
@@ -495,6 +519,65 @@ func PromptPgMeta(c *Config) error {
 	}
 
 	c.PgMetaUrl = inputText
+	return nil
+}
+
+// ----- Prompt Pub/Sub ----
+func PromptPubsub() (bool, error) {
+	input := confirmation.New("Would you like to to use pubsub ?", confirmation.No)
+	input.DefaultValue = confirmation.No
+	return input.RunPrompt()
+}
+
+func PromptPubsubOptions() (string, error) {
+	// Define options for the multiple selection
+	options := []string{string(raiden.PubSubProviderGoogle)}
+	// Create a multiple-selection prompt
+	input := selection.New(
+		"Select options (use ↑/↓ to navigate, space to select, enter to confirm):",
+		options,
+	)
+
+	input.PageSize = 1
+	return input.RunPrompt()
+}
+
+// ----- Prompt Google -----
+func PromptGoogleProjectID(c *Config) error {
+	input := textinput.New("Enter your google project id")
+	input.Validate = func(s string) error {
+		if len(s) == 0 || s == "" {
+			return errors.New("google project id is required")
+		}
+
+		return nil
+	}
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	c.GoogleProjectId = inputText
+	return nil
+}
+
+func PromptGoogleSaPath(c *Config) error {
+	input := textinput.New("Enter your service account file location")
+	input.Validate = func(s string) error {
+		if len(s) == 0 || s == "" {
+			return errors.New("service account file location is required")
+		}
+
+		return nil
+	}
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	c.GoogleSaPath = inputText
 	return nil
 }
 

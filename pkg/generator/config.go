@@ -48,6 +48,13 @@ ALLOWED_TABLES: {{ .AllowedTables }}
 
 SCHEDULE_STATUS: '{{ .ScheduleStatus }}'
 
+{{- if .GOOGLE_PROJECT_ID }}
+GOOGLE_PROJECT_ID: {{ .GOOGLE_PROJECT_ID }}
+{{- end }}
+{{- if .GOOGLE_SA_PATH }}
+GOOGLE_SA_PATH: {{ .GOOGLE_SA_PATH }}
+{{- end }}
+
 BREAKER_ENABLE: {{ .BreakerEnable }}
 
 TRACE_ENABLE: {{ .TraceEnable }}

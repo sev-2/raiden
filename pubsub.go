@@ -19,7 +19,7 @@ var PubSubLogger = logger.HcLog().Named("raiden.pubsub")
 type PubSubProviderType string
 
 const (
-	PubSubProviderGoogle  PubSubProviderType = "google_pub_sub"
+	PubSubProviderGoogle  PubSubProviderType = "google"
 	PubSubProviderUnknown PubSubProviderType = "unknown"
 )
 
@@ -129,7 +129,9 @@ func (s *pubSub) Listen() {
 	g.Add(func() error {
 		return s.provider.google.StartListen(googleHandlers)
 	}, func(err error) {
-		s.provider.google.StopListen()
+		if err := s.provider.google.StopListen(); err != nil {
+			PubSubLogger.Error("failed stop listener", "message", err)
+		}
 	})
 
 	if err := g.Run(); err != nil {
@@ -220,7 +222,9 @@ func (s *googlePubSubProvider) listen(subscription *pubsub.Subscription, handler
 			}
 
 			// Process the received message
-			handler.Consume(&subCtx, msg)
+			if err := handler.Consume(&subCtx, msg); err != nil {
+				PubSubLogger.Error("Failed consumer message", "topic", handler.Topic(), "message", string(msg.Data))
+			}
 
 			// Acknowledge the message
 			if handler.AutoAck() {
