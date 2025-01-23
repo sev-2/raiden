@@ -43,67 +43,6 @@ func TestChain_Then(t *testing.T) {
 	assert.NotNil(t, fn)
 }
 
-func Test_Route(t *testing.T) {
-	a := raiden.NewChain()
-	controller := &HelloWorldController{}
-
-	mockCtx := &mock.MockContext{
-		CtxFn: func() context.Context {
-			return context.Background()
-		},
-		SetCtxFn:  func(ctx context.Context) {},
-		SetSpanFn: func(span trace.Span) {},
-		SendErrorWithCodeFn: func(statusCode int, err error) error {
-			return nil
-		},
-		TracerFn: func() trace.Tracer {
-			noopProvider := trace.NewNoopTracerProvider()
-			tracer := noopProvider.Tracer("test")
-			return tracer
-		},
-		ConfigFn: func() *raiden.Config {
-			return &raiden.Config{
-				DeploymentTarget:    raiden.DeploymentTargetCloud,
-				ProjectId:           "test-project-id",
-				ProjectName:         "My Great Project",
-				SupabaseApiBasePath: "/v1",
-				SupabaseApiUrl:      "http://supabase.cloud.com",
-				SupabasePublicUrl:   "http://supabase.cloud.com",
-				CorsAllowedOrigins:  "*",
-				CorsAllowedMethods:  "GET, POST, PUT, DELETE, OPTIONS",
-				CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
-			}
-		},
-		RequestContextFn: func() *fasthttp.RequestCtx {
-			return &fasthttp.RequestCtx{}
-		},
-		SendJsonFn: func(data any) error {
-			return nil
-		},
-	}
-
-	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
-
-	fn = a.Then("POST", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
-
-	fn = a.Then("PUT", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
-
-	fn = a.Then("PATCH", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
-
-	fn = a.Then("DELETE", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
-
-	fn = a.Then("OPTIONS", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
-
-	fn = a.Then("HEAD", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
-}
-
 func Test_Tracer(t *testing.T) {
 	a := raiden.NewChain(m1, m2)
 

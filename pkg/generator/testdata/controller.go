@@ -115,3 +115,21 @@ func (sc *ScController) AfterGet(ctx raiden.Context) error {
 	raiden.Info("[ScController] after get fire")
 	return nil
 }
+
+type StorageController struct {
+	raiden.ControllerBase
+	Http    string `path:"/sc-list" type:"storage"`
+	Storage MyStorage
+}
+
+type StorageController struct {
+	raiden.ControllerBase
+	Http    string `path:"/sc-list" type:"rpc"`
+	Payload *GetVoteByParams
+	Result  GetVoteByResult
+}
+
+func (sc *StorageController) Post(ctx raiden.Context) error {
+	raiden.Info("[ScController] before get fire")
+	return nil
+}

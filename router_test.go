@@ -1,7 +1,9 @@
 package raiden_test
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"syscall"
@@ -9,9 +11,11 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 type SomeModel struct {
@@ -65,6 +69,63 @@ func (c *HelloWorldController) Put(ctx raiden.Context) error {
 func (c *HelloWorldController) Delete(ctx raiden.Context) error {
 	c.Result.Message = "success delete data"
 	return ctx.SendJson(c.Result)
+}
+
+type UnimplementedController struct {
+	raiden.ControllerBase
+	Http string `path:"/unimplemented" type:"custom"`
+}
+
+func (*UnimplementedController) AfterGet(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) BeforePost(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) AfterPost(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) BeforePut(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) AfterPut(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) BeforePatch(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) AfterPatch(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) BeforeDelete(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) AfterDelete(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) BeforeOptions(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) AfterOptions(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) BeforeHead(ctx raiden.Context) error {
+	return http.ErrNotSupported
+}
+
+func (*UnimplementedController) AfterHead(ctx raiden.Context) error {
+	return http.ErrNotSupported
 }
 
 type StorageController struct {
@@ -234,4 +295,119 @@ func TestRouter_NewRouteFromStorageController(t *testing.T) {
 
 	assert.Equal(t, methods[0], r.Methods[0])
 	assert.Equal(t, methods[1], r.Methods[1])
+}
+
+func Test_Route(t *testing.T) {
+	a := raiden.NewChain()
+	controller := &HelloWorldController{}
+
+	mockCtx := &mock.MockContext{
+		CtxFn: func() context.Context {
+			return context.Background()
+		},
+		SetCtxFn:  func(ctx context.Context) {},
+		SetSpanFn: func(span trace.Span) {},
+		SendErrorWithCodeFn: func(statusCode int, err error) error {
+			return nil
+		},
+		TracerFn: func() trace.Tracer {
+			noopProvider := noop.NewTracerProvider()
+			tracer := noopProvider.Tracer("test")
+			return tracer
+		},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+				CorsAllowedOrigins:  "*",
+				CorsAllowedMethods:  "GET, POST, PUT, DELETE, OPTIONS",
+				CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+		SendJsonFn: func(data any) error {
+			return nil
+		},
+	}
+
+	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
+	assert.Nil(t, fn(mockCtx))
+
+	fn = a.Then("POST", raiden.RouteTypeCustom, controller)
+	assert.Nil(t, fn(mockCtx))
+
+	fn = a.Then("PUT", raiden.RouteTypeCustom, controller)
+	assert.Nil(t, fn(mockCtx))
+
+	fn = a.Then("PATCH", raiden.RouteTypeCustom, controller)
+	assert.Nil(t, fn(mockCtx))
+
+	fn = a.Then("DELETE", raiden.RouteTypeCustom, controller)
+	assert.Nil(t, fn(mockCtx))
+
+	fn = a.Then("OPTIONS", raiden.RouteTypeCustom, controller)
+	assert.Nil(t, fn(mockCtx))
+
+	fn = a.Then("HEAD", raiden.RouteTypeCustom, controller)
+	assert.Nil(t, fn(mockCtx))
+}
+
+func Test_RouteUnimplemented(t *testing.T) {
+	a := raiden.NewChain()
+	controller := &UnimplementedController{}
+
+	mockCtx := &mock.MockContext{
+		CtxFn: func() context.Context {
+			return context.Background()
+		},
+		SetCtxFn:  func(ctx context.Context) {},
+		SetSpanFn: func(span trace.Span) {},
+		SendErrorWithCodeFn: func(statusCode int, err error) error {
+			return nil
+		},
+		TracerFn: func() trace.Tracer {
+			noopProvider := noop.NewTracerProvider()
+			tracer := noopProvider.Tracer("test")
+			return tracer
+		},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget: raiden.DeploymentTargetCloud,
+				ProjectId:        "test-project-id",
+				ProjectName:      "My Great Project"}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+		SendJsonFn: func(data any) error {
+			return nil
+		},
+	}
+
+	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
+	assert.Error(t, fn(mockCtx))
+
+	fn = a.Then("POST", raiden.RouteTypeCustom, controller)
+	assert.Error(t, fn(mockCtx))
+
+	fn = a.Then("PUT", raiden.RouteTypeCustom, controller)
+	assert.Error(t, fn(mockCtx))
+
+	fn = a.Then("PATCH", raiden.RouteTypeCustom, controller)
+	assert.Error(t, fn(mockCtx))
+
+	fn = a.Then("DELETE", raiden.RouteTypeCustom, controller)
+	assert.Error(t, fn(mockCtx))
+
+	fn = a.Then("OPTIONS", raiden.RouteTypeCustom, controller)
+	assert.Error(t, fn(mockCtx))
+
+	fn = a.Then("HEAD", raiden.RouteTypeCustom, controller)
+	assert.Error(t, fn(mockCtx))
 }

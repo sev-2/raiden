@@ -128,6 +128,7 @@ func TestApply(t *testing.T) {
 							},
 						},
 					},
+					Policies: []objects.Policy{},
 				},
 			},
 			Storage: []state.StorageState{
