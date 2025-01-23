@@ -124,7 +124,7 @@ func (q Query) GetUrl() string {
 
 	url := fmt.Sprintf("%s/rest/v1/%s", baseUrl, urlQuery)
 
-	if getConfig().Mode == raiden.SvcMode {
+	if getConfig() != nil && getConfig().Mode == raiden.SvcMode {
 		url = fmt.Sprintf("%s/%s", baseUrl, urlQuery)
 	}
 

@@ -33,7 +33,7 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 			}
 		}
 
-		if getConfig().Mode == raiden.SvcMode {
+		if getConfig() != nil && getConfig().Mode == raiden.SvcMode {
 			if strings.HasPrefix(url, "/") {
 				url = fmt.Sprintf("%s%s", baseUrl, url)
 			} else {
