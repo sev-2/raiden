@@ -91,6 +91,10 @@ func (c *Ctx) Tracer() trace.Tracer {
 	return c.tracer
 }
 
+func (c *Ctx) SetJobChan(jobChan chan JobParams) {
+	c.jobChan = jobChan
+}
+
 func (c *Ctx) NewJobCtx() (JobContext, error) {
 	if c.jobChan != nil {
 		jobCtx := newJobCtx(c.config, c.jobChan, make(JobData))

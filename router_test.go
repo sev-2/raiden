@@ -52,6 +52,21 @@ func (c *HelloWorldController) Post(ctx raiden.Context) error {
 	return ctx.SendJson(c.Result)
 }
 
+func (c *HelloWorldController) Patch(ctx raiden.Context) error {
+	c.Result.Message = "success patch data"
+	return ctx.SendJson(c.Result)
+}
+
+func (c *HelloWorldController) Put(ctx raiden.Context) error {
+	c.Result.Message = "success put data"
+	return ctx.SendJson(c.Result)
+}
+
+func (c *HelloWorldController) Delete(ctx raiden.Context) error {
+	c.Result.Message = "success delete data"
+	return ctx.SendJson(c.Result)
+}
+
 type StorageController struct {
 	raiden.ControllerBase
 	Http    string `path:"/assets" type:"storage"`
@@ -99,7 +114,7 @@ func TestRouter_RegisterMiddlewares(t *testing.T) {
 func TestRouter_AddRoute(t *testing.T) {
 	conf := loadConfig()
 	router := raiden.NewRouter(conf)
-	route := raiden.Route{Methods: []string{"GET", "POST"}, Path: "/"}
+	route := raiden.Route{Methods: []string{"GET", "POST", "PATCH", "DELETE"}, Path: "/"}
 	routes := []*raiden.Route{&route}
 	router.Register(routes)
 }

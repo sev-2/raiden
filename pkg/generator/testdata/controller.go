@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/postgres/roles"
 )
 
 type FooRequest struct {
@@ -104,7 +103,7 @@ type Sc struct {
 type ScController struct {
 	raiden.ControllerBase
 	Http  string `path:"/sc-list" type:"rest"`
-	Model roles.Anon
+	Model Sc
 }
 
 func (sc *ScController) BeforeGet(ctx raiden.Context) error {

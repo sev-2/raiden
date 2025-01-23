@@ -26,7 +26,6 @@ func TestRouter(t *testing.T) {
 			fooRoute = &r
 		case "testdata.BarController{}":
 			barRoute = &r
-
 		}
 	}
 
