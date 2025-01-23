@@ -34,6 +34,7 @@ func TestStateController_Post(t *testing.T) {
 	}
 	config := loadConfig()
 	config.AllowedTables = "*"
+	config.Mode = raiden.BffMode
 	resource.ImportLogger = logger.HcLog().Named("import")
 
 	mockContext := &mock.MockContext{
