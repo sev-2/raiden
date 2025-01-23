@@ -68,6 +68,7 @@ func loadConfig() *raiden.Config {
 		CorsAllowedOrigins:  "*",
 		CorsAllowedMethods:  "GET, POST, PUT, DELETE, OPTIONS",
 		CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
+		Mode:                raiden.BffMode,
 	}
 }
 

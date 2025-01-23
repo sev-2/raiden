@@ -23,6 +23,7 @@ func loadConfig() *raiden.Config {
 		SupabaseApiBasePath: "/v1",
 		SupabaseApiUrl:      "http://supabase.cloud.com",
 		SupabasePublicUrl:   "http://supabase.cloud.com",
+		Mode:                raiden.BffMode,
 	}
 }
 
@@ -34,7 +35,6 @@ func TestStateController_Post(t *testing.T) {
 	}
 	config := loadConfig()
 	config.AllowedTables = "*"
-	config.Mode = raiden.BffMode
 	resource.ImportLogger = logger.HcLog().Named("import")
 
 	mockContext := &mock.MockContext{
