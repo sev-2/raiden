@@ -33,6 +33,8 @@ type Config struct {
 	CorsAllowCredentials     bool             `mapstructure:"CORS_ALLOWED_CREDENTIALS"`
 	DeploymentTarget         DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
 	Environment              string           `mapstructure:"ENVIRONMENT"`
+	GoogleProjectId          string           `mapstructure:"GOOGLE_PROJECT_ID"`
+	GoogleSaPath             string           `mapstructure:"GOOGLE_SA_PATH"`
 	MaxServerRequestBodySize int              `mapstructure:"MAX_SERVER_REQUEST_BODY_SIZE"`
 	Mode                     Mode             `mapstructure:"MODE"`
 	PgMetaUrl                string           `mapstructure:"PG_META_URL"`

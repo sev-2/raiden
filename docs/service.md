@@ -95,3 +95,14 @@ networks:
 
 postrest available on `http://localhost:3000`
 pg-meta available on `http://localhost:8080`
+
+### Init Postrest
+
+run this query to create and grant access permission to anon role
+```
+CREATE ROLE anon NOLOGIN;
+
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+
+```
