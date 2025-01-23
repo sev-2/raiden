@@ -41,17 +41,13 @@ func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool
 	url := fmt.Sprintf("%s/tables", cfg.PgMetaUrl)
 
 	reqInterceptor := func(req *http.Request) error {
-		q := req.URL.Query()
-
 		if len(includedSchemas) > 0 {
-			q.Set("included_schemas", strings.Join(includedSchemas, ","))
-
+			req.URL.Query().Set("included_schemas", strings.Join(includedSchemas, ","))
 		}
 
 		if includeColumns {
-			q.Set("include_columns", strconv.FormatBool(includeColumns))
+			req.URL.Query().Set("include_columns", strconv.FormatBool(includeColumns))
 		}
-		req.URL.RawQuery = q.Encode()
 
 		return nil
 	}
