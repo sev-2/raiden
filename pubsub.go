@@ -281,7 +281,9 @@ func (s *GooglePubSubProvider) Publish(ctx context.Context, topic string, messag
 	}
 
 	// create message
-	msg := pubsub.Message{}
+	msg := pubsub.Message{
+		Attributes: make(map[string]string),
+	}
 	msg.Data = message
 
 	// set trace

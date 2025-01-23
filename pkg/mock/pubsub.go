@@ -11,6 +11,7 @@ import (
 type MockPubSubClient struct {
 	Subscriptions map[string]*MockSubscription
 	Topics        map[string]*MockTopic
+	CloseFn       func() error
 }
 
 func (m *MockPubSubClient) Subscription(id string) google.Subscription {
@@ -22,7 +23,7 @@ func (m *MockPubSubClient) Topic(id string) google.Topic {
 }
 
 func (m *MockPubSubClient) Close() error {
-	return nil
+	return m.CloseFn()
 }
 
 type MockSubscription struct {
