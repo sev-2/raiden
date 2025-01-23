@@ -51,7 +51,7 @@ SCHEDULE_STATUS: '{{ .ScheduleStatus }}'
 {{- if ne .GoogleProjectId ""}}
 GOOGLE_PROJECT_ID: {{ .GoogleProjectId }}
 {{- end }}
-{{- if .GoogleSaPath }}
+{{- if ne .GoogleSaPath ""}}
 GOOGLE_SA_PATH: {{ .GoogleSaPath }}
 {{- end }}
 
