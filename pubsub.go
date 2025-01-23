@@ -9,6 +9,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/oklog/run"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/pubsub/google"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
 )
@@ -90,9 +91,9 @@ func NewPubsub(config *Config, tracer trace.Tracer) PubSub {
 	return &PubSubManager{
 		config: config,
 		provider: pubSubProvider{
-			google: &googlePubSubProvider{
-				config: config,
-				tracer: tracer,
+			google: &GooglePubSubProvider{
+				Config: config,
+				Tracer: tracer,
 			},
 		},
 	}
@@ -169,42 +170,41 @@ type PubSubProvider interface {
 	StopListen() error
 }
 
-type googlePubSubProvider struct {
-	config *Config
-	client *pubsub.Client
-	tracer trace.Tracer
+type GooglePubSubProvider struct {
+	Config *Config
+	Client google.PubSubClient
+	Tracer trace.Tracer
 }
 
-func (s *googlePubSubProvider) validate() error {
-	if s.config.GoogleProjectId == "" {
+func (s *GooglePubSubProvider) validate() error {
+	if s.Config.GoogleProjectId == "" {
 		return errors.New("env GOOGLE_PROJECT_ID is required")
 	}
 
-	if s.config.GoogleSaPath == "" {
+	if s.Config.GoogleSaPath == "" {
 		return errors.New("env GOOGLE_SA_PATH is required")
 	}
 
 	return nil
 }
 
-func (s *googlePubSubProvider) createClient() error {
-	client, err := pubsub.NewClient(context.Background(), s.config.GoogleProjectId, option.WithCredentialsFile(s.config.GoogleSaPath))
+func (s *GooglePubSubProvider) createClient() error {
+	client, err := pubsub.NewClient(context.Background(), s.Config.GoogleProjectId, option.WithCredentialsFile(s.Config.GoogleSaPath))
 	if err != nil {
 		PubSubLogger.Error("failed create google pubsub client")
 		return err
 	}
 
-	s.client = client
-
+	s.Client = &google.GooglePubSubClient{Client: client}
 	return nil
 }
 
-func (s *googlePubSubProvider) StartListen(handler []SubscriberHandler) error {
+func (s *GooglePubSubProvider) StartListen(handler []SubscriberHandler) error {
 	if err := s.validate(); err != nil {
 		return err
 	}
 
-	if s.client == nil {
+	if s.Client == nil {
 		if err := s.createClient(); err != nil {
 			return err
 		}
@@ -212,26 +212,26 @@ func (s *googlePubSubProvider) StartListen(handler []SubscriberHandler) error {
 
 	var group run.Group
 	for _, h := range handler {
-		sub := s.client.Subscription(h.Topic())
+		sub := s.Client.Subscription(h.Topic())
 		group.Add(s.listen(sub, h), func(err error) {})
 	}
 
 	return group.Run()
 }
 
-func (s *googlePubSubProvider) listen(subscription *pubsub.Subscription, handler SubscriberHandler) func() error {
+func (s *GooglePubSubProvider) listen(subscription google.Subscription, handler SubscriberHandler) func() error {
 	return func() error {
 		PubSubLogger.Info("google - start subscribe", "name", handler.Name(), "subscription id", subscription.ID())
 		err := subscription.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
 			var subCtx = subscriberContext{
-				cfg:     s.config,
+				cfg:     s.Config,
 				Context: ctx,
 			}
 
-			if tranceID, exist := msg.Attributes["trace_id"]; exist && s.tracer != nil {
+			if tranceID, exist := msg.Attributes["trace_id"]; exist && s.Tracer != nil {
 				spanId := msg.Attributes["span_id"]
 
-				spanCtx, span := extractTraceSubscriber(context.Background(), s.tracer, tranceID, spanId, handler.Name())
+				spanCtx, span := extractTraceSubscriber(context.Background(), s.Tracer, tranceID, spanId, handler.Name())
 				subCtx.Context = spanCtx
 				subCtx.SetSpan(span)
 			}
@@ -261,20 +261,20 @@ func (s *googlePubSubProvider) listen(subscription *pubsub.Subscription, handler
 	}
 }
 
-func (s *googlePubSubProvider) StopListen() error {
-	if s.client != nil {
-		return s.client.Close()
+func (s *GooglePubSubProvider) StopListen() error {
+	if s.Client != nil {
+		return s.Client.Close()
 	}
 
 	return nil
 }
 
-func (s *googlePubSubProvider) Publish(ctx context.Context, topic string, message []byte) error {
+func (s *GooglePubSubProvider) Publish(ctx context.Context, topic string, message []byte) error {
 	if err := s.validate(); err != nil {
 		return err
 	}
 
-	if s.client == nil {
+	if s.Client == nil {
 		if err := s.createClient(); err != nil {
 			return err
 		}
@@ -294,7 +294,7 @@ func (s *googlePubSubProvider) Publish(ctx context.Context, topic string, messag
 		msg.Attributes["span_id"] = spanCtx.SpanID().String()
 	}
 
-	serverId, err := s.client.Topic(topic).Publish(ctx, &msg).Get(context.Background())
+	serverId, err := s.Client.Topic(topic).Publish(ctx, &msg).Get(context.Background())
 	if err != nil {
 		return err
 	}
