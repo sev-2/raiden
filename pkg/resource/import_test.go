@@ -577,3 +577,126 @@ func TestImportAllTableStateOnly(t *testing.T) {
 	assert.Len(t, localState.Storage, 2)
 
 }
+
+func TestImportSvc(t *testing.T) {
+	flags := &resource.Flags{
+		ProjectPath: "test_project",
+		DryRun:      true,
+	}
+	config := loadConfig()
+	config.Mode = raiden.SvcMode
+	resource.ImportLogger = logger.HcLog().Named("import")
+
+	err := resource.Import(flags, config)
+	assert.Error(t, err)
+
+	mock := &mock.MockSupabase{Cfg: config}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	dir, errDir := os.MkdirTemp("", "import")
+	assert.NoError(t, errDir)
+	flags.ProjectPath = dir
+
+	testState := state.State{
+		Tables: []state.TableState{
+			{
+				Table: objects.Table{
+					Name:        "test_local_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+					},
+					Relationships: []objects.TablesRelationship{
+						{
+							ConstraintName:    "test_local_constraint",
+							SourceSchema:      "public",
+							SourceTableName:   "test_local_table",
+							SourceColumnName:  "id",
+							TargetTableSchema: "public",
+							TargetTableName:   "test_table",
+							TargetColumnName:  "id",
+						},
+					},
+				},
+			},
+			{
+				Table: objects.Table{
+					Name:        "test_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+					},
+					Relationships: []objects.TablesRelationship{
+						{
+							ConstraintName:    "test_constraint",
+							SourceSchema:      "public",
+							SourceTableName:   "test_table",
+							SourceColumnName:  "id",
+							TargetTableSchema: "public",
+							TargetTableName:   "test_other_table",
+							TargetColumnName:  "id",
+						},
+					},
+				},
+			},
+		},
+		Storage: []state.StorageState{
+			{
+				Storage: objects.Bucket{
+					Name:   "test_bucket_policy",
+					Public: true,
+				},
+			},
+			{
+				Storage: objects.Bucket{
+					Name:   "test_other_bucket",
+					Public: true,
+				},
+			},
+		},
+		Roles: []state.RoleState{
+			{
+				Role: objects.Role{
+					Name: "mock_other_role",
+				},
+			},
+			{
+				Role: objects.Role{
+					Name: "test_other_role",
+				},
+			},
+		},
+		Rpc: []state.RpcState{
+			{
+				Function: objects.Function{
+					Name: "mock_get_vote_by",
+				},
+			},
+			{
+				Function: objects.Function{
+					Name: "test_other_rpc",
+				},
+			},
+		},
+	}
+
+	resource.RegisterModels(MockNewTable{}, MockOtherTable{})
+
+	errSaveState := state.Save(&testState)
+	assert.NoError(t, errSaveState)
+
+	err1 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
+		{ID: 1, Name: "some_table", Schema: "public"},
+		{ID: 2, Name: "other_table", Schema: "public"},
+		{ID: 3, Name: "other_table_again", Schema: "public"},
+		{ID: 4, Name: "completely_new_table", Schema: "public"},
+	})
+	assert.NoError(t, err1)
+
+	defer os.RemoveAll(dir)
+
+	errReset := state.Save(&state.State{})
+	assert.NoError(t, errReset)
+}

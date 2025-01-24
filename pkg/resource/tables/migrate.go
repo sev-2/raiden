@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/connector/pgmeta"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase"
@@ -14,8 +15,22 @@ type MigrateItem = migrator.MigrateItem[objects.Table, objects.UpdateTableParam]
 type MigrateActionFunc = migrator.MigrateActionFunc[objects.Table, objects.UpdateTableParam]
 
 var ActionFunc = MigrateActionFunc{
-	CreateFunc: supabase.CreateTable, UpdateFunc: supabase.UpdateTable,
+	CreateFunc: func(cfg *raiden.Config, param objects.Table) (response objects.Table, err error) {
+		if cfg.Mode == raiden.SvcMode {
+			return pgmeta.CreateTable(cfg, param)
+		}
+		return supabase.CreateTable(cfg, param)
+	},
+	UpdateFunc: func(cfg *raiden.Config, param objects.Table, items objects.UpdateTableParam) (err error) {
+		if cfg.Mode == raiden.SvcMode {
+			return pgmeta.UpdateTable(cfg, param, items)
+		}
+		return supabase.UpdateTable(cfg, param, items)
+	},
 	DeleteFunc: func(cfg *raiden.Config, param objects.Table) (err error) {
+		if cfg.Mode == raiden.SvcMode {
+			return pgmeta.DeleteTable(cfg, param, true)
+		}
 		return supabase.DeleteTable(cfg, param, true)
 	},
 }

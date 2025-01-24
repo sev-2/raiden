@@ -247,12 +247,21 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s/v1/projects/%s/database/query", cfg.SupabaseApiUrl, cfg.ProjectId)
+			if cfg.Mode == raiden.SvcMode {
+				url = fmt.Sprintf("%s/query", cfg.PgMetaUrl)
+			}
+			fmt.Println("condition 1 :", url)
 		}
 	} else {
+
 		switch actionType {
 		case "getTables":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+			if cfg.Mode == raiden.SvcMode {
+				url = fmt.Sprintf("%s/tables", cfg.PgMetaUrl)
+			}
+			fmt.Println("condition 2")
 		case "getRoles":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
@@ -265,6 +274,10 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 		case "postQuery":
 			method = "POST"
 			url = fmt.Sprintf("%s/query", cfg.SupabaseApiUrl)
+			if cfg.Mode == raiden.SvcMode {
+				url = fmt.Sprintf("%s/query", cfg.PgMetaUrl)
+			}
+			fmt.Println("condition 3")
 		case "getBuckets":
 			method = "GET"
 			url = fmt.Sprintf("%s/bucket", cfg.SupabaseApiUrl)
@@ -280,6 +293,10 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+			if cfg.Mode == raiden.SvcMode {
+				url = fmt.Sprintf("%s/query", cfg.PgMetaUrl)
+			}
+			fmt.Println("condition 4")
 		}
 	}
 

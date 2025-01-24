@@ -23,13 +23,15 @@ var ServerLogger = logger.HcLog().Named("raiden.server")
 
 // --- server configuration ----
 type Server struct {
-	Config          *Config
-	Router          *router
-	HttpServer      *fasthttp.Server
-	SchedulerServer Scheduler
-	ShutdownFunc    []func(ctx context.Context) error
-	jobs            []Job
-	tracer          trace.Tracer
+	Config              *Config
+	Router              *router
+	HttpServer          *fasthttp.Server
+	SchedulerServer     Scheduler
+	pubSub              PubSub
+	ShutdownFunc        []func(ctx context.Context) error
+	subscriberHandleFun []SubscriberHandler
+	jobs                []Job
+	tracer              trace.Tracer
 }
 
 func NewServer(config *Config) *Server {
@@ -48,6 +50,10 @@ func (s *Server) RegisterRoute(routes []*Route) {
 
 func (s *Server) RegisterJobs(jobs ...Job) {
 	s.jobs = append(s.jobs, jobs...)
+}
+
+func (s *Server) RegisterSubscribers(ss ...SubscriberHandler) {
+	s.subscriberHandleFun = append(s.subscriberHandleFun, ss...)
 }
 
 func (s *Server) Use(middleware MiddlewareFn) {
@@ -95,6 +101,10 @@ func (s *Server) configureRoute() {
 
 	if s.tracer != nil {
 		s.Router.SetTracer(s.tracer)
+	}
+
+	if s.pubSub != nil {
+		s.Router.pubsub = s.pubSub
 	}
 
 	// build router
@@ -175,6 +185,22 @@ func (s *Server) runScheduleServer() {
 	s.ShutdownFunc = append(s.ShutdownFunc, ss.Stop)
 }
 
+func (s *Server) runSubscriberServer() {
+	if len(s.subscriberHandleFun) == 0 {
+		return
+	}
+
+	ss := NewPubsub(s.Config, s.tracer)
+
+	for _, h := range s.subscriberHandleFun {
+		ss.Register(h)
+	}
+
+	go ss.Listen()
+
+	s.pubSub = ss
+}
+
 func (s *Server) runHttpServer(hostname string, listener net.Listener, errChan chan error) {
 	ServerLogger.Info("started server", "hostname", hostname, "addr", listener.Addr())
 	ServerLogger.Info("press Ctrl+C to stop")
@@ -190,6 +216,8 @@ func (s *Server) Run() {
 	}
 
 	s.runScheduleServer()
+
+	s.runSubscriberServer()
 
 	// prepare server
 	s.configureHttpServer()

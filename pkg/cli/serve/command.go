@@ -45,7 +45,7 @@ func Run(config *raiden.Config, projectPath string) error {
 	// Run the command
 	ServeLogger.Info("start running server")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error running binary : %v", err)
+		return fmt.Errorf("error start server, %v", err)
 	}
 
 	return nil

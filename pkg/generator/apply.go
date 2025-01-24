@@ -16,6 +16,7 @@ var ApplyLogger hclog.Logger = logger.HcLog().Named("generator.apply")
 type GenerateApplyMainFunctionData struct {
 	Package string
 	Imports []string
+	Mode    raiden.Mode
 }
 
 const (
@@ -59,10 +60,12 @@ func main() {
 			}
 
 			// register app resource
+			bootstrap.RegisterModels()
+			{{if eq .Mode "bff"}}
 			bootstrap.RegisterRpc()
 			bootstrap.RegisterRoles()
-			bootstrap.RegisterModels()
 			bootstrap.RegisterStorages()
+			{{end}}
 			
 			if err = resource.Apply(&f, config); err != nil {
 				apply.ApplyLogger.Error(err.Error())
@@ -123,6 +126,7 @@ func GenerateApplyMainFunction(basePath string, config *raiden.Config, generateF
 	data := GenerateApplyMainFunctionData{
 		Package: "main",
 		Imports: importPaths,
+		Mode:    config.Mode,
 	}
 
 	// setup generate input param

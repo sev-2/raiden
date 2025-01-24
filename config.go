@@ -15,6 +15,13 @@ const (
 	DeploymentTargetSelfHosted DeploymentTarget = "self_hosted"
 )
 
+type Mode string
+
+const (
+	BffMode Mode = "bff"
+	SvcMode Mode = "svc"
+)
+
 type Config struct {
 	AccessToken              string           `mapstructure:"ACCESS_TOKEN"`
 	AnonKey                  string           `mapstructure:"ANON_KEY"`
@@ -26,7 +33,12 @@ type Config struct {
 	CorsAllowCredentials     bool             `mapstructure:"CORS_ALLOWED_CREDENTIALS"`
 	DeploymentTarget         DeploymentTarget `mapstructure:"DEPLOYMENT_TARGET"`
 	Environment              string           `mapstructure:"ENVIRONMENT"`
+	GoogleProjectId          string           `mapstructure:"GOOGLE_PROJECT_ID"`
+	GoogleSaPath             string           `mapstructure:"GOOGLE_SA_PATH"`
 	MaxServerRequestBodySize int              `mapstructure:"MAX_SERVER_REQUEST_BODY_SIZE"`
+	Mode                     Mode             `mapstructure:"MODE"`
+	PgMetaUrl                string           `mapstructure:"PG_META_URL"`
+	PostgRestUrl             string           `mapstructure:"POSTGREST_URL"`
 	ProjectId                string           `mapstructure:"PROJECT_ID"`
 	ProjectName              string           `mapstructure:"PROJECT_NAME"`
 	ServiceKey               string           `mapstructure:"SERVICE_KEY"`
@@ -85,6 +97,10 @@ func LoadConfig(path *string) (*Config, error) {
 
 	if config.Environment == "" {
 		config.Environment = "development"
+	}
+
+	if config.Mode == "" {
+		config.Mode = BffMode
 	}
 
 	if config.ScheduleStatus == "" {

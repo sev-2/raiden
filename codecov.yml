@@ -3,6 +3,7 @@ ignore:
   - "pkg/cli"     # ignore the CLI package related for now
   - "pkg/mock"
   - "pkg/suparest" # to be removed (or replaced)
+  - "pkg/pubsub/google" # ignore only wrapper google pubsub library
 coverage:
   range: 60..70
   status:

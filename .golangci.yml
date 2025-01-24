@@ -51,6 +51,10 @@ issues:
       linters:
         - staticcheck
         - nilerr 
+    - path: pkg/connector/.*
+      linters:
+        - staticcheck
+        - nilerr 
     - path: pkg/supabase/client/client.go
       linters:
         - unused # false positive

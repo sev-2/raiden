@@ -126,3 +126,21 @@ func TestCtx_Write(t *testing.T) {
 	assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode())
 	assert.Equal(t, data, ctx.Response.Body())
 }
+
+func TestCtx_Job(t *testing.T) {
+	jChan := make(chan raiden.JobParams)
+	ctx := newTestCtx()
+	ctx.SetJobChan(jChan)
+
+	c, e := ctx.NewJobCtx()
+	assert.NoError(t, e)
+	assert.NotNil(t, c)
+}
+
+func TestCtx_JobNil(t *testing.T) {
+	ctx := newTestCtx()
+
+	c, e := ctx.NewJobCtx()
+	assert.Error(t, e)
+	assert.Nil(t, c)
+}

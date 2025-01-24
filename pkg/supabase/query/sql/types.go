@@ -1,5 +1,15 @@
 package sql
 
+var MapDefaultFunctionValue = map[string]bool{
+	"CURRENT_TIMESTAMP": true,
+	"CURRENT_DATE":      true,
+	"CURRENT_TIME":      true,
+	"LOCALTIME":         true,
+	"LOCALTIMESTAMP":    true,
+	"SESSION_USER":      true,
+	"CURRENT_USER":      true,
+}
+
 var GetTypesQuery = `
 select
   t.oid::int8 as id,

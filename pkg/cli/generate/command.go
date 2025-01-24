@@ -127,7 +127,7 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			}
 
 			// generate route base on controllers
-			if err := generator.GenerateRoute(projectPath, config.ProjectName, generator.Generate); err != nil {
+			if err := generator.GenerateRoute(projectPath, config.ProjectName, config.Mode, generator.Generate); err != nil {
 				errChan <- err
 				return
 			}
@@ -156,33 +156,45 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 	go func() {
 		defer wg.Done()
 
-		// generate rpc register
-		GenerateLogger.Debug("start generate rpc register file")
-		if err := generator.GenerateRpcRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
-		}
-		GenerateLogger.Debug("finish generate rpc register file")
+		if config.Mode == raiden.BffMode {
+			// generate rpc register
+			GenerateLogger.Debug("start generate rpc register file")
+			if err := generator.GenerateRpcRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate rpc register file")
 
-		// generate role register
-		GenerateLogger.Debug("start generate role register file")
-		if err := generator.GenerateRoleRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
-		}
-		GenerateLogger.Debug("finish generate role register file")
+			// generate role register
+			GenerateLogger.Debug("start generate role register file")
+			if err := generator.GenerateRoleRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate role register file")
 
-		// generate model register
-		GenerateLogger.Debug("start generate model register file")
-		if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
-		}
-		GenerateLogger.Debug("finish generate role register file")
+			// generate model register
+			GenerateLogger.Debug("start generate model register file")
+			if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate role register file")
 
-		// generate storage register
-		GenerateLogger.Debug("start generate storages register file")
-		if err := generator.GenerateStoragesRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
-			errChan <- err
+			// generate storage register
+			GenerateLogger.Debug("start generate storages register file")
+			if err := generator.GenerateStoragesRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate storages register file")
 		}
-		GenerateLogger.Debug("finish generate storages register file")
+
+		if config.Mode == raiden.SvcMode {
+			// generate model register
+			GenerateLogger.Debug("start generate model register file")
+			if err := generator.GenerateModelRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+				errChan <- err
+			}
+			GenerateLogger.Debug("finish generate role register file")
+
+		}
 
 		// generate job register
 		GenerateLogger.Debug("start generate job register file")
@@ -190,6 +202,13 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 			errChan <- err
 		}
 		GenerateLogger.Debug("finish generate job register file")
+
+		// generate subscriber register
+		GenerateLogger.Debug("start generate subscriber register file")
+		if err := generator.GenerateSubscriberRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+			errChan <- err
+		}
+		GenerateLogger.Debug("finish generate subscriber register file")
 
 		if initialize {
 			// generate import main function

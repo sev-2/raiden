@@ -40,9 +40,10 @@ func main() {
 	// Setup server
 	server := raiden.NewServer(config)
 
-	// register route
+	// register resource
 	bootstrap.RegisterRoute(server)
 	bootstrap.RegisterJobs(server)
+	bootstrap.RegisterSubscribers(server)
 
 	// run server
 	server.Run()

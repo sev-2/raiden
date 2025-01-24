@@ -38,6 +38,8 @@ type (
 
 		Set(key string, value any)
 		Get(key string) any
+
+		Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
 	}
 
 	// The `Ctx` struct is a struct that implements the `Context` interface in the Raiden framework. It
@@ -52,6 +54,7 @@ type (
 		tracer  trace.Tracer
 		jobChan chan JobParams
 		data    map[string]any
+		pubSub  PubSub
 	}
 )
 
@@ -88,6 +91,10 @@ func (c *Ctx) Tracer() trace.Tracer {
 	return c.tracer
 }
 
+func (c *Ctx) SetJobChan(jobChan chan JobParams) {
+	c.jobChan = jobChan
+}
+
 func (c *Ctx) NewJobCtx() (JobContext, error) {
 	if c.jobChan != nil {
 		jobCtx := newJobCtx(c.config, c.jobChan, make(JobData))
@@ -118,6 +125,10 @@ func (c *Ctx) Set(key string, value any) {
 		c.data = make(map[string]any)
 	}
 	c.data[key] = value
+}
+
+func (c *Ctx) Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error {
+	return c.pubSub.Publish(ctx, provider, topic, message)
 }
 
 // The `SendJson` function is a method of the `Ctx` struct in the Raiden framework. It is responsible

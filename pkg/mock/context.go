@@ -28,6 +28,7 @@ type MockContext struct {
 	SetFn               func(key string, value any)
 	GetFn               func(key string) any
 	Data                map[string]any
+	PublishFn           func(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error
 }
 
 func (c *MockContext) Ctx() context.Context {
@@ -96,4 +97,8 @@ func (c *MockContext) Get(key string) any {
 
 func (c *MockContext) Set(key string, value any) {
 	c.Data[key] = value
+}
+
+func (c *MockContext) Publish(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error {
+	return c.PublishFn(ctx, provider, topic, message)
 }

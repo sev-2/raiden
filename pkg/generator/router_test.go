@@ -3,6 +3,7 @@ package generator_test
 import (
 	"testing"
 
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -12,10 +13,10 @@ func TestRouter(t *testing.T) {
 	testPath, err := utils.GetAbsolutePath("/testdata")
 	assert.NoError(t, err)
 
-	routes, err := generator.WalkScanControllers(testPath)
+	routes, err := generator.WalkScanControllers(raiden.BffMode, testPath)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 3, len(routes))
+	assert.Equal(t, 4, len(routes))
 
 	var barRoute, fooRoute *generator.GenerateRouteItem
 	for i := range routes {
@@ -25,7 +26,6 @@ func TestRouter(t *testing.T) {
 			fooRoute = &r
 		case "testdata.BarController{}":
 			barRoute = &r
-
 		}
 	}
 

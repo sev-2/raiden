@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/postgres/roles"
 )
 
 type FooRequest struct {
@@ -104,7 +103,7 @@ type Sc struct {
 type ScController struct {
 	raiden.ControllerBase
 	Http  string `path:"/sc-list" type:"rest"`
-	Model roles.Anon
+	Model Sc
 }
 
 func (sc *ScController) BeforeGet(ctx raiden.Context) error {
@@ -114,5 +113,23 @@ func (sc *ScController) BeforeGet(ctx raiden.Context) error {
 
 func (sc *ScController) AfterGet(ctx raiden.Context) error {
 	raiden.Info("[ScController] after get fire")
+	return nil
+}
+
+type StorageController struct {
+	raiden.ControllerBase
+	Http    string `path:"/sc-list" type:"storage"`
+	Storage MyStorage
+}
+
+type StorageController struct {
+	raiden.ControllerBase
+	Http    string `path:"/sc-list" type:"rpc"`
+	Payload *GetVoteByParams
+	Result  GetVoteByResult
+}
+
+func (sc *StorageController) Post(ctx raiden.Context) error {
+	raiden.Info("[ScController] before get fire")
 	return nil
 }

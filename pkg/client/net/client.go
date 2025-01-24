@@ -75,7 +75,7 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 
 	resp, err := GetClient().Do(req)
 	if err != nil {
-		errName, known := extractResponseErr(err)
+		errName, known := ExtractResponseErr(err)
 		if known {
 			err = fmt.Errorf("conn error: %v", errName)
 		} else {
@@ -157,7 +157,7 @@ func Delete[T any](url string, rawBody []byte, timeout time.Duration, reqInterce
 	return res, json.Unmarshal(byteData, &res)
 }
 
-func extractResponseErr(err error) (string, bool) {
+func ExtractResponseErr(err error) (string, bool) {
 	var (
 		errName string
 		known   = true

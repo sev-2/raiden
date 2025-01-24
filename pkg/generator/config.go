@@ -21,6 +21,9 @@ const (
 PROJECT_ID: {{ .ProjectId }}
 DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
 
+MODE: {{ .Mode }}
+
+{{if eq .Mode "bff"}}
 ACCESS_TOKEN: {{ .AccessToken }}
 ANON_KEY: {{ .AnonKey }}
 SERVICE_KEY: {{ .ServiceKey }}
@@ -28,6 +31,12 @@ SERVICE_KEY: {{ .ServiceKey }}
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
 SUPABASE_API_BASE_PATH: {{ .SupabaseApiBasePath }}
 SUPABASE_PUBLIC_URL: {{ .SupabasePublicUrl }}
+{{end}}
+
+{{if eq .Mode "svc"}}
+POSTGREST_URL: {{ .PostgRestUrl }}
+PG_META_URL: {{ .PgMetaUrl }}
+{{end}}
 
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
@@ -38,6 +47,13 @@ VERSION: 1.0.0
 ALLOWED_TABLES: {{ .AllowedTables }}
 
 SCHEDULE_STATUS: '{{ .ScheduleStatus }}'
+
+{{- if ne .GoogleProjectId ""}}
+GOOGLE_PROJECT_ID: {{ .GoogleProjectId }}
+{{- end }}
+{{- if ne .GoogleSaPath ""}}
+GOOGLE_SA_PATH: {{ .GoogleSaPath }}
+{{- end }}
 
 BREAKER_ENABLE: {{ .BreakerEnable }}
 

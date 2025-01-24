@@ -85,7 +85,7 @@ func RegisterRoute(server *raiden.Server) {
 )
 
 // Generate route configuration file
-func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) error {
+func GenerateRoute(basePath string, projectName string, mode raiden.Mode, generateFn GenerateFn) error {
 	routePath := filepath.Join(basePath, RouterDir)
 	RouterLogger.Trace("create bootstrap folder if not exist", routePath)
 	if exist := utils.IsFolderExists(routePath); !exist {
@@ -97,7 +97,7 @@ func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) e
 	controllerPath := filepath.Join(basePath, ControllerDir)
 
 	// scan all controller
-	routes, err := WalkScanControllers(controllerPath)
+	routes, err := WalkScanControllers(mode, controllerPath)
 	if err != nil {
 		return err
 	}
@@ -114,14 +114,14 @@ func GenerateRoute(basePath string, projectName string, generateFn GenerateFn) e
 	return generateFn(input, writer)
 }
 
-func WalkScanControllers(controllerPath string) ([]GenerateRouteItem, error) {
+func WalkScanControllers(mode raiden.Mode, controllerPath string) ([]GenerateRouteItem, error) {
 	RouterLogger.Trace("scan all controller", "path", controllerPath)
 
 	routes := make([]GenerateRouteItem, 0)
 	err := filepath.Walk(controllerPath, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
 			RouterLogger.Trace("collect routes", "path", path)
-			rs, e := getRoutes(path)
+			rs, e := getRoutes(mode, path)
 			if e != nil {
 				return e
 			}
@@ -143,7 +143,7 @@ func WalkScanControllers(controllerPath string) ([]GenerateRouteItem, error) {
 	return routes, nil
 }
 
-func getRoutes(filePath string) (r []GenerateRouteItem, err error) {
+func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
@@ -262,7 +262,7 @@ func getRoutes(filePath string) (r []GenerateRouteItem, err error) {
 	}
 
 	for _, m := range foundRouteMap {
-		rNew, err := generateRoute(m)
+		rNew, err := generateRoute(mode, m)
 		if err != nil {
 			return r, err
 		}
@@ -272,7 +272,7 @@ func getRoutes(filePath string) (r []GenerateRouteItem, err error) {
 	return
 }
 
-func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
+func generateRoute(mode raiden.Mode, foundRoute *FoundRoute) (GenerateRouteItem, error) {
 	var r GenerateRouteItem
 
 	r.Controller = fmt.Sprintf("%s.%s{}", foundRoute.Package, foundRoute.Name)
@@ -293,6 +293,10 @@ func generateRoute(foundRoute *FoundRoute) (GenerateRouteItem, error) {
 		case "path":
 			r.Path = fmt.Sprintf("%q", trimmedItem)
 		case "type":
+			// validate route service mode
+			if mode == raiden.SvcMode && trimmedItem != string(raiden.RouteTypeCustom) {
+				return r, fmt.Errorf("controller %s, only custom controller routes are allowed in service mode", foundRoute.Name)
+			}
 
 			// validate method
 			// exclude for rest and storage controller
