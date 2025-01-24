@@ -1,15 +1,73 @@
 package raiden_test
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
 	"testing"
 	"time"
 
+	"cloud.google.com/go/pubsub"
+	"github.com/go-co-op/gocron/v2"
+	"github.com/google/uuid"
 	"github.com/sev-2/raiden"
 	"github.com/stretchr/testify/assert"
 )
+
+type PrinHello struct {
+	raiden.JobBase
+}
+
+func (j *PrinHello) Name() string {
+	return "print-hello"
+}
+
+func (j *PrinHello) After(ctx raiden.JobContext, jobID uuid.UUID, jobName string) {
+}
+
+func (j *PrinHello) AfterErr(ctx raiden.JobContext, jobID uuid.UUID, jobName string, err error) {
+}
+
+func (j *PrinHello) Before(ctx raiden.JobContext, jobID uuid.UUID, jobName string) {
+}
+
+func (j *PrinHello) Duration() gocron.JobDefinition {
+	return gocron.DurationJob(time.Second * 20)
+}
+
+func (j *PrinHello) Task(ctx raiden.JobContext) error {
+	fmt.Printf("[%s] this message executed at %s \n", ctx.Config().ProjectName, time.Now().String())
+
+	return nil
+}
+
+type TestSubscriber struct {
+	raiden.SubscriberBase
+}
+
+func (s *TestSubscriber) Name() string {
+	return "Test New"
+}
+
+func (s *TestSubscriber) Provider() raiden.PubSubProviderType {
+	return raiden.PubSubProviderGoogle
+}
+
+func (s *TestSubscriber) Topic() string {
+	return "test.new-sub"
+}
+
+func (s *TestSubscriber) Consume(ctx raiden.SubscriberContext, message any) error {
+	msg, valid := message.(*pubsub.Message)
+	if !valid {
+		return errors.New("invalid google pubsub message")
+	}
+
+	raiden.Info("test new listener executed", "data", string(msg.Data))
+	return nil
+}
 
 func MockMiddlewareFn() raiden.MiddlewareFn {
 	return func(next raiden.RouteHandlerFn) raiden.RouteHandlerFn {
@@ -30,6 +88,22 @@ func TestServer_RegisterRoute(t *testing.T) {
 	assert.NotNil(t, s.Router)
 }
 
+func TestServer_RegisterJob(t *testing.T) {
+	conf := loadConfig()
+	s := raiden.NewServer(conf)
+
+	s.RegisterJobs(&PrinHello{})
+	assert.NotNil(t, s.RegisterJobs)
+}
+
+func TestServer_RegisterSubscriber(t *testing.T) {
+	conf := loadConfig()
+	s := raiden.NewServer(conf)
+
+	s.RegisterSubscribers(&TestSubscriber{})
+	assert.NotNil(t, s.RegisterSubscribers)
+}
+
 func TestServer_Use(t *testing.T) {
 	conf := loadConfig()
 	s := raiden.NewServer(conf)
@@ -42,6 +116,8 @@ func TestServer_StartStop(t *testing.T) {
 	if os.Getenv("TEST_RUN") == "1" {
 		conf := loadConfig()
 		s := raiden.NewServer(conf)
+		s.RegisterJobs(&PrinHello{})
+		s.RegisterSubscribers(&TestSubscriber{})
 		s.Run()
 		return
 	}
