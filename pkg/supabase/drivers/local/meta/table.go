@@ -52,6 +52,8 @@ func GetTableByName(cfg *raiden.Config, name, schema string, includeColumn bool)
 		return
 	}
 
+	fmt.Println("data : ", rs)
+
 	if len(rs) == 0 {
 		err = fmt.Errorf("get table %s in schema %s is not found", name, schema)
 		return
