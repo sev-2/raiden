@@ -24,7 +24,10 @@ func TestPostgrestRequestBind(t *testing.T) {
 
 	sampleConfigFile, err := utils.CreateFile(currentDir+"/app.yaml", true)
 	assert.NoError(t, err)
-	defer utils.DeleteFile(currentDir + "/app.yaml")
+	defer func() {
+		err := utils.DeleteFile(currentDir + "/app.yaml")
+		assert.NoError(t, err)
+	}()
 
 	configContent := `MODE: svc
 POSTGREST_URL: http://test.com:3000
@@ -75,7 +78,10 @@ func TestPostgrestRequestBind_NoSlash(t *testing.T) {
 
 	sampleConfigFile, err := utils.CreateFile(currentDir+"/app.yaml", true)
 	assert.NoError(t, err)
-	defer utils.DeleteFile(currentDir + "/app.yaml")
+	defer func() {
+		err := utils.DeleteFile(currentDir + "/app.yaml")
+		assert.NoError(t, err)
+	}()
 
 	configContent := `MODE: svc
 POSTGREST_URL: http://localhost:3000
@@ -127,7 +133,10 @@ func TestPostgrestRequestBind_NoSlashBff(t *testing.T) {
 
 	sampleConfigFile, err := utils.CreateFile(currentDir+"/app.yaml", true)
 	assert.NoError(t, err)
-	defer utils.DeleteFile(currentDir + "/app.yaml")
+	defer func() {
+		err := utils.DeleteFile(currentDir + "/app.yaml")
+		assert.NoError(t, err)
+	}()
 
 	configContent := `MODE: bff
 POSTGREST_URL: http://localhost:3000
