@@ -18,7 +18,7 @@ func (q *Query) Insert(payload interface{}, model interface{}) error {
 	headers["Content-Type"] = "application/json"
 	headers["Prefer"] = "return=representation"
 
-	_, err0 := PostgrestRequestBind(q.Context, fasthttp.MethodPost, url, jsonData, headers, q.ByPass, model)
+	_, err0 := PostgrestRequest(q.Context, q.credential, fasthttp.MethodPost, url, jsonData, headers, q.ByPass, model)
 	if err0 != nil {
 		return err0
 	}

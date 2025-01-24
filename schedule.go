@@ -42,9 +42,10 @@ type JobContext interface {
 	IsDataExist(key string) bool
 	Span() trace.Span
 	SetSpan(span trace.Span)
+	Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
 }
 
-func newJobCtx(cfg *Config, jobChan chan JobParams, data JobData) JobContext {
+func newJobCtx(cfg *Config, pubsub PubSub, jobChan chan JobParams, data JobData) JobContext {
 	if data == nil {
 		data = make(JobData, 0)
 	}
@@ -53,6 +54,7 @@ func newJobCtx(cfg *Config, jobChan chan JobParams, data JobData) JobContext {
 		cfg:     cfg,
 		jobChan: jobChan,
 		data:    data,
+		pubsub:  pubsub,
 	}
 }
 
@@ -62,6 +64,7 @@ type jobContext struct {
 	jobChan chan JobParams
 	data    JobData
 	span    trace.Span
+	pubsub  PubSub
 }
 
 func (ctx *jobContext) SetContext(c context.Context) {
@@ -106,6 +109,10 @@ func (ctx *jobContext) Span() trace.Span {
 
 func (ctx *jobContext) SetSpan(span trace.Span) {
 	ctx.span = span
+}
+
+func (ctx *jobContext) Publish(c context.Context, provider PubSubProviderType, topic string, message []byte) error {
+	return ctx.pubsub.Publish(c, provider, topic, message)
 }
 
 // ----- Scheduler Base
@@ -182,11 +189,16 @@ type SchedulerServer struct {
 	Server  gocron.Scheduler
 	jobs    []Job
 	tracer  trace.Tracer
+	pubsub  PubSub
 	JobChan chan JobParams
 }
 
 func (s *SchedulerServer) SetTracer(tracer trace.Tracer) {
 	s.tracer = tracer
+}
+
+func (s *SchedulerServer) SetPubsub(pubsub PubSub) {
+	s.pubsub = pubsub
 }
 
 func (s *SchedulerServer) RegisterJob(job Job) error {
@@ -201,7 +213,7 @@ func (s *SchedulerServer) RegisterJob(job Job) error {
 			gocron.NewTask(func(scServer *SchedulerServer, jType reflect.Type) {
 				jValue := reflect.New(jType).Interface()
 				if jobValue, ok := jValue.(Job); ok {
-					jobCtx := newJobCtx(scServer.Config, scServer.JobChan, make(JobData))
+					jobCtx := newJobCtx(scServer.Config, scServer.pubsub, scServer.JobChan, make(JobData))
 					// start tracer
 					if scServer.tracer != nil {
 						spanCtx, span := scServer.tracer.Start(context.Background(), fmt.Sprintf("job - %s", jobValue.Name()))
@@ -238,7 +250,7 @@ func (s *SchedulerServer) ListenJobChan() {
 
 		if job != nil {
 			go func(server gocron.Scheduler, cfg *Config, jobChan chan JobParams, params JobParams) {
-				jobCtx := newJobCtx(s.Config, s.JobChan, make(JobData))
+				jobCtx := newJobCtx(s.Config, s.pubsub, s.JobChan, make(JobData))
 				// start tracer
 				if s.tracer != nil {
 					spanCtx, span := extractTraceJobParam(context.Background(), s.tracer, params)

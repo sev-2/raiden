@@ -581,6 +581,32 @@ func PromptGoogleSaPath(c *Config) error {
 	return nil
 }
 
+func PromptGooglePubsubPushSubscription() (bool, error) {
+	input := confirmation.New("Would you like to to use 'push' subscription ?", confirmation.No)
+	input.DefaultValue = confirmation.No
+	return input.RunPrompt()
+}
+
+// ----- Prompt Server Dsn -----
+func PromptServerDsn(c *Config) error {
+	input := textinput.New("Enter your server dns (current service public url include protocol)")
+	input.Validate = func(s string) error {
+		if len(s) == 0 || s == "" {
+			return errors.New("server dns is required")
+		}
+
+		return nil
+	}
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	c.ServerDns = inputText
+	return nil
+}
+
 // ----- Check and generate functionality -----
 
 func Generate(config *raiden.Config, projectPath string) error {
