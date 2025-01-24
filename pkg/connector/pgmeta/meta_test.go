@@ -24,22 +24,38 @@ func TestCreateTable(t *testing.T) {
 
 	// Define the new table to be created
 	newTable := objects.Table{
-		Name:   "test_local_table",
-		Schema: "public",
-	}
+		Name:        "test_local_table",
+		PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+		Schema:      "public",
+		Columns: []objects.Column{
+			{Name: "id", DataType: "uuid"},
+			{Name: "name", DataType: "text"},
+		},
 
-	// Mock the response for the GetTableByName call
-	mockedTableResponse := []objects.Table{
-		{
-			Name:        "test_local_table",
-			Schema:      "public",
-			PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
-			Columns: []objects.Column{
-				{Name: "id", DataType: "uuid"},
-				{Name: "name", DataType: "text"},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "test_constraint_old",
+				SourceSchema:      "private",
+				SourceTableName:   "test_table",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "old_table",
+				TargetColumnName:  "id",
+			},
+			{
+				ConstraintName:    "",
+				SourceSchema:      "public",
+				SourceTableName:   "test_table1",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "old_table1",
+				TargetColumnName:  "id",
 			},
 		},
 	}
+
+	// Mock the response for the GetTableByName call
+	mockedTableResponse := []objects.Table{newTable}
 	httpmock.RegisterResponder("POST", "http://example.com/query",
 		func(req *http.Request) (*http.Response, error) {
 			var payload pgmeta.ExecuteQueryParam
@@ -127,6 +143,17 @@ func TestUpdateTable(t *testing.T) {
 			{Name: "name", DataType: "text"},
 			{Name: "phone", DataType: "int"},
 		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "test_local_constraint",
+				SourceSchema:      "public",
+				SourceTableName:   "test_local_table",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "test_table",
+				TargetColumnName:  "id",
+			},
+		},
 	}
 
 	data2 := []objects.Table{
@@ -201,6 +228,100 @@ func TestUpdateTable(t *testing.T) {
 				UpdateItems: []objects.UpdateColumnType{
 					objects.UpdateColumnDelete,
 				},
+			},
+		},
+	})
+
+	// Assertions
+	assert.NoError(t, err)
+}
+
+func TestUpdateTable_RelationUpdate(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+	}
+
+	// Mock the response for the GetTableByName call
+	data1 := objects.Table{
+		Name:        "test_local_table",
+		Schema:      "public",
+		PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+		RLSForced:   false,
+		Columns: []objects.Column{
+			{Name: "id", DataType: "uuid"},
+			{Name: "name", DataType: "text"},
+			{Name: "phone", DataType: "int"},
+		},
+		Relationships: []objects.TablesRelationship{
+			{
+				ConstraintName:    "test_local_constraint",
+				SourceSchema:      "public",
+				SourceTableName:   "test_local_table",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "test_table",
+				TargetColumnName:  "id",
+			},
+			{
+				ConstraintName:    "test_local_constraint_2",
+				SourceSchema:      "public",
+				SourceTableName:   "test_local_table_2",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "test_table_2",
+				TargetColumnName:  "id",
+			},
+		},
+	}
+
+	data2 := []objects.Table{data1}
+
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, data2)
+		},
+	)
+
+	// Call the function under test
+	err := pgmeta.UpdateTable(cfg, data1, objects.UpdateTableParam{
+		OldData:             data1,
+		ForceCreateRelation: false,
+		ChangeItems: []objects.UpdateTableType{
+			objects.UpdateTableSchema,
+			objects.UpdateTableName,
+			objects.UpdateTableRlsEnable,
+			objects.UpdateTableRlsForced,
+			objects.UpdateTablePrimaryKey,
+		},
+		ChangeRelationItems: []objects.UpdateRelationItem{
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "",
+					SourceSchema:      "some-schema",
+					SourceColumnName:  "some-column",
+					TargetTableSchema: "other-schema",
+				},
+				Type: objects.UpdateRelationCreate,
+			},
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "test_local_constraint",
+					SourceSchema:      "public",
+					SourceTableName:   "test_local_table_1",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "test_table_1",
+					TargetColumnName:  "id",
+				},
+				Type: objects.UpdateRelationUpdate,
+			},
+			{
+				Data: data1.Relationships[1],
+				Type: objects.UpdateRelationDelete,
 			},
 		},
 	})
