@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"cloud.google.com/go/pubsub"
@@ -365,7 +366,9 @@ func (s *GooglePubSubProvider) StartListen(handler []SubscriberHandler) error {
 	var group run.Group
 	for _, h := range handler {
 		sub := s.Client.Subscription(h.Subscription())
-		group.Add(s.listen(sub, h), func(err error) {})
+		group.Add(s.listen(sub, h), func(err error) {
+			os.Exit(1)
+		})
 	}
 
 	return group.Run()
