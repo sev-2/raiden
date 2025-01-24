@@ -215,20 +215,32 @@ func (s *PubSubManager) Serve(handler SubscriberHandler) (fasthttp.RequestHandle
 			response["message"] = err.Error()
 			resByte, err := json.Marshal(response)
 			if err != nil {
-				ctx.WriteString(fmt.Sprintf("{\"message\":\"%s\"}", err.Error()))
+				errMsg := fmt.Sprintf("{\"message\":\"%s\"}", err.Error())
+				if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+					// Log the error if necessary
+					PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error", handler.Name()), "message", writeErr)
+				}
 				return
 			}
 
-			ctx.Write(resByte)
+			if _, err := ctx.Write(resByte); err != nil {
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.Write() error", handler.Name()), "message", err)
+			}
 			return
 		}
 
 		resByte, err := json.Marshal(response)
 		if err != nil {
-			ctx.WriteString(fmt.Sprintf("{\"message\":\"%s\"}", err.Error()))
+			errMsg := fmt.Sprintf("{\"message\":\"%s\"}", err.Error())
+			if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+				// Log the error if necessary
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error in last step", handler.Name()), "message", writeErr)
+			}
 			return
 		}
-		ctx.Write(resByte)
+		if _, err := ctx.Write(resByte); err != nil {
+			PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.Write() error ins last step", handler.Name()), "message", err)
+		}
 	}, nil
 
 }
