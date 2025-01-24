@@ -145,6 +145,30 @@ func (r *router) BuildHandler() {
 			})
 		}
 	}
+
+	pushSubscriptionHandlers := r.pubsub.Handlers()
+	if len(pushSubscriptionHandlers) > 0 {
+		pubsubGroup := r.engine.Group("/" + SubscriptionPrefixEndpoint)
+		for _, pushSubscription := range r.pubsub.Handlers() {
+			if pushSubscription.SubscriptionType() == SubscriptionTypePull {
+				continue
+			}
+
+			pHandler, err := r.pubsub.Serve(pushSubscription)
+			if err != nil {
+				RouterLogger.Error("serve push subscription", "message", err)
+				os.Exit(1)
+			}
+
+			var endpoint = pushSubscription.PushEndpoint()
+			if !strings.HasPrefix(endpoint, "/") {
+				endpoint = "/" + endpoint
+			}
+
+			pubsubGroup.POST(endpoint, pHandler)
+		}
+	}
+
 }
 
 func (r *router) buildNativeMiddleware(route *Route, chain Chain) Chain {

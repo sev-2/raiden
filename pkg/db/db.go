@@ -10,6 +10,11 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+type Credential struct {
+	Token  string
+	ApiKey string
+}
+
 type Query struct {
 	Context      raiden.Context
 	model        interface{}
@@ -23,6 +28,7 @@ type Query struct {
 	OffsetValue  int
 	Errors       []error
 	ByPass       bool
+	credential   Credential
 }
 
 type ModelBase struct {
@@ -38,6 +44,11 @@ func NewQuery(ctx raiden.Context) *Query {
 		Context: ctx,
 		ByPass:  false,
 	}
+}
+
+func (q *Query) SetCredential(credential Credential) *Query {
+	q.credential = credential
+	return q
 }
 
 // Model is the From alias
@@ -85,7 +96,7 @@ func (q Query) Get(collection interface{}) error {
 	headers["Content-Type"] = "application/json"
 	headers["Prefer"] = "return=representation"
 
-	_, err := PostgrestRequestBind(q.Context, fasthttp.MethodGet, url, nil, headers, q.ByPass, collection)
+	_, err := PostgrestRequest(q.Context, q.credential, fasthttp.MethodGet, url, nil, headers, q.ByPass, collection)
 	if err != nil {
 		return err
 	}
@@ -100,7 +111,7 @@ func (q Query) Single(model interface{}) error {
 
 	headers["Accept"] = "application/vnd.pgrst.object+json"
 
-	_, err := PostgrestRequestBind(q.Context, "GET", url, nil, headers, q.ByPass, model)
+	_, err := PostgrestRequest(q.Context, q.credential, "GET", url, nil, headers, q.ByPass, model)
 	if err != nil {
 		return err
 	}

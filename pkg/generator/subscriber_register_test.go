@@ -48,7 +48,7 @@ func (s *RideHailingSubscriber) Provider() raiden.PubSubProviderType {
 	return raiden.PubSubProviderGoogle
 }
 
-func (s *RideHailingSubscriber) Topic() string {
+func (s *RideHailingSubscriber) Subscripbtion() string {
 	return "transaction.ride-hailing.new-sub"
 }
 
