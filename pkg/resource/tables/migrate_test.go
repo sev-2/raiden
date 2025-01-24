@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jarcoal/httpmock"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/resource/tables"
 	"github.com/sev-2/raiden/pkg/state"
@@ -166,4 +167,159 @@ func TestMigrate(t *testing.T) {
 
 	errors := tables.Migrate(config, migrateItems, stateChan, tables.ActionFunc)
 	assert.Equal(t, 1, len(errors))
+}
+
+func TestActionFunc_Create(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	// Mock endpoint for pgmeta.CreateTable
+	httpmock.RegisterResponder("POST", "https://pgmeta.test.com/query",
+		httpmock.NewJsonResponderOrPanic(200, []objects.Table{
+			{
+				Name:    "test_table",
+				Schema:  "public",
+				Comment: "Test table creation",
+			},
+		}))
+
+	// Mock endpoint for supabase.CreateTable
+	httpmock.RegisterResponder("POST", "https://api.test.com/query",
+		httpmock.NewJsonResponderOrPanic(200, []objects.Table{
+			{
+				Name:    "test_table",
+				Schema:  "public",
+				Comment: "Test table creation",
+			},
+		}))
+
+	// Test for `pgmeta.CreateTable` when cfg.Mode == SvcMode
+	cfg := &raiden.Config{
+		Mode:           raiden.SvcMode,
+		PgMetaUrl:      "https://pgmeta.test.com",
+		SupabaseApiUrl: "https://api.test.com",
+	}
+
+	param := objects.Table{
+		Name:   "test_table",
+		Schema: "public",
+	}
+
+	response, err := tables.ActionFunc.CreateFunc(cfg, param)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if response.Name != "test_table" || response.Schema != "public" {
+		t.Errorf("unexpected response: %+v", response)
+	}
+
+	// Test for `supabase.CreateTable` when cfg.Mode != SvcMode
+	cfg.Mode = raiden.BffMode
+
+	response, err = tables.ActionFunc.CreateFunc(cfg, param)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if response.Name != "test_table" || response.Schema != "public" {
+		t.Errorf("unexpected response: %+v", response)
+	}
+
+	// Debug mock call counts
+	t.Log(httpmock.GetCallCountInfo())
+}
+
+func TestActionFunc_Update(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	// Mock endpoint for pgmeta.CreateTable
+	httpmock.RegisterResponder("POST", "https://pgmeta.test.com/query",
+		httpmock.NewJsonResponderOrPanic(200, []objects.Table{
+			{
+				Name:    "test_table",
+				Schema:  "public",
+				Comment: "Test table creation",
+			},
+		}))
+
+	// Mock endpoint for supabase.CreateTable
+	httpmock.RegisterResponder("POST", "https://api.test.com/query",
+		httpmock.NewJsonResponderOrPanic(200, []objects.Table{
+			{
+				Name:    "test_table",
+				Schema:  "public",
+				Comment: "Test table creation",
+			},
+		}))
+
+	// Test for `pgmeta.CreateTable` when cfg.Mode == SvcMode
+	cfg := &raiden.Config{
+		Mode:           raiden.SvcMode,
+		PgMetaUrl:      "https://pgmeta.test.com",
+		SupabaseApiUrl: "https://api.test.com",
+	}
+
+	param := objects.Table{
+		Name:   "test_table",
+		Schema: "public",
+	}
+
+	items := objects.UpdateTableParam{}
+
+	err := tables.ActionFunc.UpdateFunc(cfg, param, items)
+	assert.NoError(t, err)
+
+	// Test for `supabase.CreateTable` when cfg.Mode != SvcMode
+	cfg.Mode = raiden.BffMode
+
+	err = tables.ActionFunc.UpdateFunc(cfg, param, items)
+	assert.NoError(t, err)
+
+	// Debug mock call counts
+	t.Log(httpmock.GetCallCountInfo())
+}
+
+func TestActionFunc_Delete(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	// Mock endpoint for pgmeta.CreateTable
+	httpmock.RegisterResponder("POST", "https://pgmeta.test.com/query",
+		httpmock.NewJsonResponderOrPanic(200, map[string]any{
+			"message": "success",
+		}),
+	)
+
+	// Mock endpoint for supabase.CreateTable
+	httpmock.RegisterResponder("POST", "https://api.test.com/query",
+		httpmock.NewJsonResponderOrPanic(200, map[string]any{
+			"message": "success",
+		}),
+	)
+
+	// Test for `pgmeta.CreateTable` when cfg.Mode == SvcMode
+	cfg := &raiden.Config{
+		Mode:           raiden.SvcMode,
+		PgMetaUrl:      "https://pgmeta.test.com",
+		SupabaseApiUrl: "https://api.test.com",
+	}
+
+	param := objects.Table{
+		Name:   "test_table",
+		Schema: "public",
+	}
+
+	err := tables.ActionFunc.DeleteFunc(cfg, param)
+	assert.NoError(t, err)
+
+	// Test for `supabase.CreateTable` when cfg.Mode != SvcMode
+	cfg.Mode = raiden.BffMode
+
+	err = tables.ActionFunc.DeleteFunc(cfg, param)
+	assert.NoError(t, err)
+
+	// Debug mock call counts
+	t.Log(httpmock.GetCallCountInfo())
 }
