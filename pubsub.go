@@ -119,20 +119,6 @@ func (s *SubscriberBase) Consume(ctx SubscriberContext, message any) error {
 	return fmt.Errorf("subscriber %s in not implemented", s.Name())
 }
 
-func (s *SubscriberBase) ParsePushSubscriptionMessage(message any) (*PushSubscriptionData, error) {
-	byteData, valid := message.([]byte)
-	if !valid {
-		return nil, errors.New("push subscription message is not valid")
-	}
-
-	var data PushSubscriptionData
-	if err := json.Unmarshal(byteData, &data); err != nil {
-		return nil, err
-	}
-
-	return &data, nil
-}
-
 // ----- Subscription Server -----
 type PubSub interface {
 	Register(handler SubscriberHandler)
@@ -230,7 +216,7 @@ func (s *PubSubManager) Serve(handler SubscriberHandler) (fasthttp.RequestHandle
 
 		response := map[string]any{"message": "success handle"}
 
-		if err := handler.Consume(&subCtx, ctx.Request.Body()); err != nil {
+		if err := handler.Consume(&subCtx, data.Message); err != nil {
 			ctx.SetStatusCode(http.StatusInternalServerError)
 			response["message"] = err.Error()
 			resByte, err := json.Marshal(response)
