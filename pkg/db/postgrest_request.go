@@ -174,7 +174,6 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 	defer fasthttp.ReleaseResponse(res)
 
 	if err := client.Do(req, res); err != nil {
-		fmt.Println("err : ", err.Error())
 		return res, err
 	}
 
