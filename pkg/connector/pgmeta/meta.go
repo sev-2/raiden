@@ -123,7 +123,6 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 			return errors.New(strings.Join(errMsg, ";"))
 		}
 	}
-
 	if len(updateItem.ChangeRelationItems) > 0 || updateItem.ForceCreateRelation {
 		errorsUpdate := updateRelations(cfg, updateItem.ChangeRelationItems, newTable.Relationships, updateItem.ForceCreateRelation)
 		if len(errorsUpdate) > 0 {

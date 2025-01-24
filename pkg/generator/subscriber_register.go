@@ -87,8 +87,8 @@ func createRegisterSubscriberInput(projectName string, subscriberRegisterDir str
 	}
 
 	if len(subscriberList) > 0 {
-		rpcImportPath := fmt.Sprintf("%s/internal/subscribers", utils.ToGoModuleName(projectName))
-		imports = append(imports, fmt.Sprintf("%q", rpcImportPath))
+		subscriberImportPath := fmt.Sprintf("%s/internal/subscribers", utils.ToGoModuleName(projectName))
+		imports = append(imports, fmt.Sprintf("%q", subscriberImportPath))
 	}
 
 	// set passed parameter
@@ -123,6 +123,7 @@ func WalkScanSubscriber(subscriberDir string) ([]string, error) {
 		}
 		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}

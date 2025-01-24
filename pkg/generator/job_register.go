@@ -87,8 +87,8 @@ func createRegisterJobInput(projectName string, jobRegisterDir string, jobList [
 	}
 
 	if len(jobList) > 0 {
-		rpcImportPath := fmt.Sprintf("%s/internal/jobs", utils.ToGoModuleName(projectName))
-		imports = append(imports, fmt.Sprintf("%q", rpcImportPath))
+		jobImportPath := fmt.Sprintf("%s/internal/jobs", utils.ToGoModuleName(projectName))
+		imports = append(imports, fmt.Sprintf("%q", jobImportPath))
 	}
 
 	// set passed parameter

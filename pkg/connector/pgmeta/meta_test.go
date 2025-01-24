@@ -2,6 +2,7 @@ package pgmeta_test
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -152,35 +153,16 @@ func TestUpdateTable(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "test_table",
 				TargetColumnName:  "id",
-			},
-		},
-	}
-
-	data2 := []objects.Table{
-		{
-			Name:        "test_local_table",
-			Schema:      "public",
-			PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
-			RLSForced:   true,
-			Columns: []objects.Column{
-				{Name: "id", DataType: "uuid"},
-				{Name: "name", DataType: "text"},
-				{Name: "phone", DataType: "text"},
-				{Name: "createAt", DataType: "time.Time"},
-			},
-			Relationships: []objects.TablesRelationship{
-				{
-					ConstraintName:    "test_local_constraint",
-					SourceSchema:      "public",
-					SourceTableName:   "test_local_table",
-					SourceColumnName:  "id",
-					TargetTableSchema: "public",
-					TargetTableName:   "test_table",
-					TargetColumnName:  "id",
+				Index: &objects.Index{
+					Schema: "public",
+					Table:  "test_local_table",
+					Name:   "test_local_table_id_index",
 				},
 			},
 		},
 	}
+
+	data2 := []objects.Table{data1}
 
 	httpmock.RegisterResponder("POST", "http://example.com/query",
 		func(req *http.Request) (*http.Response, error) {
@@ -202,10 +184,18 @@ func TestUpdateTable(t *testing.T) {
 		ChangeRelationItems: []objects.UpdateRelationItem{
 			{
 				Data: objects.TablesRelationship{
-					ConstraintName:    "",
-					SourceSchema:      "some-schema",
-					SourceColumnName:  "some-column",
-					TargetTableSchema: "other-schema",
+					ConstraintName:    "test_local_constraint",
+					SourceSchema:      "public",
+					SourceTableName:   "test_local_table",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "test_table",
+					TargetColumnName:  "id",
+					Index: &objects.Index{
+						Schema: "public",
+						Table:  "test_local_table",
+						Name:   "test_local_table_id_index",
+					},
 				},
 				Type: objects.UpdateRelationCreate,
 			},
@@ -221,6 +211,9 @@ func TestUpdateTable(t *testing.T) {
 				Name: "phone",
 				UpdateItems: []objects.UpdateColumnType{
 					objects.UpdateColumnDataType,
+					objects.UpdateColumnName,
+					objects.UpdateColumnDefaultValue,
+					objects.UpdateColumnNullable,
 				},
 			},
 			{
@@ -234,6 +227,77 @@ func TestUpdateTable(t *testing.T) {
 
 	// Assertions
 	assert.NoError(t, err)
+}
+
+func TestUpdateTable_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+	}
+
+	// Mock the response for the GetTableByName call
+	data1 := objects.Table{
+		Name:        "test_local_table",
+		Schema:      "public",
+		PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+		RLSForced:   false,
+		Columns: []objects.Column{
+			{Name: "id", DataType: "uuid"},
+			{Name: "name", DataType: "text"},
+			{Name: "phone", DataType: "int"},
+		},
+	}
+
+	data2 := []objects.Table{data1}
+
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			var payload pgmeta.ExecuteQueryParam
+			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+				return httpmock.NewStringResponse(400, "Bad Request"), nil
+			}
+
+			if strings.Contains(payload.Query, "RENAME COLUMN") {
+				return nil, errors.New("network error")
+			}
+			return httpmock.NewJsonResponse(200, data2)
+		},
+	)
+
+	// Call the function under test
+	err := pgmeta.UpdateTable(cfg, data1, objects.UpdateTableParam{
+		OldData:             data1,
+		ForceCreateRelation: true,
+		ChangeColumnItems: []objects.UpdateColumnItem{
+			{
+				Name: "createAt",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnNew,
+				},
+			},
+			{
+				Name: "phone",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnDataType,
+					objects.UpdateColumnName,
+					objects.UpdateColumnDefaultValue,
+					objects.UpdateColumnNullable,
+				},
+			},
+			{
+				Name: "name",
+				UpdateItems: []objects.UpdateColumnType{
+					objects.UpdateColumnDelete,
+				},
+			},
+		},
+	})
+
+	// Assertions
+	assert.Error(t, err)
 }
 
 func TestUpdateTable_RelationUpdate(t *testing.T) {
@@ -265,6 +329,11 @@ func TestUpdateTable_RelationUpdate(t *testing.T) {
 				TargetTableSchema: "public",
 				TargetTableName:   "test_table",
 				TargetColumnName:  "id",
+				Index: &objects.Index{
+					Schema: "public",
+					Table:  "test_local_table",
+					Name:   "test_local_table_id_index",
+				},
 			},
 			{
 				ConstraintName:    "test_local_constraint_2",
@@ -273,6 +342,48 @@ func TestUpdateTable_RelationUpdate(t *testing.T) {
 				SourceColumnName:  "id",
 				TargetTableSchema: "public",
 				TargetTableName:   "test_table_2",
+				TargetColumnName:  "id",
+				Index: &objects.Index{
+					Schema: "public",
+					Table:  "test_local_table_2",
+					Name:   "test_local_table_id_index_2",
+				},
+			},
+			{
+				ConstraintName:    "test_local_constraint_new",
+				SourceSchema:      "public",
+				SourceTableName:   "test_local_table",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "test_table",
+				TargetColumnName:  "id",
+				Index: &objects.Index{
+					Schema: "public",
+					Table:  "test_local_table",
+					Name:   "test_local_table_id_index",
+				},
+			},
+			{
+				ConstraintName:    "existing_constrain_fkey",
+				SourceSchema:      "public",
+				SourceTableName:   "test_local_table",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "test_table",
+				TargetColumnName:  "id",
+				Index: &objects.Index{
+					Schema: "public",
+					Table:  "test_local_table",
+					Name:   "test_local_table_id_index",
+				},
+			},
+			{
+				ConstraintName:    "",
+				SourceSchema:      "public",
+				SourceTableName:   "test_exist_table",
+				SourceColumnName:  "id",
+				TargetTableSchema: "public",
+				TargetTableName:   "test_table",
 				TargetColumnName:  "id",
 			},
 		},
@@ -316,12 +427,38 @@ func TestUpdateTable_RelationUpdate(t *testing.T) {
 					TargetTableSchema: "public",
 					TargetTableName:   "test_table_1",
 					TargetColumnName:  "id",
+					Index: &objects.Index{
+						Schema: "public",
+						Table:  "test_local_table",
+						Name:   "test_local_table_id",
+					},
 				},
 				Type: objects.UpdateRelationUpdate,
 			},
 			{
 				Data: data1.Relationships[1],
 				Type: objects.UpdateRelationDelete,
+			},
+			{
+				Data: data1.Relationships[2],
+				Type: objects.UpdateRelationCreate,
+			},
+			{
+				Data: objects.TablesRelationship{
+					ConstraintName:    "existing_constrain",
+					SourceSchema:      "public",
+					SourceTableName:   "test_local_table",
+					SourceColumnName:  "id",
+					TargetTableSchema: "public",
+					TargetTableName:   "test_table",
+					TargetColumnName:  "id",
+					Index: &objects.Index{
+						Schema: "public",
+						Table:  "test_local_table",
+						Name:   "test_local_table_id_index",
+					},
+				},
+				Type: objects.UpdateRelationUpdate,
 			},
 		},
 	})
