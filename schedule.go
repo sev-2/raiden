@@ -46,7 +46,7 @@ type JobContext interface {
 	Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
 }
 
-func newJobCtx(cfg *Config, pubsub PubSub, jobChan chan JobParams, data JobData) JobContext {
+func newJobCtx(cfg *Config, pubSub PubSub, jobChan chan JobParams, data JobData) JobContext {
 	if data == nil {
 		data = make(JobData, 0)
 	}
@@ -55,7 +55,7 @@ func newJobCtx(cfg *Config, pubsub PubSub, jobChan chan JobParams, data JobData)
 		cfg:     cfg,
 		jobChan: jobChan,
 		data:    data,
-		pubsub:  pubsub,
+		pubSub:  pubSub,
 	}
 }
 
@@ -65,7 +65,7 @@ type jobContext struct {
 	jobChan chan JobParams
 	data    JobData
 	span    trace.Span
-	pubsub  PubSub
+	pubSub  PubSub
 }
 
 func (ctx *jobContext) SetContext(c context.Context) {
@@ -113,7 +113,10 @@ func (ctx *jobContext) SetSpan(span trace.Span) {
 }
 
 func (ctx *jobContext) Publish(c context.Context, provider PubSubProviderType, topic string, message []byte) error {
-	return ctx.pubsub.Publish(c, provider, topic, message)
+	if ctx.pubSub == nil {
+		return errors.New("unable to publish because pubsub not initialize")
+	}
+	return ctx.pubSub.Publish(c, provider, topic, message)
 }
 
 // ----- Scheduler Base
