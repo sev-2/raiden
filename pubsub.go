@@ -200,22 +200,42 @@ func (s *PubSubManager) Serve(handler SubscriberHandler) (fasthttp.RequestHandle
 		return nil, err
 	}
 
+	subscriptionSignature := fmt.Sprintf("projects/%s/subscriptions/%s", s.config.GoogleProjectId, handler.Subscription())
+
 	return func(ctx *fasthttp.RequestCtx) {
 		var subCtx = subscriberContext{
 			cfg: s.config, Context: context.Background(),
 		}
 
 		ctx.SetContentType("application/json")
-		response := map[string]any{
-			"message": "success handle",
+
+		// validate data
+		var data PushSubscriptionData
+		if err := json.Unmarshal(ctx.Request.Body(), &data); err != nil {
+			errMsg := "{\"message\":\"invalid json data\"}"
+			if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error", handler.Name()), "message", writeErr)
+			}
+			return
 		}
+
+		if data.Subscription != subscriptionSignature {
+			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			errMsg := "{\"message\":\"subscription validation failed: received unexpected subscription name\"}"
+			if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error", handler.Name()), "message", writeErr)
+			}
+			return
+		}
+
+		response := map[string]any{"message": "success handle"}
 
 		if err := handler.Consume(&subCtx, ctx.Request.Body()); err != nil {
 			ctx.SetStatusCode(http.StatusInternalServerError)
 			response["message"] = err.Error()
 			resByte, err := json.Marshal(response)
 			if err != nil {
-				errMsg := fmt.Sprintf("{\"message\":\"%s\"}", err.Error())
+				errMsg := "{\"message\":\"invalid json data\"}"
 				if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
 					// Log the error if necessary
 					PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error", handler.Name()), "message", writeErr)
@@ -231,7 +251,7 @@ func (s *PubSubManager) Serve(handler SubscriberHandler) (fasthttp.RequestHandle
 
 		resByte, err := json.Marshal(response)
 		if err != nil {
-			errMsg := fmt.Sprintf("{\"message\":\"%s\"}", err.Error())
+			errMsg := "{\"message\":\"invalid json data\"}"
 			if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
 				// Log the error if necessary
 				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error in last step", handler.Name()), "message", writeErr)
