@@ -351,7 +351,7 @@ func (s *GooglePubSubProvider) CreateSubscription(handler SubscriberHandler) err
 	}
 
 	if s.Config.ServerDns == "" {
-		return errors.New("the SERVER_DSN configuration is required when using the 'push' subscription type.")
+		return errors.New("the SERVER_DSN configuration is required when using the 'push' subscription type")
 	}
 
 	if s.Client == nil {

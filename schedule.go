@@ -2,6 +2,7 @@ package raiden
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -203,7 +204,7 @@ func (s *SchedulerServer) SetPubsub(pubsub PubSub) {
 
 func (s *SchedulerServer) RegisterJob(job Job) error {
 	if job == nil {
-		return fmt.Errorf("Could not register nil job")
+		return errors.New("could not register empty job")
 	}
 
 	s.jobs = append(s.jobs, job)
