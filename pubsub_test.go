@@ -54,7 +54,7 @@ func TestNewGooglePubsub(t *testing.T) {
 
 	assert.Equal(t, true, handler.AutoAck())
 	assert.Equal(t, "unknown", handler.Name())
-	assert.Equal(t, "", handler.Topic())
+	assert.Equal(t, "", handler.Subscription())
 	assert.Error(t, handler.Consume(nil, nil))
 
 	// assert register

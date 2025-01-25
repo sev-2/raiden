@@ -38,7 +38,7 @@ func (q *Query) Count(opts ...CountOptions) (int, error) {
 	headers["Range-Unit"] = "items"
 
 	var a interface{}
-	resp, err := PostgrestRequestBind(q.Context, fasthttp.MethodHead, url, nil, headers, q.ByPass, &a)
+	resp, err := PostgrestRequest(q.Context, q.credential, fasthttp.MethodHead, url, nil, headers, q.ByPass, &a)
 	if err != nil {
 		return 0, err
 	}

@@ -2,14 +2,18 @@ package raiden
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
 	"strings"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/oklog/run"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/pubsub/google"
+	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
 )
@@ -23,6 +27,26 @@ const (
 	PubSubProviderGoogle  PubSubProviderType = "google"
 	PubSubProviderUnknown PubSubProviderType = "unknown"
 )
+
+type SubscriptionType string
+
+const (
+	SubscriptionTypePull SubscriptionType = "pull"
+	SubscriptionTypePush SubscriptionType = "push"
+)
+
+const SubscriptionPrefixEndpoint = "pubsub-endpoint"
+
+type PushSubscriptionMessage struct {
+	Data         string `json:"data"`
+	MessageId    string `json:"message_id"`
+	Publish_time string `json:"publish_time"`
+}
+
+type PushSubscriptionData struct {
+	Message      PushSubscriptionMessage `json:"message"`
+	Subscription string                  `json:"subscription"`
+}
 
 // ----- Subscription Context -----
 type SubscriberContext interface {
@@ -51,11 +75,14 @@ func (ctx *subscriberContext) SetSpan(span trace.Span) {
 
 // ----- Subscription Handler -----
 type SubscriberHandler interface {
-	Name() string
-	Provider() PubSubProviderType
-	Topic() string
 	AutoAck() bool
+	Name() string
 	Consume(ctx SubscriberContext, message any) error
+	Provider() PubSubProviderType
+	PushEndpoint() string
+	Subscription() string
+	SubscriptionType() SubscriptionType
+	Topic() string
 }
 
 type SubscriberBase struct{}
@@ -72,8 +99,20 @@ func (s *SubscriberBase) Provider() PubSubProviderType {
 	return PubSubProviderUnknown
 }
 
+func (s *SubscriberBase) Subscription() string {
+	return ""
+}
+
+func (s *SubscriberBase) PushEndpoint() string {
+	return ""
+}
+
 func (s *SubscriberBase) Topic() string {
 	return ""
+}
+
+func (s *SubscriberBase) SubscriptionType() SubscriptionType {
+	return SubscriptionTypePull
 }
 
 func (s *SubscriberBase) Consume(ctx SubscriberContext, message any) error {
@@ -85,6 +124,8 @@ type PubSub interface {
 	Register(handler SubscriberHandler)
 	Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
 	Listen()
+	Serve(handle SubscriberHandler) (fasthttp.RequestHandler, error)
+	Handlers() []SubscriberHandler
 }
 
 func NewPubsub(config *Config, tracer trace.Tracer) PubSub {
@@ -116,6 +157,10 @@ func (s *PubSubManager) Register(handler SubscriberHandler) {
 	s.handlers = append(s.handlers, handler)
 }
 
+func (s *PubSubManager) Handlers() []SubscriberHandler {
+	return s.handlers
+}
+
 func (s *PubSubManager) GetHandlerCount() int {
 	return len(s.handlers)
 }
@@ -131,28 +176,106 @@ func (s *PubSubManager) SetProvider(providerType PubSubProviderType, provider Pu
 	}
 }
 
+func (s *PubSubManager) Serve(handler SubscriberHandler) (fasthttp.RequestHandler, error) {
+
+	if handler.SubscriptionType() != SubscriptionTypePush {
+		return nil, fmt.Errorf("subscription %s is not push subscription", handler.Name())
+	}
+
+	if err := s.provider.google.CreateSubscription(handler); err != nil {
+		return nil, err
+	}
+
+	subscriptionSignature := fmt.Sprintf("projects/%s/subscriptions/%s", s.config.GoogleProjectId, handler.Subscription())
+
+	return func(ctx *fasthttp.RequestCtx) {
+		var subCtx = subscriberContext{
+			cfg: s.config, Context: context.Background(),
+		}
+
+		ctx.SetContentType("application/json")
+
+		// validate data
+		var data PushSubscriptionData
+		if err := json.Unmarshal(ctx.Request.Body(), &data); err != nil {
+			errMsg := "{\"message\":\"invalid json data\"}"
+			if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error", handler.Name()), "message", writeErr)
+			}
+			return
+		}
+
+		if data.Subscription != subscriptionSignature {
+			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			errMsg := "{\"message\":\"subscription validation failed: received unexpected subscription name\"}"
+			if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error", handler.Name()), "message", writeErr)
+			}
+			return
+		}
+
+		response := map[string]any{"message": "success handle"}
+
+		if err := handler.Consume(&subCtx, data.Message); err != nil {
+			ctx.SetStatusCode(http.StatusInternalServerError)
+			response["message"] = err.Error()
+			resByte, err := json.Marshal(response)
+			if err != nil {
+				errMsg := "{\"message\":\"invalid json data\"}"
+				if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+					// Log the error if necessary
+					PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error", handler.Name()), "message", writeErr)
+				}
+				return
+			}
+
+			if _, err := ctx.Write(resByte); err != nil {
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.Write() error", handler.Name()), "message", err)
+			}
+			return
+		}
+
+		resByte, err := json.Marshal(response)
+		if err != nil {
+			errMsg := "{\"message\":\"invalid json data\"}"
+			if _, writeErr := ctx.WriteString(errMsg); writeErr != nil {
+				// Log the error if necessary
+				PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.WriteString() error in last step", handler.Name()), "message", writeErr)
+			}
+			return
+		}
+		if _, err := ctx.Write(resByte); err != nil {
+			PubSubLogger.Error(fmt.Sprintf("%s endpoint handler ctx.Write() error ins last step", handler.Name()), "message", err)
+		}
+	}, nil
+
+}
+
 // StartListen implements Subscriber.
 func (s *PubSubManager) Listen() {
 	var g run.Group
 
-	var googleHandlers []SubscriberHandler
+	var googlePullHandlers []SubscriberHandler
 	for _, h := range s.handlers {
-		if h.Provider() == PubSubProviderGoogle {
-			googleHandlers = append(googleHandlers, h)
+		if h.Provider() == PubSubProviderGoogle && h.SubscriptionType() == SubscriptionTypePull {
+			googlePullHandlers = append(googlePullHandlers, h)
 		}
 	}
 
-	g.Add(func() error {
-		return s.provider.google.StartListen(googleHandlers)
-	}, func(err error) {
-		if err := s.provider.google.StopListen(); err != nil {
-			PubSubLogger.Error("failed stop listener", "message", err)
-		}
-	})
+	if len(googlePullHandlers) > 0 {
+		g.Add(func() error {
+			return s.provider.google.StartListen(googlePullHandlers)
+		}, func(err error) {
+			if err := s.provider.google.StopListen(); err != nil {
+				PubSubLogger.Error("failed stop listener", "message", err)
+			}
+		})
 
-	if err := g.Run(); err != nil {
-		PubSubLogger.Error("stop subscribe", "message", err)
+		if err := g.Run(); err != nil {
+			PubSubLogger.Error("stop subscribe", "message", err)
+		}
 	}
+
 }
 
 func (s *PubSubManager) Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error {
@@ -166,6 +289,7 @@ func (s *PubSubManager) Publish(ctx context.Context, provider PubSubProviderType
 // ----- Pub Sub Provider -----
 type PubSubProvider interface {
 	Publish(ctx context.Context, topic string, message []byte) error
+	CreateSubscription(SubscriberHandler) error
 	StartListen(handler []SubscriberHandler) error
 	StopListen() error
 }
@@ -199,6 +323,53 @@ func (s *GooglePubSubProvider) createClient() error {
 	return nil
 }
 
+func (s *GooglePubSubProvider) CreateSubscription(handler SubscriberHandler) error {
+	if handler.SubscriptionType() != SubscriptionTypePush {
+		return fmt.Errorf("%s is not push subscription", handler.Name())
+	}
+
+	if handler.Topic() == "" {
+		return fmt.Errorf("topic in subscription %s ir required", handler.Name())
+	}
+
+	if handler.PushEndpoint() == "" {
+		return fmt.Errorf("push endpoint in subscription %s ir required", handler.Name())
+	}
+
+	if s.Config.ServerDns == "" {
+		return errors.New("the SERVER_DSN configuration is required when using the 'push' subscription type")
+	}
+
+	if s.Client == nil {
+		if err := s.createClient(); err != nil {
+			return err
+		}
+	}
+
+	t := s.Client.Topic(handler.Topic())
+
+	var endpoint string
+	if strings.HasPrefix("/", handler.PushEndpoint()) {
+		endpoint = fmt.Sprintf("%s/%s%s", s.Config.ServerDns, SubscriptionPrefixEndpoint, handler.PushEndpoint())
+	} else {
+		endpoint = fmt.Sprintf("%s/%s/%s", s.Config.ServerDns, SubscriptionPrefixEndpoint, handler.PushEndpoint())
+	}
+
+	_, err := s.Client.CreateSubscription(context.Background(), handler.Subscription(), pubsub.SubscriptionConfig{
+		Topic: t.GetInstance(),
+		PushConfig: pubsub.PushConfig{
+			Endpoint: endpoint,
+		},
+	})
+
+	if strings.Contains(err.Error(), "Resource already exists in the project") {
+		PubSubLogger.Info("google - subscription already exists in the project", "topic", handler.Topic(), "subscription-id", handler.Subscription())
+		return nil
+	}
+
+	return err
+}
+
 func (s *GooglePubSubProvider) StartListen(handler []SubscriberHandler) error {
 	if err := s.validate(); err != nil {
 		return err
@@ -212,8 +383,10 @@ func (s *GooglePubSubProvider) StartListen(handler []SubscriberHandler) error {
 
 	var group run.Group
 	for _, h := range handler {
-		sub := s.Client.Subscription(h.Topic())
-		group.Add(s.listen(sub, h), func(err error) {})
+		sub := s.Client.Subscription(h.Subscription())
+		group.Add(s.listen(sub, h), func(err error) {
+			os.Exit(1)
+		})
 	}
 
 	return group.Run()
@@ -238,7 +411,7 @@ func (s *GooglePubSubProvider) listen(subscription google.Subscription, handler 
 
 			// Process the received message
 			if err := handler.Consume(&subCtx, msg); err != nil {
-				PubSubLogger.Error("Failed consumer message", "topic", handler.Topic(), "message", string(msg.Data))
+				PubSubLogger.Error("Failed consumer message", "topic", handler.Subscription(), "message", string(msg.Data))
 			}
 
 			// Acknowledge the message

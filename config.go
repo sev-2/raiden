@@ -44,6 +44,7 @@ type Config struct {
 	ServiceKey               string           `mapstructure:"SERVICE_KEY"`
 	ServerHost               string           `mapstructure:"SERVER_HOST"`
 	ServerPort               string           `mapstructure:"SERVER_PORT"`
+	ServerDns                string           `mapstructure:"SERVER_DNS"`
 	SupabaseApiUrl           string           `mapstructure:"SUPABASE_API_URL"`
 	SupabaseApiBasePath      string           `mapstructure:"SUPABASE_API_BASE_PATH"`
 	SupabasePublicUrl        string           `mapstructure:"SUPABASE_PUBLIC_URL"`

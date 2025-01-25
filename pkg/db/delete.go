@@ -12,7 +12,7 @@ func (q *Query) Delete() error {
 	headers["Prefer"] = "return=representation"
 
 	var a interface{}
-	_, err := PostgrestRequestBind(q.Context, fasthttp.MethodDelete, url, nil, headers, q.ByPass, &a)
+	_, err := PostgrestRequest(q.Context, q.credential, fasthttp.MethodDelete, url, nil, headers, q.ByPass, &a)
 	if err != nil {
 		return err
 	}

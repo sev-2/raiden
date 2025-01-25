@@ -55,7 +55,7 @@ func (s *TestSubscriber) Provider() raiden.PubSubProviderType {
 	return raiden.PubSubProviderGoogle
 }
 
-func (s *TestSubscriber) Topic() string {
+func (s *TestSubscriber) Subscripbtion() string {
 	return "test.new-sub"
 }
 
