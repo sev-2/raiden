@@ -128,6 +128,9 @@ func (c *Ctx) Set(key string, value any) {
 }
 
 func (c *Ctx) Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error {
+	if c.pubSub == nil {
+		return errors.New("unable to publish because pubsub not initialize")
+	}
 	return c.pubSub.Publish(ctx, provider, topic, message)
 }
 

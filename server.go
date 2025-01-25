@@ -104,7 +104,7 @@ func (s *Server) configureRoute() {
 	}
 
 	if s.pubSub != nil {
-		s.Router.pubsub = s.pubSub
+		s.Router.pubSub = s.pubSub
 	}
 
 	// build router
