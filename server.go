@@ -163,6 +163,10 @@ func (s *Server) runScheduleServer() {
 		ss.SetTracer(s.tracer)
 	}
 
+	if s.pubSub != nil {
+		ss.SetPubsub(s.pubSub)
+	}
+
 	s.SchedulerServer = ss
 
 	// register job
@@ -215,9 +219,9 @@ func (s *Server) Run() {
 		}
 	}
 
-	s.runScheduleServer()
-
 	s.runSubscriberServer()
+
+	s.runScheduleServer()
 
 	// prepare server
 	s.configureHttpServer()

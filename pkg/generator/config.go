@@ -40,6 +40,7 @@ PG_META_URL: {{ .PgMetaUrl }}
 
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
+SERVER_DNS: {{ .ServerDns }}
 
 ENVIRONMENT: development
 VERSION: 1.0.0

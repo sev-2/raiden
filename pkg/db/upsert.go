@@ -28,7 +28,7 @@ func (q *Query) Upsert(payload []interface{}, opt UpsertOptions) error {
 	headers["Prefer"] = "resolution=" + opt.OnConflict
 
 	var a interface{}
-	_, err0 := PostgrestRequestBind(q.Context, fasthttp.MethodPost, url, jsonData, headers, q.ByPass, &a)
+	_, err0 := PostgrestRequest(q.Context, q.credential, fasthttp.MethodPost, url, jsonData, headers, q.ByPass, &a)
 	if err0 != nil {
 		return err0
 	}

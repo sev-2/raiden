@@ -97,7 +97,7 @@ func (c *Ctx) SetJobChan(jobChan chan JobParams) {
 
 func (c *Ctx) NewJobCtx() (JobContext, error) {
 	if c.jobChan != nil {
-		jobCtx := newJobCtx(c.config, c.jobChan, make(JobData))
+		jobCtx := newJobCtx(c.config, c.pubSub, c.jobChan, make(JobData))
 		spanCtx := trace.SpanContextFromContext(c.Context)
 		jobCtx.SetContext(trace.ContextWithSpanContext(context.Background(), spanCtx))
 		return jobCtx, nil

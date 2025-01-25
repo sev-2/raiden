@@ -8,6 +8,7 @@ import (
 
 // PubSubClient defines the methods required for Pub/Sub client interaction.
 type PubSubClient interface {
+	CreateSubscription(ctx context.Context, id string, cfg pubsub.SubscriptionConfig) (Subscription, error)
 	Subscription(id string) Subscription
 	Topic(id string) Topic
 	Close() error
@@ -22,6 +23,7 @@ type Subscription interface {
 // Topic defines the methods required for publishing messages.
 type Topic interface {
 	Publish(ctx context.Context, msg *pubsub.Message) PublishResult
+	GetInstance() *pubsub.Topic
 }
 
 // PublishResult abstracts the result of publishing a message.
@@ -35,6 +37,11 @@ type GooglePubSubClient struct {
 
 func (g *GooglePubSubClient) Subscription(id string) Subscription {
 	return &GoogleSubscription{subscription: g.Client.Subscription(id)}
+}
+
+func (g *GooglePubSubClient) CreateSubscription(ctx context.Context, id string, cfg pubsub.SubscriptionConfig) (Subscription, error) {
+	sub, err := g.Client.CreateSubscription(context.Background(), id, cfg)
+	return &GoogleSubscription{subscription: sub}, err
 }
 
 func (g *GooglePubSubClient) Topic(id string) Topic {
@@ -63,6 +70,10 @@ type GoogleTopic struct {
 
 func (g *GoogleTopic) Publish(ctx context.Context, msg *pubsub.Message) PublishResult {
 	return &GooglePublishResult{result: g.topic.Publish(ctx, msg)}
+}
+
+func (g *GoogleTopic) GetInstance() *pubsub.Topic {
+	return g.topic
 }
 
 type GooglePublishResult struct {
