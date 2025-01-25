@@ -172,6 +172,17 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 						}
 					}
 
+					// check index field
+					indexed := field.Tag.Get("indexed")
+					if len(indexed) > 0 {
+						rel.Index = &objects.Index{
+							Schema:     ei.Table.Schema,
+							Table:      rel.TargetTableName,
+							Name:       fmt.Sprintf("ix_%s_%s", rel.TargetTableName, rel.TargetColumnName),
+							Definition: fmt.Sprintf("CREATE INDEX ix_%s_%s ON %s(%s);", rel.TargetTableName, rel.TargetColumnName, rel.TargetTableName, rel.TargetColumnName),
+						}
+					}
+
 					ei.Table.Relationships = append(ei.Table.Relationships, rel)
 				}
 			}
