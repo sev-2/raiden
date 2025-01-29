@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"reflect"
+	"time"
 
+	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -40,6 +44,8 @@ type (
 		Get(key string) any
 
 		Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
+
+		HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
 	}
 
 	// The `Ctx` struct is a struct that implements the `Context` interface in the Raiden framework. It
@@ -159,6 +165,30 @@ func (c *Ctx) SendErrorWithCode(statusCode int, err error) error {
 		StatusCode: statusCode,
 		Code:       fasthttp.StatusMessage(statusCode),
 	}
+}
+
+func (c *Ctx) HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error {
+	if reflect.TypeOf(response).Kind() != reflect.Ptr {
+		return errors.New("response payload must be pointer")
+	}
+
+	byteData, err := net.SendRequest(method, url, body, timeout, func(req *http.Request) error {
+		currentHeaders := req.Header.Clone()
+		if len(headers) > 0 {
+			for k, v := range headers {
+				currentHeaders.Set(k, v)
+			}
+		}
+		req.Header = currentHeaders
+
+		return nil
+	}, nil)
+
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(byteData, response)
 }
 
 // The `WriteError` function is a method of the `Ctx` struct in the Raiden framework. It is responsible

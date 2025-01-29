@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/oklog/run"
+	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/pubsub/google"
 	"github.com/valyala/fasthttp"
@@ -53,6 +56,7 @@ type SubscriberContext interface {
 	Config() *Config
 	Span() trace.Span
 	SetSpan(span trace.Span)
+	HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
 }
 
 type subscriberContext struct {
@@ -71,6 +75,30 @@ func (ctx *subscriberContext) Span() trace.Span {
 
 func (ctx *subscriberContext) SetSpan(span trace.Span) {
 	ctx.span = span
+}
+
+func (c *subscriberContext) HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error {
+	if reflect.TypeOf(response).Kind() != reflect.Ptr {
+		return errors.New("response payload must be pointer")
+	}
+
+	byteData, err := net.SendRequest(method, url, body, timeout, func(req *http.Request) error {
+		currentHeaders := req.Header.Clone()
+		if len(headers) > 0 {
+			for k, v := range headers {
+				currentHeaders.Set(k, v)
+			}
+		}
+		req.Header = currentHeaders
+
+		return nil
+	}, nil)
+
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(byteData, response)
 }
 
 // ----- Subscription Handler -----
