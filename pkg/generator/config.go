@@ -23,7 +23,7 @@ DEPLOYMENT_TARGET: {{ .DeploymentTarget }}
 
 MODE: {{ .Mode }}
 
-{{if eq .Mode "bff"}}
+{{- if eq .Mode "bff"}}
 ACCESS_TOKEN: {{ .AccessToken }}
 ANON_KEY: {{ .AnonKey }}
 SERVICE_KEY: {{ .ServiceKey }}
@@ -31,13 +31,11 @@ SERVICE_KEY: {{ .ServiceKey }}
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
 SUPABASE_API_BASE_PATH: {{ .SupabaseApiBasePath }}
 SUPABASE_PUBLIC_URL: {{ .SupabasePublicUrl }}
-{{end}}
-
-{{if eq .Mode "svc"}}
+{{- end}}
+{{- if eq .Mode "svc"}}
 POSTGREST_URL: {{ .PostgRestUrl }}
 PG_META_URL: {{ .PgMetaUrl }}
-{{end}}
-
+{{- end}}
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
 SERVER_DNS: {{ .ServerDns }}
@@ -45,10 +43,8 @@ SERVER_DNS: {{ .ServerDns }}
 ENVIRONMENT: development
 VERSION: 1.0.0
 
-ALLOWED_TABLES: {{ .AllowedTables }}
-
+ALLOWED_TABLES: '{{ .AllowedTables }}'
 SCHEDULE_STATUS: '{{ .ScheduleStatus }}'
-
 {{- if ne .GoogleProjectId ""}}
 GOOGLE_PROJECT_ID: {{ .GoogleProjectId }}
 {{- end }}
