@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"time"
 
 	"github.com/sev-2/raiden"
 	"github.com/valyala/fasthttp"
@@ -29,6 +30,7 @@ type MockContext struct {
 	GetFn               func(key string) any
 	Data                map[string]any
 	PublishFn           func(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error
+	HttpRequestFn       func(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
 }
 
 func (c *MockContext) Ctx() context.Context {
@@ -101,4 +103,8 @@ func (c *MockContext) Set(key string, value any) {
 
 func (c *MockContext) Publish(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error {
 	return c.PublishFn(ctx, provider, topic, message)
+}
+
+func (c *MockContext) HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error {
+	return c.HttpRequestFn(method, url, body, headers, timeout, response)
 }
