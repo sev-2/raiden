@@ -469,6 +469,19 @@ func getBucketUrl(cfg *raiden.Config) string {
 	return fmt.Sprintf("%s/storage/v1/bucket", publicUrl)
 }
 
+func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get all types from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "types", func() ([]objects.Type, error) {
+			return cloud.GetTypes(cfg, includedSchemas)
+		})
+	}
+	SupabaseLogger.Debug("Get all types from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "types", func() ([]objects.Type, error) {
+		return meta.GetTypes(cfg, includedSchemas)
+	})
+}
+
 func decorateActionWithDataErr[T any](action, resource string, fetchFn func() (T, error)) (T, error) {
 	data, err := fetchFn()
 	if err != nil && (StorageLogger.GetLevel() != hclog.Trace && StorageLogger.GetLevel() != hclog.Debug) {

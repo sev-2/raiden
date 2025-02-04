@@ -71,6 +71,13 @@ func RegisterRole(list ...raiden.Role) {
 	registeredRoles = append(registeredRoles, list...)
 }
 
+// ----- Handle register types -----
+var registeredTypes []raiden.Type
+
+func RegisterTypes(list ...raiden.Type) {
+	registeredTypes = append(registeredTypes, list...)
+}
+
 // ----- Handle register models -----
 var RegisteredModels []any
 
@@ -183,6 +190,7 @@ func filterIsNativeRole(mapNativeRole map[string]raiden.Role, supabaseRole []obj
 func extractAppResource(f *Flags, latestState *state.State) (
 	extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult,
 	extractedRpc state.ExtractRpcResult, extractedStorage state.ExtractStorageResult,
+	extractedType state.ExtractTypeResult,
 	err error,
 ) {
 	if latestState == nil {
@@ -199,6 +207,13 @@ func extractAppResource(f *Flags, latestState *state.State) (
 	}
 
 	if f.All() || f.ModelsOnly {
+		ImportLogger.Debug("Start extract type")
+		extractedType, err = state.ExtractType(latestState.Types, registeredTypes, false)
+		if err != nil {
+			return
+		}
+		ImportLogger.Debug("Finish extract type")
+
 		ImportLogger.Debug("Start extract table")
 		extractedTable, err = state.ExtractTable(latestState.Tables, RegisteredModels)
 		if err != nil {

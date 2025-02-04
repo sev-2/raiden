@@ -116,7 +116,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	ApplyLogger.Info("extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, latestLocalState)
+	appTables, appRoles, appRpcFunctions, appStorage, _, err := extractAppResource(flags, latestLocalState)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,8 @@ func Apply(flags *Flags, config *raiden.Config) error {
 
 	if flags.All() || flags.ModelsOnly {
 		allowedTable := []string{}
-		if config.AllowedTables != "*" {
+
+		if config.Mode == raiden.SvcMode && config.AllowedTables != "*" {
 			allowedTable = strings.Split(config.AllowedTables, ",")
 		}
 

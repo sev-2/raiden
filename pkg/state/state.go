@@ -23,6 +23,7 @@ type (
 		Roles   []RoleState
 		Rpc     []RpcState
 		Storage []StorageState
+		Types   []TypeState
 	}
 
 	TableState struct {
@@ -90,6 +91,14 @@ type (
 		Existing []objects.Policy
 		New      []objects.Policy
 		Delete   []objects.Policy
+	}
+
+	TypeState struct {
+		Type       objects.Type
+		Name       string
+		TypePath   string
+		TypeStruct string
+		LastUpdate time.Time
 	}
 )
 
@@ -287,6 +296,61 @@ func (s *LocalState) FindStorage(storageId string) (index int, storageState Stor
 		}
 	}
 	return
+}
+
+func (s *LocalState) AddType(t TypeState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+	s.State.Types = append(s.State.Types, t)
+	s.NeedUpdate = true
+}
+
+func (s *LocalState) FindType(typeId int) (index int, tState TypeState, found bool) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	found = false
+
+	for i := range s.State.Types {
+		r := s.State.Types[i]
+
+		if r.Type.ID == typeId {
+			found = true
+			tState = r
+			index = i
+			return
+		}
+	}
+	return
+}
+
+func (s *LocalState) UpdateType(index int, state TypeState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	s.State.Types[index] = state
+	s.NeedUpdate = true
+}
+
+func (s *LocalState) DeleteType(typeId int) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	index := -1
+	for i := range s.State.Types {
+		r := s.State.Types[i]
+
+		if r.Type.ID == typeId {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return
+	}
+	s.State.Types = append(s.State.Types[:index], s.State.Types[index+1:]...)
+	s.NeedUpdate = true
 }
 
 func (s *LocalState) FindStorageByPermissionName(name string) (index int, storageState StorageState, found bool) {
