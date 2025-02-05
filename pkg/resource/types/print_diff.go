@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/fatih/color"
+	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -234,6 +235,45 @@ func GenerateDiffMessage(name string, diffType DiffType, updateType objects.Upda
 }
 
 // ----- diff change -----
+
+func GetDiffChangeMessage(items []MigrateItem) string {
+	newData := []string{}
+	deleteData := []string{}
+	updateData := []string{}
+
+	for i := range items {
+		item := items[i]
+
+		var name string
+		if item.NewData.Name != "" {
+			name = item.NewData.Name
+		} else if item.OldData.Name != "" {
+			name = item.OldData.Name
+		}
+
+		switch item.Type {
+		case migrator.MigrateTypeCreate:
+			newData = append(newData, fmt.Sprintf("- %s", name))
+		case migrator.MigrateTypeUpdate:
+			diffMessage, err := GenerateDiffChangeUpdateMessage(name, item)
+			if err != nil {
+				Logger.Error("print change type error", "msg", err.Error())
+				continue
+			}
+			updateData = append(updateData, diffMessage)
+		case migrator.MigrateTypeDelete:
+			deleteData = append(deleteData, fmt.Sprintf("- %s", name))
+		}
+	}
+
+	changeMsg, err := GenerateDiffChangeMessage(newData, updateData, deleteData)
+	if err != nil {
+		Logger.Error("print change type error", "msg", err.Error())
+		return ""
+	}
+	return changeMsg
+}
+
 const DiffChangeTemplate = `
   {{- if gt (len .NewData) 0}}
   New Type
@@ -276,7 +316,7 @@ func GenerateDiffChangeMessage(newData []string, updateData []string, deleteData
 	return buff.String(), nil
 }
 
-const DiffChangeUpdateTemplate = `  - Update Type {{ .Name }}
+const DiffChangeUpdateTemplate = `  - Update Role {{ .Name }}
   {{- if gt (len .ChangeItems) 0}}
       Change Configuration
       {{- range .ChangeItems}}
@@ -284,3 +324,48 @@ const DiffChangeUpdateTemplate = `  - Update Type {{ .Name }}
       {{- end }}
   {{- end -}}
   `
+
+func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, error) {
+	diffItems := item.MigrationItems
+
+	var changeMsgArr []string
+	for i := range diffItems.ChangeItems {
+		c := diffItems.ChangeItems[i]
+		switch c {
+		case objects.UpdateTypeName:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "name", item.OldData.Name, item.NewData.Name))
+		case objects.UpdateTypeSchema:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "schema", item.OldData.Schema, item.NewData.Schema))
+		case objects.UpdateTypeComment:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "comment", item.OldData.Comment, item.NewData.Comment))
+		case objects.UpdateTypeFormat:
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "format", item.OldData.Format, item.NewData.Format))
+		case objects.UpdateTypeEnums:
+			oldData := strings.Join(item.OldData.Enums, ",")
+			newData := strings.Join(item.NewData.Enums, ",")
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "enums", oldData, newData))
+		case objects.UpdateTypeAttributes:
+			oldData := strings.Join(item.OldData.Attributes, ",")
+			newData := strings.Join(item.NewData.Attributes, ",")
+			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "attributes", oldData, newData))
+		}
+	}
+
+	param := map[string]any{
+		"Name":        name,
+		"ChangeItems": changeMsgArr,
+	}
+
+	tmplInstance := template.New("generate diff change update")
+	tmpl, err := tmplInstance.Parse(DiffChangeUpdateTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing : %v", err)
+	}
+
+	var buff bytes.Buffer
+	if err := tmpl.Execute(&buff, param); err != nil {
+		return "", err
+	}
+
+	return buff.String(), nil
+}

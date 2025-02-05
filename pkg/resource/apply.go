@@ -17,6 +17,7 @@ import (
 	"github.com/sev-2/raiden/pkg/resource/rpc"
 	"github.com/sev-2/raiden/pkg/resource/storages"
 	"github.com/sev-2/raiden/pkg/resource/tables"
+	"github.com/sev-2/raiden/pkg/resource/types"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -31,6 +32,7 @@ type MigrateData struct {
 	Rpc      []rpc.MigrateItem
 	Policies []policies.MigrateItem
 	Storages []storages.MigrateItem
+	Types    []types.MigrateItem
 }
 
 // Migrate resource :
@@ -116,7 +118,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	ApplyLogger.Info("extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, _, err := extractAppResource(flags, latestLocalState)
+	appTables, appRoles, appRpcFunctions, appStorage, appTypes, err := extractAppResource(flags, latestLocalState)
 	if err != nil {
 		return err
 	}
@@ -202,6 +204,16 @@ func Apply(flags *Flags, config *raiden.Config) error {
 		} else {
 			migrateData.Policies = data
 		}
+	}
+
+	if len(appTypes.New) > 0 || len(appTypes.Existing) > 0 || len(appTypes.Delete) > 0 {
+		// bind app policies to resource
+		if data, err := types.BuildMigrateData(appTypes, resource.Types); err != nil {
+			return err
+		} else {
+			migrateData.Types = data
+		}
+
 	}
 
 	ApplyLogger.Info("finish build migrate data")
@@ -312,6 +324,19 @@ func Migrate(config *raiden.Config, importState *state.LocalState, projectPath s
 			defer w.Done()
 
 			errors := storages.Migrate(config, resource.Storages, stateChan, storages.ActionFunc)
+			if len(errors) > 0 {
+				eChan <- errors
+				return
+			}
+		}(&wg, errChan)
+	}
+
+	if len(resource.Types) > 0 {
+		wg.Add(1)
+		go func(w *sync.WaitGroup, eChan chan []error) {
+			defer w.Done()
+
+			errors := types.Migrate(config, resource.Types, stateChan, types.ActionFunc)
 			if len(errors) > 0 {
 				eChan <- errors
 				return
@@ -750,6 +775,39 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 					rState.LastUpdate = time.Now()
 					localState.UpdateStorage(fIndex, rState)
 				}
+			case *types.MigrateItem:
+				switch m.Type {
+				case migrator.MigrateTypeCreate:
+					if m.NewData.Name == "" {
+						continue
+					}
+					typeStruct := utils.SnakeCaseToPascalCase(m.NewData.Name)
+					typePath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.RoleDir, utils.ToSnakeCase(m.NewData.Name))
+
+					r := state.TypeState{
+						Type:       m.NewData,
+						TypePath:   typePath,
+						TypeStruct: typeStruct,
+						LastUpdate: time.Now(),
+					}
+
+					localState.AddType(r)
+				case migrator.MigrateTypeDelete:
+					if m.OldData.Name == "" {
+						continue
+					}
+					localState.DeleteType(m.OldData.ID)
+				case migrator.MigrateTypeUpdate:
+					fIndex, rState, found := localState.FindType(m.NewData.ID)
+					if !found {
+						continue
+					}
+
+					rState.Type = m.NewData
+					rState.LastUpdate = time.Now()
+					localState.UpdateType(fIndex, rState)
+				}
+
 			}
 		}
 		done <- localState.Persist()
@@ -759,25 +817,35 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 
 func PrintApplyChangeReport(migrateData MigrateData) {
 	diffMessage := []string{}
+
 	diffTable := tables.GetDiffChangeMessage(migrateData.Tables)
 	if len(diffTable) > 0 {
 		diffMessage = append(diffMessage, diffTable)
 	}
+
 	diffPolicy := policies.GetDiffChangeMessage(migrateData.Policies)
 	if len(diffPolicy) > 0 {
 		diffMessage = append(diffMessage, diffPolicy)
 	}
+
 	diffRole := roles.GetDiffChangeMessage(migrateData.Roles)
 	if len(diffRole) > 0 {
 		diffMessage = append(diffMessage, diffRole)
 	}
+
 	diffRpc := rpc.GetDiffChangeMessage(migrateData.Rpc)
 	if len(diffRpc) > 0 {
 		diffMessage = append(diffMessage, diffRpc)
 	}
+
 	diffStorage := storages.GetDiffChangeMessage(migrateData.Storages)
 	if len(diffStorage) > 0 {
 		diffMessage = append(diffMessage, diffStorage)
+	}
+
+	diffTypes := types.GetDiffChangeMessage(migrateData.Types)
+	if len(diffTypes) > 0 {
+		diffMessage = append(diffMessage, diffTypes)
 	}
 
 	if len(diffMessage) == 0 {

@@ -1,4 +1,4 @@
-package meta
+package pgmeta
 
 import (
 	"fmt"
@@ -14,7 +14,8 @@ import (
 
 func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, error) {
 	MetaLogger.Trace("start fetching types from meta")
-	url := fmt.Sprintf("%s%s/types", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+	url := fmt.Sprintf("%s/types", cfg.PgMetaUrl)
+
 	reqInterceptor := func(req *http.Request) error {
 		if len(includedSchemas) > 0 {
 			req.URL.Query().Set("included_schemas", strings.Join(includedSchemas, ","))
@@ -22,6 +23,7 @@ func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, err
 
 		return nil
 	}
+
 	rs, err := net.Get[[]objects.Type](url, net.DefaultTimeout, reqInterceptor, nil)
 	if err != nil {
 		err = fmt.Errorf("get types error : %s", err)
@@ -33,7 +35,7 @@ func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, err
 func GetTypeByName(cfg *raiden.Config, includedSchema []string, name string) (result objects.Type, err error) {
 	MetaLogger.Trace("start fetching type by name from meta")
 	sql := sql.GenerateTypeQuery(includedSchema, name) + " limit 1"
-	rs, err := ExecuteQuery[[]objects.Type](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Type](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get type error : %s", err)
 		return
@@ -55,7 +57,7 @@ func CreateType(cfg *raiden.Config, t objects.Type) (objects.Type, error) {
 		return objects.Type{}, nil
 	}
 
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return objects.Type{}, fmt.Errorf("create new type %s error : %s", t.Name, err)
 	}
@@ -71,7 +73,7 @@ func DeleteType(cfg *raiden.Config, t objects.Type) error {
 		return err
 	}
 
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete Type %s error : %s", t.Name, err)
 	}
@@ -86,7 +88,7 @@ func UpdateType(cfg *raiden.Config, t objects.Type) error {
 	if err != nil {
 		return err
 	}
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, updateSql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.PgMetaUrl, updateSql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update type %s error : %s", t.Name, err)
 	}

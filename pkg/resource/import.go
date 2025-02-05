@@ -251,7 +251,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 		if len(resource.Types) > 0 {
 			ImportLogger.Info("start generate types")
 			captureFunc := ImportDecorateFunc(resource.Types, func(item objects.Type, input generator.GenerateInput) bool {
-				if i, ok := input.BindData.(generator.GenerateRoleData); ok {
+				if i, ok := input.BindData.(generator.GenerateTypeData); ok {
 					if i.Name == item.Name {
 						return true
 					}
