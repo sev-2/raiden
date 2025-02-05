@@ -52,12 +52,8 @@ func GetTypeByName(cfg *raiden.Config, includedSchema []string, name string) (re
 func CreateType(cfg *raiden.Config, t objects.Type) (objects.Type, error) {
 	MetaLogger.Trace("start create type", "name", t.Name)
 	// Execute SQL Query
-	sql, err := query.BuildTypeQuery(query.TypeActionCreate, &t)
-	if err != nil {
-		return objects.Type{}, nil
-	}
-
-	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
+	sql, _ := query.BuildTypeQuery(query.TypeActionCreate, &t)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return objects.Type{}, fmt.Errorf("create new type %s error : %s", t.Name, err)
 	}
@@ -68,12 +64,9 @@ func CreateType(cfg *raiden.Config, t objects.Type) (objects.Type, error) {
 
 func DeleteType(cfg *raiden.Config, t objects.Type) error {
 	MetaLogger.Trace("start delete type", "name", t.Name)
-	sql, err := query.BuildTypeQuery(query.TypeActionDelete, &t)
-	if err != nil {
-		return err
-	}
+	sql, _ := query.BuildTypeQuery(query.TypeActionDelete, &t)
 
-	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete Type %s error : %s", t.Name, err)
 	}
@@ -84,11 +77,8 @@ func DeleteType(cfg *raiden.Config, t objects.Type) error {
 
 func UpdateType(cfg *raiden.Config, t objects.Type) error {
 	MetaLogger.Trace("start update type", "name", t.Name)
-	updateSql, err := query.BuildTypeQuery(query.TypeActionUpdate, &t)
-	if err != nil {
-		return err
-	}
-	_, err = ExecuteQuery[any](cfg.PgMetaUrl, updateSql, nil, nil, nil)
+	updateSql, _ := query.BuildTypeQuery(query.TypeActionUpdate, &t)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, updateSql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update type %s error : %s", t.Name, err)
 	}

@@ -68,6 +68,52 @@ func TestGetTypes_Err(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestGetTypesByName_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+	}
+
+	// Mock the response for the GetTypeByName call
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return nil, http.ErrServerClosed
+		},
+	)
+
+	// Call the function under test
+	_, err := pgmeta.GetTypeByName(cfg, []string{"public"}, "public")
+	// Assertions
+	assert.Error(t, err)
+}
+
+func TestGetTypesByName_ErrNoData(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+	}
+
+	// Mock the response for the GetTypeByName call
+	mockedTypesResponse := []objects.Type{}
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, mockedTypesResponse)
+		},
+	)
+
+	// Call the function under test
+	_, err := pgmeta.GetTypeByName(cfg, []string{"public"}, "public")
+
+	// Assertions
+	assert.Error(t, err)
+}
+
 func TestCreateType(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -115,6 +161,35 @@ func TestCreateType(t *testing.T) {
 	assert.Equal(t, "public", result.Schema)
 }
 
+func TestCreateType_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+	}
+
+	// Define the new table to be created
+	newType := objects.Type{
+		Name:   "test_type_1",
+		Schema: "public",
+	}
+
+	// Mock the response for the GetTypeByName call
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return nil, http.ErrServerClosed
+		},
+	)
+
+	// Call the function under test
+	_, err := pgmeta.CreateType(cfg, newType)
+
+	// Assertions
+	assert.Error(t, err)
+}
+
 func TestUpdateType(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -146,6 +221,34 @@ func TestUpdateType(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestUpdateType_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+	}
+
+	// Mock the response for the GetTableByName call
+	data1 := objects.Type{
+		Name:   "test_type_1",
+		Schema: "public",
+		Enums:  []string{"test_1", "test_2"},
+	}
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return nil, http.ErrServerClosed
+		},
+	)
+
+	// Call the function under test
+	err := pgmeta.UpdateType(cfg, data1)
+
+	// Assertions
+	assert.Error(t, err)
+}
+
 func TestDeleteType(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -175,4 +278,33 @@ func TestDeleteType(t *testing.T) {
 
 	// Assertions
 	assert.NoError(t, err)
+}
+
+func TestDeleteType_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+	}
+
+	// Mock the response for the GetTableByName call
+	data1 := objects.Type{
+		Name:   "test_type_1",
+		Schema: "public",
+		Enums:  []string{"test_1", "test_2"},
+	}
+
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return nil, http.ErrServerClosed
+		},
+	)
+
+	// Call the function under test
+	err := pgmeta.DeleteType(cfg, data1)
+
+	// Assertions
+	assert.Error(t, err)
 }

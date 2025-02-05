@@ -412,9 +412,6 @@ func (s *GooglePubSubProvider) StartListen(handler []SubscriberHandler) error {
 	var group run.Group
 	for _, h := range handler {
 		sub := s.Client.Subscription(h.Subscription())
-		if sub == nil {
-			continue
-		}
 		group.Add(s.listen(sub, h), func(err error) {
 			if err != nil {
 				slog.Error("s.listen()", "message", err.Error())

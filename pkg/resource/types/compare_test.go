@@ -36,9 +36,10 @@ func TestCompare(t *testing.T) {
 }
 
 func TestCompareList(t *testing.T) {
+	sourceComment := "source comment"
 	source := []objects.Type{
 		{
-			Name:       "type1",
+			Name:       "type1_updated",
 			Schema:     "public",
 			Format:     "",
 			Enums:      []string{"test_1", "test_2"},
@@ -46,11 +47,26 @@ func TestCompareList(t *testing.T) {
 			Comment:    nil,
 		},
 		{
-			Name:   "type2",
-			Schema: "auth",
+			Name:    "type2",
+			Schema:  "auth",
+			Comment: nil,
+		},
+		{
+			Name:       "type3",
+			Schema:     "auth",
+			Comment:    &sourceComment,
+			Attributes: []string{"attribute_1"},
+		},
+		{
+			Name:       "type4",
+			Schema:     "auth",
+			Comment:    &sourceComment,
+			Enums:      []string{"enum_x"},
+			Attributes: []string{"attribute_x"},
 		},
 	}
 
+	targetComment := "comment test"
 	target := []objects.Type{
 		{
 			Name:       "type1_updated",
@@ -61,25 +77,42 @@ func TestCompareList(t *testing.T) {
 			Comment:    nil,
 		},
 		{
-			Name:   "type2",
-			Schema: "public",
+			Name:       "type2",
+			Schema:     "public",
+			Comment:    &targetComment,
+			Attributes: []string{"attribute_1"},
+		},
+		{
+			Name:       "type3",
+			Schema:     "auth",
+			Comment:    &targetComment,
+			Attributes: []string{"attribute_1", "attribute_2"},
+		},
+		{
+			Name:       "type4",
+			Schema:     "auth",
+			Comment:    &sourceComment,
+			Enums:      []string{"enum_x"},
+			Attributes: []string{"attribute_x"},
 		},
 	}
 
 	diffResult, err := types.CompareList(source, target)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(diffResult))
-	assert.Equal(t, "type1", diffResult[0].SourceResource.Name)
-	assert.Equal(t, "type2", diffResult[0].TargetResource.Name)
+	assert.Equal(t, 4, len(diffResult))
+	assert.Equal(t, "type1_updated", diffResult[0].SourceResource.Name)
+	assert.Equal(t, "type4", diffResult[0].TargetResource.Name)
 }
 
 func TestCompareItem(t *testing.T) {
 	source := objects.Type{
-		Name: "type1",
+		Name:   "type1",
+		Schema: "public",
 	}
 
 	target := objects.Type{
-		Name: "type1_updated",
+		Name:   "type1_updated",
+		Schema: "auth",
 	}
 
 	diffResult := types.CompareItem(source, target)

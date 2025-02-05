@@ -45,6 +45,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	if err != nil {
 		return err
 	}
+
 	spResource.Tables = tables.AttachIndexAndAction(spResource.Tables, spResource.Indexes, spResource.RelationActions)
 
 	// create import state
@@ -57,11 +58,10 @@ func Import(flags *Flags, config *raiden.Config) error {
 
 	if config.Mode == raiden.SvcMode {
 		spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
-	}
-
-	if config.AllowedTables != "*" {
-		allowedTable := strings.Split(config.AllowedTables, ",")
-		spResource.Tables = filterAllowedTables(spResource.Tables, allowedTable...)
+		if config.AllowedTables != "*" {
+			allowedTable := strings.Split(config.AllowedTables, ",")
+			spResource.Tables = filterAllowedTables(spResource.Tables, allowedTable...)
+		}
 	}
 
 	ImportLogger.Trace("filter function by schema")
