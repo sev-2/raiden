@@ -38,16 +38,16 @@ func (*MockType) Comment() *string {
 }
 
 func TestExtractType(t *testing.T) {
-	roleStates := []state.TypeState{
-		{Type: objects.Type{Name: "existing_role"}},
-		{Type: objects.Type{Name: "test_role"}},
+	typeStates := []state.TypeState{
+		{Type: objects.Type{Name: "existing_type"}},
+		{Type: objects.Type{Name: "test_type"}},
 	}
 
 	appTypes := []raiden.Type{
 		&MockType{},
 	}
 
-	result, err := state.ExtractType(roleStates, appTypes)
+	result, err := state.ExtractType(typeStates, appTypes)
 	assert.NoError(t, err)
 	assert.Len(t, result.Existing, 0)
 	assert.Len(t, result.New, 1)
@@ -55,10 +55,10 @@ func TestExtractType(t *testing.T) {
 }
 
 func TestBindToSupabaseType(t *testing.T) {
-	role := MockType{}
+	dataType := MockType{}
 	r := objects.Type{}
 
-	state.BindToSupabaseType(&r, &role)
+	state.BindToSupabaseType(&r, &dataType)
 	assert.Equal(t, "type_1", r.Name)
 	assert.Equal(t, "public", r.Schema)
 	assert.Equal(t, "", r.Format)
@@ -92,15 +92,31 @@ func TestBuildTypeFromState(t *testing.T) {
 func TestExtractTypeResult_ToDeleteFlatMap(t *testing.T) {
 	extractTypeResult := state.ExtractTypeResult{
 		Delete: []objects.Type{
-			{Name: "role1"},
-			{Name: "role2"},
+			{Name: "type1"},
+			{Name: "type2"},
 		},
 	}
 
 	mapData := extractTypeResult.ToDeleteFlatMap()
 	assert.Len(t, mapData, 2)
-	assert.Contains(t, mapData, "role1")
-	assert.Contains(t, mapData, "role2")
-	assert.Equal(t, "role1", mapData["role1"].Name)
-	assert.Equal(t, "role2", mapData["role2"].Name)
+	assert.Contains(t, mapData, "type1")
+	assert.Contains(t, mapData, "type2")
+	assert.Equal(t, "type1", mapData["type1"].Name)
+	assert.Equal(t, "type2", mapData["type2"].Name)
+}
+
+func TestExtractTypeResult_ToMap(t *testing.T) {
+	extractTypeResult := state.ExtractTypeResult{
+		Existing: []objects.Type{
+			{Name: "type1"},
+			{Name: "type2"},
+		},
+	}
+
+	mapData := extractTypeResult.ToMap()
+	assert.Len(t, mapData, 2)
+	assert.Contains(t, mapData, "type1")
+	assert.Contains(t, mapData, "type2")
+	assert.Equal(t, "type1", mapData["type1"].Name)
+	assert.Equal(t, "type2", mapData["type2"].Name)
 }
