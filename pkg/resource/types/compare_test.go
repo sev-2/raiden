@@ -10,13 +10,25 @@ import (
 
 func TestCompare(t *testing.T) {
 	source := []objects.Type{
-		{Name: "type4"},
-		{Name: "type4"},
+		{
+			Name:       "type1_updated",
+			Schema:     "public",
+			Format:     "",
+			Enums:      []string{"test_1", "test_2"},
+			Attributes: []string{"attribute_1"},
+			Comment:    nil,
+		},
 	}
 
 	target := []objects.Type{
-		{Name: "type3"},
-		{Name: "type4"},
+		{
+			Name:       "type1_updated",
+			Schema:     "public",
+			Format:     "",
+			Enums:      []string{"test_1", "test_2"},
+			Attributes: []string{"attribute_1"},
+			Comment:    nil,
+		},
 	}
 
 	err := types.Compare(source, target)
@@ -44,8 +56,8 @@ func TestCompareList(t *testing.T) {
 			Name:       "type1_updated",
 			Schema:     "public",
 			Format:     "",
-			Enums:      []string{"test_1", "test_2"},
-			Attributes: []string{},
+			Enums:      []string{"test_1", "test_2", "test_3"},
+			Attributes: []string{"attribute_1"},
 			Comment:    nil,
 		},
 		{

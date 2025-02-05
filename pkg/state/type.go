@@ -14,7 +14,7 @@ type ExtractTypeResult struct {
 	Delete   []objects.Type
 }
 
-func ExtractType(typeStates []TypeState, appTypes []raiden.Type, withNativeRole bool) (result ExtractTypeResult, err error) {
+func ExtractType(typeStates []TypeState, appTypes []raiden.Type) (result ExtractTypeResult, err error) {
 	mapTypeState := map[string]TypeState{}
 	for i := range typeStates {
 		r := typeStates[i]

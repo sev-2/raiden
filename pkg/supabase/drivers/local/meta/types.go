@@ -33,7 +33,7 @@ func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, err
 func GetTypeByName(cfg *raiden.Config, includedSchema []string, name string) (result objects.Type, err error) {
 	MetaLogger.Trace("start fetching type by name from meta")
 	sql := sql.GenerateTypeQuery(includedSchema, name) + " limit 1"
-	rs, err := ExecuteQuery[[]objects.Type](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Type](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("get type error : %s", err)
 		return
@@ -55,7 +55,7 @@ func CreateType(cfg *raiden.Config, t objects.Type) (objects.Type, error) {
 		return objects.Type{}, nil
 	}
 
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return objects.Type{}, fmt.Errorf("create new type %s error : %s", t.Name, err)
 	}
@@ -71,7 +71,7 @@ func DeleteType(cfg *raiden.Config, t objects.Type) error {
 		return err
 	}
 
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete Type %s error : %s", t.Name, err)
 	}
@@ -86,7 +86,7 @@ func UpdateType(cfg *raiden.Config, t objects.Type) error {
 	if err != nil {
 		return err
 	}
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, updateSql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), updateSql, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("update type %s error : %s", t.Name, err)
 	}

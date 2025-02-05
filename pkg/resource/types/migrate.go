@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/connector/pgmeta"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
@@ -65,7 +67,6 @@ func BuildMigrateData(extractedLocalData state.ExtractTypeResult, supabaseData [
 					break
 				}
 			}
-
 			if isExist {
 				migrateData = append(migrateData, MigrateItem{
 					Type:    migrator.MigrateTypeDelete,
@@ -74,6 +75,8 @@ func BuildMigrateData(extractedLocalData state.ExtractTypeResult, supabaseData [
 			}
 		}
 	}
+
+	fmt.Println("total : ", len(migrateData))
 	Logger.Info("finish build migrate type data")
 	return
 }

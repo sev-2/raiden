@@ -5,49 +5,51 @@ import (
 	"testing"
 
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/resource/rpc"
+	"github.com/sev-2/raiden/pkg/resource/types"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBuildMigrateData(t *testing.T) {
-	extractedLocalData := state.ExtractRpcResult{
-		New: []objects.Function{
-			{Name: "function4"},
+	extractedLocalData := state.ExtractTypeResult{
+		New: []objects.Type{
+			{Name: "type_1"},
 		},
-		Existing: []objects.Function{
-			{Name: "function2"},
-			{Name: "function3"},
+		Existing: []objects.Type{
+			{Name: "type_2"},
+			{Name: "type_3"},
 		},
-		Delete: []objects.Function{
-			{Name: "function1"},
+		Delete: []objects.Type{
+			{Name: "type_4"},
 		},
 	}
 
-	supabaseRpcs := []objects.Function{
-		{Name: "function1"},
-		{Name: "function2"},
-		{Name: "function3"},
+	supabaseTypes := []objects.Type{
+		{Name: "type_1"},
+		{Name: "type_2"},
+		{Name: "type_4"},
 	}
 
-	migrateData, err := rpc.BuildMigrateData(extractedLocalData, supabaseRpcs)
+	migrateData, err := types.BuildMigrateData(extractedLocalData, supabaseTypes)
+
+	fmt.Printf("%+v", migrateData)
 	assert.NoError(t, err)
 	assert.Equal(t, 4, len(migrateData))
 }
 
 func TestBuildMigrateItem(t *testing.T) {
-	localRpcs := []objects.Function{
-		{Name: "function1"},
-		{Name: "function2"},
+	localTypes := []objects.Type{
+		{Name: "type_1"},
+		{Name: "type_2"},
 	}
 
-	supabaseRpcs := []objects.Function{
-		{Name: "function1"},
-		{Name: "function3"},
+	supabaseTypes := []objects.Type{
+		{Name: "type_1"},
+		{Name: "type_3"},
 	}
 
-	migrateData, err := rpc.BuildMigrateItem(supabaseRpcs, localRpcs)
+	migrateData, err := types.BuildMigrateItem(supabaseTypes, localTypes)
 	assert.NoError(t, err)
 	fmt.Println(migrateData)
 }
@@ -57,13 +59,13 @@ func TestMigrate(t *testing.T) {
 	stateChan := make(chan any)
 	defer close(stateChan)
 
-	migrateItems := []rpc.MigrateItem{
+	migrateItems := []types.MigrateItem{
 		{
 			Type:    "create",
-			NewData: objects.Function{Name: "function1"},
+			NewData: objects.Type{Name: "type_1"},
 		},
 	}
 
-	errors := rpc.Migrate(config, migrateItems, stateChan, rpc.ActionFunc)
+	errors := types.Migrate(config, migrateItems, stateChan, types.ActionFunc)
 	assert.Equal(t, 1, len(errors))
 }

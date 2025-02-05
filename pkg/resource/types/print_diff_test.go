@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/resource/types"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
@@ -93,68 +94,46 @@ func TestPrintDiff(t *testing.T) {
 }
 
 // TestGetDiffChangeMessage tests the GetDiffChangeMessage type
-// func TestGetDiffChangeMessage(t *testing.T) {
-// 	items := []types.MigrateItem{
-// 		{
-// 			Type:    migrator.MigrateTypeCreate,
-// 			NewData: objects.Type{Name: "new_type"},
-// 		},
-// 		{
-// 			Type: migrator.MigrateTypeUpdate,
-// 			NewData: objects.Type{
-// 				Name:              "source_type",
-// 				CanBypassRLS:      true,
-// 				CanCreateDB:       true,
-// 				CanCreateRole:     true,
-// 				CanLogin:          true,
-// 				Config:            map[string]interface{}{"key": "value"},
-// 				ConnectionLimit:   10,
-// 				InheritRole:       true,
-// 				IsReplicationRole: true,
-// 				IsSuperuser:       true,
-// 				ValidUntil:        &objects.SupabaseTime{},
-// 			},
-// 			OldData: objects.Type{
-// 				Name:              "target_type",
-// 				CanBypassRLS:      false,
-// 				CanCreateDB:       false,
-// 				CanCreateRole:     false,
-// 				CanLogin:          false,
-// 				Config:            map[string]interface{}{"key": "new-value"},
-// 				ConnectionLimit:   20,
-// 				InheritRole:       false,
-// 				IsReplicationRole: false,
-// 				IsSuperuser:       false,
-// 				ValidUntil:        &objects.SupabaseTime{},
-// 			},
-// 			MigrationItems: objects.UpdateDataType{
-// 				OldData: objects.Type{Name: "source_type"},
-// 				ChangeItems: []objects.UpdateRoleType{
-// 					objects.UpdateRoleName,
-// 					objects.UpdateRoleCanBypassRls,
-// 					objects.UpdateRoleCanCreateDb,
-// 					objects.UpdateRoleCanCreateRole,
-// 					objects.UpdateRoleCanLogin,
-// 					objects.UpdateRoleConfig,
-// 					objects.UpdateConnectionLimit,
-// 					objects.UpdateRoleInheritRole,
-// 					objects.UpdateRoleIsReplication,
-// 					objects.UpdateRoleIsSuperUser,
-// 					objects.UpdateRoleValidUntil,
-// 				},
-// 			},
-// 		},
-// 		{
-// 			Type:    migrator.MigrateTypeDelete,
-// 			OldData: objects.Type{Name: "delete_type"},
-// 		},
-// 	}
+func TestGetDiffChangeMessage(t *testing.T) {
+	items := []types.MigrateItem{
+		{
+			Type:    migrator.MigrateTypeCreate,
+			NewData: objects.Type{Name: "new_type"},
+		},
+		{
+			Type: migrator.MigrateTypeUpdate,
+			NewData: objects.Type{
+				Name:   "source_type",
+				Schema: "public",
+			},
+			OldData: objects.Type{
+				Name:   "new_type",
+				Schema: "auth",
+			},
+			MigrationItems: objects.UpdateTypeParam{
+				OldData: objects.Type{
+					Name:   "new_type",
+					Schema: "auth",
+				},
+				ChangeItems: []objects.UpdateDataType{
+					objects.UpdateTypeName,
+					objects.UpdateTypeEnums,
+					objects.UpdateTypeAttributes,
+					objects.UpdateTypeComment,
+				},
+			},
+		},
+		{
+			Type:    migrator.MigrateTypeDelete,
+			OldData: objects.Type{Name: "delete_type"},
+		},
+	}
 
-// 	diffMessage := types.GetDiffChangeMessage(items)
-// 	assert.Contains(t, diffMessage, "New Type"
-// 	assert.Contains(t, diffMessage, "Update Type")
-// 	assert.Contains(t, diffMessage, "Delete Type")
-// }
+	diffMessage := types.GetDiffChangeMessage(items)
+	assert.Contains(t, diffMessage, "New Type")
+	assert.Contains(t, diffMessage, "Update Type")
+	assert.Contains(t, diffMessage, "Delete Type")
+}
 
 // TestGenerateDiffMessage tests the GenerateDiffMessage type
 func TestGenerateDiffMessage(t *testing.T) {

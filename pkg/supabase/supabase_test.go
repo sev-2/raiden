@@ -1666,3 +1666,257 @@ func TestDeleteBucket_All(t *testing.T) {
 	err := supabase.DeleteBucket(cfg, objects.Bucket{})
 	assert.Error(t, err)
 }
+
+func TestGetTypes_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetTypes(cfg, []string{"public"})
+	assert.Error(t, err)
+
+	remoteTypes := []objects.Type{
+		{
+			ID:   1,
+			Name: "some-type",
+		},
+		{
+			ID:   2,
+			Name: "another-type",
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTypesWithExpectedResponse(200, remoteTypes)
+	assert.NoError(t, err0)
+
+	types, err1 := supabase.GetTypes(cfg, []string{"public"})
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteTypes), len(types))
+}
+
+func TestGetTypes_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetTypes(cfg, []string{"public"})
+	assert.Error(t, err)
+
+	remoteTypes := []objects.Type{
+		{
+			ID:   1,
+			Name: "some-type",
+		},
+		{
+			ID:   2,
+			Name: "another-type",
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTypesWithExpectedResponse(200, remoteTypes)
+	assert.NoError(t, err0)
+
+	types, err1 := supabase.GetTypes(cfg, []string{"public"})
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteTypes), len(types))
+}
+
+func TestGetTypeByName_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetTypeByName(cfg, []string{"public"}, "some-type")
+	assert.Error(t, err)
+
+	remoteType := objects.Type{
+		ID:   1,
+		Name: "some-type",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTypeByNameWithExpectedResponse(200, remoteType)
+	assert.NoError(t, err0)
+
+	dataType, err1 := supabase.GetTypeByName(cfg, []string{"public"}, "some-type")
+	assert.NoError(t, err1)
+	assert.Equal(t, remoteType.Name, dataType.Name)
+}
+
+func TestGetTypeByName_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetTypeByName(cfg, []string{"public"}, "some-type")
+	assert.Error(t, err)
+
+	remoteType := objects.Type{
+		ID:   1,
+		Name: "some-type",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTypeByNameWithExpectedResponse(200, remoteType)
+	assert.NoError(t, err0)
+
+	dataType, err1 := supabase.GetTypeByName(cfg, []string{"public"}, "some-type")
+	assert.NoError(t, err1)
+	assert.Equal(t, remoteType.Name, dataType.Name)
+}
+
+func TestCreateType_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.CreateType(cfg, objects.Type{})
+	assert.Error(t, err)
+
+	localType := objects.Type{
+		Name: "some-type",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockCreateTypeWithExpectedResponse(200, localType)
+	assert.NoError(t, err0)
+
+	createdType, err1 := supabase.CreateType(cfg, localType)
+	assert.NoError(t, err1)
+	assert.Equal(t, localType.Name, createdType.Name)
+}
+
+func TestCreateType_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.CreateType(cfg, objects.Type{})
+	assert.Error(t, err)
+
+	localType := objects.Type{
+		Name: "some-type",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockCreateTypeWithExpectedResponse(200, localType)
+	assert.NoError(t, err0)
+
+	createdType, err1 := supabase.CreateType(cfg, localType)
+	assert.NoError(t, err1)
+	assert.Equal(t, localType.Name, createdType.Name)
+}
+
+func TestUpdateType_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.UpdateType(cfg, objects.Type{})
+	assert.Error(t, err)
+
+	var validUntil = objects.NewSupabaseTime(time.Now())
+
+	_, errT := validUntil.MarshalJSON()
+	assert.NoError(t, errT)
+
+	localType := objects.Type{
+		Name:       "some-type",
+		Schema:     "public",
+		Format:     "",
+		Enums:      []string{"test_1"},
+		Attributes: []string{},
+		Comment:    nil,
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateTypeWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateType(cfg, localType)
+	assert.NoError(t, err1)
+}
+
+// Type Test
+
+func TestUpdateType_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.UpdateType(cfg, objects.Type{})
+	assert.Error(t, err)
+
+	var validUntil = objects.NewSupabaseTime(time.Now())
+
+	_, errT := validUntil.MarshalJSON()
+	assert.NoError(t, errT)
+
+	localType := objects.Type{
+		Name:       "some-type",
+		Schema:     "public",
+		Format:     "",
+		Enums:      []string{"test_1"},
+		Attributes: []string{},
+		Comment:    nil,
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateTypeWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateType(cfg, localType)
+	assert.NoError(t, err1)
+}
+
+func TestDeleteType_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	err := supabase.DeleteType(cfg, objects.Type{})
+	assert.Error(t, err)
+
+	localType := objects.Type{
+		Name: "some-type",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteTypeWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteType(cfg, localType)
+	assert.NoError(t, err1)
+}
+
+func TestDeleteType_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	err := supabase.DeleteType(cfg, objects.Type{})
+	assert.Error(t, err)
+
+	localType := objects.Type{
+		Name: "some-type",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockDeleteTypeWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.DeleteType(cfg, localType)
+	assert.NoError(t, err1)
+}

@@ -208,7 +208,7 @@ func extractAppResource(f *Flags, latestState *state.State) (
 
 	if f.All() || f.ModelsOnly {
 		ImportLogger.Debug("Start extract type")
-		extractedType, err = state.ExtractType(latestState.Types, registeredTypes, false)
+		extractedType, err = state.ExtractType(latestState.Types, registeredTypes)
 		if err != nil {
 			return
 		}
