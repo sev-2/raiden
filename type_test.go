@@ -34,12 +34,13 @@ func TestTypeBase_Enums(t *testing.T) {
 
 func TestTypeBase_Attribute(t *testing.T) {
 	typeBase := raiden.TypeBase{}
-	assert.Equal(t, false, typeBase.Attributes())
+	assert.Equal(t, 0, len(typeBase.Attributes()))
 }
 
 func TestTypeBase_Comment(t *testing.T) {
 	typeBase := raiden.TypeBase{}
-	assert.Equal(t, nil, typeBase.Comment())
+	var expected *string
+	assert.EqualValues(t, expected, typeBase.Comment())
 }
 
 func TestTypeBase_Value(t *testing.T) {
