@@ -166,7 +166,7 @@ func MapTableAttributes(projectName string, table objects.Table, mapDataType map
 		var userDataType *objects.Type
 
 		// check data type
-		if c.DataType == "USER-DEFINED" && mapDataType != nil {
+		if c.DataType == string(postgres.UserDefined) && mapDataType != nil {
 			dataType, exist := mapDataType[c.Format]
 			if exist {
 				userDataType = &dataType

@@ -10,6 +10,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
+	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -486,7 +487,18 @@ func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, err
 				}
 				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %v >>> %v", "default value", oldValue, newValue))
 			case objects.UpdateColumnDataType:
-				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %v >>> %v", "data type", oldColumn.DataType, newColum.DataType))
+				oldDataType := oldColumn.DataType
+				newDataType := newColum.DataType
+
+				if oldDataType == string(postgres.UserDefined) {
+					oldDataType = oldColumn.Format
+				}
+
+				if newDataType == string(postgres.UserDefined) {
+					newDataType = newColum.Format
+				}
+
+				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %v >>> %v", "data type", oldDataType, newDataType))
 			case objects.UpdateColumnUnique:
 				updateItemArr = append(updateItemArr, fmt.Sprintf("- %s : %t >>> %t", "is unique", oldColumn.IsUnique, newColum.IsUnique))
 			case objects.UpdateColumnNullable:

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/supabase/query/sql"
 )
@@ -188,10 +189,16 @@ func BuildUpdateColumnQuery(oldColumn, newColumn objects.Column, updateItem obje
 				)
 			}
 		case objects.UpdateColumnDataType:
+			dataType := newColumn.DataType
+
+			if dataType == string(postgres.UserDefined) {
+				dataType = newColumn.Format
+			}
+
 			sqlStatements = append(
 				sqlStatements,
 				fmt.Sprintf(
-					"%s ALTER COLUMN %s SET DATA TYPE %s USING %s::%s;", alter, oldColumn.Name, newColumn.DataType, oldColumn.Name, newColumn.DataType,
+					"%s ALTER COLUMN %s SET DATA TYPE %s USING %s::%s;", alter, oldColumn.Name, dataType, oldColumn.Name, dataType,
 				),
 			)
 		case objects.UpdateColumnUnique:
@@ -352,7 +359,12 @@ func buildColumnDef(column objects.Column) (string, error) {
 		isUniqueClause = "UNIQUE"
 	}
 
-	q := fmt.Sprintf("%s %s %s %s %s", column.Name, column.DataType, defaultValueClause, isNullableClause, isUniqueClause)
+	dataType := column.DataType
+	if dataType == string(postgres.UserDefined) {
+		dataType = column.Format
+	}
+
+	q := fmt.Sprintf("%s %s %s %s %s", column.Name, dataType, defaultValueClause, isNullableClause, isUniqueClause)
 	return q, nil
 }
 

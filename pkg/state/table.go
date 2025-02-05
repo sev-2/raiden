@@ -111,7 +111,7 @@ func buildTableFromModel(model any, mapDataType map[string]objects.Type) (ei Ext
 				if c.DataType == string(postgres.TextType) {
 					_, exist := mapDataType[ct.Type]
 					if exist {
-						c.DataType = "USER-DEFINED"
+						c.DataType = string(postgres.UserDefined)
 						c.Format = ct.Type
 					}
 				}
@@ -274,7 +274,7 @@ func buildTableFromState(model any, mapDataType map[string]objects.Type, state T
 				if c.DataType == string(postgres.TextType) {
 					_, exist := mapDataType[ct.Type]
 					if exist {
-						c.DataType = "USER-DEFINED"
+						c.DataType = string(postgres.UserDefined)
 						c.Format = ct.Type
 					}
 				}
