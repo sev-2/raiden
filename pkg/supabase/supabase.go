@@ -469,6 +469,71 @@ func getBucketUrl(cfg *raiden.Config) string {
 	return fmt.Sprintf("%s/storage/v1/bucket", publicUrl)
 }
 
+func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get all types from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "types", func() ([]objects.Type, error) {
+			return cloud.GetTypes(cfg, includedSchemas)
+		})
+	}
+	SupabaseLogger.Debug("Get all types from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "types", func() ([]objects.Type, error) {
+		return meta.GetTypes(cfg, includedSchemas)
+	})
+}
+
+func GetTypeByName(cfg *raiden.Config, includedSchemas []string, name string) (objects.Type, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get type by name from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "rpc", func() (objects.Type, error) {
+			return cloud.GetTypeByName(cfg, includedSchemas, name)
+		})
+	}
+	SupabaseLogger.Debug("Get type by name from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "rpc", func() (objects.Type, error) {
+		return meta.GetTypeByName(cfg, includedSchemas, name)
+	})
+}
+
+func CreateType(cfg *raiden.Config, t objects.Type) (objects.Type, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Create type from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("create", "rpc", func() (objects.Type, error) {
+			return cloud.CreateType(cfg, t)
+		})
+	}
+	SupabaseLogger.Debug("Create type from supabase pg-meta")
+	return decorateActionWithDataErr("create", "rpc", func() (objects.Type, error) {
+		return meta.CreateType(cfg, t)
+	})
+}
+
+func UpdateType(cfg *raiden.Config, t objects.Type) (err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Update type in supabase cloud", "name", t.Name, "project-id", cfg.ProjectId)
+		return decorateActionErr("update", "rpc", func() error {
+			return cloud.UpdateType(cfg, t)
+		})
+	}
+	SupabaseLogger.Debug("Update type in supabase pg-meta", "name", t.Name)
+	return decorateActionErr("update", "rpc", func() error {
+		return meta.UpdateType(cfg, t)
+	})
+}
+
+func DeleteType(cfg *raiden.Config, t objects.Type) (err error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Delete type in supabase cloud", "name", t.Name, "project-id", cfg.ProjectId)
+		return decorateActionErr("delete", "rpc", func() error {
+			return cloud.DeleteType(cfg, t)
+		})
+	}
+	SupabaseLogger.Debug("Delete type in supabase pg-meta", "name", t.Name)
+	return decorateActionErr("delete", "rpc", func() error {
+		return meta.DeleteType(cfg, t)
+	})
+}
+
 func decorateActionWithDataErr[T any](action, resource string, fetchFn func() (T, error)) (T, error) {
 	data, err := fetchFn()
 	if err != nil && (StorageLogger.GetLevel() != hclog.Trace && StorageLogger.GetLevel() != hclog.Debug) {

@@ -13,6 +13,7 @@ import (
 	"github.com/sev-2/raiden/pkg/resource/rpc"
 	"github.com/sev-2/raiden/pkg/resource/storages"
 	"github.com/sev-2/raiden/pkg/resource/tables"
+	"github.com/sev-2/raiden/pkg/resource/types"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -146,6 +147,16 @@ func TestApply(t *testing.T) {
 					},
 				},
 			},
+			Types: []state.TypeState{
+				{
+					Type: objects.Type{
+						Name:   "test_type",
+						Format: "test_type",
+						Schema: "public",
+						Enums:  []string{"test_1", "test_2"},
+					},
+				},
+			},
 		},
 	}
 
@@ -209,6 +220,16 @@ func TestMigrate(t *testing.T) {
 					Storage: objects.Bucket{
 						Name:   "test_bucket_policy",
 						Public: true,
+					},
+				},
+			},
+			Types: []state.TypeState{
+				{
+					Type: objects.Type{
+						Name:   "test_type",
+						Format: "test_type",
+						Schema: "public",
+						Enums:  []string{"test_1", "test_2"},
 					},
 				},
 			},
@@ -440,6 +461,52 @@ func TestMigrate(t *testing.T) {
 				OldData: objects.Bucket{
 					Name:   "test_bucket_deleted",
 					Public: true,
+				},
+			},
+		},
+		Types: []types.MigrateItem{
+			{
+				Type: migrator.MigrateTypeCreate,
+				NewData: objects.Type{
+					Name:   "test_type",
+					Format: "test_type",
+					Schema: "public",
+					Enums:  []string{"test_1", "test_2"},
+				},
+			},
+			{
+				Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Type{
+					Name:   "old_test_type",
+					Format: "old_test_type",
+					Schema: "public",
+					Enums:  []string{"test_1", "test_2"},
+				},
+				NewData: objects.Type{
+					Name:   "new_test_type",
+					Format: "new_test_type",
+					Schema: "public",
+					Enums:  []string{"test_1", "test_2"},
+				},
+				MigrationItems: objects.UpdateTypeParam{
+					OldData: objects.Type{
+						Name:   "old_test_type",
+						Format: "old_test_type",
+						Schema: "public",
+						Enums:  []string{"test_1", "test_2"},
+					},
+					ChangeItems: []objects.UpdateDataType{
+						objects.UpdateTypeName,
+					},
+				},
+			},
+			{
+				Type: migrator.MigrateTypeDelete,
+				OldData: objects.Type{
+					Name:   "delete_test_type",
+					Format: "delete_test_type",
+					Schema: "public",
+					Enums:  []string{"test_1", "test_2"},
 				},
 			},
 		},

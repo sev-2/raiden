@@ -1,5 +1,7 @@
 package sql
 
+import "fmt"
+
 var MapDefaultFunctionValue = map[string]bool{
 	"CURRENT_TIMESTAMP": true,
 	"CURRENT_DATE":      true,
@@ -59,3 +61,27 @@ where
     )
   )
 `
+
+func GenerateTypesQuery(includeSchemas []string) string {
+	if len(includeSchemas) == 0 {
+		includeSchemas = append(includeSchemas, "public")
+	}
+
+	filteredSql := GetTypesQuery + " and n.nspname %s"
+	return fmt.Sprintf(filteredSql, filterByList(includeSchemas, nil, nil))
+}
+
+func GenerateTypeQuery(includeSchemas []string, name string) string {
+	if len(includeSchemas) == 0 {
+		includeSchemas = append(includeSchemas, "public")
+	}
+
+	filteredSql := GetTypesQuery + " and n.nspname %s"
+	sql := fmt.Sprintf(filteredSql, filterByList(includeSchemas, nil, nil))
+
+	if name != "" {
+		sql = fmt.Sprintf("%s and t.typname = %s", sql, Literal(name))
+	}
+
+	return sql
+}

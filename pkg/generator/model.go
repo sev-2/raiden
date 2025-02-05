@@ -86,7 +86,7 @@ type {{ .StructName }} struct {
 `
 )
 
-func GenerateModels(basePath string, tables []*GenerateModelInput, generateFn GenerateFn) (err error) {
+func GenerateModels(basePath string, projectName string, tables []*GenerateModelInput, mapDataType map[string]objects.Type, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, ModelDir)
 	ModelLogger.Trace("create models folder if not exist", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -97,7 +97,7 @@ func GenerateModels(basePath string, tables []*GenerateModelInput, generateFn Ge
 
 	for i := range tables {
 		t := tables[i]
-		if err := GenerateModel(folderPath, t, generateFn); err != nil {
+		if err := GenerateModel(folderPath, projectName, t, mapDataType, generateFn); err != nil {
 			return err
 		}
 	}
@@ -105,7 +105,7 @@ func GenerateModels(basePath string, tables []*GenerateModelInput, generateFn Ge
 	return nil
 }
 
-func GenerateModel(folderPath string, input *GenerateModelInput, generateFn GenerateFn) error {
+func GenerateModel(folderPath string, projectName string, input *GenerateModelInput, mapDataType map[string]objects.Type, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
@@ -113,7 +113,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 	}
 
 	// map column data
-	columns, importsPath := MapTableAttributes(input.Table, input.ValidationTags)
+	columns, importsPath := MapTableAttributes(projectName, input.Table, mapDataType, input.ValidationTags)
 	rlsTag := BuildRlsTag(input.Policies, input.Table.Name, supabase.RlsTypeModel)
 	raidenPkgDbPath := "github.com/sev-2/raiden/pkg/db"
 	importsPath = append(importsPath, raidenPkgDbPath)
@@ -155,7 +155,7 @@ func GenerateModel(folderPath string, input *GenerateModelInput, generateFn Gene
 }
 
 // map table to column, map pg type to go type and get dependency import path
-func MapTableAttributes(table objects.Table, validationTags state.ModelValidationTag) (columns []GenerateModelColumn, importsPath []string) {
+func MapTableAttributes(projectName string, table objects.Table, mapDataType map[string]objects.Type, validationTags state.ModelValidationTag) (columns []GenerateModelColumn, importsPath []string) {
 	importsMap := make(map[string]any)
 	mapPrimaryKey := map[string]bool{}
 	for _, k := range table.PrimaryKeys {
@@ -163,10 +163,27 @@ func MapTableAttributes(table objects.Table, validationTags state.ModelValidatio
 	}
 
 	for _, c := range table.Columns {
+		var userDataType *objects.Type
+
+		// check data type
+		if c.DataType == string(postgres.UserDefined) && mapDataType != nil {
+			dataType, exist := mapDataType[c.Format]
+			if exist {
+				userDataType = &dataType
+			}
+		}
+
 		column := GenerateModelColumn{
 			Name: c.Name,
-			Tag:  buildColumnTag(c, mapPrimaryKey, validationTags),
-			Type: postgres.ToGoType(postgres.DataType(c.DataType), c.IsNullable),
+			Tag:  buildColumnTag(c, mapPrimaryKey, userDataType, validationTags),
+		}
+
+		if userDataType != nil {
+			column.Type = fmt.Sprintf("types.%s", utils.SnakeCaseToPascalCase(userDataType.Name))
+			typeImportPath := fmt.Sprintf("%s/internal/types", utils.ToGoModuleName(projectName))
+			importsMap[typeImportPath] = true
+		} else {
+			column.Type = postgres.ToGoType(postgres.DataType(c.DataType), c.IsNullable)
 		}
 
 		splitType := strings.Split(column.Type, ".")
@@ -192,6 +209,9 @@ func MapTableAttributes(table objects.Table, validationTags state.ModelValidatio
 	}
 
 	for key := range importsMap {
+		if key == "" {
+			continue
+		}
 		importsPath = append(importsPath, key)
 	}
 	sort.Strings(importsPath)
@@ -199,7 +219,7 @@ func MapTableAttributes(table objects.Table, validationTags state.ModelValidatio
 	return
 }
 
-func buildColumnTag(c objects.Column, mapPk map[string]bool, validationTags state.ModelValidationTag) string {
+func buildColumnTag(c objects.Column, mapPk map[string]bool, userDefinedType *objects.Type, validationTags state.ModelValidationTag) string {
 	var tags []string
 
 	// append json tag
@@ -218,9 +238,13 @@ func buildColumnTag(c objects.Column, mapPk map[string]bool, validationTags stat
 		fmt.Sprintf("name:%s", c.Name),
 	}
 
-	if postgres.IsValidDataType(c.DataType) {
-		pdType := postgres.GetPgDataTypeName(postgres.DataType(c.DataType), true)
-		columnTags = append(columnTags, "type:"+string(pdType))
+	if userDefinedType != nil {
+		columnTags = append(columnTags, "type:"+string(userDefinedType.Name))
+	} else {
+		if postgres.IsValidDataType(c.DataType) {
+			pdType := postgres.GetPgDataTypeName(postgres.DataType(c.DataType), true)
+			columnTags = append(columnTags, "type:"+string(pdType))
+		}
 	}
 
 	_, exist := mapPk[c.Name]

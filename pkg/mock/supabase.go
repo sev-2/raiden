@@ -190,6 +190,36 @@ func (m *MockSupabase) MockDeleteBucketsWithExpectedResponse(httpCode int) error
 	return registerMock(m.Cfg, actionType, method, url, httpCode, supabase.DefaultBucketSuccessResponse{})
 }
 
+func (m *MockSupabase) MockGetTypesWithExpectedResponse(httpCode int, types []objects.Type) error {
+	actionType, method, url := getMethodAndUrl(m.Cfg, "getTypes")
+
+	return registerMock(m.Cfg, actionType, method, url, httpCode, types)
+}
+
+func (m *MockSupabase) MockGetTypeByNameWithExpectedResponse(httpCode int, dataType objects.Type) error {
+	actionType, method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(m.Cfg, actionType, method, url, httpCode, []objects.Type{dataType})
+}
+
+func (m *MockSupabase) MockCreateTypeWithExpectedResponse(httpCode int, dataType objects.Type) error {
+	actionType, method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(m.Cfg, actionType, method, url, httpCode, []objects.Type{dataType})
+}
+
+func (m *MockSupabase) MockUpdateTypeWithExpectedResponse(httpCode int) error {
+	actionType, method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(m.Cfg, actionType, method, url, httpCode, objects.Type{})
+}
+
+func (m *MockSupabase) MockDeleteTypeWithExpectedResponse(httpCode int) error {
+	actionType, method, url := getMethodAndUrl(m.Cfg, "common")
+
+	return registerMock(m.Cfg, actionType, method, url, httpCode, objects.Type{})
+}
+
 func registerMock(cfg *raiden.Config, actionType string, method string, url string, httpCode int, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -214,6 +244,10 @@ func registerMock(cfg *raiden.Config, actionType string, method string, url stri
 		case "getFunctions":
 			httpmock.RegisterMatcherResponder(method, url,
 				httpmock.BodyContainsString("pg_namespace n on f.pronamespace = n.oid"),
+				httpmock.NewStringResponder(httpCode, string(jsonData)))
+		case "getTypes":
+			httpmock.RegisterMatcherResponder(method, url,
+				httpmock.BodyContainsString("typname as name"),
 				httpmock.NewStringResponder(httpCode, string(jsonData)))
 		}
 	}
@@ -250,18 +284,19 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 			if cfg.Mode == raiden.SvcMode {
 				url = fmt.Sprintf("%s/query", cfg.PgMetaUrl)
 			}
-			fmt.Println("condition 1 :", url)
 		}
 	} else {
 
 		switch actionType {
+		case "getTypes":
+			method = "GET"
+			url = fmt.Sprintf("%s%s/types", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 		case "getTables":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/tables", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 			if cfg.Mode == raiden.SvcMode {
 				url = fmt.Sprintf("%s/tables", cfg.PgMetaUrl)
 			}
-			fmt.Println("condition 2")
 		case "getRoles":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
@@ -277,7 +312,6 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 			if cfg.Mode == raiden.SvcMode {
 				url = fmt.Sprintf("%s/query", cfg.PgMetaUrl)
 			}
-			fmt.Println("condition 3")
 		case "getBuckets":
 			method = "GET"
 			url = fmt.Sprintf("%s/bucket", cfg.SupabaseApiUrl)
@@ -296,7 +330,6 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 			if cfg.Mode == raiden.SvcMode {
 				url = fmt.Sprintf("%s/query", cfg.PgMetaUrl)
 			}
-			fmt.Println("condition 4")
 		}
 	}
 

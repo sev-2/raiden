@@ -29,7 +29,7 @@ type ExtractTableResult struct {
 	Delete   ExtractTableItems
 }
 
-func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTableResult, err error) {
+func ExtractTable(tableStates []TableState, appTable []any, mapDataType map[string]objects.Type) (result ExtractTableResult, err error) {
 	var mapTableState = make(map[string]TableState)
 
 	for i := range tableStates {
@@ -42,12 +42,12 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 		ts, isExist := mapTableState[tableName]
 
 		if !isExist {
-			nt := buildTableFromModel(t)
+			nt := buildTableFromModel(t, mapDataType)
 			result.New = append(result.New, nt)
 			continue
 		}
 
-		tb := buildTableFromState(t, ts)
+		tb := buildTableFromState(t, mapDataType, ts)
 		result.Existing = append(result.Existing, tb)
 
 		delete(mapTableState, tableName)
@@ -72,7 +72,7 @@ func ExtractTable(tableStates []TableState, appTable []any) (result ExtractTable
 	return
 }
 
-func buildTableFromModel(model any) (ei ExtractTableItem) {
+func buildTableFromModel(model any, mapDataType map[string]objects.Type) (ei ExtractTableItem) {
 	modelType := reflect.TypeOf(model)
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
@@ -107,6 +107,15 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 				}
 
 				bindColumn(&field, &ct, &c)
+
+				if c.DataType == string(postgres.TextType) {
+					_, exist := mapDataType[ct.Type]
+					if exist {
+						c.DataType = string(postgres.UserDefined)
+						c.Format = ct.Type
+					}
+				}
+
 				ei.Table.Columns = append(ei.Table.Columns, c)
 
 				if ct.PrimaryKey {
@@ -187,7 +196,7 @@ func buildTableFromModel(model any) (ei ExtractTableItem) {
 	return
 }
 
-func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
+func buildTableFromState(model any, mapDataType map[string]objects.Type, state TableState) (ei ExtractTableItem) {
 	modelType := reflect.TypeOf(model)
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
@@ -261,6 +270,14 @@ func buildTableFromState(model any, state TableState) (ei ExtractTableItem) {
 				c.Schema = ei.Table.Schema
 
 				bindColumn(&field, &ct, &c)
+
+				if c.DataType == string(postgres.TextType) {
+					_, exist := mapDataType[ct.Type]
+					if exist {
+						c.DataType = string(postgres.UserDefined)
+						c.Format = ct.Type
+					}
+				}
 
 				if ct.PrimaryKey {
 					if pk, exist := mapPrimaryKey[c.Name]; exist {

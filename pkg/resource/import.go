@@ -14,6 +14,7 @@ import (
 	"github.com/sev-2/raiden/pkg/resource/rpc"
 	"github.com/sev-2/raiden/pkg/resource/storages"
 	"github.com/sev-2/raiden/pkg/resource/tables"
+	"github.com/sev-2/raiden/pkg/resource/types"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -44,6 +45,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	if err != nil {
 		return err
 	}
+
 	spResource.Tables = tables.AttachIndexAndAction(spResource.Tables, spResource.Indexes, spResource.RelationActions)
 
 	// create import state
@@ -53,11 +55,13 @@ func Import(flags *Flags, config *raiden.Config) error {
 	// filter table for with allowed schema
 	ImportLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
 	ImportLogger.Trace("filter table by schema")
-	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
 
-	if config.AllowedTables != "*" {
-		allowedTable := strings.Split(config.AllowedTables, ",")
-		spResource.Tables = filterAllowedTables(spResource.Tables, allowedTable...)
+	if config.Mode == raiden.SvcMode {
+		spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+		if config.AllowedTables != "*" {
+			allowedTable := strings.Split(config.AllowedTables, ",")
+			spResource.Tables = filterAllowedTables(spResource.Tables, allowedTable...)
+		}
 	}
 
 	ImportLogger.Trace("filter function by schema")
@@ -75,7 +79,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	ImportLogger.Info("extract data from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, err := extractAppResource(flags, localState)
+	appTables, appRoles, appRpcFunctions, appStorage, appType, err := extractAppResource(flags, localState)
 	if err != nil {
 		return err
 	}
@@ -91,6 +95,22 @@ func Import(flags *Flags, config *raiden.Config) error {
 	mapModelValidationTags := make(map[string]state.ModelValidationTag)
 
 	// compare resource
+	if (flags.All() || flags.ModelsOnly) && len(appType.Existing) > 0 {
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare types")
+		}
+		if err := types.Compare(spResource.Types, appType.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare types")
+		}
+	}
+
 	ImportLogger.Info("compare supabase resource and local resource")
 	if (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
 		if !flags.DryRun {
@@ -189,6 +209,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		Table:   tables.GetNewCountData(spResource.Tables, appTables),
 		Storage: storages.GetNewCountData(spResource.Storages, appStorage),
 		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
+		Types:   types.GetNewCountData(spResource.Types, appType),
 	}
 	if !flags.DryRun {
 		if flags.UpdateStateOnly {
@@ -226,6 +247,24 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		if len(resource.Types) > 0 {
+			ImportLogger.Info("start generate types")
+			captureFunc := ImportDecorateFunc(resource.Types, func(item objects.Type, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GenerateTypeData); ok {
+					if i.Name == item.Name {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+
+			if err := generator.GenerateTypes(projectPath, resource.Types, captureFunc); err != nil {
+				errChan <- err
+			}
+			ImportLogger.Info("finish generate types")
+		}
+
 		if len(resource.Tables) > 0 {
 			tableInputs := tables.BuildGenerateModelInputs(resource.Tables, resource.Policies, mapModelValidationTags)
 			ImportLogger.Info("start generate tables")
@@ -238,7 +277,13 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 				return false
 			}, stateChan)
 
-			if err := generator.GenerateModels(projectPath, tableInputs, captureFunc); err != nil {
+			var mapDataType = make(map[string]objects.Type)
+			for i := range resource.Types {
+				dataType := resource.Types[i]
+				mapDataType[dataType.Name] = dataType
+			}
+
+			if err := generator.GenerateModels(projectPath, config.ProjectName, tableInputs, mapDataType, captureFunc); err != nil {
 				errChan <- err
 			}
 			ImportLogger.Info("finish generate tables")
@@ -450,6 +495,14 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 						LastUpdate:    time.Now(),
 					}
 					localState.AddStorage(storageState)
+				case objects.Type:
+					typeState := state.TypeState{
+						Type:       parseItem,
+						TypePath:   genInput.OutputPath,
+						TypeStruct: utils.SnakeCaseToPascalCase(parseItem.Name),
+						LastUpdate: time.Now(),
+					}
+					localState.AddType(typeState)
 				}
 			}
 		}
@@ -464,6 +517,7 @@ type ImportReport struct {
 	Role    int
 	Rpc     int
 	Storage int
+	Types   int
 }
 
 func PrintImportReport(report ImportReport, dryRun bool) {

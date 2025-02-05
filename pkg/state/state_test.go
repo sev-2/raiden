@@ -232,6 +232,55 @@ func TestLocalState_DeleteStorage(t *testing.T) {
 	assert.Empty(t, localState.State.Storage)
 }
 
+func TestLocalState_AddType(t *testing.T) {
+	localState := &state.LocalState{}
+	dataType := state.TypeState{
+		Type: objects.Type{Name: "test_type"},
+	}
+
+	localState.AddType(dataType)
+	assert.Len(t, localState.State.Types, 1)
+	assert.True(t, localState.NeedUpdate)
+}
+
+func TestLocalState_FindType(t *testing.T) {
+	localState := &state.LocalState{}
+	dataType := state.TypeState{
+		Type: objects.Type{ID: 1, Name: "test_type"},
+	}
+	localState.AddType(dataType)
+
+	index, typeState, found := localState.FindType(1)
+	assert.True(t, found)
+	assert.Equal(t, 0, index)
+	assert.Equal(t, dataType, typeState)
+}
+
+func TestLocalState_UpdateType(t *testing.T) {
+	localState := &state.LocalState{}
+	dataType := state.TypeState{
+		Type: objects.Type{ID: 1, Name: "test_type"},
+	}
+	localState.AddType(dataType)
+
+	newType := state.TypeState{
+		Type: objects.Type{ID: 1, Name: "updated_type"},
+	}
+	localState.UpdateType(0, newType)
+	assert.Equal(t, "updated_type", localState.State.Types[0].Type.Name)
+}
+
+func TestLocalState_DeleteType(t *testing.T) {
+	localState := &state.LocalState{}
+	dataType := state.TypeState{
+		Type: objects.Type{ID: 1, Name: "test_type"},
+	}
+	localState.AddType(dataType)
+
+	localState.DeleteType(1)
+	assert.Empty(t, localState.State.Types)
+}
+
 func TestGetStateFilePath(t *testing.T) {
 	path, err := state.GetStateFilePath()
 	assert.NoError(t, err)

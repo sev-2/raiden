@@ -9,6 +9,7 @@ import (
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/mock"
+	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/resource"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -371,6 +372,122 @@ func TestImportRpcOnly(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/rpc"))
+
+	defer os.RemoveAll(dir)
+
+	errReset := state.Save(&state.State{})
+	assert.NoError(t, errReset)
+}
+
+type MockType struct {
+	raiden.TypeBase
+}
+
+func (*MockType) Name() string {
+	return "test_status"
+}
+
+func (*MockType) Format() string {
+	return "test_status"
+}
+
+func (*MockType) Schema() string {
+	return "public"
+}
+
+func TestImportModelsOnly(t *testing.T) {
+	flags := &resource.Flags{
+		ProjectPath: "test_project",
+		DryRun:      false,
+		ModelsOnly:  true,
+	}
+
+	config := loadConfig()
+	resource.ImportLogger = logger.HcLog().Named("import")
+
+	mock := &mock.MockSupabase{Cfg: config}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	dir, errDir := os.MkdirTemp("", "import")
+	assert.NoError(t, errDir)
+	flags.ProjectPath = dir
+
+	resource.RegisterTypes(&MockType{})
+
+	testState := state.State{
+		Tables: []state.TableState{
+			{
+				Table: objects.Table{
+					Name:        "test_local_table",
+					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+					Columns: []objects.Column{
+						{Name: "id", DataType: "uuid"},
+						{Name: "name", DataType: "text"},
+						{Name: "status", DataType: string(postgres.UserDefined), Format: "test_status", IsNullable: true},
+					},
+					Relationships: []objects.TablesRelationship{
+						{
+							ConstraintName:    "test_local_constraint",
+							SourceSchema:      "public",
+							SourceTableName:   "test_local_table",
+							SourceColumnName:  "id",
+							TargetTableSchema: "public",
+							TargetTableName:   "test_table",
+							TargetColumnName:  "id",
+						},
+					},
+				},
+			},
+		},
+		Types: []state.TypeState{
+			{
+				Type: objects.Type{
+					ID:     1,
+					Name:   "test_status",
+					Format: "test_status",
+					Schema: "public",
+				},
+				Name: "test_status",
+			},
+			{
+				Type: objects.Type{
+					ID:     2,
+					Name:   "delete_test_status",
+					Format: "delete_test_status",
+				},
+				Name: "test_status",
+			},
+		},
+	}
+
+	resource.RegisterModels(MockNewTable{}, MockOtherTable{})
+
+	errSaveState := state.Save(&testState)
+	assert.NoError(t, errSaveState)
+
+	err1 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
+		{ID: 1, Name: "test_local_table", Schema: "public"},
+		{ID: 2, Name: "other_table", Schema: "public"},
+		{ID: 3, Name: "other_table_again", Schema: "public"},
+		{ID: 4, Name: "completely_new_table", Schema: "public"},
+	})
+	assert.NoError(t, err1)
+
+	err2 := mock.MockGetTypesWithExpectedResponse(200, []objects.Type{
+		{
+			ID:     1,
+			Name:   "test_status",
+			Format: "test_status",
+			Schema: "public",
+		},
+	})
+	assert.NoError(t, err2)
+
+	err := resource.Import(flags, config)
+	assert.NoError(t, err)
+
+	assert.Equal(t, true, utils.IsFolderExists(dir+"/internal/models"))
 
 	defer os.RemoveAll(dir)
 

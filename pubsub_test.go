@@ -11,8 +11,6 @@ import (
 	"github.com/sev-2/raiden/pkg/pubsub/google"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/trace"
-	// Mock TracerProvider
-	// Core trace constructs
 )
 
 type pubsubHandler struct {
@@ -163,6 +161,8 @@ func TestGooglePubSubProvider_StartListen(t *testing.T) {
 			handlerCalled = true
 			return nil
 		},
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+		SubscriptionValue:     "test-topic",
 	}
 
 	// Create provider
@@ -207,6 +207,8 @@ func TestGooglePubSubProvider_StartListenErr(t *testing.T) {
 		ConsumeFunc: func(ctx raiden.SubscriberContext, msg any) error {
 			return nil
 		},
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+		SubscriptionValue:     "test-topic",
 	}
 
 	// Create provider
@@ -244,6 +246,8 @@ func TestGooglePubSubProvider_StartListenErrCancel(t *testing.T) {
 		ConsumeFunc: func(ctx raiden.SubscriberContext, msg any) error {
 			return nil
 		},
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+		SubscriptionValue:     "test-topic",
 	}
 
 	// Create provider
@@ -292,6 +296,8 @@ func TestGooglePubSubProvider_StartListenWithTrace(t *testing.T) {
 			handlerCalled = true
 			return nil
 		},
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+		SubscriptionValue:     "test-topic",
 	}
 
 	// Create provider

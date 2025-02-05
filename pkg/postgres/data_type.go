@@ -94,6 +94,8 @@ const (
 
 	// jsonbType represents the JSONB data type in PostgreSQL.
 	JsonbType DataType = "jsonb"
+
+	UserDefined DataType = "USER-DEFINED"
 )
 
 // ToGoType Convert postgres type to golang type

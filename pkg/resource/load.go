@@ -23,6 +23,7 @@ type Resource struct {
 	Storages        []objects.Bucket
 	Indexes         []objects.Index
 	RelationActions []objects.TablesRelationshipAction
+	Types           []objects.Type
 }
 
 // The Load function loads resources based on the provided flags and project ID, and returns a resource
@@ -37,25 +38,28 @@ func Load(flags *Flags, cfg *raiden.Config) (*Resource, error) {
 		switch rs := result.(type) {
 		case []objects.Table:
 			resource.Tables = rs
-			LoadLogger.Debug("Finish Get Table From Supabase")
+			LoadLogger.Debug("finish get Table from server")
 		case []objects.Role:
 			resource.Roles = rs
-			LoadLogger.Debug("Finish Get Role From Supabase")
+			LoadLogger.Debug("finish get Role from server")
 		case objects.Policies:
 			resource.Policies = rs
-			LoadLogger.Debug("Finish Get Policy From Supabase")
+			LoadLogger.Debug("finish get Policy from server")
 		case []objects.Function:
 			resource.Functions = rs
-			LoadLogger.Debug("Finish Get Function From Supabase")
+			LoadLogger.Debug("finish get Function from server")
 		case []objects.Bucket:
 			resource.Storages = rs
-			LoadLogger.Debug("Finish Get Bucket From Supabase")
+			LoadLogger.Debug("finish get Bucket from server")
 		case []objects.Index:
 			resource.Indexes = rs
-			LoadLogger.Debug("Finish Get Indexes From Supabase")
+			LoadLogger.Debug("finish get Indexes from server")
 		case []objects.TablesRelationshipAction:
 			resource.RelationActions = rs
-			LoadLogger.Debug("Finish Get Relation Action From Supabase")
+			LoadLogger.Debug("finish get Relation Action from server")
+		case []objects.Type:
+			resource.Types = rs
+			LoadLogger.Debug("finish get Type from server")
 		case error:
 			return nil, rs
 		}
@@ -77,7 +81,7 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 	if cfg.Mode == raiden.BffMode {
 		if flags.All() || flags.ModelsOnly || flags.StoragesOnly {
 			wg.Add(1)
-			LoadLogger.Debug("Get Policy From Supabase")
+			LoadLogger.Debug("get Policy from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) (objects.Policies, error) {
 				rs, e := supabase.GetPolicies(cfg)
 				if e != nil {
@@ -96,7 +100,7 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 			})
 
 			wg.Add(1)
-			LoadLogger.Debug("Get Role From Supabase")
+			LoadLogger.Debug("get Role from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
 				return supabase.GetRoles(cfg)
 			})
@@ -104,19 +108,25 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 
 		if flags.All() || flags.ModelsOnly {
 			wg.Add(1)
-			LoadLogger.Debug("Get Table From Supabase")
+			LoadLogger.Debug("get Types from server")
+			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Type, error) {
+				return supabase.GetTypes(cfg, []string{raiden.DefaultTypeSchema})
+			})
+
+			wg.Add(1)
+			LoadLogger.Debug("get Table from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
 				return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
 			})
 
 			wg.Add(1)
-			LoadLogger.Debug("Get Index From Supabase")
+			LoadLogger.Debug("get Index from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
 				return supabase.GetIndexes(cfg, supabase.DefaultIncludedSchema[0])
 			})
 
 			wg.Add(1)
-			LoadLogger.Debug("Get Table Relation Actions From Supabase")
+			LoadLogger.Debug("get Table Relation Actions from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
 				return supabase.GetTableRelationshipActions(cfg, supabase.DefaultIncludedSchema[0])
 			})
@@ -124,7 +134,7 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 
 		if flags.All() || flags.RolesOnly {
 			wg.Add(1)
-			LoadLogger.Debug("Get Role From Supabase")
+			LoadLogger.Debug("get Role from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
 				return supabase.GetRoles(cfg)
 			})
@@ -133,14 +143,20 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 		if flags.All() || flags.RpcOnly {
 			if flags.RpcOnly {
 				wg.Add(1)
-				LoadLogger.Debug("Get Table From Supabase")
+				LoadLogger.Debug("get Types from server")
+				go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Type, error) {
+					return supabase.GetTypes(cfg, []string{raiden.DefaultTypeSchema})
+				})
+
+				wg.Add(1)
+				LoadLogger.Debug("get Table from server")
 				go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
 					return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
 				})
 			}
 
 			wg.Add(1)
-			LoadLogger.Debug("Get Function From Supabase")
+			LoadLogger.Debug("get Function from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
 				return supabase.GetFunctions(cfg)
 			})
@@ -148,12 +164,19 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 
 		if flags.All() || flags.StoragesOnly {
 			wg.Add(1)
-			LoadLogger.Debug("Get Bucket From Supabase")
+			LoadLogger.Debug("get Bucket from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Bucket, error) {
 				return supabase.GetBuckets(cfg)
 			})
 		}
 	} else {
+
+		wg.Add(1)
+		LoadLogger.Debug("Get Type From Pg Meta")
+		go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Type, error) {
+			return pgmeta.GetTypes(cfg, []string{raiden.DefaultTypeSchema})
+		})
+
 		wg.Add(1)
 		LoadLogger.Debug("Get Table From Pg Meta")
 		go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {

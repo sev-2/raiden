@@ -21,14 +21,14 @@ func filterByList(include, exclude, defaultExclude []string) string {
 	return ""
 }
 
-func literal(s string) string {
+func Literal(s string) string {
 	return fmt.Sprintf("'%s'", s)
 }
 
 func mapToLiterals(strings []string) []string {
 	result := make([]string, len(strings))
 	for i, s := range strings {
-		result[i] = literal(s)
+		result[i] = Literal(s)
 	}
 	return result
 }

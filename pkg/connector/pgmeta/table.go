@@ -483,15 +483,3 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 func getRelationConstrainName(schema, table, foreignKey string) string {
 	return fmt.Sprintf("%s_%s_%s_fkey", schema, table, foreignKey)
 }
-
-// ---- Index -----
-func GetIndexes(cfg *raiden.Config, schema string) ([]objects.Index, error) {
-	MetaLogger.Trace("start fetching indexes from meta")
-	rs, err := ExecuteQuery[[]objects.Index](cfg.PgMetaUrl, sql.GenerateGetIndexQuery(schema), nil, nil, nil)
-	if err != nil {
-		err = fmt.Errorf("get indexes error : %s", err)
-		return []objects.Index{}, err
-	}
-	MetaLogger.Trace("finish fetching policy by name from meta")
-	return rs, nil
-}
