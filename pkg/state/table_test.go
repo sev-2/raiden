@@ -46,7 +46,7 @@ type Candidate struct {
 func TestExtractTable_NoRelation(t *testing.T) {
 	tableState := make([]state.TableState, 0)
 	appTable := []any{&Candidate{}}
-	rs, err := state.ExtractTable(tableState, appTable)
+	rs, err := state.ExtractTable(tableState, appTable, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(rs.Existing))
@@ -74,7 +74,7 @@ func TestExtractTable_NoRelation(t *testing.T) {
 func TestExtractTable_WithRelation(t *testing.T) {
 	tableState := make([]state.TableState, 0)
 	appTable := []any{&Submission{}}
-	rs, err := state.ExtractTable(tableState, appTable)
+	rs, err := state.ExtractTable(tableState, appTable, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(rs.Existing))
@@ -157,7 +157,7 @@ func TestExtractTable(t *testing.T) {
 	}
 
 	appTable := []any{&Submission{}}
-	result, err := state.ExtractTable(tableStates, appTable)
+	result, err := state.ExtractTable(tableStates, appTable, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(result.New))
 	assert.Equal(t, 1, len(result.Existing))

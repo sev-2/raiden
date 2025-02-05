@@ -215,7 +215,8 @@ func extractAppResource(f *Flags, latestState *state.State) (
 		ImportLogger.Debug("Finish extract type")
 
 		ImportLogger.Debug("Start extract table")
-		extractedTable, err = state.ExtractTable(latestState.Tables, RegisteredModels)
+		mapDataType := extractedType.ToMap()
+		extractedTable, err = state.ExtractTable(latestState.Tables, RegisteredModels, mapDataType)
 		if err != nil {
 			return
 		}

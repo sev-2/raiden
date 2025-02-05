@@ -169,6 +169,8 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 
 		// updateColumnItems = append(updateColumnItems, objects.UpdateColumnDefaultValue)
 		if sc.DataType != tc.DataType {
+			fmt.Println("[sc.DataType] : ", sc.DataType)
+			fmt.Println("[tc.DataType] : ", tc.DataType)
 			updateColumnItems = append(updateColumnItems, objects.UpdateColumnDataType)
 		}
 

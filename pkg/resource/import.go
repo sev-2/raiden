@@ -209,6 +209,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		Table:   tables.GetNewCountData(spResource.Tables, appTables),
 		Storage: storages.GetNewCountData(spResource.Storages, appStorage),
 		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
+		Types:   types.GetNewCountData(spResource.Types, appType),
 	}
 	if !flags.DryRun {
 		if flags.UpdateStateOnly {
@@ -276,7 +277,13 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 				return false
 			}, stateChan)
 
-			if err := generator.GenerateModels(projectPath, tableInputs, captureFunc); err != nil {
+			var mapDataType = make(map[string]objects.Type)
+			for i := range resource.Types {
+				dataType := resource.Types[i]
+				mapDataType[dataType.Name] = dataType
+			}
+
+			if err := generator.GenerateModels(projectPath, config.ProjectName, tableInputs, mapDataType, captureFunc); err != nil {
 				errChan <- err
 			}
 			ImportLogger.Info("finish generate tables")

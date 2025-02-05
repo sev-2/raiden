@@ -118,7 +118,7 @@ func GenerateType(folderPath string, t objects.Type, generateFn GenerateFn) erro
 
 	if len(t.Enums) > 0 {
 		enums := []string{}
-		for _, e := range enums {
+		for _, e := range t.Enums {
 			enums = append(enums, fmt.Sprintf("%q", e))
 		}
 		data.Enums = fmt.Sprintf("[]string{%s}", strings.Join(enums, ","))
@@ -126,7 +126,7 @@ func GenerateType(folderPath string, t objects.Type, generateFn GenerateFn) erro
 
 	if len(t.Attributes) > 0 {
 		attributes := []string{}
-		for _, e := range attributes {
+		for _, e := range t.Attributes {
 			attributes = append(attributes, fmt.Sprintf("%q", e))
 		}
 		data.Attributes = fmt.Sprintf("[]string{%s}", strings.Join(attributes, ","))

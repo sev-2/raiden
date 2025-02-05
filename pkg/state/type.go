@@ -75,3 +75,23 @@ func (er ExtractTypeResult) ToDeleteFlatMap() map[string]*objects.Type {
 
 	return mapData
 }
+
+func (er ExtractTypeResult) ToMap() map[string]objects.Type {
+	mapData := make(map[string]objects.Type)
+
+	if len(er.New) > 0 {
+		for i := range er.New {
+			r := er.New[i]
+			mapData[r.Name] = r
+		}
+	}
+
+	if len(er.Existing) > 0 {
+		for i := range er.Existing {
+			r := er.Existing[i]
+			mapData[r.Name] = r
+		}
+	}
+
+	return mapData
+}

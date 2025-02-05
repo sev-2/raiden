@@ -58,7 +58,7 @@ func TestGenerateModels(t *testing.T) {
 		},
 	}
 
-	err2 := generator.GenerateModels(dir, tables, generator.GenerateFn(generator.Generate))
+	err2 := generator.GenerateModels(dir, "test-project", tables, nil, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/models/test_table.go")
 }
