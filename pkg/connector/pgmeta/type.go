@@ -21,6 +21,10 @@ func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, err
 			req.URL.Query().Set("included_schemas", strings.Join(includedSchemas, ","))
 		}
 
+		if len(cfg.JwtToken) > 0 {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.JwtToken))
+		}
+
 		return nil
 	}
 
@@ -35,7 +39,7 @@ func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, err
 func GetTypeByName(cfg *raiden.Config, includedSchema []string, name string) (result objects.Type, err error) {
 	MetaLogger.Trace("start fetching type by name from meta")
 	sql := sql.GenerateTypeQuery(includedSchema, name) + " limit 1"
-	rs, err := ExecuteQuery[[]objects.Type](cfg.PgMetaUrl, sql, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Type](cfg.PgMetaUrl, sql, nil, DefaultAuthInterceptor(cfg.JwtToken), nil)
 	if err != nil {
 		err = fmt.Errorf("get type error : %s", err)
 		return
@@ -53,7 +57,7 @@ func CreateType(cfg *raiden.Config, t objects.Type) (objects.Type, error) {
 	MetaLogger.Trace("start create type", "name", t.Name)
 	// Execute SQL Query
 	sql, _ := query.BuildTypeQuery(query.TypeActionCreate, &t)
-	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, DefaultAuthInterceptor(cfg.JwtToken), nil)
 	if err != nil {
 		return objects.Type{}, fmt.Errorf("create new type %s error : %s", t.Name, err)
 	}
@@ -78,7 +82,7 @@ func DeleteType(cfg *raiden.Config, t objects.Type) error {
 func UpdateType(cfg *raiden.Config, t objects.Type) error {
 	MetaLogger.Trace("start update type", "name", t.Name)
 	updateSql, _ := query.BuildTypeQuery(query.TypeActionUpdate, &t)
-	_, err := ExecuteQuery[any](cfg.PgMetaUrl, updateSql, nil, nil, nil)
+	_, err := ExecuteQuery[any](cfg.PgMetaUrl, updateSql, nil, DefaultAuthInterceptor(cfg.JwtToken), nil)
 	if err != nil {
 		return fmt.Errorf("update type %s error : %s", t.Name, err)
 	}

@@ -69,8 +69,8 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 		}
 	}
 
+	Logger.Trace("net.request", "url", url)
 	Logger.Trace("net.request", "timeout", reqTimeout)
-	Logger.Trace("net.request", "headers", req.Header)
 	Logger.Trace("net.request", "body", string(body))
 
 	resp, err := GetClient().Do(req)

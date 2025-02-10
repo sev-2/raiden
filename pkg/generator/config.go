@@ -35,6 +35,7 @@ SUPABASE_PUBLIC_URL: {{ .SupabasePublicUrl }}
 {{- if eq .Mode "svc"}}
 POSTGREST_URL: {{ .PostgRestUrl }}
 PG_META_URL: {{ .PgMetaUrl }}
+JWT_TOKEN: {{ .JwtToken }}
 {{- end}}
 SERVER_HOST: {{ .ServerHost }}
 SERVER_PORT: {{ .ServerPort }}
