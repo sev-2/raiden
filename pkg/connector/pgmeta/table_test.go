@@ -21,6 +21,7 @@ func TestCreateTable(t *testing.T) {
 	cfg := &raiden.Config{
 		PgMetaUrl: "http://example.com",
 		ProjectId: "test_project",
+		JwtToken:  "meta token",
 	}
 
 	// Define the new table to be created
@@ -93,6 +94,7 @@ func TestGetTables(t *testing.T) {
 	cfg := &raiden.Config{
 		PgMetaUrl: "http://example.com",
 		ProjectId: "test_project",
+		JwtToken:  "meta token",
 	}
 
 	// Mock the response for the GetTableByName call
@@ -131,6 +133,7 @@ func TestUpdateTable(t *testing.T) {
 	cfg := &raiden.Config{
 		PgMetaUrl: "http://example.com",
 		ProjectId: "test_project",
+		JwtToken:  "meta token",
 	}
 
 	// Mock the response for the GetTableByName call
@@ -236,6 +239,7 @@ func TestUpdateTable_Err(t *testing.T) {
 	cfg := &raiden.Config{
 		PgMetaUrl: "http://example.com",
 		ProjectId: "test_project",
+		JwtToken:  "meta token",
 	}
 
 	// Mock the response for the GetTableByName call
@@ -307,6 +311,7 @@ func TestUpdateTable_RelationUpdate(t *testing.T) {
 	cfg := &raiden.Config{
 		PgMetaUrl: "http://example.com",
 		ProjectId: "test_project",
+		JwtToken:  "meta token",
 	}
 
 	// Mock the response for the GetTableByName call
@@ -474,6 +479,7 @@ func TestDeleteTable(t *testing.T) {
 	cfg := &raiden.Config{
 		PgMetaUrl: "http://example.com",
 		ProjectId: "test_project",
+		JwtToken:  "meta token",
 	}
 
 	// Mock the response for the GetTableByName call
