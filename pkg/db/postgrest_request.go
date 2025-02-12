@@ -77,12 +77,12 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 
 	if bypass {
 		if flag.Lookup("test.v") == nil {
-			if getConfig().Mode == raiden.SvcMode {
-				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
-			} else {
-				req.Header.Set("apikey", getConfig().ServiceKey)
-				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
-			}
+			req.Header.Set("apikey", getConfig().ServiceKey)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+		}
+
+		if getConfig() != nil && getConfig().Mode == raiden.SvcMode && getConfig().JwtToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
 		}
 	} else {
 		apikey := string(ctx.RequestContext().Request.Header.Peek("apikey"))
@@ -169,12 +169,12 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 
 	if bypass {
 		if flag.Lookup("test.v") == nil {
-			if getConfig().Mode == raiden.SvcMode {
-				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
-			} else {
-				req.Header.Set("apikey", getConfig().ServiceKey)
-				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
-			}
+			req.Header.Set("apikey", getConfig().ServiceKey)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+		}
+
+		if getConfig() != nil && getConfig().Mode == raiden.SvcMode && getConfig().JwtToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
 		}
 	} else {
 
