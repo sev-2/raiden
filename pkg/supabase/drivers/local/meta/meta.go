@@ -3,6 +3,7 @@ package meta
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/client/net"
@@ -15,6 +16,17 @@ var MetaLogger = logger.HcLog().Named("supabase.meta")
 type ExecuteQueryParam struct {
 	Query     string `json:"query"`
 	Variables any    `json:"variables"`
+}
+
+func DefaultInterceptor(cfg *raiden.Config) net.RequestInterceptor {
+	return func(req *http.Request) error {
+		if cfg.SupabaseApiToken != "" {
+			token := fmt.Sprintf("%s %s", cfg.SupabaseApiTokenType, cfg.SupabaseApiToken)
+			req.Header.Set("Authorization", token)
+		}
+
+		return nil
+	}
 }
 
 func ExecuteQuery[T any](baseUrl, query string, variables any, reqInterceptor net.RequestInterceptor, resInterceptor net.ResponseInterceptor) (result T, err error) {

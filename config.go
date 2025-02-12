@@ -22,6 +22,13 @@ const (
 	SvcMode Mode = "svc"
 )
 
+type TokenType string
+
+const (
+	TokenTypeBasic  TokenType = "basic"
+	TokenTypeBearer TokenType = "bearer"
+)
+
 type Config struct {
 	AccessToken              string           `mapstructure:"ACCESS_TOKEN"`
 	AnonKey                  string           `mapstructure:"ANON_KEY"`
@@ -48,6 +55,8 @@ type Config struct {
 	ServerDns                string           `mapstructure:"SERVER_DNS"`
 	SupabaseApiUrl           string           `mapstructure:"SUPABASE_API_URL"`
 	SupabaseApiBasePath      string           `mapstructure:"SUPABASE_API_BASE_PATH"`
+	SupabaseApiToken         string           `mapstructure:"SUPABASE_API_TOKEN"`
+	SupabaseApiTokenType     string           `mapstructure:"SUPABASE_API_TOKEN_TYPE"`
 	SupabasePublicUrl        string           `mapstructure:"SUPABASE_PUBLIC_URL"`
 	ScheduleStatus           ScheduleStatus   `mapstructure:"SCHEDULE_STATUS"`
 	TraceEnable              bool             `mapstructure:"TRACE_ENABLE"`

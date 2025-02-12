@@ -15,7 +15,7 @@ import (
 func GetPolicies(cfg *raiden.Config) ([]objects.Policy, error) {
 	MetaLogger.Trace("start fetching policies from meta")
 	url := fmt.Sprintf("%s%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := net.Get[[]objects.Policy](url, net.DefaultTimeout, nil, nil)
+	rs, err := net.Get[[]objects.Policy](url, net.DefaultTimeout, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
 	}
@@ -29,7 +29,7 @@ func GetPolicyByName(cfg *raiden.Config, name string) (result objects.Policy, er
 	sql := fmt.Sprintf(qTemplate, pq.QuoteLiteral(strings.ToLower(name)))
 
 	// logger.Trace("Get Policy by name - execute : ", sql)
-	rs, err := ExecuteQuery[[]objects.Policy](getBaseUrl(cfg), sql, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Policy](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		err = fmt.Errorf("get policy error : %s", err)
 		return
@@ -48,7 +48,7 @@ func CreatePolicy(cfg *raiden.Config, policy objects.Policy) (objects.Policy, er
 	sql := query.BuildCreatePolicyQuery(policy)
 
 	// Execute SQL Query
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return objects.Policy{}, fmt.Errorf("create new policy %s error : %s", policy.Name, err)
 	}
@@ -60,7 +60,7 @@ func UpdatePolicy(cfg *raiden.Config, policy objects.Policy, updatePolicyParams 
 	MetaLogger.Trace("start update policy", "name", policy.Name)
 	sql := query.BuildUpdatePolicyQuery(policy, updatePolicyParams)
 	// Execute SQL Query
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update policy %s error : %s", policy.Name, err)
 	}
@@ -73,7 +73,7 @@ func DeletePolicy(cfg *raiden.Config, policy objects.Policy) error {
 	sql := query.BuildDeletePolicyQuery(policy)
 
 	// execute delete
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("delete role %s error : %s", policy.Name, err)
 	}

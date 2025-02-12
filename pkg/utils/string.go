@@ -190,3 +190,8 @@ func CleanDoubleColonPattern(input string) string {
 	re := regexp.MustCompile(`::\w+`)
 	return re.ReplaceAllString(input, "")
 }
+
+func RemoveAllWhitespace(s string) string {
+	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(s, "")
+}

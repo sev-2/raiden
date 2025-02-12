@@ -8,6 +8,13 @@ import (
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
+type CompareMode string
+
+const (
+	CompareModeImport CompareMode = "import"
+	CompareModeApply  CompareMode = "apply"
+)
+
 type CompareDiffResult struct {
 	Name           string
 	SourceResource objects.Table
@@ -16,8 +23,8 @@ type CompareDiffResult struct {
 	IsConflict     bool
 }
 
-func Compare(source []objects.Table, target []objects.Table) error {
-	diffResult, err := CompareList(source, target)
+func Compare(mode CompareMode, source []objects.Table, target []objects.Table) error {
+	diffResult, err := CompareList(mode, source, target)
 	if err != nil {
 		return err
 	}
@@ -28,7 +35,7 @@ func Compare(source []objects.Table, target []objects.Table) error {
 	return PrintDiffResult(diffResult, sMapRelation, tMapRelation)
 }
 
-func CompareList(sourceTable, targetTable []objects.Table) (diffResult []CompareDiffResult, err error) {
+func CompareList(mode CompareMode, sourceTable, targetTable []objects.Table) (diffResult []CompareDiffResult, err error) {
 	mapTargetTable := make(map[int]objects.Table)
 	for i := range targetTable {
 		t := targetTable[i]
@@ -43,17 +50,18 @@ func CompareList(sourceTable, targetTable []objects.Table) (diffResult []Compare
 			continue
 		}
 
-		df := CompareItem(t, tt)
+		df := CompareItem(mode, t, tt)
 		if !df.IsConflict {
 			continue
 		}
+
 		diffResult = append(diffResult, df)
 	}
 
 	return
 }
 
-func CompareItem(source, target objects.Table) (diffResult CompareDiffResult) {
+func CompareItem(mode CompareMode, source, target objects.Table) (diffResult CompareDiffResult) {
 	var updateItem objects.UpdateTableParam
 
 	// create map pk for compare target pk with source pk
@@ -98,7 +106,7 @@ func CompareItem(source, target objects.Table) (diffResult CompareDiffResult) {
 	updateItem.ChangeColumnItems = compareColumns(source.Columns, target.Columns)
 
 	// compare relations
-	updateItem.ChangeRelationItems = compareRelations(&source, source.Relationships, target.Relationships)
+	updateItem.ChangeRelationItems = compareRelations(mode, &source, source.Relationships, target.Relationships)
 
 	if len(updateItem.ChangeItems) == 0 && len(updateItem.ChangeColumnItems) == 0 && len(updateItem.ChangeRelationItems) == 0 {
 		diffResult.IsConflict = false
@@ -207,7 +215,7 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 	return
 }
 
-func compareRelations(table *objects.Table, source, target []objects.TablesRelationship) (updateItems []objects.UpdateRelationItem) {
+func compareRelations(mode CompareMode, table *objects.Table, source, target []objects.TablesRelationship) (updateItems []objects.UpdateRelationItem) {
 	mapTargetRelation := make(map[string]objects.TablesRelationship)
 	for i := range target {
 		c := target[i]
@@ -238,7 +246,7 @@ func compareRelations(table *objects.Table, source, target []objects.TablesRelat
 			continue
 		}
 
-		if t.Index == nil && sc.Index == nil {
+		if t.Index == nil && sc.Index == nil && mode == CompareModeApply {
 			updateItems = append(updateItems, objects.UpdateRelationItem{
 				Data: sc,
 				Type: objects.UpdateRelationCreateIndex,

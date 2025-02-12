@@ -126,6 +126,15 @@ func SimpleConfigure() (*Config, error) {
 				return nil, err
 			}
 
+			if err := PromptSupabaseApiToken(config); err != nil {
+				return nil, err
+			}
+
+			if config.SupabaseApiTokenType != "" {
+				if err := PromptSupabaseApiTokenType(config); err != nil {
+					return nil, err
+				}
+			}
 			if err := PromptSupabasePublicUrl(config); err != nil {
 				return nil, err
 			}
@@ -376,6 +385,29 @@ func PromptSupabaseApiPath(c *Config) error {
 	}
 
 	c.SupabaseApiBasePath = inputText
+	return nil
+}
+
+func PromptSupabaseApiToken(c *Config) error {
+	input := textinput.New("Enter supabase api token (optional)")
+
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+
+	c.SupabaseApiToken = inputText
+	return nil
+}
+
+func PromptSupabaseApiTokenType(c *Config) error {
+	input := selection.New("Enter supabase api token type", []raiden.TokenType{raiden.TokenTypeBasic, raiden.TokenTypeBearer})
+	input.PageSize = 2
+	inputText, err := input.RunPrompt()
+	if err != nil {
+		return err
+	}
+	c.SupabaseApiTokenType = string(inputText)
 	return nil
 }
 

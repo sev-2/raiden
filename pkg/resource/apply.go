@@ -150,6 +150,12 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	ApplyLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
 	ApplyLogger.Trace("filter table by schema")
 	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	if config.Mode == raiden.BffMode {
+		if config.AllowedTables != "*" {
+			allowedTable := strings.Split(config.AllowedTables, ",")
+			resource.Tables = filterAllowedTables(resource.Tables, strings.Split(flags.AllowedSchema, ","), allowedTable...)
+		}
+	}
 	ApplyLogger.Trace("filter function by schema")
 	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
 	ApplyLogger.Debug("finish filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)

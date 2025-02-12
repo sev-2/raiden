@@ -13,7 +13,7 @@ import (
 func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
 	MetaLogger.Trace("start fetching functions from meta")
 	url := fmt.Sprintf("%s%s/functions", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := net.Get[[]objects.Function](url, net.DefaultTimeout, nil, nil)
+	rs, err := net.Get[[]objects.Function](url, net.DefaultTimeout, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
 	}
@@ -24,7 +24,7 @@ func GetFunctions(cfg *raiden.Config) ([]objects.Function, error) {
 func GetFunctionByName(cfg *raiden.Config, schema, name string) (result objects.Function, err error) {
 	MetaLogger.Trace("start fetching function by name from meta")
 	sql := sql.GenerateFunctionByNameQuery(schema, name) + " limit 1"
-	rs, err := ExecuteQuery[[]objects.Function](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Function](cfg.SupabaseApiUrl, sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		err = fmt.Errorf("get function error : %s", err)
 		return
@@ -46,7 +46,7 @@ func CreateFunction(cfg *raiden.Config, fn objects.Function) (objects.Function, 
 		return objects.Function{}, nil
 	}
 
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return objects.Function{}, fmt.Errorf("create new function %s error : %s", fn.Name, err)
 	}
@@ -62,7 +62,7 @@ func DeleteFunction(cfg *raiden.Config, fn objects.Function) error {
 		return err
 	}
 
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("delete Function %s error : %s", fn.Name, err)
 	}
@@ -77,7 +77,7 @@ func UpdateFunction(cfg *raiden.Config, fn objects.Function) error {
 	if err != nil {
 		return err
 	}
-	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, updateSql, nil, nil, nil)
+	_, err = ExecuteQuery[any](cfg.SupabaseApiUrl, updateSql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update function %s error : %s", fn.Name, err)
 	}

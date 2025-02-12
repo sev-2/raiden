@@ -27,6 +27,11 @@ func GetTables(cfg *raiden.Config, includedSchemas []string, includeColumns bool
 			req.URL.Query().Set("include_columns", strconv.FormatBool(includeColumns))
 		}
 
+		if cfg.SupabaseApiToken != "" {
+			token := fmt.Sprintf("%s %s", cfg.SupabaseApiTokenType, cfg.SupabaseApiToken)
+			req.Header.Set("Authorization", token)
+		}
+
 		return nil
 	}
 
@@ -46,13 +51,11 @@ func GetTableByName(cfg *raiden.Config, name, schema string, includeColumn bool)
 		return result, err
 	}
 
-	rs, err := ExecuteQuery[[]objects.Table](getBaseUrl(cfg), q, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Table](getBaseUrl(cfg), q, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		err = fmt.Errorf("get tables error : %s", err)
 		return
 	}
-
-	fmt.Println("data : ", rs)
 
 	if len(rs) == 0 {
 		err = fmt.Errorf("get table %s in schema %s is not found", name, schema)
@@ -75,7 +78,7 @@ func CreateTable(cfg *raiden.Config, newTable objects.Table) (result objects.Tab
 	}
 
 	// execute update
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return result, fmt.Errorf("create new table %s error : %s", newTable.Name, err)
 	}
@@ -87,7 +90,7 @@ func UpdateTable(cfg *raiden.Config, newTable objects.Table, updateItem objects.
 	MetaLogger.Trace("start update table", "name", newTable.Name)
 	sql := query.BuildUpdateTableQuery(newTable, updateItem)
 	// execute update
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update tables error : %s", err)
 	}
@@ -123,7 +126,7 @@ func DeleteTable(cfg *raiden.Config, table objects.Table, cascade bool) error {
 	MetaLogger.Trace("start delete table", "name", table.Name)
 	sql := query.BuildDeleteTableQuery(table, true)
 	// execute delete
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("delete table %s error : %s", table.Name, err)
 	}
@@ -136,7 +139,7 @@ func GetTableRelationshipActions(cfg *raiden.Config, schema string) ([]objects.T
 	MetaLogger.Trace("start fetching table relationships from supabase")
 	q := sql.GenerateGetTableRelationshipActionsQuery(schema)
 
-	rs, err := ExecuteQuery[[]objects.TablesRelationshipAction](getBaseUrl(cfg), q, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.TablesRelationshipAction](getBaseUrl(cfg), q, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return rs, fmt.Errorf("get table relationships error : %s", err)
 	}
@@ -246,7 +249,7 @@ func CreateColumn(cfg *raiden.Config, column objects.Column, isPrimary bool) err
 	}
 
 	// Execute SQL Query
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("create column %s.%s error : %s", column.Table, column.Name, err)
 	}
@@ -260,7 +263,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 	sql := query.BuildUpdateColumnQuery(oldColumn, newColumn, updateItem)
 
 	// Execute SQL Query
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update column %s.%s error : %s", newColumn.Table, newColumn.Name, err)
 	}
@@ -271,7 +274,7 @@ func UpdateColumn(cfg *raiden.Config, oldColumn, newColumn objects.Column, updat
 func DeleteColumn(cfg *raiden.Config, column objects.Column) error {
 	MetaLogger.Trace("start delete column", "table", column.Table, "name", column.Name)
 	sql := query.BuildDeleteColumnQuery(column)
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("delete column %s.%s error : %s", column.Table, column.Name, err)
 	}
@@ -378,7 +381,7 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return err
 	}
 
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("create foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -387,7 +390,7 @@ func createForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
 		return err
 	} else if len(indexSql) > 0 {
-		_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+		_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, DefaultInterceptor(cfg), nil)
 		if err != nil {
 			return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 		}
@@ -410,7 +413,7 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 	}
 
 	sql := deleteSql + createSql
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -420,7 +423,7 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
 			return err
 		} else if len(indexSql) > 0 {
-			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, DefaultInterceptor(cfg), nil)
 			if err != nil {
 				return fmt.Errorf("create foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 			}
@@ -439,7 +442,7 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return err
 	}
 
-	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("delete foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
@@ -449,7 +452,7 @@ func deleteForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationDelete, relation); err != nil {
 			return err
 		} else if len(indexSql) > 0 {
-			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, nil, nil)
+			_, err = ExecuteQuery[any](getBaseUrl(cfg), indexSql, nil, DefaultInterceptor(cfg), nil)
 			if err != nil {
 				return fmt.Errorf("delete foreign index %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 			}

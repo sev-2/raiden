@@ -120,7 +120,7 @@ func WalkScanRpc(rpcDir string) ([]string, error) {
 	err := filepath.Walk(rpcDir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") {
 			RpcRegisterLogger.Trace("collect rpc", "path", path)
-			rs, e := getStructByBaseAndExcludeReturnType(path, "RpcBase", map[string]bool{"RpcReturnDataTypeTrigger": true})
+			rs, e := getStructByBaseAndExcludeReturnType(path, "RpcBase", map[string]bool{})
 			if e != nil {
 				return e
 			}
