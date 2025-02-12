@@ -108,10 +108,12 @@ func loadCloudConfig() *raiden.Config {
 
 func loadSelfHostedConfig() *raiden.Config {
 	return &raiden.Config{
-		DeploymentTarget:    raiden.DeploymentTargetSelfHosted,
-		ProjectId:           "test-project-local-id",
-		SupabaseApiBasePath: "/v1",
-		SupabaseApiUrl:      "http://supabase.local.com",
+		DeploymentTarget:     raiden.DeploymentTargetSelfHosted,
+		ProjectId:            "test-project-local-id",
+		SupabaseApiBasePath:  "/v1",
+		SupabaseApiUrl:       "http://supabase.local.com",
+		SupabaseApiToken:     "qwe3qe12e23e32r42ear",
+		SupabaseApiTokenType: "basic",
 	}
 }
 

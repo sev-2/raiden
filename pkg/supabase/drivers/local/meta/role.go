@@ -14,7 +14,7 @@ import (
 func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 	MetaLogger.Trace("start fetching roles from meta")
 	url := fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
-	rs, err := net.Get[[]objects.Role](url, net.DefaultTimeout, nil, nil)
+	rs, err := net.Get[[]objects.Role](url, net.DefaultTimeout, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		err = fmt.Errorf("get roles error : %s", err)
 	}
@@ -27,7 +27,7 @@ func GetRoleByName(cfg *raiden.Config, name string) (result objects.Role, err er
 	qTemplate := sql.GetRolesQuery + " where rolname = %s limit 1"
 	q := fmt.Sprintf(qTemplate, pq.QuoteLiteral(name))
 
-	rs, err := ExecuteQuery[[]objects.Role](getBaseUrl(cfg), q, nil, nil, nil)
+	rs, err := ExecuteQuery[[]objects.Role](getBaseUrl(cfg), q, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		err = fmt.Errorf("get role error : %s", err)
 		return
@@ -45,7 +45,7 @@ func CreateRole(cfg *raiden.Config, role objects.Role) (objects.Role, error) {
 	MetaLogger.Trace("start create role", "name", role.Name)
 	sql := query.BuildCreateRoleQuery(role)
 	// Execute SQL Query
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return objects.Role{}, fmt.Errorf("create new role %s error : %s", role.Name, err)
 	}
@@ -56,7 +56,7 @@ func CreateRole(cfg *raiden.Config, role objects.Role) (objects.Role, error) {
 func UpdateRole(cfg *raiden.Config, newRole objects.Role, updateRoleParam objects.UpdateRoleParam) error {
 	MetaLogger.Trace("start update role", "name", newRole.Name)
 	sql := query.BuildUpdateRoleQuery(newRole, updateRoleParam)
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update new role %s error : %s", updateRoleParam.OldData.Name, err)
 	}
@@ -69,7 +69,7 @@ func DeleteRole(cfg *raiden.Config, role objects.Role) error {
 	sql := query.BuildDeleteRoleQuery(role)
 
 	// execute delete
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, nil, nil)
+	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("delete role %s error : %s", role.Name, err)
 	}

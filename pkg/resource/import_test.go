@@ -420,6 +420,7 @@ func TestImportModelsOnly(t *testing.T) {
 			{
 				Table: objects.Table{
 					Name:        "test_local_table",
+					Schema:      "public",
 					PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
 					Columns: []objects.Column{
 						{Name: "id", DataType: "uuid"},
@@ -455,6 +456,7 @@ func TestImportModelsOnly(t *testing.T) {
 					ID:     2,
 					Name:   "delete_test_status",
 					Format: "delete_test_status",
+					Schema: "public",
 				},
 				Name: "test_status",
 			},

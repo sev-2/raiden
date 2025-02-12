@@ -123,7 +123,7 @@ func BuildMigrateData(extractedLocalData state.ExtractTableResult, supabaseData 
 
 func BuildMigrateItem(supabaseData, localData []objects.Table) (migratedData []MigrateItem, err error) {
 	Logger.Info("compare supabase and local resource for existing table data")
-	result, e := CompareList(localData, supabaseData)
+	result, e := CompareList(CompareModeApply, localData, supabaseData)
 	if e != nil {
 		err = e
 		return

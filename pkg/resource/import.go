@@ -56,11 +56,12 @@ func Import(flags *Flags, config *raiden.Config) error {
 	ImportLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
 	ImportLogger.Trace("filter table by schema")
 
-	if config.Mode == raiden.SvcMode {
-		spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+
+	if config.Mode == raiden.BffMode {
 		if config.AllowedTables != "*" {
 			allowedTable := strings.Split(config.AllowedTables, ",")
-			spResource.Tables = filterAllowedTables(spResource.Tables, allowedTable...)
+			spResource.Tables = filterAllowedTables(spResource.Tables, strings.Split(flags.AllowedSchema, ","), allowedTable...)
 		}
 	}
 
@@ -135,7 +136,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 			}
 		}
 
-		if err := tables.Compare(spResource.Tables, compareTables); err != nil {
+		if err := tables.Compare(tables.CompareModeImport, spResource.Tables, compareTables); err != nil {
 			if flags.DryRun {
 				dryRunError = append(dryRunError, err.Error())
 			} else {
@@ -211,6 +212,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
 		Types:   types.GetNewCountData(spResource.Types, appType),
 	}
+
 	if !flags.DryRun {
 		if flags.UpdateStateOnly {
 			return updateStateOnly(&importState, spResource, mapModelValidationTags)

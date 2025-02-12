@@ -30,7 +30,10 @@ SERVICE_KEY: {{ .ServiceKey }}
 
 SUPABASE_API_URL: {{ .SupabaseApiUrl }}
 SUPABASE_API_BASE_PATH: {{ .SupabaseApiBasePath }}
+SUPABASE_API_TOKEN: {{ .SupabaseApiToken }}
+SUPABASE_API_TOKEN_TYPE: {{ .SupabaseApiTokenType }}
 SUPABASE_PUBLIC_URL: {{ .SupabasePublicUrl }}
+
 {{- end}}
 {{- if eq .Mode "svc"}}
 POSTGREST_URL: {{ .PostgRestUrl }}

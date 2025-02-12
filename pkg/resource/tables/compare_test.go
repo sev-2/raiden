@@ -19,7 +19,7 @@ func TestCompare(t *testing.T) {
 		{ID: 2, Name: "table2"},
 	}
 
-	err := tables.Compare(source, target)
+	err := tables.Compare(tables.CompareModeImport, source, target)
 	assert.NoError(t, err)
 }
 
@@ -52,7 +52,7 @@ func TestCompareList(t *testing.T) {
 		},
 	}
 
-	diffResult, err := tables.CompareList(source, target)
+	diffResult, err := tables.CompareList(tables.CompareModeImport, source, target)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(diffResult))
 	assert.Equal(t, "table1", diffResult[0].SourceResource.Name)
@@ -142,7 +142,7 @@ func TestCompareItem(t *testing.T) {
 		},
 	}
 
-	diffResult := tables.CompareItem(source, target)
+	diffResult := tables.CompareItem(tables.CompareModeImport, source, target)
 	assert.True(t, diffResult.IsConflict)
 	assert.Equal(t, "table1", diffResult.SourceResource.Name)
 	assert.Equal(t, "table1_updated", diffResult.TargetResource.Name)
@@ -224,7 +224,7 @@ func TestCompareItemWithoutIndex(t *testing.T) {
 		},
 	}
 
-	diffResult := tables.CompareItem(source, target)
+	diffResult := tables.CompareItem(tables.CompareModeImport, source, target)
 	assert.True(t, diffResult.IsConflict)
 	assert.Equal(t, "table1", diffResult.SourceResource.Name)
 	assert.Equal(t, "table1_updated", diffResult.TargetResource.Name)

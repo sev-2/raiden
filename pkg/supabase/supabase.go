@@ -27,7 +27,7 @@ var DefaultObjectTable = "objects"
 
 var (
 	DefaultApiUrl         = "https://api.supabase.com"
-	DefaultIncludedSchema = []string{"public", "auth"}
+	DefaultIncludedSchema = []string{"public"}
 )
 
 type RlsType string

@@ -54,6 +54,10 @@ func CompareItem(source, target objects.Function) (diffResult CompareDiffResult)
 
 	source.CompleteStatement = strings.ToLower(utils.CleanUpString(source.CompleteStatement))
 	target.CompleteStatement = strings.ToLower(utils.CleanUpString(target.CompleteStatement))
+
+	source.CompleteStatement = strings.ReplaceAll(source.CompleteStatement, "search_path to ", "search_path = ")
+	target.CompleteStatement = strings.ReplaceAll(target.CompleteStatement, "search_path to ", "search_path = ")
+
 	sourceCompare := strings.ReplaceAll(source.CompleteStatement, " ", "")
 	targetCompare := strings.ReplaceAll(target.CompleteStatement, " ", "")
 

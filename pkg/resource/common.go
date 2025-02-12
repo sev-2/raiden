@@ -116,7 +116,7 @@ func filterTableBySchema(input []objects.Table, allowedSchema ...string) (output
 }
 
 // ----- Filter allowed table ------
-func filterAllowedTables(input []objects.Table, allowedTable ...string) (output []objects.Table) {
+func filterAllowedTables(input []objects.Table, allowedSchema []string, allowedTable ...string) (output []objects.Table) {
 	if len(allowedTable) == 0 {
 		return input
 	}
@@ -126,9 +126,33 @@ func filterAllowedTables(input []objects.Table, allowedTable ...string) (output 
 		mapAllowedTable[t] = true
 	}
 
+	filterSchema := []string{"public"}
+	if len(allowedSchema) > 0 && allowedSchema[0] != "" {
+		filterSchema = allowedSchema
+	}
+	mapSchema := map[string]bool{}
+
+	for _, t := range filterSchema {
+		mapSchema[t] = true
+	}
+
 	for i := range input {
 		t := input[i]
+
 		if _, exist := mapAllowedTable[t.Name]; exist {
+			r := []objects.TablesRelationship{}
+
+			for _, rl := range t.Relationships {
+				_, sourceSchemaExist := mapSchema[rl.SourceSchema]
+				_, sourceExist := mapAllowedTable[rl.SourceTableName]
+				_, targetSchemaExist := mapSchema[rl.TargetTableSchema]
+				_, targetExist := mapAllowedTable[rl.TargetTableName]
+
+				if sourceExist && targetExist && sourceSchemaExist && targetSchemaExist {
+					r = append(r, rl)
+				}
+			}
+			t.Relationships = r
 			output = append(output, t)
 		}
 	}
