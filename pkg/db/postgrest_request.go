@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -10,14 +11,29 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func PostgrestRequest(ctx raiden.Context, credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
-	if ctx != nil {
-		return PostgrestRequestBind(ctx, method, url, payload, headers, bypass, result)
-	}
-	return PostgrestRequestBindCredential(credential, method, url, payload, headers, bypass, result)
+type ErrorResponse struct {
+	Message string `json:"message"`
+	Code    string `json:"code"`
+	Hint    string `json:"hint"`
+	Details string `json:"details"`
 }
 
-func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
+func PostgrestRequest(ctx raiden.Context, credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
+	callbackErr := func(errCode int, data []byte) error {
+		var errorResponse ErrorResponse
+		if err := json.Unmarshal(data, &errorResponse); err == nil && errorResponse.Message != "" && errorResponse.Code != "" {
+			return errors.New(errorResponse.Message)
+		}
+		return nil
+	}
+
+	if ctx != nil {
+		return PostgrestRequestBind(ctx, method, url, payload, headers, bypass, result, callbackErr)
+	}
+	return PostgrestRequestBindCredential(credential, method, url, payload, headers, bypass, result, callbackErr)
+}
+
+func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}, callbackErr func(code int, data []byte) error) (*fasthttp.Response, error) {
 
 	if !isAllowedMethod(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
@@ -63,6 +79,10 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 		if flag.Lookup("test.v") == nil {
 			req.Header.Set("apikey", getConfig().ServiceKey)
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+		}
+
+		if getConfig() != nil && getConfig().Mode == raiden.SvcMode && getConfig().JwtToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
 		}
 	} else {
 		apikey := string(ctx.RequestContext().Request.Header.Peek("apikey"))
@@ -91,6 +111,11 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	}
 
 	body := res.Body()
+	if callbackErr != nil {
+		if err := callbackErr(res.StatusCode(), body); err != nil {
+			return res, err
+		}
+	}
 
 	if result != nil {
 		if err := json.Unmarshal(body, result); err != nil {
@@ -101,7 +126,7 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	return res, nil
 }
 
-func PostgrestRequestBindCredential(credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
+func PostgrestRequestBindCredential(credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}, callbackErr func(code int, data []byte) error) (*fasthttp.Response, error) {
 	if !isAllowedMethod(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
@@ -146,6 +171,10 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 		if flag.Lookup("test.v") == nil {
 			req.Header.Set("apikey", getConfig().ServiceKey)
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+		}
+
+		if getConfig() != nil && getConfig().Mode == raiden.SvcMode && getConfig().JwtToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
 		}
 	} else {
 
@@ -178,6 +207,12 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 	}
 
 	body := res.Body()
+
+	if callbackErr != nil {
+		if err := callbackErr(res.StatusCode(), body); err != nil {
+			return res, err
+		}
+	}
 
 	if result != nil {
 		if err := json.Unmarshal(body, result); err != nil {
