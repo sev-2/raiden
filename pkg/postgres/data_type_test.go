@@ -127,6 +127,9 @@ func TestGetPgDataTypeName(t *testing.T) {
 		{postgres.UuidType, false, postgres.UuidType},
 		{postgres.JsonType, false, postgres.JsonType},
 		{postgres.JsonbType, false, postgres.JsonbType},
+		{postgres.PointType, false, postgres.PointType},
+		{postgres.SmallSerialType, false, postgres.SmallSerialType},
+		{"undefined", false, postgres.TextType},
 	}
 
 	for _, test := range tests {
