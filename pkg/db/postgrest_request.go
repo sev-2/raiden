@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -9,6 +10,13 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/valyala/fasthttp"
 )
+
+type ErrorResponse struct {
+	Message string `json:"message"`
+	Code    string `json:"code"`
+	Hint    string `json:"hint"`
+	Details string `json:"details"`
+}
 
 func PostgrestRequest(ctx raiden.Context, credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
 	if ctx != nil {
@@ -61,8 +69,12 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 
 	if bypass {
 		if flag.Lookup("test.v") == nil {
-			req.Header.Set("apikey", getConfig().ServiceKey)
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+			if getConfig().Mode == raiden.SvcMode {
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
+			} else {
+				req.Header.Set("apikey", getConfig().ServiceKey)
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+			}
 		}
 	} else {
 		apikey := string(ctx.RequestContext().Request.Header.Peek("apikey"))
@@ -91,6 +103,10 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	}
 
 	body := res.Body()
+	var errorResponse ErrorResponse
+	if err := json.Unmarshal(body, &errorResponse); err == nil && errorResponse.Message != "" && errorResponse.Code != "" {
+		return res, errors.New(errorResponse.Message)
+	}
 
 	if result != nil {
 		if err := json.Unmarshal(body, result); err != nil {
@@ -144,8 +160,12 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 
 	if bypass {
 		if flag.Lookup("test.v") == nil {
-			req.Header.Set("apikey", getConfig().ServiceKey)
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+			if getConfig().Mode == raiden.SvcMode {
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().JwtToken))
+			} else {
+				req.Header.Set("apikey", getConfig().ServiceKey)
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", getConfig().ServiceKey))
+			}
 		}
 	} else {
 
@@ -179,6 +199,10 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 
 	body := res.Body()
 
+	var errorResponse ErrorResponse
+	if err := json.Unmarshal(body, &errorResponse); err == nil && errorResponse.Message != "" && errorResponse.Code != "" {
+		return res, errors.New(errorResponse.Message)
+	}
 	if result != nil {
 		if err := json.Unmarshal(body, result); err != nil {
 			return res, fmt.Errorf("failed to unmarshal response body: %w", err)
