@@ -95,6 +95,8 @@ const (
 	// jsonbType represents the JSONB data type in PostgreSQL.
 	JsonbType DataType = "jsonb"
 
+	PointType DataType = "point"
+
 	UserDefined DataType = "USER-DEFINED"
 )
 
@@ -121,6 +123,8 @@ func ToGoType(pgType DataType, isNullable bool) (goType string) {
 		goType = "uuid.UUID" // Assuming you have a UUID library imported
 	case JsonType, JsonbType:
 		goType = "interface{}" // Use a more specific type based on your JSON library
+	case PointType:
+		goType = "postgres.Point"
 	default:
 		goType = "interface{}"
 	}
@@ -161,6 +165,8 @@ func ToPostgresType(goType string) (pgType DataType) {
 		pgType = BooleanType
 	case "uuid.UUID":
 		pgType = UuidType
+	case "postgres.Point":
+		pgType = PointType
 	case "interface{}", "any":
 		pgType = TextType
 
@@ -190,6 +196,8 @@ func IsValidDataType(value string) bool {
 		UuidType: {},
 		// ----- Json Type -----
 		JsonType: {}, JsonbType: {},
+		// ----- Point Type -----
+		PointType: {},
 	}
 
 	dataType := DataType(strings.ToLower(value))
@@ -264,7 +272,9 @@ func GetPgDataTypeName(pgType DataType, returnAlias bool) DataType {
 	case JsonType:
 		return JsonType
 	case JsonbType:
-		return JsonType
+		return JsonbType
+	case PointType:
+		return PointType
 	}
 
 	return TextType

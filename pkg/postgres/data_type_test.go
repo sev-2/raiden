@@ -26,6 +26,7 @@ func TestToGoType(t *testing.T) {
 		{postgres.UuidType, false, "uuid.UUID"},
 		{postgres.JsonType, false, "interface{}"},
 		{postgres.JsonbType, false, "interface{}"},
+		{postgres.PointType, false, "postgres.Point"},
 		{"unknown", false, "interface{}"},
 	}
 
@@ -56,6 +57,7 @@ func TestToPostgresType(t *testing.T) {
 		{"bool", postgres.BooleanType},
 		{"uuid.UUID", postgres.UuidType},
 		{"interface{}", postgres.TextType},
+		{"postgres.Point", postgres.PointType},
 		{"any", postgres.TextType},
 		{"unknown", postgres.TextType},
 	}
@@ -124,7 +126,7 @@ func TestGetPgDataTypeName(t *testing.T) {
 		{postgres.BooleanType, false, postgres.BooleanType},
 		{postgres.UuidType, false, postgres.UuidType},
 		{postgres.JsonType, false, postgres.JsonType},
-		{postgres.JsonbType, false, postgres.JsonType},
+		{postgres.JsonbType, false, postgres.JsonbType},
 	}
 
 	for _, test := range tests {

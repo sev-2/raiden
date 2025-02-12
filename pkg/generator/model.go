@@ -202,6 +202,11 @@ func MapTableAttributes(projectName string, table objects.Table, mapDataType map
 			case "json":
 				importPackageName = "encoding/json"
 			}
+
+			if column.Type == "postgres.Point" || column.Type == "*postgres.Point" {
+				importPackageName = "github.com/sev-2/raiden/pkg/postgres"
+			}
+
 			importsMap[importPackageName] = true
 		}
 
