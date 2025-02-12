@@ -189,6 +189,142 @@ func TestApply(t *testing.T) {
 	assert.NoError(t, errReset)
 }
 
+func TestApply_AllowedTable(t *testing.T) {
+	flags := &resource.Flags{
+		DryRun:        true,
+		AllowedSchema: "public",
+	}
+	config := loadConfig()
+	config.AllowedTables = "table_1,table_2"
+
+	err := resource.Apply(flags, config)
+	assert.Error(t, err)
+
+	flags.DryRun = false
+	importState := &state.LocalState{
+		State: state.State{
+			Tables: []state.TableState{
+				{
+					Table: objects.Table{
+						Name:        "test_local_table",
+						PrimaryKeys: []objects.PrimaryKey{{Name: "id"}},
+						Columns: []objects.Column{
+							{Name: "id", DataType: "uuid"},
+							{Name: "name", DataType: "text"},
+						},
+						Relationships: []objects.TablesRelationship{
+							{
+								ConstraintName:    "test_local_constraint",
+								SourceSchema:      "public",
+								SourceTableName:   "test_local_table",
+								SourceColumnName:  "id",
+								TargetTableSchema: "public",
+								TargetTableName:   "test_table",
+								TargetColumnName:  "id",
+							},
+						},
+					},
+					Policies: []objects.Policy{},
+				},
+			},
+			Storage: []state.StorageState{
+				{
+					Storage: objects.Bucket{
+						Name:   "test_bucket_policy",
+						Public: true,
+					},
+				},
+			},
+			Roles: []state.RoleState{
+				{
+					Role: objects.Role{
+						Name: "test_role",
+					},
+				},
+			},
+			Types: []state.TypeState{
+				{
+					Type: objects.Type{
+						Name:   "test_type",
+						Format: "test_type",
+						Schema: "public",
+						Enums:  []string{"test_1", "test_2"},
+					},
+				},
+			},
+		},
+	}
+
+	errSaveState := state.Save(&importState.State)
+	assert.NoError(t, errSaveState)
+
+	mock := &mock.MockSupabase{Cfg: config}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetRolesWithExpectedResponse(200, []objects.Role{
+		{
+			Name: "test_other_role",
+		},
+	})
+	assert.NoError(t, err0)
+
+	err1 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{})
+	assert.NoError(t, err1)
+
+	err2 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
+		{
+			Name:   "table_1",
+			Schema: "public",
+			Columns: []objects.Column{
+				{
+					ID:     "1",
+					Schema: "public",
+					Name:   "id",
+				},
+			},
+		},
+		{
+			Name:   "table_2",
+			Schema: "public",
+			Columns: []objects.Column{
+				{
+					ID:     "1",
+					Schema: "public",
+					Name:   "id",
+				},
+				{
+					ID:     "1",
+					Schema: "public",
+					Name:   "fk_column_id",
+				},
+			},
+			Relationships: []objects.TablesRelationship{
+				{
+					ConstraintName:    "relation_table_1",
+					SourceSchema:      "public",
+					SourceTableName:   "table_2",
+					SourceColumnName:  "fk_column_id",
+					TargetTableSchema: "public",
+					TargetTableName:   "table_1",
+					TargetColumnName:  "id",
+				},
+			},
+		},
+	})
+	assert.NoError(t, err2)
+
+	resource.RegisterModels(MockNewTable{})
+	resource.RegisterModels(MockOtherTable{})
+	resource.RegisterRole(MockNewRole{})
+
+	err = resource.Apply(flags, config)
+	assert.NoError(t, err)
+
+	errReset := state.Save(&state.State{})
+	assert.NoError(t, errReset)
+}
+
 func TestMigrate(t *testing.T) {
 	config := loadConfig()
 	importState := &state.LocalState{
