@@ -38,6 +38,7 @@ func TestGenerateModels(t *testing.T) {
 				Columns: []objects.Column{
 					{Name: "id", DataType: "integer", IsNullable: false},
 					{Name: "name", DataType: "text", IsNullable: true},
+					{Name: "location", DataType: "point", IsNullable: true},
 				},
 				RLSEnabled: true,
 				RLSForced:  false,

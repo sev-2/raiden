@@ -417,7 +417,7 @@ func updateForeignKey(cfg *raiden.Config, relation *objects.TablesRelationship) 
 		return fmt.Errorf("update foreign key %s.%s error : %s", relation.SourceTableName, relation.SourceColumnName, err)
 	}
 
-	if relation.Action == nil {
+	if relation.Index == nil {
 		// create FK index
 		if indexSql, err := query.BuildFKIndexQuery(objects.UpdateRelationCreate, relation); err != nil {
 			return err
