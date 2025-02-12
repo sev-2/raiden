@@ -212,6 +212,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
 		Types:   types.GetNewCountData(spResource.Types, appType),
 	}
+
 	if !flags.DryRun {
 		if flags.UpdateStateOnly {
 			return updateStateOnly(&importState, spResource, mapModelValidationTags)

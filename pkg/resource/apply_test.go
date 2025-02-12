@@ -92,6 +92,7 @@ func loadConfig() *raiden.Config {
 		SupabaseApiUrl:      "http://supabase.cloud.com",
 		SupabasePublicUrl:   "http://supabase.cloud.com",
 		Mode:                raiden.BffMode,
+		AllowedTables:       "*",
 	}
 }
 
