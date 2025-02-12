@@ -19,13 +19,21 @@ type ErrorResponse struct {
 }
 
 func PostgrestRequest(ctx raiden.Context, credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
-	if ctx != nil {
-		return PostgrestRequestBind(ctx, method, url, payload, headers, bypass, result)
+	callbackErr := func(errCode int, data []byte) error {
+		var errorResponse ErrorResponse
+		if err := json.Unmarshal(data, &errorResponse); err == nil && errorResponse.Message != "" && errorResponse.Code != "" {
+			return errors.New(errorResponse.Message)
+		}
+		return nil
 	}
-	return PostgrestRequestBindCredential(credential, method, url, payload, headers, bypass, result)
+
+	if ctx != nil {
+		return PostgrestRequestBind(ctx, method, url, payload, headers, bypass, result, callbackErr)
+	}
+	return PostgrestRequestBindCredential(credential, method, url, payload, headers, bypass, result, callbackErr)
 }
 
-func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
+func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}, callbackErr func(code int, data []byte) error) (*fasthttp.Response, error) {
 
 	if !isAllowedMethod(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
@@ -103,9 +111,10 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	}
 
 	body := res.Body()
-	var errorResponse ErrorResponse
-	if err := json.Unmarshal(body, &errorResponse); err == nil && errorResponse.Message != "" && errorResponse.Code != "" {
-		return res, errors.New(errorResponse.Message)
+	if callbackErr != nil {
+		if err := callbackErr(res.StatusCode(), body); err != nil {
+			return res, err
+		}
 	}
 
 	if result != nil {
@@ -117,7 +126,7 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	return res, nil
 }
 
-func PostgrestRequestBindCredential(credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}) (*fasthttp.Response, error) {
+func PostgrestRequestBindCredential(credential Credential, method string, url string, payload []byte, headers map[string]string, bypass bool, result interface{}, callbackErr func(code int, data []byte) error) (*fasthttp.Response, error) {
 	if !isAllowedMethod(method) {
 		return nil, fmt.Errorf("method %s is not allowed", method)
 	}
@@ -199,10 +208,12 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 
 	body := res.Body()
 
-	var errorResponse ErrorResponse
-	if err := json.Unmarshal(body, &errorResponse); err == nil && errorResponse.Message != "" && errorResponse.Code != "" {
-		return res, errors.New(errorResponse.Message)
+	if callbackErr != nil {
+		if err := callbackErr(res.StatusCode(), body); err != nil {
+			return res, err
+		}
 	}
+
 	if result != nil {
 		if err := json.Unmarshal(body, result); err != nil {
 			return res, fmt.Errorf("failed to unmarshal response body: %w", err)
