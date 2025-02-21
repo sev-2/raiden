@@ -52,11 +52,10 @@ func (s *Server) ConfigureLogLevel() {
 		SetLogLevel(hclog.Trace)
 	case "debug":
 		SetLogLevel(hclog.Debug)
-	case "error":
-		SetLogLevel(hclog.Error)
 	case "warning":
 		SetLogLevel(hclog.Warn)
-	case "info":
+	case "error":
+		SetLogLevel(hclog.Error)
 	default:
 		SetLogLevel(hclog.Info)
 	}
