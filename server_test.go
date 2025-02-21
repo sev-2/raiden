@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
 	"github.com/stretchr/testify/assert"
 )
@@ -110,6 +111,29 @@ func TestServer_Use(t *testing.T) {
 	middleware := MockMiddlewareFn()
 
 	s.Use(middleware)
+}
+
+func TestServer_Log(t *testing.T) {
+	conf := loadConfig()
+	conf.LogLevel = "trace"
+	s := raiden.NewServer(conf)
+	s.ConfigureLogLevel()
+	assert.Equal(t, hclog.Trace, raiden.GetLogLevel())
+
+	conf.LogLevel = "debug"
+	s = raiden.NewServer(conf)
+	s.ConfigureLogLevel()
+	assert.Equal(t, hclog.Debug, raiden.GetLogLevel())
+
+	conf.LogLevel = "warning"
+	s = raiden.NewServer(conf)
+	s.ConfigureLogLevel()
+	assert.Equal(t, hclog.Warn, raiden.GetLogLevel())
+
+	conf.LogLevel = "error"
+	s = raiden.NewServer(conf)
+	s.ConfigureLogLevel()
+	assert.Equal(t, hclog.Error, raiden.GetLogLevel())
 }
 
 func TestServer_StartStop(t *testing.T) {

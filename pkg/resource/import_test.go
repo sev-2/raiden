@@ -403,6 +403,7 @@ func TestImportModelsOnly(t *testing.T) {
 	}
 
 	config := loadConfig()
+	config.AllowedTables = "test_local_table"
 	resource.ImportLogger = logger.HcLog().Named("import")
 
 	mock := &mock.MockSupabase{Cfg: config}
@@ -631,7 +632,7 @@ func TestImportAllTableStateOnly(t *testing.T) {
 		UpdateStateOnly: true,
 	}
 	config := loadConfig()
-	config.AllowedTables = "*"
+	config.AllowedTables = "some_table"
 
 	resource.ImportLogger = logger.HcLog().Named("import")
 

@@ -20,6 +20,10 @@ func SetLogLevel(level hclog.Level) {
 	logInstance.SetLevel(level)
 }
 
+func GetLogLevel() hclog.Level {
+	return logInstance.GetLevel()
+}
+
 func Info(message string, v ...any) {
 	checkLogInstance()
 	logInstance.Info(message, v...)

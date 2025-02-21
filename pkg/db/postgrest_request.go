@@ -106,18 +106,25 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 	res := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(res)
 
+	raiden.Debug("db.request", "url", url)
+	raiden.Debug("db.request", "method", method)
+
 	if err := client.Do(req, res); err != nil {
 		return res, err
 	}
 
 	body := res.Body()
+
+	raiden.Debug("db.response", "status code", res.StatusCode())
+	raiden.Debug("db.response", "data", string(body))
+
 	if callbackErr != nil {
 		if err := callbackErr(res.StatusCode(), body); err != nil {
 			return res, err
 		}
 	}
 
-	if result != nil {
+	if result != nil && len(body) != 0 {
 		if err := json.Unmarshal(body, result); err != nil {
 			return res, fmt.Errorf("failed to unmarshal response body: %w", err)
 		}
@@ -202,11 +209,17 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 	res := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(res)
 
+	raiden.Debug("db.request", "url", url)
+	raiden.Debug("db.request", "method", method)
+
 	if err := client.Do(req, res); err != nil {
 		return res, err
 	}
 
 	body := res.Body()
+
+	raiden.Debug("db.response", "status code", res.StatusCode())
+	raiden.Debug("db.response", "data", string(body))
 
 	if callbackErr != nil {
 		if err := callbackErr(res.StatusCode(), body); err != nil {
@@ -214,7 +227,7 @@ func PostgrestRequestBindCredential(credential Credential, method string, url st
 		}
 	}
 
-	if result != nil {
+	if result != nil && len(body) != 0 {
 		if err := json.Unmarshal(body, result); err != nil {
 			return res, fmt.Errorf("failed to unmarshal response body: %w", err)
 		}

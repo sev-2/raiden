@@ -75,7 +75,7 @@ func SimpleConfigure() (*Config, error) {
 	config := &Config{
 		raiden.Config{
 			ScheduleStatus: "off",
-			BreakerEnable:  true,
+			BreakerEnable:  false,
 			TraceEnable:    false,
 			Version:        "1.0.0",
 			ServerHost:     "127.0.0.1",
