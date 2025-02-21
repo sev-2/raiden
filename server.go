@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/tracer"
 	"github.com/valyala/fasthttp"
@@ -41,6 +42,23 @@ func NewServer(config *Config) *Server {
 		HttpServer: &fasthttp.Server{
 			MaxRequestBodySize: config.MaxServerRequestBodySize,
 		},
+	}
+}
+
+func (s *Server) ConfigureLogLevel() {
+	// set up log configuration
+	switch s.Config.LogLevel {
+	case "trace":
+		SetLogLevel(hclog.Trace)
+	case "debug":
+		SetLogLevel(hclog.Debug)
+	case "error":
+		SetLogLevel(hclog.Error)
+	case "warning":
+		SetLogLevel(hclog.Warn)
+	case "info":
+	default:
+		SetLogLevel(hclog.Info)
 	}
 }
 
@@ -218,6 +236,8 @@ func (s *Server) Run() {
 			os.Exit(1)
 		}
 	}
+
+	s.ConfigureLogLevel()
 
 	s.runSubscriberServer()
 

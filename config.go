@@ -43,6 +43,7 @@ type Config struct {
 	GoogleProjectId          string           `mapstructure:"GOOGLE_PROJECT_ID"`
 	GoogleSaPath             string           `mapstructure:"GOOGLE_SA_PATH"`
 	JwtToken                 string           `mapstructure:"JWT_TOKEN"`
+	LogLevel                 string           `mapstructure:"LOG_LEVEL"`
 	MaxServerRequestBodySize int              `mapstructure:"MAX_SERVER_REQUEST_BODY_SIZE"`
 	Mode                     Mode             `mapstructure:"MODE"`
 	PgMetaUrl                string           `mapstructure:"PG_META_URL"`
