@@ -34,7 +34,7 @@ func TestStateController_Post(t *testing.T) {
 		UpdateStateOnly: true,
 	}
 	config := loadConfig()
-	config.AllowedTables = "*"
+	config.AllowedTables = "some_table"
 	resource.ImportLogger = logger.HcLog().Named("import")
 
 	mockContext := &mock.MockContext{
