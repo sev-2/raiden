@@ -106,7 +106,7 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 			})
 		}
 
-		if (flags.All() || flags.ModelsOnly) && cfg.AllowedTables != "*" {
+		if (flags.All() || flags.ModelsOnly) && cfg.AllowedTables != "" {
 			wg.Add(1)
 			LoadLogger.Debug("get Types from server")
 			go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Type, error) {
