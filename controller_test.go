@@ -402,6 +402,29 @@ func TestMarshallAndValidate(t *testing.T) {
 
 }
 
+func TestMarshallAndValidate_ByMethod(t *testing.T) {
+	ctx := newMockCtx()
+	type Request struct {
+		Search   string `query:"q"`
+		Resource string `json:"resource" validate:"requiredForMethod=Post"`
+	}
+	type Controller struct {
+		raiden.ControllerBase
+		Payload *Request
+	}
+	controller := &Controller{}
+
+	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+	ctx.SetBodyString("{\"resource\":\"\"}")
+
+	err := raiden.MarshallAndValidate(ctx.RequestContext(), controller)
+	assert.NoError(t, err)
+
+	ctx.Request.Header.SetMethod(fasthttp.MethodPost)
+	err = raiden.MarshallAndValidate(ctx.RequestContext(), controller)
+	assert.Error(t, err)
+}
+
 func TestController_PassDataRestPost(t *testing.T) {
 	var reqCtx fasthttp.RequestCtx
 	context := raiden.Ctx{
