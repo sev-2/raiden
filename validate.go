@@ -23,7 +23,9 @@ type WithValidator func(name string, validateFn validator.Func) ValidatorFunc
 // validate payload
 func Validate(ctx context.Context, payload any, requestValidators ...ValidatorFunc) error {
 	validatorInstance := validator.New()
-	validatorInstance.RegisterValidationCtx("requiredForMethod", RequiredForMethodValidator)
+	if err := validatorInstance.RegisterValidationCtx("requiredForMethod", RequiredForMethodValidator); err != nil {
+		return err
+	}
 
 	if len(requestValidators) > 0 {
 		for _, rv := range requestValidators {
