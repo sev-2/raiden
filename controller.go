@@ -610,7 +610,6 @@ func setPayloadValue(fieldValue reflect.Value, value string) error {
 		return setPayloadValue(fieldValue.Elem(), value)
 	default:
 		fieldValue.SetZero()
-		// return fmt.Errorf("%s : unsupported field type %s", fieldValue.Type().Name(), fieldValue.Kind())
 	}
 
 	return nil
