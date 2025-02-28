@@ -233,7 +233,8 @@ func TestRequiredForMethodValidator(t *testing.T) {
 	}
 
 	validate := validator.New()
-	validate.RegisterValidationCtx("requiredForMethod", raiden.RequiredForMethodValidator)
+	err := validate.RegisterValidationCtx("requiredForMethod", raiden.RequiredForMethodValidator)
+	assert.NoError(t, err)
 
 	one := 1
 	uintOne := uint(1)
