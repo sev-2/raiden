@@ -83,7 +83,7 @@ func New(config *raiden.Config, opts ExecuteOptions) Executor {
 	}
 }
 
-func NewFromRaidenContext(ctx raiden.Context, opts ExecuteOptions) Executor {
+func NewFromContext(ctx raiden.Context, opts ExecuteOptions) Executor {
 	driver := &SupabaseDriver{}
 
 	baseUrl := ctx.Config().SupabasePublicUrl

@@ -65,7 +65,7 @@ func TestExecutor_BffOffset(t *testing.T) {
 	defer closeFn()
 
 	ctx := getMockCtx()
-	paginator := paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator := paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Page:      1,
 		Limit:     10,
 		Type:      paginate.OffsetPagination,
@@ -92,7 +92,7 @@ func TestExecutor_BffOffset(t *testing.T) {
 	})
 	defer closeFn2()
 
-	paginator2 := paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator2 := paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Page:      1,
 		Limit:     10,
 		Type:      paginate.OffsetPagination,
@@ -119,7 +119,7 @@ func TestExecutor_BffOffset(t *testing.T) {
 	})
 	defer closeFn3()
 
-	paginator3 := paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator3 := paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Page:      3,
 		Limit:     10,
 		Type:      paginate.OffsetPagination,
@@ -150,7 +150,7 @@ func TestExecutor_BffCursorNext(t *testing.T) {
 	defer closeFn()
 
 	ctx := getMockCtx()
-	paginator := paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator := paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Limit:           3,
 		Type:            paginate.CursorPagination,
 		IsBypass:        true,
@@ -181,7 +181,7 @@ func TestExecutor_BffCursorNext(t *testing.T) {
 	})
 	defer closeFn2()
 
-	paginator = paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator = paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Cursor:          1,
 		Limit:           3,
 		Type:            paginate.CursorPagination,
@@ -237,7 +237,7 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 		return nil
 	}
 
-	paginator := paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator := paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Limit:           3,
 		Type:            paginate.CursorPagination,
 		WithCount:       true,
@@ -273,7 +273,7 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	})
 	defer closeFn()
 
-	paginator = paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator = paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Cursor:          2,
 		Limit:           3,
 		Type:            paginate.CursorPagination,
@@ -341,7 +341,7 @@ func TestExecutor_SvcCursor(t *testing.T) {
 		}
 	}
 
-	paginator := paginate.NewFromRaidenContext(ctx, paginate.ExecuteOptions{
+	paginator := paginate.NewFromContext(ctx, paginate.ExecuteOptions{
 		Page:      1,
 		Limit:     10,
 		Type:      paginate.OffsetPagination,
