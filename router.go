@@ -179,7 +179,7 @@ func (r *router) buildNativeMiddleware(route *Route, chain Chain) Chain {
 	}
 
 	if r.config.BreakerEnable {
-		// chain = chain.Append(BreakerMiddleware(route.Path))
+		chain = chain.Append(BreakerMiddleware(route.Path))
 	}
 
 	return chain
