@@ -602,8 +602,15 @@ func setPayloadValue(fieldValue reflect.Value, value string) error {
 			return fmt.Errorf("%s : must be integer value", fieldValue.Type().Name())
 		}
 		fieldValue.SetInt(int64(intValue))
+	case reflect.Ptr:
+		// Handle pointer types
+		if fieldValue.IsNil() {
+			fieldValue.Set(reflect.New(fieldValue.Type().Elem())) // Allocate new value
+		}
+		return setPayloadValue(fieldValue.Elem(), value)
 	default:
-		return fmt.Errorf("%s : unsupported field type %s", fieldValue.Type().Name(), fieldValue.Kind())
+		fieldValue.SetZero()
+		// return fmt.Errorf("%s : unsupported field type %s", fieldValue.Type().Name(), fieldValue.Kind())
 	}
 
 	return nil
