@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -125,7 +126,11 @@ func (s *SupabaseDriver) request(statement string, withCount bool) ([]Item, int,
 		if withCount && contentRange != "" {
 			parts := strings.Split(contentRange, "/")
 			if len(parts) == 2 {
-				fmt.Sscanf(parts[1], "%d", &count)
+				countInt, err := strconv.Atoi(parts[1])
+				if err != nil {
+					return err
+				}
+				count = countInt
 			}
 		}
 		return nil
