@@ -203,7 +203,15 @@ func MapTableAttributes(projectName string, table objects.Table, mapDataType map
 				importPackageName = "encoding/json"
 			}
 
-			if column.Type == "postgres.Point" || column.Type == "*postgres.Point" {
+			// custom type
+			postgresCustomTypes := map[string]bool{
+				"postgres.Point":     true,
+				"*postgres.Point":    true,
+				"postgres.DateTime":  true,
+				"*postgres.DateTime": true,
+			}
+
+			if postgresCustomTypes[column.Type] {
 				importPackageName = "github.com/sev-2/raiden/pkg/postgres"
 			}
 
