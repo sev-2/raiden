@@ -344,10 +344,6 @@ func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, err
 			oldData := strings.Join(item.OldData.Enums, ",")
 			newData := strings.Join(item.NewData.Enums, ",")
 			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "enums", oldData, newData))
-		case objects.UpdateTypeAttributes:
-			oldData := strings.Join(item.OldData.Attributes, ",")
-			newData := strings.Join(item.NewData.Attributes, ",")
-			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %v >>> %v", "attributes", oldData, newData))
 		}
 	}
 

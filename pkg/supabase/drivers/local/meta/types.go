@@ -17,7 +17,9 @@ func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, err
 	url := fmt.Sprintf("%s%s/types", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 	reqInterceptor := func(req *http.Request) error {
 		if len(includedSchemas) > 0 {
-			req.URL.Query().Set("included_schemas", strings.Join(includedSchemas, ","))
+			reqQuery := req.URL.Query()
+			reqQuery.Set("included_schemas", strings.Join(includedSchemas, ","))
+			req.URL.RawQuery = reqQuery.Encode()
 		}
 
 		if cfg.SupabaseApiToken != "" {
@@ -27,6 +29,7 @@ func GetTypes(cfg *raiden.Config, includedSchemas []string) ([]objects.Type, err
 
 		return nil
 	}
+
 	rs, err := net.Get[[]objects.Type](url, net.DefaultTimeout, reqInterceptor, nil)
 	if err != nil {
 		err = fmt.Errorf("get types error : %s", err)

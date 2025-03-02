@@ -29,8 +29,8 @@ func (*MockType) Enums() []string {
 	return []string{"type_1", "type_2"}
 }
 
-func (*MockType) Attributes() []string {
-	return []string{}
+func (*MockType) Attributes() []objects.TypeAttribute {
+	return []objects.TypeAttribute{}
 }
 
 func (*MockType) Comment() *string {
@@ -74,7 +74,7 @@ func TestBuildTypeFromState(t *testing.T) {
 			Schema:     "test",
 			Format:     "type_1",
 			Enums:      []string{"type_1", "type_2"},
-			Attributes: []string{},
+			Attributes: []objects.TypeAttribute{},
 			Comment:    nil,
 		},
 	}

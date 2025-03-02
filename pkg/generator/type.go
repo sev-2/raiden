@@ -61,10 +61,6 @@ func (r *{{.Name | ToGoIdentifier }}) Enums() []string {
 	return {{ .Enums }}
 }
 
-func (r *{{.Name | ToGoIdentifier }}) Attributes() []string {
-	return {{ .Attributes }}
-}
-
 func (r *{{.Name | ToGoIdentifier }}) Comment() *string {
 	return {{ .Comment }}
 }

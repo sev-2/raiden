@@ -1833,7 +1833,7 @@ func TestUpdateType_Cloud(t *testing.T) {
 		Schema:     "public",
 		Format:     "",
 		Enums:      []string{"test_1"},
-		Attributes: []string{},
+		Attributes: []objects.TypeAttribute{},
 		Comment:    nil,
 	}
 
@@ -1866,7 +1866,7 @@ func TestUpdateType_SelfHosted(t *testing.T) {
 		Schema:     "public",
 		Format:     "",
 		Enums:      []string{"test_1"},
-		Attributes: []string{},
+		Attributes: []objects.TypeAttribute{},
 		Comment:    nil,
 	}
 

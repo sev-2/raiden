@@ -76,14 +76,28 @@ func MatchReplacer(query string, paramKey string, replacement string) string {
 
 	// Replace the parameter in the query, considering context
 	for i := 0; i < len(words); i++ {
-		if words[i] == paramKey {
+		wRaw := words[i]
+		if strings.Contains(wRaw, "::") {
+			wRaw = strings.SplitN(wRaw, "::", 2)[0]
+		}
+
+		if strings.Contains(wRaw, paramKey) {
+			re := regexp.MustCompile(`:\w+`)
+			// Find first match
+			wRaw = re.FindString(paramKey)
+		}
+
+		re := regexp.MustCompile(fmt.Sprintf(`[^a-zA-Z0-9%s\s]`, regexp.QuoteMeta(":")))
+		wCheck := re.ReplaceAllString(wRaw, "")
+		if wCheck == paramKey {
+
 			// Check if there is a dot (.) before or after the parameter
 			hasDotBefore := i > 0 && strings.HasSuffix(words[i-1], ".")
 			hasDotAfter := i < len(words)-1 && strings.HasPrefix(words[i+1], ".")
 
 			// Replace only if it's not part of a longer identifier (e.g., :u.Role)
 			if !hasDotBefore && !hasDotAfter {
-				words[i] = replacement
+				words[i] = strings.ReplaceAll(words[i], paramKey, replacement)
 			}
 		}
 	}

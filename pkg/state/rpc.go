@@ -62,7 +62,8 @@ func BindRpcFunction(rpc raiden.Rpc, fn *objects.Function) (err error) {
 	fn.CompleteStatement = rpc.GetCompleteStmt()
 
 	// validate definition query
-	matches := regexp.MustCompile(`:\w+`).FindAllString(fn.CompleteStatement, -1)
+	cleanStatement := strings.ReplaceAll(fn.CompleteStatement, "::", "")
+	matches := regexp.MustCompile(`:\w+`).FindAllString(cleanStatement, -1)
 	if len(matches) > 0 {
 		var errMsg string
 		if len(matches) > 1 {
