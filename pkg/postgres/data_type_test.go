@@ -52,7 +52,7 @@ func TestToPostgresType(t *testing.T) {
 		{"float32", postgres.RealType},
 		{"float64", postgres.DoublePrecisionType},
 		{"string", postgres.TextType},
-		{"postgres.DateTime", postgres.TimestampTzType},
+		{"postgres.DateTime", postgres.TimestampType},
 		{"time.Duration", postgres.IntervalType},
 		{"bool", postgres.BooleanType},
 		{"uuid.UUID", postgres.UuidType},
