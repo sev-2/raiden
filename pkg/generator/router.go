@@ -354,7 +354,7 @@ func getRoutes(mode raiden.Mode, controllerPath, controllerType, routePath strin
 	}
 
 	for _, m := range foundRouteMap {
-		rNew, err := generateRoute(mode, m)
+		rNew, err := BuildRouteItem(mode, m)
 		if err != nil {
 			return r, err
 		}
@@ -365,7 +365,7 @@ func getRoutes(mode raiden.Mode, controllerPath, controllerType, routePath strin
 	return
 }
 
-func generateRoute(mode raiden.Mode, foundRoute *FoundRoute) (GenerateRouteItem, error) {
+func BuildRouteItem(mode raiden.Mode, foundRoute *FoundRoute) (GenerateRouteItem, error) {
 	var r GenerateRouteItem
 
 	r.Import = foundRoute.Import
