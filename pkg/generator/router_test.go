@@ -16,15 +16,15 @@ func TestRouter(t *testing.T) {
 	routes, err := generator.WalkScanControllers(raiden.BffMode, testPath)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 4, len(routes))
+	assert.Equal(t, 6, len(routes))
 
 	var barRoute, fooRoute *generator.GenerateRouteItem
 	for i := range routes {
 		r := routes[i]
 		switch r.Controller {
-		case "testdata.FooController{}":
+		case "rest_v1_foo__name.FooController{}":
 			fooRoute = &r
-		case "testdata.BarController{}":
+		case "function_v1_bar.BarController{}":
 			barRoute = &r
 		}
 	}
@@ -33,12 +33,12 @@ func TestRouter(t *testing.T) {
 	assert.NotNil(t, barRoute)
 
 	assert.Equal(t, "raiden.RouteTypeCustom", fooRoute.Type)
-	assert.Equal(t, "\"/foo/{name}\"", fooRoute.Path)
+	assert.Equal(t, "\"/internal/controllers/rest/v1/foo/{name}\"", fooRoute.Path)
 	assert.Equal(t, "[]string{fasthttp.MethodPost, fasthttp.MethodPatch, fasthttp.MethodPut, fasthttp.MethodDelete, fasthttp.MethodHead, fasthttp.MethodOptions, fasthttp.MethodGet}", fooRoute.Methods)
-	assert.Equal(t, "testdata.FooController{}", fooRoute.Controller)
+	assert.Equal(t, "rest_v1_foo__name.FooController{}", fooRoute.Controller)
 
 	assert.Equal(t, "raiden.RouteTypeFunction", barRoute.Type)
-	assert.Equal(t, "\"/bar\"", barRoute.Path)
+	assert.Equal(t, "\"/internal/controllers/function/v1/bar\"", barRoute.Path)
 	assert.Equal(t, "[]string{fasthttp.MethodPost}", barRoute.Methods)
-	assert.Equal(t, "testdata.BarController{}", barRoute.Controller)
+	assert.Equal(t, "function_v1_bar.BarController{}", barRoute.Controller)
 }

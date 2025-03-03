@@ -17,7 +17,7 @@ func TestWalkRpcDir(t *testing.T) {
 
 	rs, err := generator.WalkScanRpc(testPath)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(rs))
+	assert.Equal(t, 2, len(rs))
 	assert.Equal(t, "CreateProfile", rs[0])
 }
 
@@ -27,7 +27,7 @@ func TestScanRpcAndExclude(t *testing.T) {
 
 	rs, err := generator.WalkScanRpc(testPath)
 	assert.NoError(t, err)
-	assert.Len(t, rs, 3)
+	assert.Len(t, rs, 2)
 }
 
 func TestGenerateRpcRegister(t *testing.T) {

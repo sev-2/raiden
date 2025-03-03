@@ -155,7 +155,7 @@ func scanControllerDir(mode raiden.Mode, controllerPath, routePath string, route
 	for _, entry := range entries {
 		newControllerPath := fmt.Sprintf("%s/%s", controllerPath, entry.Name())
 		newRoutePath := fmt.Sprintf("%s/%s", routePath, utils.ToKebabCase(entry.Name()))
-		if strings.Contains(entry.Name(), "_") {
+		if strings.HasPrefix(entry.Name(), "_") {
 			cleanPath := utils.ToSnakeCase(entry.Name())
 			newRoutePath = fmt.Sprintf("%s/{%s}", routePath, strings.TrimPrefix(cleanPath, "_"))
 		}
@@ -177,6 +177,12 @@ func scanControllerDir(mode raiden.Mode, controllerPath, routePath string, route
 						return err
 					}
 					routers = append(routers, restRoutes...)
+				case "function":
+					functionRoutes, err := getRoutes(mode, filePath, "function", routePath)
+					if err != nil {
+						return err
+					}
+					routers = append(routers, functionRoutes...)
 				case "custom":
 					customRoutes, err := getRoutes(mode, filePath, "custom", routePath)
 					if err != nil {
