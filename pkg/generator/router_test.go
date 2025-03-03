@@ -42,3 +42,54 @@ func TestRouter(t *testing.T) {
 	assert.Equal(t, "[]string{fasthttp.MethodPost}", barRoute.Methods)
 	assert.Equal(t, "function_v1_bar.BarController{}", barRoute.Controller)
 }
+
+func TestCreateRouteInput(t *testing.T) {
+	projectName := "myproject"
+	routePath := "/app/routes"
+	routes := []generator.GenerateRouteItem{
+		{
+			Import: struct {
+				Alias string
+				Path  string
+			}{Alias: "myController", Path: "/users"},
+			Type:       "rpc",
+			Path:       "/users",
+			Methods:    "GET",
+			Controller: "UserController",
+			Model:      "UserModel",
+			Storage:    "UserStorage",
+		},
+		{
+			Import: struct {
+				Alias string
+				Path  string
+			}{Alias: "orderController", Path: "/orders"},
+			Type:       "function",
+			Path:       "/orders",
+			Methods:    "POST",
+			Controller: "OrderController",
+			Model:      "OrderModel",
+			Storage:    "OrderStorage",
+		},
+	}
+
+	input, err := generator.CreateRouteInput(projectName, routePath, routes)
+	assert.NoError(t, err)
+
+	// Validate output file path
+	assert.Contains(t, input.OutputPath, routePath)
+
+	// Validate template info
+	assert.Equal(t, "routerTemplate", input.TemplateName)
+
+	// Validate imports
+
+	bindData, ok := input.BindData.(generator.GenerateRouterData)
+	assert.True(t, ok)
+	assert.Equal(t, len(bindData.Routes), 2)
+	assert.Equal(t, len(bindData.Imports), 7)
+
+	r := bindData.Routes[0]
+	assert.Equal(t, "function", r.Type)
+	assert.Equal(t, "/orders", r.Path)
+}

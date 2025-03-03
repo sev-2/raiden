@@ -111,7 +111,7 @@ func GenerateRoute(basePath string, projectName string, mode raiden.Mode, genera
 		return err
 	}
 
-	input, err := createRouteInput(projectName, routePath, routes)
+	input, err := CreateRouteInput(projectName, routePath, routes)
 	if err != nil {
 		return err
 	}
@@ -433,7 +433,7 @@ func generateRoute(mode raiden.Mode, foundRoute *FoundRoute) (GenerateRouteItem,
 	return r, nil
 }
 
-func createRouteInput(projectName string, routePath string, routes []GenerateRouteItem) (input GenerateInput, err error) {
+func CreateRouteInput(projectName string, routePath string, routes []GenerateRouteItem) (input GenerateInput, err error) {
 	// set file path
 	filePath := filepath.Join(routePath, RouterFilename)
 
