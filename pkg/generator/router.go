@@ -5,7 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -24,6 +24,10 @@ var RouterLogger hclog.Logger = logger.HcLog().Named("generator.router")
 // ----- Define type, variable and constant -----
 type (
 	GenerateRouteItem struct {
+		Import struct {
+			Alias string
+			Path  string
+		}
 		Type       string
 		Path       string
 		Methods    string
@@ -39,9 +43,14 @@ type (
 	}
 
 	FoundRoute struct {
+		Import struct {
+			Alias string
+			Path  string
+		}
 		Package string
 		Name    string
-		Tag     string
+		Type    string
+		Path    string
 		Methods []string
 		Model   string
 		Storage string
@@ -117,35 +126,96 @@ func GenerateRoute(basePath string, projectName string, mode raiden.Mode, genera
 func WalkScanControllers(mode raiden.Mode, controllerPath string) ([]GenerateRouteItem, error) {
 	RouterLogger.Trace("scan all controller", "path", controllerPath)
 
-	routes := make([]GenerateRouteItem, 0)
-	err := filepath.Walk(controllerPath, func(path string, info fs.FileInfo, err error) error {
-		if strings.HasSuffix(path, ".go") {
-			RouterLogger.Trace("collect routes", "path", path)
-			rs, e := getRoutes(mode, path)
-			if e != nil {
-				return e
-			}
-
-			for _, r := range rs {
-				if r.Path != "" && len(r.Methods) > 0 {
-					RouterLogger.Trace("found controller", "controller", r.Controller)
-					routes = append(routes, r)
-				}
-			}
-
-		}
-		return nil
-	})
+	routeMap := make(map[string]*GenerateRouteItem)
+	err := scanControllerDir(mode, controllerPath, "", routeMap)
 	if err != nil {
 		return nil, err
 	}
 
-	return routes, nil
+	routers := make([]GenerateRouteItem, 0)
+	if len(routeMap) > 0 {
+		for _, v := range routeMap {
+			if v != nil {
+				routers = append(routers, *v)
+			}
+		}
+	}
+
+	return routers, nil
 }
 
-func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err error) {
+func scanControllerDir(mode raiden.Mode, controllerPath, routePath string, routeMap map[string]*GenerateRouteItem) error {
+	RouterLogger.Trace("scan all controller", "path", controllerPath)
+
+	entries, err := os.ReadDir(controllerPath)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		newControllerPath := fmt.Sprintf("%s/%s", controllerPath, entry.Name())
+		newRoutePath := fmt.Sprintf("%s/%s", routePath, utils.ToKebabCase(entry.Name()))
+		if strings.Contains(entry.Name(), "_") {
+			cleanPath := utils.ToSnakeCase(entry.Name())
+			newRoutePath = fmt.Sprintf("%s/{%s}", routePath, strings.TrimPrefix(cleanPath, "_"))
+		}
+
+		if entry.IsDir() {
+			scanControllerDir(mode, newControllerPath, newRoutePath, routeMap) // Recursively scan subdirectories
+		} else {
+			if strings.HasSuffix(entry.Name(), ".go") {
+				fileName := strings.TrimSuffix(entry.Name(), ".go")
+				filePath := fmt.Sprintf("%s/%s", controllerPath, entry.Name())
+				var routers []GenerateRouteItem
+
+				switch fileName {
+				case "rest":
+					restRoutes, err := getRoutes(mode, filePath, "rest", routePath)
+					if err != nil {
+						return err
+					}
+					routers = append(routers, restRoutes...)
+				case "custom":
+					customRoutes, err := getRoutes(mode, filePath, "custom", routePath)
+					if err != nil {
+						return err
+					}
+					routers = append(routers, customRoutes...)
+				case "rpc":
+					rpcRoutes, err := getRoutes(mode, filePath, "rpc", routePath)
+					if err != nil {
+						return err
+					}
+					routers = append(routers, rpcRoutes...)
+				case "storage":
+					storageRoutes, err := getRoutes(mode, filePath, "storage", routePath)
+					if err != nil {
+						return err
+					}
+					routers = append(routers, storageRoutes...)
+				case "realtime":
+					realtimeRoutes, err := getRoutes(mode, filePath, "realtime", routePath)
+					if err != nil {
+						return err
+					}
+					routers = append(routers, realtimeRoutes...)
+				}
+
+				if len(routers) > 0 {
+					for i := range routers {
+						r := routers[i]
+						routeMap[r.Path] = &r
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func getRoutes(mode raiden.Mode, controllerPath, controllerType, routePath string) (r []GenerateRouteItem, err error) {
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
+	file, err := parser.ParseFile(fset, controllerPath, nil, parser.ParseComments)
 	if err != nil {
 		return r, err
 	}
@@ -158,26 +228,24 @@ func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err er
 			if t.Name != nil && t.Type != nil {
 				// Check if it's a struct
 				if st, ok := t.Type.(*ast.StructType); ok {
-					foundRoute := &FoundRoute{}
-					if fr, exist := foundRouteMap[t.Name.Name]; exist {
+					foundRoute := &FoundRoute{
+						Type: controllerType,
+						Path: routePath,
+					}
+					if fr, exist := foundRouteMap[routePath]; exist {
 						foundRoute = fr
 					}
 
-					// Check if it has the Http / Model attribute
 					foundField := false
 					for _, field := range st.Fields.List {
+						if se, isSe := field.Type.(*ast.SelectorExpr); isSe && se.Sel.Name == "ControllerBase" {
+							foundRoute.Name = t.Name.Name
+							foundRouteMap[routePath] = foundRoute
+							foundField = true
+							continue
+						}
+
 						for _, fName := range field.Names {
-
-							if fName != nil && fName.Name == "Http" && field.Tag != nil {
-								tag := strings.Trim(field.Tag.Value, "`")
-								foundRoute.Name = t.Name.Name
-								foundRoute.Tag = tag
-
-								foundRouteMap[t.Name.Name] = foundRoute
-								foundField = true
-								continue
-							}
-
 							if fName != nil && fName.Name == "Model" {
 								switch fType := field.Type.(type) {
 								case *ast.StarExpr:
@@ -190,7 +258,7 @@ func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err er
 									foundRoute.Model = fmt.Sprintf("%s{}", fType.Name)
 								}
 
-								foundRouteMap[t.Name.Name] = foundRoute
+								foundRouteMap[routePath] = foundRoute
 								foundField = true
 								continue
 							}
@@ -207,7 +275,7 @@ func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err er
 									foundRoute.Storage = fmt.Sprintf("%s{}", fType.Name)
 								}
 
-								foundRouteMap[t.Name.Name] = foundRoute
+								foundRouteMap[routePath] = foundRoute
 								foundField = true
 								continue
 							}
@@ -227,8 +295,8 @@ func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err er
 			startExp, isStartExp := t.Recv.List[0].Type.(*ast.StarExpr)
 			if isStartExp {
 				structName := fmt.Sprintf("%s", startExp.X)
-				route, isExist := foundRouteMap[structName]
-				if isExist {
+				route, isExist := foundRouteMap[routePath]
+				if isExist && route.Name == structName {
 					switch strings.ToUpper(t.Name.Name) {
 					case fasthttp.MethodGet:
 						route.Methods = append(route.Methods, "fasthttp.MethodGet")
@@ -250,15 +318,31 @@ func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err er
 		}
 		return true
 	})
-
 	if len(foundRouteMap) == 0 {
 		return r, nil
 	}
 
 	// bind package name
-	fileDir := filepath.Dir(filePath)
+	fileDir := filepath.Dir(controllerPath)
 	for _, m := range foundRouteMap {
-		_, m.Package = filepath.Split(fileDir)
+		splitFile := strings.Split(fileDir, ControllerDir)
+		if len(splitFile) == 2 {
+			m.Import.Path = splitFile[1]
+		}
+
+		if len(m.Import.Path) > 0 {
+			alias := utils.ToSnakeCase(
+				strings.ReplaceAll(
+					strings.TrimPrefix(m.Import.Path, "/"),
+					"/", "_",
+				),
+			)
+			m.Package = alias
+			m.Import.Alias = alias
+		} else {
+			_, m.Package = filepath.Split(fileDir)
+		}
+
 	}
 
 	for _, m := range foundRouteMap {
@@ -266,6 +350,7 @@ func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err er
 		if err != nil {
 			return r, err
 		}
+
 		r = append(r, rNew)
 	}
 
@@ -275,79 +360,68 @@ func getRoutes(mode raiden.Mode, filePath string) (r []GenerateRouteItem, err er
 func generateRoute(mode raiden.Mode, foundRoute *FoundRoute) (GenerateRouteItem, error) {
 	var r GenerateRouteItem
 
+	r.Import = foundRoute.Import
 	r.Controller = fmt.Sprintf("%s.%s{}", foundRoute.Package, foundRoute.Name)
 	r.Model = foundRoute.Model
 	r.Storage = foundRoute.Storage
-
-	tagItems := strings.Split(foundRoute.Tag, " ")
+	r.Type = foundRoute.Type
+	r.Path = fmt.Sprintf("%q", foundRoute.Path)
 	r.Methods = GenerateArrayDeclaration(reflect.ValueOf(foundRoute.Methods), true)
 
-	for _, tagItem := range tagItems {
-		items := strings.Split(tagItem, ":")
-		if len(items) != 2 {
-			continue
-		}
-
-		trimmedItem := strings.Trim(items[1], "\"")
-		switch items[0] {
-		case "path":
-			r.Path = fmt.Sprintf("%q", trimmedItem)
-		case "type":
-			// validate route service mode
-			if mode == raiden.SvcMode && trimmedItem != string(raiden.RouteTypeCustom) {
-				return r, fmt.Errorf("controller %s, only custom controller routes are allowed in service mode", foundRoute.Name)
-			}
-
-			// validate method
-			// exclude for rest and storage controller
-			// because automatically register by route
-			if len(foundRoute.Methods) == 0 && trimmedItem != string(raiden.RouteTypeRest) && trimmedItem != string(raiden.RouteTypeStorage) {
-				return r, fmt.Errorf("controller %s, required to set method handler. available method Get, Post, Put, Patch, Delete, and Option", foundRoute.Name)
-			}
-
-			if trimmedItem == string(raiden.RouteTypeRest) && r.Model == "" {
-				return r, fmt.Errorf("controller %s, required to set model because have rest type", foundRoute.Name)
-			}
-
-			switch trimmedItem {
-			case string(raiden.RouteTypeFunction):
-				if len(foundRoute.Methods) > 1 {
-					return r, fmt.Errorf("controller %s with type function,only allowed set 1 method and only allowed setup with post method", foundRoute.Name)
-				}
-
-				if len(foundRoute.Methods) == 1 && foundRoute.Methods[0] != "fasthttp.MethodPost" {
-					return r, fmt.Errorf("controller %s with type function,only allowed setup with Post method", foundRoute.Name)
-				}
-
-				r.Type = "raiden.RouteTypeFunction"
-			case string(raiden.RouteTypeCustom):
-				r.Type = "raiden.RouteTypeCustom"
-			case string(raiden.RouteTypeRpc):
-				if len(foundRoute.Methods) > 1 {
-					return r, fmt.Errorf("controller %s with type rpc,only allowed set 1 method and only allowed setup with post method", foundRoute.Name)
-				}
-
-				if len(foundRoute.Methods) == 1 && foundRoute.Methods[0] != "fasthttp.MethodPost" {
-					return r, fmt.Errorf("controller %s with type rpc,only allowed setup with Post method", foundRoute.Name)
-				}
-
-				r.Type = "raiden.RouteTypeRpc"
-			case string(raiden.RouteTypeRest):
-				r.Type = "raiden.RouteTypeRest"
-			case string(raiden.RouteTypeRealtime):
-				r.Type = "raiden.RouteTypeRealtime"
-			case string(raiden.RouteTypeStorage):
-				r.Type = "raiden.RouteTypeStorage"
-			default:
-				return r, fmt.Errorf(
-					"%s.%s : unsupported route type %s, available type are %s, %s, %s, %s, %s and %s ",
-					foundRoute.Package, foundRoute.Name, items[1],
-					raiden.RouteTypeFunction, raiden.RouteTypeCustom, raiden.RouteTypeRpc,
-					raiden.RouteTypeRest, raiden.RouteTypeRealtime, raiden.RouteTypeStorage,
-				)
-			}
-		}
+	// validate route service mode
+	if mode == raiden.SvcMode && r.Type != string(raiden.RouteTypeCustom) {
+		return r, fmt.Errorf("controller %s, only custom controller routes are allowed in service mode", foundRoute.Name)
 	}
+
+	// validate method
+	// exclude for rest and storage controller
+	// because automatically register by route
+	if len(foundRoute.Methods) == 0 && r.Type != string(raiden.RouteTypeRest) && r.Type != string(raiden.RouteTypeStorage) {
+		return r, fmt.Errorf("controller %s, required to set method handler. available method Get, Post, Put, Patch, Delete, and Option", foundRoute.Name)
+	}
+
+	if r.Type == string(raiden.RouteTypeRest) && r.Model == "" {
+		return r, fmt.Errorf("controller %s, required to set model because have rest type", foundRoute.Name)
+	}
+
+	switch r.Type {
+	case string(raiden.RouteTypeFunction):
+		if len(foundRoute.Methods) > 1 {
+			return r, fmt.Errorf("controller %s with type function,only allowed set 1 method and only allowed setup with post method", foundRoute.Name)
+		}
+
+		if len(foundRoute.Methods) == 1 && foundRoute.Methods[0] != "fasthttp.MethodPost" {
+			return r, fmt.Errorf("controller %s with type function,only allowed setup with Post method", foundRoute.Name)
+		}
+
+		r.Type = "raiden.RouteTypeFunction"
+	case string(raiden.RouteTypeCustom):
+		r.Type = "raiden.RouteTypeCustom"
+	case string(raiden.RouteTypeRpc):
+		if len(foundRoute.Methods) > 1 {
+			return r, fmt.Errorf("controller %s with type rpc,only allowed set 1 method and only allowed setup with post method", foundRoute.Name)
+		}
+
+		if len(foundRoute.Methods) == 1 && foundRoute.Methods[0] != "fasthttp.MethodPost" {
+			return r, fmt.Errorf("controller %s with type rpc,only allowed setup with Post method", foundRoute.Name)
+		}
+
+		r.Type = "raiden.RouteTypeRpc"
+	case string(raiden.RouteTypeRest):
+		r.Type = "raiden.RouteTypeRest"
+	case string(raiden.RouteTypeRealtime):
+		r.Type = "raiden.RouteTypeRealtime"
+	case string(raiden.RouteTypeStorage):
+		r.Type = "raiden.RouteTypeStorage"
+	default:
+		return r, fmt.Errorf(
+			"%s.%s : unsupported route type %s, available type are %s, %s, %s, %s, %s and %s ",
+			foundRoute.Package, foundRoute.Name, r.Type,
+			raiden.RouteTypeFunction, raiden.RouteTypeCustom, raiden.RouteTypeRpc,
+			raiden.RouteTypeRest, raiden.RouteTypeRealtime, raiden.RouteTypeStorage,
+		)
+	}
+
 	return r, nil
 }
 
@@ -363,8 +437,13 @@ func createRouteInput(projectName string, routePath string, routes []GenerateRou
 	}
 
 	if len(routes) > 0 {
-		routeImportPath := fmt.Sprintf("%s/internal/controllers", utils.ToGoModuleName(projectName))
-		imports = append(imports, fmt.Sprintf("%q", routeImportPath))
+		for i := range routes {
+			r := routes[i]
+			if len(r.Import.Alias) > 0 && len(r.Import.Path) > 0 {
+				routeImportPath := fmt.Sprintf("%s/internal/controllers%s", utils.ToGoModuleName(projectName), r.Import.Path)
+				imports = append(imports, fmt.Sprintf("%s %q", r.Import.Alias, routeImportPath))
+			}
+		}
 	}
 
 	isHaveModel := false

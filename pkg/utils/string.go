@@ -207,3 +207,33 @@ func CleanDoubleColonPattern(input string) string {
 	re := regexp.MustCompile(`::\w+`)
 	return re.ReplaceAllString(input, "")
 }
+
+func ToKebabCase(s string) string {
+	// Replace non-alphanumeric characters with a space
+	re := regexp.MustCompile(`[^\w\s-]`)
+	s = re.ReplaceAllString(s, " ")
+
+	// Handle PascalCase and camelCase (insert hyphen between lowercase-uppercase transitions)
+	re = regexp.MustCompile(`([a-z\d])([A-Z])`)
+	s = re.ReplaceAllString(s, "$1-$2")
+
+	// Handle consecutive uppercase sequences (acronyms) correctly (e.g., "HTMLtoJSX" -> "html-to-jsx")
+	re = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`)
+	s = re.ReplaceAllString(s, "$1-$2")
+
+	// Convert to lowercase
+	s = strings.ToLower(s)
+
+	// Replace spaces and underscores with hyphens
+	s = strings.ReplaceAll(s, "_", "-")
+	s = strings.ReplaceAll(s, " ", "-")
+
+	// Remove duplicate hyphens
+	re = regexp.MustCompile(`-+`)
+	s = re.ReplaceAllString(s, "-")
+
+	// Trim hyphens from the start and end
+	s = strings.Trim(s, "-")
+
+	return s
+}

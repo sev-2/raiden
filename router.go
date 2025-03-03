@@ -219,11 +219,13 @@ func (r *router) bindRoute(chain Chain, route *Route) {
 }
 
 func (r *router) registerRpcAndFunctionHandler(route *Route) {
-	var routeType string
+	var routeType, routePath string
 	if route.Type == RouteTypeFunction {
 		routeType = "function "
+		routePath = strings.TrimPrefix(route.Path, "/functions/v1")
 	} else {
 		routeType = "rpc"
+		routePath = strings.TrimPrefix(route.Path, "/rest/v1/rpc")
 	}
 
 	if len(route.Methods) > 1 {
@@ -242,7 +244,7 @@ func (r *router) registerRpcAndFunctionHandler(route *Route) {
 		if len(r.middlewares) > 0 {
 			chain = r.buildAppMiddleware(chain)
 		}
-		group.POST(route.Path, buildHandler(
+		group.POST(routePath, buildHandler(
 			r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, route.Controller),
 		))
 	}
@@ -272,11 +274,12 @@ func (r *router) registerRestHandler(route *Route) {
 			TableName:  GetTableName(route.Model),
 		}
 
-		group.GET(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodGet, route.Type, restController)))
-		group.POST(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, restController)))
-		group.PUT(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPut, route.Type, restController)))
-		group.PATCH(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
-		group.DELETE(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+		path := strings.TrimPrefix(route.Path, "/rest/v1")
+		group.GET(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
 	}
 }
 
@@ -294,11 +297,12 @@ func (r *router) registerStorageHandler(route *Route) {
 			RoutePath:  route.Path,
 		}
 
-		group.GET(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodGet, route.Type, restController)))
-		group.POST(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, restController)))
-		group.PUT(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPut, route.Type, restController)))
-		group.PATCH(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
-		group.DELETE(route.Path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+		path := strings.ReplaceAll(route.Path, "/storage/v1", "/storage/v1/object")
+		group.GET(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodGet, route.Type, restController)))
+		group.POST(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, restController)))
+		group.PUT(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPut, route.Type, restController)))
+		group.PATCH(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
+		group.DELETE(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
 	}
 }
 
