@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/sev-2/raiden/pkg/logger"
@@ -15,7 +13,6 @@ import (
 
 var (
 	headerContentTypeJson = []byte("application/json")
-	httpClientInstance    Client
 	DefaultTimeout        = time.Duration(20000) * time.Millisecond
 	Logger                = logger.HcLog().Named("supabase.client")
 )
@@ -43,10 +40,9 @@ type DefaultResponse struct {
 	Message string `json:"message"`
 }
 
-func getClient() Client {
+var DefaultGetClientFn = func() Client {
 	maxIdleConnDuration := time.Hour * 1
-
-	httpClientInstance = &fasthttp.Client{
+	return &fasthttp.Client{
 		ReadTimeout:                   DefaultTimeout,
 		WriteTimeout:                  DefaultTimeout,
 		MaxIdleConnDuration:           maxIdleConnDuration,
@@ -54,18 +50,10 @@ func getClient() Client {
 		DisableHeaderNamesNormalizing: true,
 		DisablePathNormalizing:        true,
 		MaxConnWaitTimeout:            DefaultTimeout,
-		Dial: (&fasthttp.TCPDialer{
-			Concurrency:      4096,
-			DNSCacheDuration: time.Hour,
-		}).Dial,
 	}
-
-	return httpClientInstance
 }
 
-func SetClient(c Client) {
-	httpClientInstance = c
-}
+var GetClientFn = DefaultGetClientFn
 
 func SendRequest(method string, url string, body []byte, timeout time.Duration, reqInterceptor RequestInterceptor, resInterceptor ResponseInterceptor) (rawBody []byte, err error) {
 	reqTimeout := DefaultTimeout
@@ -94,7 +82,7 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 	Logger.Trace("request", "headers", string(req.Header.Header()))
 	Logger.Trace("request", "body", string(req.Body()))
 
-	err = getClient().DoTimeout(req, resp, reqTimeout)
+	err = GetClientFn().DoTimeout(req, resp, reqTimeout)
 	if err != nil {
 		logger.HcLog().Error("[SendRequest][DoTimeout]", "err-type", reflect.TypeOf(err).String(), "err-msg", err.Error())
 		return
@@ -115,7 +103,11 @@ func SendRequest(method string, url string, body []byte, timeout time.Duration, 
 
 	statusCode := resp.StatusCode()
 
-	if !strings.HasPrefix(strconv.Itoa(statusCode), "2") {
+	Logger.Trace("response", "statusCode", statusCode)
+	Logger.Trace("response", "header", resp.Header.String())
+	Logger.Trace("response", "body", string(resp.Body()))
+
+	if statusCode > 399 {
 		err = fmt.Errorf("invalid HTTP response code: %d", statusCode)
 		if resp.Body() != nil && len(resp.Body()) > 0 {
 			Logger.Error(string(resp.Body()))

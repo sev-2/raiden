@@ -1,6 +1,7 @@
 package raiden_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -69,7 +70,7 @@ func TestValidate_Success(t *testing.T) {
 		Age:   30,
 	}
 
-	err := raiden.Validate(payload)
+	err := raiden.Validate(context.Background(), payload)
 	assert.NoError(t, err)
 }
 
@@ -80,7 +81,7 @@ func TestValidate_Failure(t *testing.T) {
 		Age:   150,
 	}
 
-	err := raiden.Validate(payload)
+	err := raiden.Validate(context.Background(), payload)
 	assert.Error(t, err)
 
 	validationErr, ok := err.(*raiden.ErrorResponse)
@@ -131,7 +132,7 @@ func TestValidate_SuccessAll(t *testing.T) {
 		SHA256Only:              "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
 	}
 
-	err := raiden.Validate(payload)
+	err := raiden.Validate(context.Background(), payload)
 	assert.NoError(t, err)
 }
 
@@ -172,7 +173,7 @@ func TestValidate_FailureAll(t *testing.T) {
 		DatetimeOnly:            "not-a-datetime",
 	}
 
-	err := raiden.Validate(payload)
+	err := raiden.Validate(context.Background(), payload)
 	assert.Error(t, err)
 
 	validationErr, ok := err.(*raiden.ErrorResponse)
@@ -219,6 +220,112 @@ func TestValidate_CustomValidator(t *testing.T) {
 		Age:   30,
 	}
 
-	err := raiden.Validate(payload, raiden.ValidatorFunc{Name: customValidationName, Validator: customValidation})
+	err := raiden.Validate(context.Background(), payload, raiden.ValidatorFunc{Name: customValidationName, Validator: customValidation})
 	assert.NoError(t, err)
+}
+
+// TestRequiredForMethodValidator tests validation logic based on HTTP methods
+func TestRequiredForMethodValidator(t *testing.T) {
+
+	// Helper function to create a validation context with HTTP method
+	var createValidationContext = func(method string) context.Context {
+		return context.WithValue(context.Background(), raiden.MethodContextKey, method)
+	}
+
+	validate := validator.New()
+	err := validate.RegisterValidationCtx("requiredForMethod", raiden.RequiredForMethodValidator)
+	assert.NoError(t, err)
+
+	one := 1
+	uintOne := uint(1)
+	floatOne := float32(1)
+	zero := 0
+	str := "hello"
+	emptyStr := ""
+	slice := []int{1, 2, 3}
+	emptySlice := []int{}
+	m := map[string]int{"key": 1}
+	emptyMap := map[string]int{}
+	customStruct := struct{ Name string }{"Test"}
+	emptyStruct := struct{ Name string }{}
+
+	tests := []struct {
+		name     string
+		method   string
+		data     interface{}
+		expected bool
+	}{
+		// Integers
+		{"Valid int for POST", fasthttp.MethodPost, struct {
+			ID int `validate:"requiredForMethod=POST"`
+		}{ID: one}, true},
+		{"Valid pointer int for POST", fasthttp.MethodPost, struct {
+			ID *int `validate:"requiredForMethod=POST"`
+		}{ID: &one}, true},
+		{"Valid uint for POST", fasthttp.MethodPost, struct {
+			ID uint `validate:"requiredForMethod=POST"`
+		}{ID: uintOne}, true},
+		{"Valid float for POST", fasthttp.MethodPost, struct {
+			ID float32 `validate:"requiredForMethod=POST"`
+		}{ID: floatOne}, true},
+		{"Invalid int=0 for POST", fasthttp.MethodPost, struct {
+			ID int `validate:"requiredForMethod=POST"`
+		}{ID: zero}, false},
+		{"Valid *int for GET", fasthttp.MethodGet, struct {
+			ID *int `validate:"requiredForMethod=GET"`
+		}{ID: &one}, true},
+		{"Invalid nil *int for GET", fasthttp.MethodGet, struct {
+			ID *int `validate:"requiredForMethod=GET"`
+		}{ID: nil}, false},
+
+		// Strings
+		{"Valid string for POST", fasthttp.MethodPost, struct {
+			Name string `validate:"requiredForMethod=POST"`
+		}{Name: str}, true},
+		{"Invalid empty string for POST", fasthttp.MethodPost, struct {
+			Name string `validate:"requiredForMethod=POST"`
+		}{Name: emptyStr}, false},
+
+		// Slices
+		{"Valid slice for PUT", fasthttp.MethodPut, struct {
+			Tags []int `validate:"requiredForMethod=PUT"`
+		}{Tags: slice}, true},
+		{"Invalid empty slice for PUT", fasthttp.MethodPut, struct {
+			Tags []int `validate:"requiredForMethod=PUT"`
+		}{Tags: emptySlice}, false},
+
+		// Maps
+		{"Valid map for PATCH", fasthttp.MethodPatch, struct {
+			Config map[string]int `validate:"requiredForMethod=PATCH"`
+		}{Config: m}, true},
+		{"Invalid empty map for PATCH", fasthttp.MethodPatch, struct {
+			Config map[string]int `validate:"requiredForMethod=PATCH"`
+		}{Config: emptyMap}, false},
+
+		// Structs
+		{"Valid struct for DELETE", fasthttp.MethodDelete, struct {
+			Info struct{ Name string } `validate:"requiredForMethod=DELETE"`
+		}{Info: customStruct}, true},
+		{"Invalid empty struct for DELETE", fasthttp.MethodDelete, struct {
+			Info struct{ Name string } `validate:"requiredForMethod=DELETE"`
+		}{Info: emptyStruct}, false},
+
+		// Optional cases (not required)
+		{"Valid missing field for GET (not required)", fasthttp.MethodGet, struct {
+			Unused string `validate:"requiredForMethod=POST"`
+		}{Unused: ""}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := createValidationContext(tt.method)
+			err := validate.StructCtx(ctx, tt.data)
+			if tt.expected {
+				assert.NoError(t, err, "Validation should pass")
+			} else {
+				assert.Error(t, err, "Validation should fail")
+			}
+		})
+	}
+
 }

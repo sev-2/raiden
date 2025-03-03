@@ -25,7 +25,7 @@ func TestGenerateTypes(t *testing.T) {
 			Schema:     "public",
 			Format:     "",
 			Enums:      []string{"test_1", "test_2"},
-			Attributes: []string{},
+			Attributes: []objects.TypeAttribute{},
 			Comment:    nil,
 		},
 	}

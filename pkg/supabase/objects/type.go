@@ -1,13 +1,18 @@
 package objects
 
+type TypeAttribute struct {
+	Name   string `json:"name"`
+	TypeID int    `json:"type_id"`
+}
+
 type Type struct {
-	ID         int      `json:"id"`
-	Name       string   `json:"name"`
-	Schema     string   `json:"schema"`
-	Format     string   `json:"format"`
-	Enums      []string `json:"enums"`
-	Attributes []string `json:"attributes"`
-	Comment    *string  `json:"comment"` // Use pointer to handle null values
+	ID         int             `json:"id"`
+	Name       string          `json:"name"`
+	Schema     string          `json:"schema"`
+	Format     string          `json:"format"`
+	Enums      []string        `json:"enums"`
+	Attributes []TypeAttribute `json:"attributes"`
+	Comment    *string         `json:"comment"` // Use pointer to handle null values
 }
 
 type UpdateDataType string

@@ -11,23 +11,27 @@ import (
 func TestCompare(t *testing.T) {
 	source := []objects.Type{
 		{
-			Name:       "type1_updated",
-			Schema:     "public",
-			Format:     "",
-			Enums:      []string{"test_1", "test_2"},
-			Attributes: []string{"attribute_1"},
-			Comment:    nil,
+			Name:   "type1_updated",
+			Schema: "public",
+			Format: "",
+			Enums:  []string{"test_1", "test_2"},
+			Attributes: []objects.TypeAttribute{{
+				Name: "type_attribute_1",
+			}},
+			Comment: nil,
 		},
 	}
 
 	target := []objects.Type{
 		{
-			Name:       "type1_updated",
-			Schema:     "public",
-			Format:     "",
-			Enums:      []string{"test_1", "test_2"},
-			Attributes: []string{"attribute_1"},
-			Comment:    nil,
+			Name:   "type1_updated",
+			Schema: "public",
+			Format: "",
+			Enums:  []string{"test_1", "test_2"},
+			Attributes: []objects.TypeAttribute{{
+				Name: "type_attribute_1",
+			}},
+			Comment: nil,
 		},
 	}
 
@@ -43,7 +47,7 @@ func TestCompareList(t *testing.T) {
 			Schema:     "public",
 			Format:     "",
 			Enums:      []string{"test_1", "test_2"},
-			Attributes: []string{},
+			Attributes: []objects.TypeAttribute{},
 			Comment:    nil,
 		},
 		{
@@ -55,14 +59,14 @@ func TestCompareList(t *testing.T) {
 			Name:       "type3",
 			Schema:     "auth",
 			Comment:    &sourceComment,
-			Attributes: []string{"attribute_1"},
+			Attributes: []objects.TypeAttribute{{Name: "type_attribute_1"}},
 		},
 		{
 			Name:       "type4",
 			Schema:     "auth",
 			Comment:    &sourceComment,
 			Enums:      []string{"enum_x"},
-			Attributes: []string{"attribute_x"},
+			Attributes: []objects.TypeAttribute{{Name: "type_attribute_x"}},
 		},
 	}
 
@@ -73,27 +77,27 @@ func TestCompareList(t *testing.T) {
 			Schema:     "public",
 			Format:     "",
 			Enums:      []string{"test_1", "test_2", "test_3"},
-			Attributes: []string{"attribute_1"},
+			Attributes: []objects.TypeAttribute{{Name: "type_attribute_1"}},
 			Comment:    nil,
 		},
 		{
 			Name:       "type2",
 			Schema:     "public",
 			Comment:    &targetComment,
-			Attributes: []string{"attribute_1"},
+			Attributes: []objects.TypeAttribute{{Name: "type_attribute_1"}},
 		},
 		{
 			Name:       "type3",
 			Schema:     "auth",
 			Comment:    &targetComment,
-			Attributes: []string{"attribute_1", "attribute_2"},
+			Attributes: []objects.TypeAttribute{{Name: "type_attribute_1"}, {Name: "type_attribute_2"}},
 		},
 		{
 			Name:       "type4",
 			Schema:     "auth",
 			Comment:    &sourceComment,
 			Enums:      []string{"enum_x"},
-			Attributes: []string{"attribute_x"},
+			Attributes: []objects.TypeAttribute{{Name: "type_attribute_x"}},
 		},
 	}
 

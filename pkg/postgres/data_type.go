@@ -72,6 +72,7 @@ const (
 	// timeType represents a time of day (no date) in PostgreSQL.
 	TimeType      DataType = "time without time zone" // 8 bytes, time of day (no date), 1 microsecond
 	TimeTypeAlias DataType = "time"
+
 	// timeTzType represents a time of day (no date), with time zone in PostgreSQL.
 	TimeTzType      DataType = "time with time zone" // 12 bytes, time of day with time zone, 1 microsecond
 	TimeTzTypeAlias DataType = "timez"
@@ -114,7 +115,7 @@ func ToGoType(pgType DataType, isNullable bool) (goType string) {
 	case VarcharType, VarcharTypeAlias, CharType, BpcharType, TextType:
 		goType = "string"
 	case TimestampType, TimestampTypeAlias, TimestampTzType, TimestampTzTypeAlias, TimeType, TimeTypeAlias, TimeTzType, TimeTzTypeAlias, DateType:
-		goType = "time.Time"
+		goType = "postgres.DateTime"
 	case IntervalType:
 		goType = "time.Duration"
 	case BooleanType:
@@ -157,8 +158,8 @@ func ToPostgresType(goType string) (pgType DataType) {
 		pgType = DoublePrecisionType
 	case "string":
 		pgType = TextType
-	case "time.Time":
-		pgType = TimestampTzType
+	case "postgres.DateTime":
+		pgType = TimestampType
 	case "time.Duration":
 		pgType = IntervalType
 	case "bool":
@@ -169,7 +170,6 @@ func ToPostgresType(goType string) (pgType DataType) {
 		pgType = PointType
 	case "interface{}", "any":
 		pgType = TextType
-
 	default:
 		// Default to TEXT for unknown types
 		pgType = TextType

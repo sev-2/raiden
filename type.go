@@ -1,6 +1,10 @@
 package raiden
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/sev-2/raiden/pkg/supabase/objects"
+)
 
 const (
 	DefaultTypeSchema = "public"
@@ -12,7 +16,7 @@ type (
 		Schema() string
 		Format() string
 		Enums() []string
-		Attributes() []string
+		Attributes() []objects.TypeAttribute
 		Comment() *string
 	}
 )
@@ -38,8 +42,8 @@ func (*TypeBase) Enums() []string {
 	return []string{}
 }
 
-func (*TypeBase) Attributes() []string {
-	return []string{}
+func (*TypeBase) Attributes() []objects.TypeAttribute {
+	return []objects.TypeAttribute{}
 }
 
 func (*TypeBase) Comment() *string {

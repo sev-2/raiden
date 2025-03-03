@@ -1,6 +1,7 @@
 package raiden
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -20,8 +21,12 @@ type ValidatorFunc struct {
 type WithValidator func(name string, validateFn validator.Func) ValidatorFunc
 
 // validate payload
-func Validate(payload any, requestValidators ...ValidatorFunc) error {
+func Validate(ctx context.Context, payload any, requestValidators ...ValidatorFunc) error {
 	validatorInstance := validator.New()
+	if err := validatorInstance.RegisterValidationCtx("requiredForMethod", RequiredForMethodValidator); err != nil {
+		return err
+	}
+
 	if len(requestValidators) > 0 {
 		for _, rv := range requestValidators {
 			err := validatorInstance.RegisterValidation(rv.Name, rv.Validator)
@@ -32,7 +37,7 @@ func Validate(payload any, requestValidators ...ValidatorFunc) error {
 	}
 
 	validatePayload := func(payload any) error {
-		if err := validatorInstance.Struct(payload); err != nil {
+		if err := validatorInstance.StructCtx(ctx, payload); err != nil {
 			validationError, isValid := err.(validator.ValidationErrors)
 			if !isValid {
 				return err
@@ -94,11 +99,66 @@ func Validate(payload any, requestValidators ...ValidatorFunc) error {
 	return nil
 }
 
+type ContextKey string
+
+const MethodContextKey ContextKey = "method"
+
+func RequiredForMethodValidator(ctx context.Context, fl validator.FieldLevel) bool {
+	// Get the method from context
+	method, ok := ctx.Value(MethodContextKey).(string)
+	if !ok {
+		return false // Context does not have a valid method
+	}
+
+	// Extract required methods from tag parameters
+	requiredMethods := strings.Split(fl.Param(), " ")
+
+	loweredMethods := []string{}
+	for _, method := range requiredMethods {
+		loweredMethods = append(loweredMethods, strings.ToLower(method))
+	}
+
+	// Check if the method from context matches any required method
+	if contains(loweredMethods, strings.ToLower(method)) {
+		field := fl.Field()
+
+		// If the field is a pointer, check if it's nil before dereferencing
+		if field.Kind() == reflect.Ptr {
+			if field.IsNil() {
+				return false // Pointer is nil, invalid
+			}
+			field = field.Elem() // Dereference pointer
+		}
+
+		// Validate based on the field's type
+		switch field.Kind() {
+		case reflect.String:
+			return field.String() != "" // Ensure string is not empty
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return field.Int() > 0 // Ensure int is greater than 0
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return field.Uint() > 0 // Ensure uint is greater than 0
+		case reflect.Float32, reflect.Float64:
+			return field.Float() != 0 // Ensure float is non-zero
+		case reflect.Slice, reflect.Map, reflect.Array:
+			return field.Len() > 0 // Ensure slice/map/array is not empty
+		case reflect.Struct:
+			return !field.IsZero() // Ensure struct is not zero-valued
+		default:
+			return !field.IsZero() // Ensure non-zero values for all other types
+		}
+	}
+
+	return true
+}
+
 // getInvalidMessage is manual mapping for error message base on validation result
 // todo : integrate with i18n
 func getInvalidMessage(field, tag, param string) (errMessage string) {
 	field = strings.ToLower(field)
 	switch tag {
+	case "requiredForMethod":
+		errMessage = fmt.Sprintf("%s is required", field)
 	case "required":
 		errMessage = fmt.Sprintf("%s is required", field)
 	case "email":

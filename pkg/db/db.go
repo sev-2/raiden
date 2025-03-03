@@ -119,6 +119,10 @@ func (q Query) Single(model interface{}) error {
 	return nil
 }
 
+func (q Query) GetQueryURI() string {
+	return buildQueryURI(q)
+}
+
 func (q Query) GetUrl() string {
 	urlQuery := buildQueryURI(q)
 

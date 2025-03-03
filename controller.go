@@ -1,6 +1,7 @@
 package raiden
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -305,7 +306,7 @@ func (rc RestController) Patch(ctx Context) error {
 		return err
 	}
 
-	if err1 := Validate(model); err1 != nil {
+	if err1 := Validate(ctx.RequestContext(), model); err1 != nil {
 		return err1
 	}
 
@@ -328,7 +329,7 @@ func (rc RestController) Post(ctx Context) error {
 		return err
 	}
 
-	if err1 := Validate(model); err1 != nil {
+	if err1 := Validate(ctx.RequestContext(), model); err1 != nil {
 		return err1
 	}
 
@@ -343,7 +344,7 @@ func (rc RestController) Put(ctx Context) error {
 		return err
 	}
 
-	if err1 := Validate(model); err1 != nil {
+	if err1 := Validate(ctx.RequestContext(), model); err1 != nil {
 		return err1
 	}
 
@@ -562,7 +563,11 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 	}
 
 	// validate marshalled payload
-	if err := Validate(payloadPtr); err != nil {
+	reqContext := context.WithValue(
+		context.Background(),
+		MethodContextKey, string(ctx.Request.Header.Method()),
+	)
+	if err := Validate(reqContext, payloadPtr); err != nil {
 		return err
 	}
 
@@ -602,8 +607,14 @@ func setPayloadValue(fieldValue reflect.Value, value string) error {
 			return fmt.Errorf("%s : must be integer value", fieldValue.Type().Name())
 		}
 		fieldValue.SetInt(int64(intValue))
+	case reflect.Ptr:
+		// Handle pointer types
+		if fieldValue.IsNil() {
+			fieldValue.Set(reflect.New(fieldValue.Type().Elem())) // Allocate new value
+		}
+		return setPayloadValue(fieldValue.Elem(), value)
 	default:
-		return fmt.Errorf("%s : unsupported field type %s", fieldValue.Type().Name(), fieldValue.Kind())
+		fieldValue.SetZero()
 	}
 
 	return nil
