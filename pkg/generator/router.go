@@ -161,7 +161,9 @@ func scanControllerDir(mode raiden.Mode, controllerPath, routePath string, route
 		}
 
 		if entry.IsDir() {
-			scanControllerDir(mode, newControllerPath, newRoutePath, routeMap) // Recursively scan subdirectories
+			if err := scanControllerDir(mode, newControllerPath, newRoutePath, routeMap); err != nil {
+				return err
+			}
 		} else {
 			if strings.HasSuffix(entry.Name(), ".go") {
 				fileName := strings.TrimSuffix(entry.Name(), ".go")
