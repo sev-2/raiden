@@ -1,8 +1,6 @@
-package storages
+package sclist
 
-import (
-	"github.com/sev-2/raiden"
-)
+import "github.com/sev-2/raiden"
 
 type MyStorage struct {
 	raiden.BucketBase
@@ -16,4 +14,9 @@ func (r *MyStorage) Name() string {
 }
 func (r *MyStorage) Public() bool {
 	return true
+}
+
+type StorageController struct {
+	raiden.ControllerBase
+	Storage MyStorage
 }

@@ -288,6 +288,13 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 			if err := generator.GenerateModels(projectPath, config.ProjectName, tableInputs, mapDataType, captureFunc); err != nil {
 				errChan <- err
 			}
+
+			if config.Mode == raiden.BffMode {
+				if err := generator.GenerateRestControllers(projectPath, config.ProjectName, tableInputs, generator.Generate); err != nil {
+					errChan <- err
+				}
+			}
+
 			ImportLogger.Info("finish generate tables")
 		}
 

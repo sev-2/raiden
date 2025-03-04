@@ -93,3 +93,35 @@ func TestCleanDoubleColonPattern(t *testing.T) {
 	expected := "text"
 	assert.Equal(t, expected, utils.CleanDoubleColonPattern(input))
 }
+
+// TestToKebabCase tests the ToKebabCase function with various inputs.
+func TestToKebabCase(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"HelloWorld", "hello-world"},
+		{"helloWorld", "hello-world"},
+		{"hello_world", "hello-world"},
+		{"hello world!", "hello-world"},
+		{"  someMixedCASE_String  ", "some-mixed-case-string"},
+		{"APIResponseHandler", "api-response-handler"},
+		{"convertToKebab", "convert-to-kebab"},
+		{"multiple    spaces", "multiple-spaces"},
+		{"___leading_trailing___", "leading-trailing"},
+		{"123Numbers456", "123-numbers456"},
+		{"JSONParser", "json-parser"},
+		{"HTMLToJSX", "html-to-jsx"}, // Ensures acronyms are handled
+		{"GoLangIsGreat", "go-lang-is-great"},
+		{"special@#$characters", "special-characters"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := utils.ToKebabCase(tt.input)
+			if result != tt.expected {
+				t.Errorf("ToKebabCase(%q) = %q; want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
