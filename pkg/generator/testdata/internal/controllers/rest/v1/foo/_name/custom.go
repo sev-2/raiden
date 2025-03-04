@@ -7,7 +7,6 @@ import (
 )
 
 type FooRequest struct {
-	Name string `path:"name"`
 }
 
 type FooResponse struct {
@@ -22,7 +21,7 @@ type FooController struct {
 }
 
 func (c *FooController) Post(ctx raiden.Context) error {
-	c.Result.Message = fmt.Sprintf("foo : %s", c.Payload.Name)
+
 	return ctx.SendJson(c.Result)
 }
 

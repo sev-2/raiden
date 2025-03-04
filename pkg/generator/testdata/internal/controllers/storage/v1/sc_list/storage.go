@@ -18,6 +18,5 @@ func (r *MyStorage) Public() bool {
 
 type StorageController struct {
 	raiden.ControllerBase
-	Http    string `path:"/sc-list" type:"storage"`
 	Storage MyStorage
 }
