@@ -23,7 +23,6 @@ type Sc struct {
 
 type ScController struct {
 	raiden.ControllerBase
-	Http  string `path:"/sc-list" type:"rest"`
 	Model Sc
 }
 
