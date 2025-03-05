@@ -42,6 +42,8 @@ type (
 
 		Set(key string, value any)
 		Get(key string) any
+		GetParam(key string) any
+		GetQuery(key string) string
 
 		Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
 
@@ -124,6 +126,14 @@ func (c *Ctx) Get(key string) any {
 		c.data = make(map[string]any)
 	}
 	return c.data[key]
+}
+
+func (c *Ctx) GetParam(key string) any {
+	return c.RequestContext().UserValue(key)
+}
+
+func (c *Ctx) GetQuery(key string) string {
+	return string(c.RequestContext().QueryArgs().Peek(key))
 }
 
 func (c *Ctx) Set(key string, value any) {

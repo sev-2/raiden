@@ -28,6 +28,8 @@ type MockContext struct {
 	WriteErrorFn        func(err error)
 	SetFn               func(key string, value any)
 	GetFn               func(key string) any
+	GetPathFn           func(key string) any
+	GetQueryFn          func(key string) string
 	Data                map[string]any
 	PublishFn           func(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error
 	HttpRequestFn       func(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
@@ -99,6 +101,14 @@ func (c *MockContext) Get(key string) any {
 
 func (c *MockContext) Set(key string, value any) {
 	c.Data[key] = value
+}
+
+func (c *MockContext) GetParam(key string) any {
+	return c.GetPathFn(key)
+}
+
+func (c *MockContext) GetQuery(key string) string {
+	return c.GetQueryFn(key)
 }
 
 func (c *MockContext) Publish(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error {
