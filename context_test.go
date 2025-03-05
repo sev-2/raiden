@@ -37,9 +37,12 @@ var (
 
 // Helper function to create a new Ctx instance
 func newTestCtx() *raiden.Ctx {
+	req := fasthttp.RequestCtx{}
+	req.SetUserValue("name", "name_xxxx")
+	req.URI().QueryArgs().Add("status", "approved_xxx")
 	ctx := &raiden.Ctx{
 		Context:    mockCtx,
-		RequestCtx: &fasthttp.RequestCtx{},
+		RequestCtx: &req,
 	}
 
 	ctx.SetSpan(mockSpan)
@@ -80,6 +83,21 @@ func TestCtx_GetSet(t *testing.T) {
 	ctx := newTestCtx()
 	ctx.Set(mockDataKey, mockDataVal)
 	assert.Equal(t, mockDataVal, ctx.Get(mockDataKey))
+}
+
+func TestCtx_GetParams(t *testing.T) {
+	ctx := newTestCtx()
+	param := ctx.GetParam("name")
+
+	paramStr, isString := param.(string)
+	assert.True(t, isString)
+	assert.Equal(t, "name_xxxx", paramStr)
+}
+
+func TestCtx_GetQuery(t *testing.T) {
+	ctx := newTestCtx()
+	status := ctx.GetQuery("status")
+	assert.Equal(t, "approved_xxx", status)
 }
 
 func TestCtx_SendJson(t *testing.T) {
