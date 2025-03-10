@@ -64,6 +64,12 @@ type Config struct {
 	TraceCollector           string           `mapstructure:"TRACE_COLLECTOR"`
 	TraceCollectorEndpoint   string           `mapstructure:"TRACE_COLLECTOR_ENDPOINT"`
 	Version                  string           `mapstructure:"VERSION"`
+	SmtpHost                 string           `mapstructure:"SMTP_HOST"`
+	SmtpPort                 int              `mapstructure:"SMTP_PORT"`
+	SmtpUser                 string           `mapstructure:"SMTP_USER"`
+	SmtpPass                 string           `mapstructure:"SMTP_PASS"`
+	SmtpAdminEmail           string           `mapstructure:"SMTP_ADMIN_EMAIL"`
+	SmtpSenderName           string           `mapstructure:"SMTP_SENDER_NAME"`
 }
 
 // The function `LoadConfig` loads a configuration file based on the provided path or uses default
