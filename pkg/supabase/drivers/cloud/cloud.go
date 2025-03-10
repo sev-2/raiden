@@ -3,7 +3,6 @@ package cloud
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -17,8 +16,7 @@ var CloudLogger = logger.HcLog().Named("supabase.cloud")
 
 func DefaultAuthInterceptor(accessToken string) func(req *http.Request) error {
 	return func(req *http.Request) error {
-		log.Println("accessToken", accessToken)
-		req.Header.Set("Authorization", accessToken)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 		return nil
 	}
 }
