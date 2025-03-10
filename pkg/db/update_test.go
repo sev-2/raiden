@@ -20,4 +20,11 @@ func TestUpdate(t *testing.T) {
 		Update(article, &articleMockModel)
 
 	assert.NoError(t, err)
+
+	err = NewQuery(&mockRaidenContext).
+		Model(articleMockModel).
+		Eq("id", 1).
+		Update(&article, &articleMockModel)
+
+	assert.NoError(t, err)
 }

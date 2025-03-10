@@ -17,7 +17,13 @@ func (q *Query) Update(p interface{}, model interface{}) error {
 	url := q.GetUrl()
 
 	var cols []string
+
 	t := reflect.TypeOf(p)
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		cols = append(cols, field.Name)
