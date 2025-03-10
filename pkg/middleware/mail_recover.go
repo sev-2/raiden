@@ -29,17 +29,20 @@ func sendPasswordRecovery(ctx raiden.Context) error {
 
 	token := crypto.GenerateTokenHash(user.Email, otp)
 
-	supabase.UpdateUserByEmail(ctx.Config(), email, token)
-	referrerURL := ctx.Get("redirect_to").(string)
-	externalURL := ctx.Get("externalURL").(string)
+	if err := supabase.UpdateUserByEmail(ctx.Config(), email, token); err != nil {
+		raiden.Error("error update user by email", err.Error())
+		return err
+	}
 
-	extUrl, err := url.Parse(externalURL)
+	referrerURL := ctx.Get("redirect_to").(string)
+	extUrl, err := url.Parse(referrerURL)
 
 	if (err != nil) || (extUrl.Scheme == "") || (extUrl.Host == "") {
 		return err
 	}
 
 	if err := mailer.RecoveryMail(email, token, otp, referrerURL, extUrl); err != nil {
+		raiden.Error("error send recovery mail", err.Error())
 		return err
 	}
 
