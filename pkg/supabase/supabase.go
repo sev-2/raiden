@@ -559,3 +559,17 @@ func decorateActionErr(action, resource string, fetchFn func() error) error {
 	}
 	return err
 }
+
+func GetUserByEmail(cfg *raiden.Config, email string) (objects.User, error) {
+	SupabaseLogger.Debug("Get user by email from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "user", func() (objects.User, error) {
+		return meta.GetUserByEmail(cfg, email)
+	})
+}
+
+func UpdateUserByEmail(cfg *raiden.Config, email string, token string) error {
+	SupabaseLogger.Debug("Update user by email from supabase pg-meta")
+	return decorateActionErr("update", "user", func() error {
+		return meta.UpdateUserRecoveryToken(cfg, email, token)
+	})
+}
