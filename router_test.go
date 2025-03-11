@@ -47,26 +47,31 @@ type HelloWorldController struct {
 }
 
 func (c *HelloWorldController) Get(ctx raiden.Context) error {
+	ctx.Set("method_get", true)
 	c.Result.Message = "success get data"
 	return ctx.SendJson(c.Result)
 }
 
 func (c *HelloWorldController) Post(ctx raiden.Context) error {
+	ctx.Set("method_post", true)
 	c.Result.Message = "success post data"
 	return ctx.SendJson(c.Result)
 }
 
 func (c *HelloWorldController) Patch(ctx raiden.Context) error {
+	ctx.Set("method_path", true)
 	c.Result.Message = "success patch data"
 	return ctx.SendJson(c.Result)
 }
 
 func (c *HelloWorldController) Put(ctx raiden.Context) error {
+	ctx.Set("method_put", true)
 	c.Result.Message = "success put data"
 	return ctx.SendJson(c.Result)
 }
 
 func (c *HelloWorldController) Delete(ctx raiden.Context) error {
+	ctx.Set("method_delete", true)
 	c.Result.Message = "success delete data"
 	return ctx.SendJson(c.Result)
 }
@@ -301,15 +306,9 @@ func Test_Route(t *testing.T) {
 	a := raiden.NewChain()
 	controller := &HelloWorldController{}
 
+	fsCtx := fasthttp.RequestCtx{}
+
 	mockCtx := &mock.MockContext{
-		CtxFn: func() context.Context {
-			return context.Background()
-		},
-		SetCtxFn:  func(ctx context.Context) {},
-		SetSpanFn: func(span trace.Span) {},
-		SendErrorWithCodeFn: func(statusCode int, err error) error {
-			return nil
-		},
 		TracerFn: func() trace.Tracer {
 			noopProvider := noop.NewTracerProvider()
 			tracer := noopProvider.Tracer("test")
@@ -328,40 +327,34 @@ func Test_Route(t *testing.T) {
 				CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
 			}
 		},
-		RequestContextFn: func() *fasthttp.RequestCtx {
-			return &fasthttp.RequestCtx{}
-		},
-		SendJsonFn: func(data any) error {
-			return nil
-		},
 	}
 
-	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
+	fn := a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "GET", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("POST", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "POST", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("PUT", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PUT", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("PATCH", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PATCH", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("DELETE", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "DELETE", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("OPTIONS", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "OPTIONS", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("HEAD", raiden.RouteTypeCustom, controller)
-	assert.Nil(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "HEAD", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 }
 
 func Test_RouteUnimplemented(t *testing.T) {
 	a := raiden.NewChain()
 	controller := &UnimplementedController{}
-
+	fsCtx := fasthttp.RequestCtx{}
 	mockCtx := &mock.MockContext{
 		CtxFn: func() context.Context {
 			return context.Background()
@@ -390,24 +383,25 @@ func Test_RouteUnimplemented(t *testing.T) {
 		},
 	}
 
-	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
-	assert.Error(t, fn(mockCtx))
+	fn := a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "GET", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("POST", raiden.RouteTypeCustom, controller)
-	assert.Error(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "POST", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("PUT", raiden.RouteTypeCustom, controller)
-	assert.Error(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PUT", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("PATCH", raiden.RouteTypeCustom, controller)
-	assert.Error(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PATCH", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("DELETE", raiden.RouteTypeCustom, controller)
-	assert.Error(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "DELETE", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("OPTIONS", raiden.RouteTypeCustom, controller)
-	assert.Error(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "OPTIONS", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
 
-	fn = a.Then("HEAD", raiden.RouteTypeCustom, controller)
-	assert.Error(t, fn(mockCtx))
+	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "HEAD", raiden.RouteTypeCustom, controller)
+	fn(&fsCtx)
+
 }

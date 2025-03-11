@@ -132,10 +132,18 @@ func (r *router) BuildHandler() {
 
 	// Proxy auth url
 	if r.config.Mode == BffMode {
+		chain := NewChain()
+		if r.config.TraceEnable {
+			chain = chain.Append(TraceMiddleware)
+		}
+
+		// if len(r.middlewares) > 0 {
+		// 	chain = r.buildAppMiddleware(chain)
+		// }
+
 		u, err := url.Parse(r.config.SupabasePublicUrl)
 		if err == nil {
-			r.engine.ANY("/auth/v1/{path:*}", AuthProxy(r.config, nil, nil))
-
+			r.engine.ANY("/auth/v1/{path:*}", AuthProxy(r.config, chain, nil, nil))
 			r.engine.GET("/realtime/v1/websocket", func(ctx *fasthttp.RequestCtx) {
 				WebSocketHandler(ctx, u)
 			})
@@ -187,7 +195,7 @@ func (r *router) buildNativeMiddleware(route *Route, chain Chain) Chain {
 
 func (r *router) buildAppMiddleware(chain Chain) Chain {
 	for _, m := range r.middlewares {
-		chain.Append(m)
+		chain = chain.Append(m)
 	}
 	return chain
 }
@@ -198,22 +206,21 @@ func (r *router) findRouteGroup(routeType RouteType) *fs_router.Group {
 
 func (r *router) bindRoute(chain Chain, route *Route) {
 	for _, m := range route.Methods {
-		handler := chain.Then(m, route.Type, route.Controller)
 		switch strings.ToUpper(m) {
 		case fasthttp.MethodGet:
-			r.engine.GET(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, handler))
+			r.engine.GET(route.Path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, m, route.Type, route.Controller))
 		case fasthttp.MethodPost:
-			r.engine.POST(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, handler))
+			r.engine.POST(route.Path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, m, route.Type, route.Controller))
 		case fasthttp.MethodPut:
-			r.engine.PUT(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, handler))
+			r.engine.PUT(route.Path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, m, route.Type, route.Controller))
 		case fasthttp.MethodPatch:
-			r.engine.PATCH(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, handler))
+			r.engine.PATCH(route.Path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, m, route.Type, route.Controller))
 		case fasthttp.MethodDelete:
-			r.engine.DELETE(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, handler))
+			r.engine.DELETE(route.Path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, m, route.Type, route.Controller))
 		case fasthttp.MethodOptions:
-			r.engine.OPTIONS(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, handler))
+			r.engine.OPTIONS(route.Path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, m, route.Type, route.Controller))
 		case fasthttp.MethodHead:
-			r.engine.HEAD(route.Path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, handler))
+			r.engine.HEAD(route.Path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, m, route.Type, route.Controller))
 		}
 	}
 }
@@ -244,9 +251,8 @@ func (r *router) registerRpcAndFunctionHandler(route *Route) {
 		if len(r.middlewares) > 0 {
 			chain = r.buildAppMiddleware(chain)
 		}
-		group.POST(routePath, buildHandler(
-			r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, route.Controller),
-		))
+
+		group.POST(routePath, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPost, route.Type, route.Controller))
 	}
 }
 
@@ -275,11 +281,11 @@ func (r *router) registerRestHandler(route *Route) {
 		}
 
 		path := strings.TrimPrefix(route.Path, "/rest/v1")
-		group.GET(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodGet, route.Type, restController)))
-		group.POST(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, restController)))
-		group.PUT(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPut, route.Type, restController)))
-		group.PATCH(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
-		group.DELETE(path, buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+		group.GET(path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodGet, route.Type, restController))
+		group.POST(path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPost, route.Type, restController))
+		group.PUT(path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPut, route.Type, restController))
+		group.PATCH(path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPatch, route.Type, restController))
+		group.DELETE(path, chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodDelete, route.Type, restController))
 	}
 }
 
@@ -298,11 +304,11 @@ func (r *router) registerStorageHandler(route *Route) {
 		}
 
 		path := strings.ReplaceAll(route.Path, "/storage/v1", "/storage/v1/object")
-		group.GET(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodGet, route.Type, restController)))
-		group.POST(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPost, route.Type, restController)))
-		group.PUT(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPut, route.Type, restController)))
-		group.PATCH(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodPatch, route.Type, restController)))
-		group.DELETE(path+"/{path:*}", buildHandler(r.config, r.tracer, r.jobChan, r.pubSub, chain.Then(fasthttp.MethodDelete, route.Type, restController)))
+		group.GET(path+"/{path:*}", chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodGet, route.Type, restController))
+		group.POST(path+"/{path:*}", chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPost, route.Type, restController))
+		group.PUT(path+"/{path:*}", chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPut, route.Type, restController))
+		group.PATCH(path+"/{path:*}", chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPatch, route.Type, restController))
+		group.DELETE(path+"/{path:*}", chain.Then(r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodDelete, route.Type, restController))
 	}
 }
 

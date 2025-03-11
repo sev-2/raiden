@@ -747,10 +747,11 @@ var allowedAuthPathMap = map[string]bool{
 
 func AuthProxy(
 	config *Config,
+	chain Chain,
 	requestInterceptor func(req *fasthttp.Request),
 	responseInterceptor func(resp *fasthttp.Response) error,
 ) fasthttp.RequestHandler {
-	return func(ctx *fasthttp.RequestCtx) {
+	return chain.ServeFsHandle(config, func(ctx *fasthttp.RequestCtx) {
 		// Create a new request object
 		req := fasthttp.AcquireRequest()
 		defer fasthttp.ReleaseRequest(req)
@@ -781,7 +782,7 @@ func AuthProxy(
 		resp := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(resp)
 
-		proxyLogger.Debug("Forward request", "method", req.Header.Method(), "uri", req.URI().FullURI())
+		proxyLogger.Debug("Forward request", "method", req.Header.Method(), "uri", string(req.URI().FullURI()))
 		if requestInterceptor != nil {
 			requestInterceptor(req)
 		}
@@ -810,7 +811,7 @@ func AuthProxy(
 
 		ctx.Response.SetStatusCode(resp.StatusCode())
 		ctx.Response.SetBody(resp.Body())
-	}
+	})
 }
 
 func countCharOccurrences(str string, char string) int {
