@@ -310,8 +310,10 @@ func TestAuthProxy(t *testing.T) {
 		},
 	}
 
+	chain := raiden.NewChain()
 	handler := raiden.AuthProxy(
 		ctx.Config(),
+		chain,
 		func(req *fasthttp.Request) {},
 		func(resp *fasthttp.Response) error { return nil },
 	)
@@ -330,8 +332,10 @@ func TestAuthProxy_ActualCallWithoutMock(t *testing.T) {
 		},
 	}
 
+	chain := raiden.NewChain()
 	handler := raiden.AuthProxy(
 		ctx.Config(),
+		chain,
 		func(req *fasthttp.Request) {},
 		func(resp *fasthttp.Response) error { return nil },
 	)
@@ -349,8 +353,10 @@ func TestAuthProxy_NotAllowedPath(t *testing.T) {
 		},
 	}
 
+	chain := raiden.NewChain()
 	handler := raiden.AuthProxy(
 		ctx.Config(),
+		chain,
 		func(req *fasthttp.Request) {},
 		func(resp *fasthttp.Response) error { return nil },
 	)
@@ -368,8 +374,10 @@ func TestAuthProxy_AllowedWithSpecificPath(t *testing.T) {
 		},
 	}
 
+	chain := raiden.NewChain()
 	handler := raiden.AuthProxy(
 		ctx.Config(),
+		chain,
 		func(req *fasthttp.Request) {},
 		func(resp *fasthttp.Response) error { return nil },
 	)

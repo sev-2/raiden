@@ -66,6 +66,14 @@ type (
 	}
 )
 
+func NewCtx(config *Config, tracer trace.Tracer, jobChan chan JobParams) Ctx {
+	return Ctx{
+		config:  config,
+		tracer:  tracer,
+		jobChan: jobChan,
+	}
+}
+
 func (c *Ctx) Config() *Config {
 	return c.config
 }
