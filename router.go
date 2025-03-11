@@ -136,9 +136,9 @@ func (r *router) BuildHandler() {
 			chain = chain.Append(TraceMiddleware)
 		}
 
-		// if len(r.middlewares) > 0 {
-		// 	chain = r.buildAppMiddleware(chain)
-		// }
+		if len(r.middlewares) > 0 {
+			chain = r.buildAppMiddleware(chain)
+		}
 
 		u, err := url.Parse(r.config.SupabasePublicUrl)
 		if err == nil {

@@ -1,7 +1,6 @@
 package raiden_test
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -302,6 +301,29 @@ func TestRouter_NewRouteFromStorageController(t *testing.T) {
 	assert.Equal(t, methods[1], r.Methods[1])
 }
 
+func TestRoute_BuildAppMiddleware(t *testing.T) {
+	conf := loadConfig()
+	conf.TraceEnable = true
+	router := raiden.NewRouter(conf)
+
+	rpcRoute := raiden.Route{
+		Type:    raiden.RouteTypeRpc,
+		Path:    "/some_rpc/",
+		Methods: []string{"POST"},
+	}
+
+	router.RegisterMiddlewares([]raiden.MiddlewareFn{
+		func(next raiden.RouteHandlerFn) raiden.RouteHandlerFn {
+			return next
+		},
+	})
+	router.Register([]*raiden.Route{&rpcRoute})
+	router.BuildHandler()
+
+	mapRoute := router.GetRegisteredRoutes()
+	assert.NotNil(t, mapRoute)
+}
+
 func Test_Route(t *testing.T) {
 	a := raiden.NewChain()
 	controller := &HelloWorldController{}
@@ -331,24 +353,39 @@ func Test_Route(t *testing.T) {
 
 	fn := a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "GET", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "{\"message\":\"success get data\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "POST", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "{\"message\":\"success post data\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PUT", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "{\"message\":\"success put data\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PATCH", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "{\"message\":\"success patch data\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "DELETE", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "{\"message\":\"success delete data\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "OPTIONS", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "{\"code\":\"Not Implemented\",\"message\":\"handler not implemented\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "HEAD", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "{\"code\":\"Not Implemented\",\"message\":\"handler not implemented\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
+
 }
 
 func Test_RouteUnimplemented(t *testing.T) {
@@ -356,14 +393,6 @@ func Test_RouteUnimplemented(t *testing.T) {
 	controller := &UnimplementedController{}
 	fsCtx := fasthttp.RequestCtx{}
 	mockCtx := &mock.MockContext{
-		CtxFn: func() context.Context {
-			return context.Background()
-		},
-		SetCtxFn:  func(ctx context.Context) {},
-		SetSpanFn: func(span trace.Span) {},
-		SendErrorWithCodeFn: func(statusCode int, err error) error {
-			return nil
-		},
 		TracerFn: func() trace.Tracer {
 			noopProvider := noop.NewTracerProvider()
 			tracer := noopProvider.Tracer("test")
@@ -375,33 +404,41 @@ func Test_RouteUnimplemented(t *testing.T) {
 				ProjectId:        "test-project-id",
 				ProjectName:      "My Great Project"}
 		},
-		RequestContextFn: func() *fasthttp.RequestCtx {
-			return &fasthttp.RequestCtx{}
-		},
-		SendJsonFn: func(data any) error {
-			return nil
-		},
 	}
 
 	fn := a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "GET", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "field Payload is not exist in UnimplementedController", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "POST", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "field Payload is not exist in UnimplementedController", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PUT", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "field Payload is not exist in UnimplementedController", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "PATCH", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "field Payload is not exist in UnimplementedController", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "DELETE", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "field Payload is not exist in UnimplementedController", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "OPTIONS", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "field Payload is not exist in UnimplementedController", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 	fn = a.Then(mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "HEAD", raiden.RouteTypeCustom, controller)
 	fn(&fsCtx)
+	assert.Equal(t, "field Payload is not exist in UnimplementedController", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
 
 }
