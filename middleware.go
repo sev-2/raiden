@@ -1,6 +1,7 @@
 package raiden
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/breaker"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var MiddlewareLogger = logger.HcLog().Named("raiden.middleware")
@@ -20,7 +22,8 @@ type (
 	Chain interface {
 		Append(middlewares ...MiddlewareFn) Chain
 		Prepend(middlewares ...MiddlewareFn) Chain
-		Then(httpMethod string, routeType RouteType, fn Controller) RouteHandlerFn
+		Then(config *Config, tracer trace.Tracer, jobChan chan JobParams, pubSub PubSub, httpMethod string, routeType RouteType, fn Controller) fasthttp.RequestHandler
+		ServeFsHandle(cfg *Config, fsHandle fasthttp.RequestHandler) fasthttp.RequestHandler
 	}
 
 	// chain acts as a list of application middlewares.
@@ -71,12 +74,47 @@ func (c chain) Prepend(middlewares ...MiddlewareFn) Chain {
 // When the request comes in, it will be passed to m1, then m2, then m3
 // and finally, the given handler
 // (assuming every middleware calls the following one).
-func (c chain) Then(httpMethod string, routeType RouteType, controller Controller) RouteHandlerFn {
-	handler := createHandleFunc(httpMethod, routeType, controller)
-	for i := range c.middlewares {
-		handler = c.middlewares[len(c.middlewares)-1-i](handler)
+func (c chain) Then(config *Config, tracer trace.Tracer, jobChan chan JobParams, pubSub PubSub, httpMethod string, routeType RouteType, controller Controller) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		handler := createHandleFunc(httpMethod, routeType, controller)
+		for i := range c.middlewares {
+			handler = c.middlewares[len(c.middlewares)-1-i](handler)
+		}
+
+		appContext := &Ctx{
+			Context:    context.Background(),
+			RequestCtx: ctx,
+			config:     config,
+			tracer:     tracer,
+			jobChan:    jobChan,
+			pubSub:     pubSub,
+		}
+
+		// execute actual handler from controller
+		if err := handler(appContext); err != nil {
+			appContext.WriteError(err)
+		}
 	}
-	return handler
+}
+
+func (c chain) ServeFsHandle(cfg *Config, next fasthttp.RequestHandler) fasthttp.RequestHandler {
+	handler := func(c Context) error {
+		next(c.RequestContext())
+		return nil
+	}
+
+	return func(fsCtx *fasthttp.RequestCtx) {
+		appContext := &Ctx{
+			config:     cfg,
+			RequestCtx: fsCtx,
+		}
+		for i := range c.middlewares {
+			handler = c.middlewares[len(c.middlewares)-1-i](handler)
+		}
+		if err := handler(appContext); err != nil {
+			appContext.WriteError(err)
+		}
+	}
 }
 
 func join(a, b []MiddlewareFn) []MiddlewareFn {

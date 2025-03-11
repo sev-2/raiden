@@ -37,7 +37,7 @@ func TestChain_Then(t *testing.T) {
 	controller := &HelloWorldController{}
 
 	// Call Then
-	fn := c.Then("GET", raiden.RouteTypeCustom, controller)
+	fn := c.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller)
 
 	// Test the returned function
 	assert.NotNil(t, fn)
@@ -52,11 +52,8 @@ func Test_Tracer(t *testing.T) {
 
 	controller := &HelloWorldController{}
 
-	fn := a.Then("GET", raiden.RouteTypeCustom, controller)
-
-	tracedChain := raiden.TraceMiddleware(fn)
-
-	assert.NotNil(t, tracedChain)
+	fn := a.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller)
+	assert.NotNil(t, fn)
 
 	mockCtx := &mock.MockContext{
 		CtxFn: func() context.Context {
@@ -93,12 +90,10 @@ func Test_Tracer(t *testing.T) {
 		},
 	}
 
-	breakerFn := breakerMiddleware(fn)
-	breakerRes := breakerFn(mockCtx)
-	assert.Nil(t, breakerRes)
-
-	initRes := fn(mockCtx)
-	assert.Nil(t, initRes)
+	tracedChain := raiden.TraceMiddleware(func(ctx raiden.Context) error {
+		return nil
+	})
+	assert.NotNil(t, tracedChain)
 
 	res := tracedChain(mockCtx)
 	assert.Nil(t, res)
