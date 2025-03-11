@@ -1,7 +1,6 @@
 package raiden
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -342,25 +341,6 @@ func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group 
 		RouteTypeRpc:      engine.Group("/rest/v1/rpc"),       // type rpc
 		RouteTypeRealtime: engine.Group("/realtime/v1"),       // type realtime
 		RouteTypeStorage:  engine.Group("/storage/v1/object"), // type storage
-	}
-}
-
-// The function "buildHandler" creates a fasthttp.RequestHandler that executes a given RouteHandlerFn
-// with a provided Config and trace.Tracer.
-func buildHandler(config *Config, tracer trace.Tracer, jobChan chan JobParams, pubSub PubSub, handler RouteHandlerFn) fasthttp.RequestHandler {
-	return func(ctx *fasthttp.RequestCtx) {
-		appContext := &Ctx{
-			RequestCtx: ctx,
-			config:     config,
-			tracer:     tracer,
-			Context:    context.Background(),
-			jobChan:    jobChan,
-			pubSub:     pubSub,
-		}
-		// execute actual handler from controller
-		if err := handler(appContext); err != nil {
-			appContext.WriteError(err)
-		}
 	}
 }
 

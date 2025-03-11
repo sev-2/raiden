@@ -104,14 +104,16 @@ func (c chain) ServeFsHandle(cfg *Config, next fasthttp.RequestHandler) fasthttp
 	}
 
 	return func(fsCtx *fasthttp.RequestCtx) {
-		appCtx := Ctx{
+		appContext := &Ctx{
 			config:     cfg,
 			RequestCtx: fsCtx,
 		}
 		for i := range c.middlewares {
 			handler = c.middlewares[len(c.middlewares)-1-i](handler)
 		}
-		handler(&appCtx)
+		if err := handler(appContext); err != nil {
+			appContext.WriteError(err)
+		}
 	}
 }
 
