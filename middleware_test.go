@@ -37,7 +37,7 @@ func TestChain_Then(t *testing.T) {
 	controller := &HelloWorldController{}
 
 	// Call Then
-	fn := c.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller)
+	fn := c.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller, nil)
 
 	// Test the returned function
 	assert.NotNil(t, fn)
@@ -52,7 +52,7 @@ func Test_Tracer(t *testing.T) {
 
 	controller := &HelloWorldController{}
 
-	fn := a.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller)
+	fn := a.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller, nil)
 	assert.NotNil(t, fn)
 
 	mockCtx := &mock.MockContext{

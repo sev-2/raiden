@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -33,6 +34,7 @@ type Server struct {
 	subscriberHandleFun []SubscriberHandler
 	jobs                []Job
 	tracer              trace.Tracer
+	libs                []any
 }
 
 func NewServer(config *Config) *Server {
@@ -75,6 +77,10 @@ func (s *Server) RegisterSubscribers(ss ...SubscriberHandler) {
 
 func (s *Server) Use(middleware MiddlewareFn) {
 	s.Router.middlewares = append(s.Router.middlewares, middleware)
+}
+
+func (s *Server) RegisterLibs(lib ...any) {
+	s.libs = append(s.libs, lib...)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
@@ -124,6 +130,11 @@ func (s *Server) configureRoute() {
 		s.Router.pubSub = s.pubSub
 	}
 
+	if s.libs != nil {
+		libItem := s.prepareLibraries()
+		s.Router.SetLib(libItem)
+	}
+
 	// build router
 	s.Router.BuildHandler()
 
@@ -136,6 +147,19 @@ func (s *Server) configureRoute() {
 
 func (s *Server) configureHttpServer() {
 	s.configureRoute()
+}
+
+// prepareLibraries processes the server libraries and returns a map
+func (s *Server) prepareLibraries() map[string]any {
+	libItem := map[string]any{}
+	for _, lib := range s.libs {
+		if lib == nil {
+			continue
+		}
+		key := reflect.TypeOf(lib).Elem()
+		libItem[key.Name()] = lib
+	}
+	return libItem
 }
 
 func (s *Server) prepareHttpServer() (h string, l net.Listener, errChan chan error) {

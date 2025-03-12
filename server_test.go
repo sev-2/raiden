@@ -21,6 +21,9 @@ type PrinHello struct {
 	raiden.JobBase
 }
 
+type LibA struct{}
+type LibB struct{}
+
 func (j *PrinHello) Name() string {
 	return "print-hello"
 }
@@ -142,6 +145,8 @@ func TestServer_StartStop(t *testing.T) {
 		s := raiden.NewServer(conf)
 		s.RegisterJobs(&PrinHello{})
 		s.RegisterSubscribers(&TestSubscriber{})
+		s.RegisterLibs(&SomeLib{})
+
 		s.Run()
 		return
 	}
@@ -153,4 +158,13 @@ func TestServer_StartStop(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	err1 := cmd.Process.Signal(syscall.SIGTERM)
 	assert.NoError(t, err1)
+}
+
+func TestServer_RegisterLibs(t *testing.T) {
+	conf := loadConfig()
+	s := raiden.NewServer(conf)
+
+	s.RegisterLibs(&SomeLib{})
+
+	assert.NotNil(t, s.RegisterLibs)
 }
