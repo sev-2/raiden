@@ -94,7 +94,7 @@ func (r *router) Register(routes []*Route) *router {
 	return r
 }
 
-func (r *router) SetLib(lib map[string]any) {
+func (r *router) ProvideLibraries(lib map[string]any) {
 	r.lib = lib
 }
 

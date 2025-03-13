@@ -33,8 +33,8 @@ type MockContext struct {
 	Data                map[string]any
 	PublishFn           func(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error
 	HttpRequestFn       func(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
-	GetLibFn            func(key any) error
-	SetLibFn            func(key map[string]any)
+	ResolveLibraryFn    func(key any) error
+	RegisterLibraryFn   func(key map[string]any)
 }
 
 func (c *MockContext) Ctx() context.Context {
@@ -121,10 +121,10 @@ func (c *MockContext) HttpRequest(method string, url string, body []byte, header
 	return c.HttpRequestFn(method, url, body, headers, timeout, response)
 }
 
-func (c *MockContext) GetLib(key any) error {
-	return c.GetLibFn(key)
+func (c *MockContext) ResolveLibrary(key any) error {
+	return c.ResolveLibraryFn(key)
 }
 
-func (c *MockContext) SetLib(key map[string]any) {
-	c.SetLibFn(key)
+func (c *MockContext) RegisterLibrary(key map[string]any) {
+	c.RegisterLibraryFn(key)
 }

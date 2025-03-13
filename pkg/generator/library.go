@@ -147,7 +147,7 @@ func scanLibDir(libPath string, libMap map[string]*GenerateLibItem) error {
 			}
 
 			if strings.HasSuffix(path, ".go") {
-				rs, e := getStructByBaseName(path, "LibBase")
+				rs, e := getStructByBaseName(path, "BaseLibrary")
 				if e != nil {
 					return e
 				}

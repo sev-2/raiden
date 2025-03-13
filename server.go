@@ -132,7 +132,7 @@ func (s *Server) configureRoute() {
 
 	if s.libs != nil {
 		libItem := s.prepareLibraries()
-		s.Router.SetLib(libItem)
+		s.Router.ProvideLibraries(libItem)
 	}
 
 	// build router

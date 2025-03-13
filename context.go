@@ -49,8 +49,8 @@ type (
 
 		HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
 
-		GetLib(key any) error
-		SetLib(key map[string]any)
+		ResolveLibrary(key any) error
+		RegisterLibrary(key map[string]any)
 	}
 
 	// The `Ctx` struct is a struct that implements the `Context` interface in the Raiden framework. It
@@ -60,13 +60,13 @@ type (
 	Ctx struct {
 		context.Context
 		*fasthttp.RequestCtx
-		config  *Config
-		span    trace.Span
-		tracer  trace.Tracer
-		jobChan chan JobParams
-		data    map[string]any
-		pubSub  PubSub
-		lib     map[string]any
+		config          *Config
+		span            trace.Span
+		tracer          trace.Tracer
+		jobChan         chan JobParams
+		data            map[string]any
+		pubSub          PubSub
+		libraryRegistry map[string]any
 	}
 )
 
@@ -115,8 +115,8 @@ func (c *Ctx) SetJobChan(jobChan chan JobParams) {
 	c.jobChan = jobChan
 }
 
-func (c *Ctx) SetLib(key map[string]any) {
-	c.lib = key
+func (c *Ctx) RegisterLibrary(key map[string]any) {
+	c.libraryRegistry = key
 }
 
 func (c *Ctx) NewJobCtx() (JobContext, error) {
@@ -241,7 +241,7 @@ func (c *Ctx) Write(data []byte) {
 	c.Response.AppendBody(data)
 }
 
-func (c *Ctx) GetLib(key any) error {
+func (c *Ctx) ResolveLibrary(key any) error {
 
 	keyVal := reflect.ValueOf(key)
 	if keyVal.Kind() != reflect.Ptr {
@@ -250,7 +250,7 @@ func (c *Ctx) GetLib(key any) error {
 
 	typeOfKey := reflect.TypeOf(key).Elem()
 
-	val, exists := c.lib[typeOfKey.Name()]
+	val, exists := c.libraryRegistry[typeOfKey.Name()]
 	if !exists {
 		return errors.New("lib not initialized")
 	}
@@ -269,5 +269,5 @@ func (c *Ctx) GetLib(key any) error {
 		return nil
 	}
 
-	return nil
+	return errors.New("lib not initialized")
 }

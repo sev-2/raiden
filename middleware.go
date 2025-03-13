@@ -82,13 +82,13 @@ func (c chain) Then(config *Config, tracer trace.Tracer, jobChan chan JobParams,
 		}
 
 		appContext := &Ctx{
-			Context:    context.Background(),
-			RequestCtx: ctx,
-			config:     config,
-			tracer:     tracer,
-			jobChan:    jobChan,
-			pubSub:     pubSub,
-			lib:        lib,
+			Context:         context.Background(),
+			RequestCtx:      ctx,
+			config:          config,
+			tracer:          tracer,
+			jobChan:         jobChan,
+			pubSub:          pubSub,
+			libraryRegistry: lib,
 		}
 
 		// execute actual handler from controller

@@ -29,7 +29,7 @@ type SomeRpc struct {
 }
 
 type SomeLib struct {
-	raiden.LibBase
+	raiden.BaseLibrary
 }
 
 var (
@@ -168,13 +168,13 @@ func TestCtx_JobNil(t *testing.T) {
 
 func TestCtx_GetLib_Ptr(t *testing.T) {
 	ctx := newTestCtx()
-	err := ctx.GetLib(SomeLib{})
+	err := ctx.ResolveLibrary(SomeLib{})
 	assert.Error(t, err)
 }
 
 func TestCtx_GetLib_Nil(t *testing.T) {
 	ctx := newTestCtx()
-	err := ctx.GetLib(&SomeLib{})
+	err := ctx.ResolveLibrary(&SomeLib{})
 	assert.Error(t, err)
 }
 
@@ -182,7 +182,7 @@ func TestCtx_SetLib(t *testing.T) {
 	lib := SomeLib{}
 	tLib := map[string]any{"SomeLib": lib}
 	ctx := newTestCtx()
-	ctx.SetLib(tLib)
-	err := ctx.GetLib(&lib)
+	ctx.RegisterLibrary(tLib)
+	err := ctx.ResolveLibrary(&lib)
 	assert.NoError(t, err)
 }
