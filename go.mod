@@ -1,6 +1,8 @@
 module github.com/sev-2/raiden
 
-go 1.21.5
+go 1.23.0
+
+toolchain go1.23.7
 
 require (
 	github.com/erikgeiser/promptkit v0.9.0
@@ -82,9 +84,9 @@ require (
 	go.opentelemetry.io/otel/metric v1.29.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
