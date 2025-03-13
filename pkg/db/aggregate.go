@@ -46,7 +46,7 @@ func (q *Query) Count(opts ...CountOptions) (int, error) {
 	contentRange := q.Context.RequestContext().Response.Header.Peek("Content-Range")
 	parts := strings.Split(string(contentRange), "/")
 
-	if len(parts) > 0 {
+	if len(parts) != 2 {
 		return 0, errors.New("invalid Content-Range format")
 	}
 
