@@ -1,6 +1,5 @@
 package raiden
 
 type (
-	BaseLibrary struct {
-	}
+	BaseLibrary struct{}
 )

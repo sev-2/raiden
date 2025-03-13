@@ -44,7 +44,7 @@ import (
 func RegisterLibs(server *raiden.Server) {
 	server.RegisterLibs(
 		{{- range .Libs}}
-			&{{.Alias}}.{{.Type}}{},
+			{{.Alias}}.NewLibrary,
 		{{- end}}
 	)
 }
