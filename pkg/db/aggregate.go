@@ -38,16 +38,16 @@ func (q *Query) Count(opts ...CountOptions) (int, error) {
 	headers["Range-Unit"] = "items"
 
 	var a interface{}
-	resp, err := PostgrestRequest(q.Context, q.credential, fasthttp.MethodHead, url, nil, headers, q.ByPass, &a)
+	_, err := PostgrestRequest(q.Context, q.credential, fasthttp.MethodHead, url, nil, headers, q.ByPass, &a)
 	if err != nil {
 		return 0, err
 	}
 
-	contentRange := resp.Header.Peek("Content-Range")
+	contentRange := q.Context.RequestContext().Response.Header.Peek("Content-Range")
 	parts := strings.Split(string(contentRange), "/")
 
 	if len(parts) > 0 {
-		return 0, errors.New("invalid range format")
+		return 0, errors.New("invalid Content-Range format")
 	}
 
 	count, err := strconv.Atoi(parts[1])
