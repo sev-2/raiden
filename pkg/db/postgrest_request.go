@@ -130,6 +130,14 @@ func PostgrestRequestBind(ctx raiden.Context, method string, url string, payload
 		}
 	}
 
+	for _, key := range res.Header.PeekKeys() {
+		headerKey := string(key)
+		ctx.RequestContext().Response.Header.Set(
+			headerKey,
+			string(res.Header.Peek(headerKey)),
+		)
+	}
+
 	return res, nil
 }
 
