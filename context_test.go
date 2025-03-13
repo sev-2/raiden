@@ -30,6 +30,7 @@ type SomeRpc struct {
 
 type SomeLib struct {
 	raiden.BaseLibrary
+	config *raiden.Config
 }
 
 var (

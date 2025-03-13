@@ -79,8 +79,11 @@ func (s *Server) Use(middleware MiddlewareFn) {
 	s.Router.middlewares = append(s.Router.middlewares, middleware)
 }
 
-func (s *Server) RegisterLibs(lib ...any) {
-	s.libs = append(s.libs, lib...)
+func (s *Server) RegisterLibs(libs ...func(config *Config) any) {
+	for _, lib := range libs {
+		library := lib(s.Config)
+		s.libs = append(s.libs, library)
+	}
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

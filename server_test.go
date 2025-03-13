@@ -145,7 +145,11 @@ func TestServer_StartStop(t *testing.T) {
 		s := raiden.NewServer(conf)
 		s.RegisterJobs(&PrinHello{})
 		s.RegisterSubscribers(&TestSubscriber{})
-		s.RegisterLibs(&SomeLib{})
+		s.RegisterLibs(func(config *raiden.Config) any {
+			return SomeLib{
+				config: config,
+			}
+		})
 
 		s.Run()
 		return
@@ -164,7 +168,11 @@ func TestServer_RegisterLibs(t *testing.T) {
 	conf := loadConfig()
 	s := raiden.NewServer(conf)
 
-	s.RegisterLibs(&SomeLib{})
+	s.RegisterLibs(func(config *raiden.Config) any {
+		return SomeLib{
+			config: config,
+		}
+	})
 
 	assert.NotNil(t, s.RegisterLibs)
 }
