@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -33,6 +34,7 @@ type Server struct {
 	subscriberHandleFun []SubscriberHandler
 	jobs                []Job
 	tracer              trace.Tracer
+	libraryRegistries   []any
 }
 
 func NewServer(config *Config) *Server {
@@ -75,6 +77,18 @@ func (s *Server) RegisterSubscribers(ss ...SubscriberHandler) {
 
 func (s *Server) Use(middleware MiddlewareFn) {
 	s.Router.middlewares = append(s.Router.middlewares, middleware)
+}
+
+func (s *Server) RegisterLibs(libs ...func(config *Config) any) {
+	for _, lib := range libs {
+		library := lib(s.Config)
+		if _, ok := library.(Library); ok {
+			s.libraryRegistries = append(s.libraryRegistries, library)
+		} else {
+			ServerLogger.Error(fmt.Sprintf("library %s is not implement Library interface", reflect.TypeOf(library).Name()))
+			os.Exit(1)
+		}
+	}
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
@@ -124,6 +138,11 @@ func (s *Server) configureRoute() {
 		s.Router.pubSub = s.pubSub
 	}
 
+	if s.libraryRegistries != nil {
+		libItem := s.prepareLibraries()
+		s.Router.ProvideLibraries(libItem)
+	}
+
 	// build router
 	s.Router.BuildHandler()
 
@@ -136,6 +155,19 @@ func (s *Server) configureRoute() {
 
 func (s *Server) configureHttpServer() {
 	s.configureRoute()
+}
+
+// prepareLibraries processes the server libraries and returns a map
+func (s *Server) prepareLibraries() map[string]any {
+	libItem := map[string]any{}
+	for _, lib := range s.libraryRegistries {
+		if lib == nil {
+			continue
+		}
+		key := reflect.TypeOf(lib).Elem()
+		libItem[key.Name()] = lib
+	}
+	return libItem
 }
 
 func (s *Server) prepareHttpServer() (h string, l net.Listener, errChan chan error) {
