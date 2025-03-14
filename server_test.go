@@ -146,7 +146,7 @@ func TestServer_StartStop(t *testing.T) {
 		s.RegisterJobs(&PrinHello{})
 		s.RegisterSubscribers(&TestSubscriber{})
 		s.RegisterLibs(func(config *raiden.Config) any {
-			return SomeLib{
+			return &SomeLib{
 				config: config,
 			}
 		})
@@ -169,7 +169,7 @@ func TestServer_RegisterLibs(t *testing.T) {
 	s := raiden.NewServer(conf)
 
 	s.RegisterLibs(func(config *raiden.Config) any {
-		return SomeLib{
+		return &SomeLib{
 			config: config,
 		}
 	})

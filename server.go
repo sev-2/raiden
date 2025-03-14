@@ -82,7 +82,18 @@ func (s *Server) Use(middleware MiddlewareFn) {
 func (s *Server) RegisterLibs(libs ...func(config *Config) any) {
 	for _, lib := range libs {
 		library := lib(s.Config)
-		s.libs = append(s.libs, library)
+		if _, ok := library.(Library); ok {
+			s.libs = append(s.libs, library)
+		} else {
+			libraryReflect := reflect.ValueOf(library)
+			if libraryReflect.Kind() != reflect.Ptr {
+				ServerLogger.Error(fmt.Sprintf("library %s is not implement Library interface", libraryReflect.Type().Name()))
+				os.Exit(1)
+			}
+			libraryType := reflect.TypeOf(library).Elem()
+			ServerLogger.Error(fmt.Sprintf("library %s is not implement Library interface", libraryType))
+			os.Exit(1)
+		}
 	}
 }
 

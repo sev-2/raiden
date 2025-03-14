@@ -50,7 +50,7 @@ type (
 		HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
 
 		ResolveLibrary(key any) error
-		RegisterLibrary(key map[string]any)
+		RegisterLibraries(key map[string]any)
 	}
 
 	// The `Ctx` struct is a struct that implements the `Context` interface in the Raiden framework. It
@@ -115,7 +115,7 @@ func (c *Ctx) SetJobChan(jobChan chan JobParams) {
 	c.jobChan = jobChan
 }
 
-func (c *Ctx) RegisterLibrary(key map[string]any) {
+func (c *Ctx) RegisterLibraries(key map[string]any) {
 	c.libraryRegistry = key
 }
 

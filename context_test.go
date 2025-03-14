@@ -183,7 +183,7 @@ func TestCtx_SetLib(t *testing.T) {
 	lib := SomeLib{}
 	tLib := map[string]any{"SomeLib": lib}
 	ctx := newTestCtx()
-	ctx.RegisterLibrary(tLib)
+	ctx.RegisterLibraries(tLib)
 	err := ctx.ResolveLibrary(&lib)
 	assert.NoError(t, err)
 }
