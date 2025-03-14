@@ -34,7 +34,7 @@ type Server struct {
 	subscriberHandleFun []SubscriberHandler
 	jobs                []Job
 	tracer              trace.Tracer
-	libs                []any
+	libraryRegistries   []any
 }
 
 func NewServer(config *Config) *Server {
@@ -83,15 +83,9 @@ func (s *Server) RegisterLibs(libs ...func(config *Config) any) {
 	for _, lib := range libs {
 		library := lib(s.Config)
 		if _, ok := library.(Library); ok {
-			s.libs = append(s.libs, library)
+			s.libraryRegistries = append(s.libraryRegistries, library)
 		} else {
-			libraryReflect := reflect.ValueOf(library)
-			if libraryReflect.Kind() != reflect.Ptr {
-				ServerLogger.Error(fmt.Sprintf("library %s is not implement Library interface", libraryReflect.Type().Name()))
-				os.Exit(1)
-			}
-			libraryType := reflect.TypeOf(library).Elem()
-			ServerLogger.Error(fmt.Sprintf("library %s is not implement Library interface", libraryType))
+			ServerLogger.Error(fmt.Sprintf("library %s is not implement Library interface", reflect.TypeOf(library).Name()))
 			os.Exit(1)
 		}
 	}
@@ -144,7 +138,7 @@ func (s *Server) configureRoute() {
 		s.Router.pubSub = s.pubSub
 	}
 
-	if s.libs != nil {
+	if s.libraryRegistries != nil {
 		libItem := s.prepareLibraries()
 		s.Router.ProvideLibraries(libItem)
 	}
@@ -166,7 +160,7 @@ func (s *Server) configureHttpServer() {
 // prepareLibraries processes the server libraries and returns a map
 func (s *Server) prepareLibraries() map[string]any {
 	libItem := map[string]any{}
-	for _, lib := range s.libs {
+	for _, lib := range s.libraryRegistries {
 		if lib == nil {
 			continue
 		}
