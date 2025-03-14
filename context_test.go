@@ -28,6 +28,11 @@ type SomeRpc struct {
 	Return GetResult   `json:"-"`
 }
 
+type SomeLib struct {
+	raiden.BaseLibrary
+	config *raiden.Config
+}
+
 var (
 	mockSpan    = trace.SpanFromContext(context.Background())
 	mockDataKey = "key"
@@ -157,8 +162,28 @@ func TestCtx_Job(t *testing.T) {
 
 func TestCtx_JobNil(t *testing.T) {
 	ctx := newTestCtx()
-
 	c, e := ctx.NewJobCtx()
 	assert.Error(t, e)
 	assert.Nil(t, c)
+}
+
+func TestCtx_GetLib_Ptr(t *testing.T) {
+	ctx := newTestCtx()
+	err := ctx.ResolveLibrary(SomeLib{})
+	assert.Error(t, err)
+}
+
+func TestCtx_GetLib_Nil(t *testing.T) {
+	ctx := newTestCtx()
+	err := ctx.ResolveLibrary(&SomeLib{})
+	assert.Error(t, err)
+}
+
+func TestCtx_SetLib(t *testing.T) {
+	lib := SomeLib{}
+	tLib := map[string]any{"SomeLib": lib}
+	ctx := newTestCtx()
+	ctx.RegisterLibraries(tLib)
+	err := ctx.ResolveLibrary(&lib)
+	assert.NoError(t, err)
 }

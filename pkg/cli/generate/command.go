@@ -217,6 +217,12 @@ func Run(flags *Flags, config *raiden.Config, projectPath string, initialize boo
 		}
 		GenerateLogger.Debug("finish generate types register file")
 
+		GenerateLogger.Debug("start generate libs register file")
+		if err := generator.GenerateLibRegister(projectPath, config.ProjectName, generator.Generate); err != nil {
+			errChan <- err
+		}
+		GenerateLogger.Debug("finish generate libs register file")
+
 		if initialize {
 			// generate import main function
 			GenerateLogger.Debug("start generate import main function file")

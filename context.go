@@ -48,6 +48,9 @@ type (
 		Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
 
 		HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
+
+		ResolveLibrary(key any) error
+		RegisterLibraries(key map[string]any)
 	}
 
 	// The `Ctx` struct is a struct that implements the `Context` interface in the Raiden framework. It
@@ -57,12 +60,13 @@ type (
 	Ctx struct {
 		context.Context
 		*fasthttp.RequestCtx
-		config  *Config
-		span    trace.Span
-		tracer  trace.Tracer
-		jobChan chan JobParams
-		data    map[string]any
-		pubSub  PubSub
+		config          *Config
+		span            trace.Span
+		tracer          trace.Tracer
+		jobChan         chan JobParams
+		data            map[string]any
+		pubSub          PubSub
+		libraryRegistry map[string]any
 	}
 )
 
@@ -109,6 +113,10 @@ func (c *Ctx) Tracer() trace.Tracer {
 
 func (c *Ctx) SetJobChan(jobChan chan JobParams) {
 	c.jobChan = jobChan
+}
+
+func (c *Ctx) RegisterLibraries(key map[string]any) {
+	c.libraryRegistry = key
 }
 
 func (c *Ctx) NewJobCtx() (JobContext, error) {
@@ -231,4 +239,35 @@ func (c *Ctx) WriteError(err error) {
 func (c *Ctx) Write(data []byte) {
 	c.Response.SetStatusCode(fasthttp.StatusOK)
 	c.Response.AppendBody(data)
+}
+
+func (c *Ctx) ResolveLibrary(key any) error {
+
+	keyVal := reflect.ValueOf(key)
+	if keyVal.Kind() != reflect.Ptr {
+		return errors.New("key must be a pointer")
+	}
+
+	typeOfKey := reflect.TypeOf(key).Elem()
+
+	val, exists := c.libraryRegistry[typeOfKey.Name()]
+	if !exists {
+		return errors.New("lib not initialized")
+	}
+
+	valReflect := reflect.ValueOf(val)
+
+	// If the stored value is a pointer but key expects a non-pointer, dereference it
+	if valReflect.Kind() == reflect.Ptr && valReflect.Elem().Type() == typeOfKey {
+		keyVal.Elem().Set(valReflect.Elem()) // Set the dereferenced value
+		return nil
+	}
+
+	// If the types match directly, assign the value
+	if valReflect.Type().AssignableTo(typeOfKey) {
+		keyVal.Elem().Set(valReflect)
+		return nil
+	}
+
+	return errors.New("lib not initialized")
 }
