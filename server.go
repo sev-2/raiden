@@ -100,9 +100,7 @@ func (s *Server) RegisterModule(module Module) {
 	s.registerLibrary(module.Libs()...)
 
 	// Register Routes
-	for _, route := range module.Routes() {
-		s.Router.routes = append(s.Router.routes, route)
-	}
+	s.Router.routes = append(s.Router.routes, module.Routes()...)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
