@@ -73,6 +73,27 @@ func (s *TestSubscriber) Consume(ctx raiden.SubscriberContext, message any) erro
 	return nil
 }
 
+type TestModule struct {
+}
+
+func (m *TestModule) Routes() []*raiden.Route {
+	return []*raiden.Route{
+		{
+			Methods: []string{"GET"}, Path: "/",
+		},
+	}
+}
+
+func (m *TestModule) Libs() []func(config *raiden.Config) any {
+	return []func(config *raiden.Config) any{
+		func(config *raiden.Config) any {
+			return &SomeLib{
+				config: config,
+			}
+		},
+	}
+}
+
 func MockMiddlewareFn() raiden.MiddlewareFn {
 	return func(next raiden.RouteHandlerFn) raiden.RouteHandlerFn {
 		return nil
@@ -175,4 +196,13 @@ func TestServer_RegisterLibs(t *testing.T) {
 	})
 
 	assert.NotNil(t, s.RegisterLibs)
+}
+
+func TestServer_RegisterModules(t *testing.T) {
+	conf := loadConfig()
+	s := raiden.NewServer(conf)
+
+	module := &TestModule{}
+	s.RegisterModules(module)
+	assert.NotNil(t, s.RegisterModules)
 }

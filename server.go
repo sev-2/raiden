@@ -80,6 +80,10 @@ func (s *Server) Use(middleware MiddlewareFn) {
 }
 
 func (s *Server) RegisterLibs(libs ...func(config *Config) any) {
+	s.registerLibrary(libs...)
+}
+
+func (s *Server) registerLibrary(libs ...func(config *Config) any) {
 	for _, lib := range libs {
 		library := lib(s.Config)
 		if _, ok := library.(Library); ok {
@@ -89,6 +93,14 @@ func (s *Server) RegisterLibs(libs ...func(config *Config) any) {
 			os.Exit(1)
 		}
 	}
+}
+
+func (s *Server) RegisterModules(module Module) {
+	// Register Libs
+	s.registerLibrary(module.Libs()...)
+
+	// Register Routes
+	s.Router.routes = append(s.Router.routes, module.Routes()...)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
