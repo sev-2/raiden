@@ -198,11 +198,11 @@ func TestServer_RegisterLibs(t *testing.T) {
 	assert.NotNil(t, s.RegisterLibs)
 }
 
-func TestServer_RegisterModule(t *testing.T) {
+func TestServer_RegisterModules(t *testing.T) {
 	conf := loadConfig()
 	s := raiden.NewServer(conf)
 
 	module := &TestModule{}
-	s.RegisterModule(module)
-	assert.NotNil(t, s.RegisterModule)
+	s.RegisterModules(module)
+	assert.NotNil(t, s.RegisterModules)
 }

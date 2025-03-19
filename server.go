@@ -95,7 +95,7 @@ func (s *Server) registerLibrary(libs ...func(config *Config) any) {
 	}
 }
 
-func (s *Server) RegisterModule(module Module) {
+func (s *Server) RegisterModules(module Module) {
 	// Register Libs
 	s.registerLibrary(module.Libs()...)
 
