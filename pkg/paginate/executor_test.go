@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -166,9 +166,6 @@ func TestExecutor_BffCursorNext(t *testing.T) {
 	})
 
 	result, err := paginator.Execute(context.Background(), "/data")
-
-	rByte, _ := json.MarshalIndent(result, "*", " ")
-	slog.Info(string(rByte))
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Data, 3)
@@ -387,6 +384,90 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 
 	prevCursor := requestCtx.Response.Header.Peek("prev-cursor")
 	assert.Equal(t, "4", string(prevCursor))
+
+	// tes cursor error
+	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
+		// assert uri
+		uri := r1.URI().String()
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d&order=id.desc", 4)
+		if strings.Contains(uri, "limit=1") {
+			return http.ErrServerClosed
+		}
+
+		assert.Equal(t, expectedUri, uri)
+
+		// assert token
+		assert.Equal(t, token, string(r1.Header.Peek("Authorization")))
+		assert.Equal(t, apiKey, string(r1.Header.Peek("apiKey")))
+
+		finalMockData := []map[string]any{{"id": 4, "name": "test_4"}, mockData[2], mockData[1]}
+		if strings.Contains(uri, "limit=1") {
+			finalMockData = []map[string]any{{"id": 5, "name": "test_5"}}
+		}
+
+		dataByte, err := json.Marshal(finalMockData)
+		if err != nil {
+			return err
+		}
+		r2.SetBodyRaw(dataByte)
+		r2.Header.Set("content-range", "0-24/3")
+		return nil
+	})
+	defer closeFn()
+
+	paginator = paginate.NewFromContext(ctx, paginate.ExecuteOptions{
+		Cursor:          2,
+		Limit:           3,
+		Type:            paginate.CursorPagination,
+		WithCount:       true,
+		CursorDirection: paginate.CursorPaginateDirectionPrev,
+	})
+
+	result, err = paginator.Execute(context.Background(), "/data")
+	assert.NoError(t, err)
+	assert.Equal(t, nil, result.PrevCursor)
+
+	// tes cursor empty
+	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
+		// assert uri
+		uri := r1.URI().String()
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d&order=id.desc", 4)
+		if strings.Contains(uri, "limit=1") {
+			return http.ErrServerClosed
+		}
+
+		assert.Equal(t, expectedUri, uri)
+
+		// assert token
+		assert.Equal(t, token, string(r1.Header.Peek("Authorization")))
+		assert.Equal(t, apiKey, string(r1.Header.Peek("apiKey")))
+
+		finalMockData := []map[string]any{{"id": 4, "name": "test_4"}, mockData[2], mockData[1]}
+		if strings.Contains(uri, "limit=1") {
+			finalMockData = []map[string]any{}
+		}
+
+		dataByte, err := json.Marshal(finalMockData)
+		if err != nil {
+			return err
+		}
+		r2.SetBodyRaw(dataByte)
+		r2.Header.Set("content-range", "0-24/3")
+		return nil
+	})
+	defer closeFn()
+
+	paginator = paginate.NewFromContext(ctx, paginate.ExecuteOptions{
+		Cursor:          2,
+		Limit:           3,
+		Type:            paginate.CursorPagination,
+		WithCount:       true,
+		CursorDirection: paginate.CursorPaginateDirectionPrev,
+	})
+
+	result, err = paginator.Execute(context.Background(), "/data")
+	assert.NoError(t, err)
+	assert.Equal(t, nil, result.PrevCursor)
 }
 
 func TestExecutor_SvcCursor(t *testing.T) {
@@ -528,4 +609,60 @@ func TestExecutor_NewBffCursorPrev(t *testing.T) {
 
 	_, err := paginator.Execute(context.Background(), "/data?select=*")
 	assert.Error(t, err)
+
+	// empty response
+	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
+		uri := r1.URI().String()
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d&order=id.desc", 4)
+		assert.Equal(t, expectedUri, uri)
+		dataByte, err := json.Marshal([]map[string]any{})
+		if err != nil {
+			return err
+		}
+		r2.SetBodyRaw(dataByte)
+		r2.Header.Set("content-range", "0-24/0")
+		return nil
+	})
+	defer closeFn()
+
+	paginator = paginate.New(cfg, paginate.ExecuteOptions{
+		Cursor:          "1",
+		Limit:           3,
+		Type:            paginate.CursorPagination,
+		IsBypass:        true,
+		WithCount:       true,
+		CursorDirection: paginate.CursorPaginateDirectionPrev,
+	})
+
+	result, err := paginator.Execute(context.Background(), "/data?select=*")
+	assert.NoError(t, err)
+	assert.Nil(t, result.PrevCursor)
+
+	// response data not expexted
+	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
+		uri := r1.URI().String()
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d&order=id.desc", 4)
+		assert.Equal(t, expectedUri, uri)
+		dataByte, err := json.Marshal([]map[string]any{{"name": "vani"}})
+		if err != nil {
+			return err
+		}
+		r2.SetBodyRaw(dataByte)
+		r2.Header.Set("content-range", "0-24/1")
+		return nil
+	})
+	defer closeFn()
+
+	paginator = paginate.New(cfg, paginate.ExecuteOptions{
+		Cursor:          "1",
+		Limit:           3,
+		Type:            paginate.CursorPagination,
+		IsBypass:        true,
+		WithCount:       true,
+		CursorDirection: paginate.CursorPaginateDirectionPrev,
+	})
+
+	result, err = paginator.Execute(context.Background(), "/data?select=*")
+	assert.NoError(t, err)
+	assert.Nil(t, result.PrevCursor)
 }

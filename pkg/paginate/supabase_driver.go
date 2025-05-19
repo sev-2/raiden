@@ -224,6 +224,7 @@ func (s SupabaseDriver) extractPrevCursor(direction string, statement string, cu
 	}
 
 	data, _, err := s.request(statement, false)
+
 	if err != nil {
 		logger.HcLog().Error("[paginate] extractPrevCursor ", "error", err)
 	}
