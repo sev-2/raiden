@@ -471,9 +471,13 @@ func TestExecutor_NewSvc(t *testing.T) {
 func TestExecutor_NewBffCursorNext(t *testing.T) {
 	closeFn := setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d", 3)
+		expectUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d", 4)
 		assert.Equal(t, expectUri, uri)
-		dataByte, err := json.Marshal(mockData)
+
+		finalMockData := mockData
+		finalMockData = append(finalMockData, map[string]any{"id": 4, "name": "test_4"})
+
+		dataByte, err := json.Marshal(finalMockData)
 		if err != nil {
 			return err
 		}
@@ -505,8 +509,8 @@ func TestExecutor_NewBffCursorNext(t *testing.T) {
 func TestExecutor_NewBffCursorPrev(t *testing.T) {
 	closeFn := setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d", 3)
-		assert.Equal(t, expectUri, uri)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d&order=id.desc", 4)
+		assert.Equal(t, expectedUri, uri)
 		return fasthttp.ErrConnectionClosed
 	})
 	defer closeFn()
