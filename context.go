@@ -47,7 +47,8 @@ type (
 
 		Publish(ctx context.Context, provider PubSubProviderType, topic string, message []byte) error
 
-		HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
+		HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration) (*http.Response, error)
+		HttpRequestAndBind(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
 
 		ResolveLibrary(key any) error
 		RegisterLibraries(key map[string]any)
@@ -193,7 +194,7 @@ func (c *Ctx) SendErrorWithCode(statusCode int, err error) error {
 	}
 }
 
-func (c *Ctx) HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error {
+func (c *Ctx) HttpRequestAndBind(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error {
 	if reflect.TypeOf(response).Kind() != reflect.Ptr {
 		return errors.New("response payload must be pointer")
 	}
@@ -215,6 +216,29 @@ func (c *Ctx) HttpRequest(method string, url string, body []byte, headers map[st
 	}
 
 	return json.Unmarshal(byteData, response)
+}
+
+func (c *Ctx) HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration) (response *http.Response, err error) {
+	_, errResponse := net.SendRequest(method, url, body, timeout, func(req *http.Request) error {
+		currentHeaders := req.Header.Clone()
+		if len(headers) > 0 {
+			for k, v := range headers {
+				currentHeaders.Set(k, v)
+			}
+		}
+		req.Header = currentHeaders
+
+		return nil
+	}, func(resp *http.Response) error {
+		response = resp
+		return nil
+	})
+
+	if errResponse != nil {
+		err = errResponse
+	}
+
+	return
 }
 
 // The `WriteError` function is a method of the `Ctx` struct in the Raiden framework. It is responsible

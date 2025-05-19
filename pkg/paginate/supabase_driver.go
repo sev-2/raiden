@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sev-2/raiden/pkg/client"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/valyala/fasthttp"
 )
 
@@ -32,6 +34,10 @@ func (s *SupabaseDriver) Paginate(ctx context.Context, statement string, page, l
 }
 
 func (s *SupabaseDriver) CursorPaginateNext(ctx context.Context, statement string, cursorRefColumn string, cursor any, limit int, withCount bool) ([]Item, int, any, any, error) {
+	// increase for check if have next data in next page
+	limit += 1
+
+	// build statement
 	paginateStatement := fmt.Sprintf("limit=%d", limit)
 
 	if cursor != nil {
@@ -43,27 +49,40 @@ func (s *SupabaseDriver) CursorPaginateNext(ctx context.Context, statement strin
 		}
 	}
 
-	if len(strings.Split(statement, "?")) == 2 {
-		statement = fmt.Sprintf("%s&%s", statement, paginateStatement)
+	finalStatement := statement
+	if len(strings.Split(finalStatement, "?")) == 2 {
+		finalStatement = fmt.Sprintf("%s&%s", finalStatement, paginateStatement)
 	} else {
-		statement = fmt.Sprintf("%s?%s", statement, paginateStatement)
+		finalStatement = fmt.Sprintf("%s?%s", finalStatement, paginateStatement)
 	}
 
-	data, count, err := s.request(statement, withCount)
+	data, count, err := s.request(finalStatement, withCount)
 	if err != nil {
 		return data, 0, nil, nil, err
+	}
+
+	items := data
+	if len(data) == limit {
+		items = data[:len(data)-1]
 	}
 
 	var nextCursor, prevCursor any
 	if cursor != nil {
-		prevCursor = s.extractPrevCursor(cursorRefColumn, data)
+		prevCursor = s.extractPrevCursor("next", statement, cursorRefColumn, items)
 	}
-	nextCursor = s.extractNextCursor(cursorRefColumn, data)
 
-	return data, count, nextCursor, prevCursor, nil
+	if len(data) == limit {
+		nextCursor = s.extractNextCursor(cursorRefColumn, items)
+	}
+
+	return items, count, nextCursor, prevCursor, nil
 }
 
 func (s *SupabaseDriver) CursorPaginatePrev(ctx context.Context, statement string, cursorRefColumn string, cursor any, limit int, withCount bool) ([]Item, int, any, any, error) {
+	// increase for check if have next data in next page
+	limit += 1
+
+	// build statement
 	paginateStatement := fmt.Sprintf("limit=%d", limit)
 	if cursor != nil {
 		if reflect.TypeOf(cursor).Kind() == reflect.String && len(cursor.(string)) > 0 {
@@ -74,19 +93,37 @@ func (s *SupabaseDriver) CursorPaginatePrev(ctx context.Context, statement strin
 		}
 	}
 
-	if len(strings.Split(statement, "?")) == 2 {
-		statement = fmt.Sprintf("%s&%s", statement, paginateStatement)
+	finalStatement := statement
+	if len(strings.Split(finalStatement, "?")) == 2 {
+		finalStatement = fmt.Sprintf("%s&%s", finalStatement, paginateStatement)
 	} else {
-		statement = fmt.Sprintf("%s?%s", statement, paginateStatement)
+		finalStatement = fmt.Sprintf("%s?%s", finalStatement, paginateStatement)
 	}
 
-	data, count, err := s.request(statement, withCount)
+	if !strings.Contains(finalStatement, fmt.Sprintf("%v.desc", cursorRefColumn)) {
+		finalStatement += fmt.Sprintf("&order=%v.desc", cursorRefColumn)
+	}
+
+	data, count, err := s.request(finalStatement, withCount)
 	if err != nil {
 		return data, 0, nil, nil, err
 	}
-	nextCursor := s.extractNextCursor(cursorRefColumn, data)
-	prevCursor := s.extractPrevCursor(cursorRefColumn, data)
-	return data, count, nextCursor, prevCursor, nil
+
+	items := data
+	if len(data) == limit {
+		items = data[:len(data)-1]
+	}
+
+	var nextCursor, prevCursor any
+	if cursor != nil {
+		prevCursor = s.extractPrevCursor("prev", statement, cursorRefColumn, items)
+	}
+
+	if len(data) == limit {
+		nextCursor = s.extractNextCursor(cursorRefColumn, items)
+	}
+
+	return items, count, nextCursor, prevCursor, nil
 }
 
 func (s *SupabaseDriver) request(statement string, withCount bool) ([]Item, int, error) {
@@ -159,13 +196,41 @@ func (s SupabaseDriver) extractNextCursor(cursorRefColumn string, data []Item) a
 	return nil
 }
 
-func (s SupabaseDriver) extractPrevCursor(cursorRefColumn string, data []Item) any {
+func (s SupabaseDriver) extractPrevCursor(direction string, statement string, cursorRefColumn string, data []Item) any {
 	if len(data) == 0 {
-		return ""
+		return nil
 	}
 	firstItem := data[0]
-	if cursorRef, ok := firstItem[cursorRefColumn]; ok {
-		return cursorRef
+	cursorRef, ok := firstItem[cursorRefColumn]
+	if !ok {
+		return nil
 	}
-	return nil
+
+	// check is actual have data in database
+	prevCheckQuery := url.Values{}
+	prevCheckQuery.Set("limit", "1")
+
+	if direction == "next" {
+		prevCheckQuery.Set(cursorRefColumn, fmt.Sprintf("lt.%v", cursorRef))
+	} else {
+		prevCheckQuery.Set(cursorRefColumn, fmt.Sprintf("gt.%v", cursorRef))
+		prevCheckQuery.Set("order", fmt.Sprintf("%v.desc", cursorRefColumn))
+	}
+
+	if len(strings.Split(statement, "?")) == 2 {
+		statement = fmt.Sprintf("%s&%s", statement, prevCheckQuery.Encode())
+	} else {
+		statement = fmt.Sprintf("%s?%s", statement, prevCheckQuery.Encode())
+	}
+
+	data, _, err := s.request(statement, false)
+	if err != nil {
+		logger.HcLog().Error("[paginate] extractPrevCursor ", "error", err)
+	}
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	return cursorRef
 }
