@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/sev-2/raiden"
@@ -11,30 +12,31 @@ import (
 
 type MockContext struct {
 	*fasthttp.RequestCtx
-	CtxFn               func() context.Context
-	SetCtxFn            func(ctx context.Context)
-	ConfigFn            func() *raiden.Config
-	SendJsonFn          func(data any) error
-	SendErrorFn         func(err string) error
-	SendErrorWithCodeFn func(statusCode int, err error) error
-	RequestContextFn    func() *fasthttp.RequestCtx
-	SendRpcFn           func(rpc raiden.Rpc) error
-	ExecuteRpcFn        func(rpc raiden.Rpc) (any, error)
-	SpanFn              func() trace.Span
-	SetSpanFn           func(span trace.Span)
-	TracerFn            func() trace.Tracer
-	NewJobCtxFn         func() (raiden.JobContext, error)
-	WriteFn             func(data []byte)
-	WriteErrorFn        func(err error)
-	SetFn               func(key string, value any)
-	GetFn               func(key string) any
-	GetPathFn           func(key string) any
-	GetQueryFn          func(key string) string
-	Data                map[string]any
-	PublishFn           func(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error
-	HttpRequestFn       func(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
-	ResolveLibraryFn    func(key any) error
-	RegisterLibrariesFn func(key map[string]any)
+	CtxFn                func() context.Context
+	SetCtxFn             func(ctx context.Context)
+	ConfigFn             func() *raiden.Config
+	SendJsonFn           func(data any) error
+	SendErrorFn          func(err string) error
+	SendErrorWithCodeFn  func(statusCode int, err error) error
+	RequestContextFn     func() *fasthttp.RequestCtx
+	SendRpcFn            func(rpc raiden.Rpc) error
+	ExecuteRpcFn         func(rpc raiden.Rpc) (any, error)
+	SpanFn               func() trace.Span
+	SetSpanFn            func(span trace.Span)
+	TracerFn             func() trace.Tracer
+	NewJobCtxFn          func() (raiden.JobContext, error)
+	WriteFn              func(data []byte)
+	WriteErrorFn         func(err error)
+	SetFn                func(key string, value any)
+	GetFn                func(key string) any
+	GetPathFn            func(key string) any
+	GetQueryFn           func(key string) string
+	Data                 map[string]any
+	PublishFn            func(ctx context.Context, provider raiden.PubSubProviderType, topic string, message []byte) error
+	HttpRequestFn        func(method string, url string, body []byte, headers map[string]string, timeout time.Duration) (*http.Response, error)
+	HttpRequestAndBindFn func(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error
+	ResolveLibraryFn     func(key any) error
+	RegisterLibrariesFn  func(key map[string]any)
 }
 
 func (c *MockContext) Ctx() context.Context {
@@ -117,8 +119,12 @@ func (c *MockContext) Publish(ctx context.Context, provider raiden.PubSubProvide
 	return c.PublishFn(ctx, provider, topic, message)
 }
 
-func (c *MockContext) HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error {
-	return c.HttpRequestFn(method, url, body, headers, timeout, response)
+func (c *MockContext) HttpRequest(method string, url string, body []byte, headers map[string]string, timeout time.Duration) (*http.Response, error) {
+	return c.HttpRequestFn(method, url, body, headers, timeout)
+}
+
+func (c *MockContext) HttpRequestAndBind(method string, url string, body []byte, headers map[string]string, timeout time.Duration, response any) error {
+	return c.HttpRequestAndBindFn(method, url, body, headers, timeout, response)
 }
 
 func (c *MockContext) ResolveLibrary(key any) error {
