@@ -24,6 +24,12 @@ type GenerateTypeData struct {
 	Enums      string
 	Attributes string
 	Comment    string
+	EnumArr    []GenerateTypeDataEnum
+}
+
+type GenerateTypeDataEnum struct {
+	Key   string
+	Value string
 }
 
 const (
@@ -37,6 +43,12 @@ import (
 {{- end}}
 )
 {{- end }}
+
+const (
+{{- range .EnumArr }}
+	{{ .Key | ToGoIdentifier }} = "{{ .Value }}"
+{{- end }}
+)
 
 type {{ .Name | ToGoIdentifier }} struct {
 	raiden.TypeBase
@@ -110,12 +122,17 @@ func GenerateType(folderPath string, t objects.Type, generateFn GenerateFn) erro
 		Enums:      "[]string{}",
 		Attributes: "[]string{}",
 		Comment:    "nil",
+		EnumArr:    []GenerateTypeDataEnum{},
 	}
 
 	if len(t.Enums) > 0 {
 		enums := []string{}
 		for _, e := range t.Enums {
-			enums = append(enums, fmt.Sprintf("%q", e))
+			variableName := fmt.Sprintf("%s%s", utils.SnakeCaseToPascalCase(t.Name), utils.SnakeCaseToPascalCase(e))
+			enums = append(enums, variableName)
+			data.EnumArr = append(data.EnumArr, GenerateTypeDataEnum{
+				Key: variableName, Value: e,
+			})
 		}
 		data.Enums = fmt.Sprintf("[]string{%s}", strings.Join(enums, ","))
 	}
@@ -140,7 +157,9 @@ func GenerateType(folderPath string, t objects.Type, generateFn GenerateFn) erro
 		OutputPath:   filePath,
 		FuncMap:      funcMaps,
 	}
+	// setup writer
+	writer := &FileWriter{FilePath: input.OutputPath}
 
 	TypeLogger.Debug("generate type", "path", input.OutputPath)
-	return generateFn(input, nil)
+	return generateFn(input, writer)
 }
