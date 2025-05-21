@@ -259,9 +259,9 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	closeFn := setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		// assert uri
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?limit=%d&order=id.desc", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?limit=%d", 4)
 		if strings.Contains(uri, "limit=1.") {
-			expectedUri = "http://localhost:8002/rest/v1/data?id=gt.1&limit=1&order=id.desc"
+			expectedUri = "http://localhost:8002/rest/v1/data?id=gt.1&limit=1"
 		}
 
 		assert.Equal(t, expectedUri, uri)
@@ -312,15 +312,15 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	assert.Len(t, result.Data, 3)
 	assert.Equal(t, 3, result.Count)
 	assert.Equal(t, nil, result.PrevCursor)
-	assert.Equal(t, nil, result.NextCursor)
+	assert.Equal(t, float64(2), result.NextCursor)
 
 	// - Test cursor second page
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		// assert uri
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?%s=lt.%v&limit=%d&order=id.desc", paginate.DefaultOffsetColumn, 5, 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?%s=lt.%v&limit=%d", paginate.DefaultOffsetColumn, 5, 4)
 		if strings.Contains(uri, "limit=1") {
-			expectedUri = "http://localhost:8002/rest/v1/data?id=gt.4&limit=1&order=id.desc"
+			expectedUri = "http://localhost:8002/rest/v1/data?id=lt.4&limit=1"
 		}
 
 		assert.Equal(t, expectedUri, uri)
@@ -389,7 +389,7 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		// assert uri
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d&order=id.desc", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d", 4)
 		if strings.Contains(uri, "limit=1") {
 			return http.ErrServerClosed
 		}
@@ -431,7 +431,7 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		// assert uri
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d&order=id.desc", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d", 4)
 		if strings.Contains(uri, "limit=1") {
 			return http.ErrServerClosed
 		}
@@ -590,7 +590,7 @@ func TestExecutor_NewBffCursorNext(t *testing.T) {
 func TestExecutor_NewBffCursorPrev(t *testing.T) {
 	closeFn := setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d&order=id.desc", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d", 4)
 		assert.Equal(t, expectedUri, uri)
 		return fasthttp.ErrConnectionClosed
 	})
@@ -613,7 +613,7 @@ func TestExecutor_NewBffCursorPrev(t *testing.T) {
 	// empty response
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d&order=id.desc", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d", 4)
 		assert.Equal(t, expectedUri, uri)
 		dataByte, err := json.Marshal([]map[string]any{})
 		if err != nil {
@@ -641,7 +641,7 @@ func TestExecutor_NewBffCursorPrev(t *testing.T) {
 	// response data not expexted
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d&order=id.desc", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d", 4)
 		assert.Equal(t, expectedUri, uri)
 		dataByte, err := json.Marshal([]map[string]any{{"name": "vani"}})
 		if err != nil {
@@ -663,6 +663,58 @@ func TestExecutor_NewBffCursorPrev(t *testing.T) {
 	})
 
 	result, err = paginator.Execute(context.Background(), "/data?select=*")
+	assert.NoError(t, err)
+	assert.Nil(t, result.PrevCursor)
+}
+
+func TestExecutor_NewBffCursorPrevDescending(t *testing.T) {
+	closeFn := setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
+		uri := r1.URI().String()
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d", 4)
+		assert.Equal(t, expectedUri, uri)
+		return fasthttp.ErrConnectionClosed
+	})
+	defer closeFn()
+
+	ctx := getMockCtx()
+	cfg := ctx.Config()
+	cfg.SupabasePublicUrl = "http://localhost:8002/"
+
+	// response data not expexted
+	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
+		uri := r1.URI().String()
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&order=id.asc&id=gt.1&limit=%d", 4)
+		if strings.Contains(uri, "lt.") {
+			expectedUri = "http://localhost:8002/rest/v1/data?select=*&order=id.asc&id=lt.2&limit=1"
+		}
+
+		assert.Equal(t, expectedUri, uri)
+
+		finalMockData := []map[string]any{{"id": 4, "name": "test_4"}, mockData[2], mockData[1], mockData[0]}
+		if strings.Contains(uri, "limit=1") {
+			finalMockData = []map[string]any{}
+		}
+
+		dataByte, err := json.Marshal(finalMockData)
+		if err != nil {
+			return err
+		}
+		r2.SetBodyRaw(dataByte)
+		r2.Header.Set("content-range", "0-24/1")
+		return nil
+	})
+	defer closeFn()
+
+	paginator := paginate.New(cfg, paginate.ExecuteOptions{
+		Cursor:          "1",
+		Limit:           3,
+		Type:            paginate.CursorPagination,
+		IsBypass:        true,
+		WithCount:       true,
+		CursorDirection: paginate.CursorPaginateDirectionPrev,
+	})
+
+	result, err := paginator.Execute(context.Background(), "/data?select=*&order=id.desc")
 	assert.NoError(t, err)
 	assert.Nil(t, result.PrevCursor)
 }
