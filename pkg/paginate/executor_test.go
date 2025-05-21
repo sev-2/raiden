@@ -177,8 +177,8 @@ func TestExecutor_BffCursorNext(t *testing.T) {
 	closeFn2 := setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
 		expectUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=gt.%d&limit=%d", 1, 4)
-		if strings.Contains(uri, "lt.") {
-			expectUri = "http://localhost:8002/rest/v1/data?select=*&id=lt.2&limit=1"
+		if strings.Contains(uri, "limit=1") {
+			expectUri = "http://localhost:8002/rest/v1/data?select=*&id=gt.2&limit=1"
 		}
 
 		assert.Equal(t, expectUri, uri)
@@ -260,7 +260,7 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 		// assert uri
 		uri := r1.URI().String()
 		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?limit=%d", 4)
-		if strings.Contains(uri, "limit=1.") {
+		if strings.Contains(uri, "limit=1") {
 			expectedUri = "http://localhost:8002/rest/v1/data?id=gt.1&limit=1"
 		}
 
@@ -318,9 +318,9 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		// assert uri
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?%s=lt.%v&limit=%d", paginate.DefaultOffsetColumn, 5, 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?%s=lt.%v&limit=%d&order=id.desc", paginate.DefaultOffsetColumn, 5, 4)
 		if strings.Contains(uri, "limit=1") {
-			expectedUri = "http://localhost:8002/rest/v1/data?id=lt.4&limit=1"
+			expectedUri = "http://localhost:8002/rest/v1/data?id=lt.2&limit=1"
 		}
 
 		assert.Equal(t, expectedUri, uri)
@@ -357,8 +357,8 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result.Data, 3)
 	assert.Equal(t, 3, result.Count)
-	assert.Equal(t, float64(4), result.PrevCursor)
-	assert.Equal(t, float64(2), result.NextCursor)
+	assert.Equal(t, float64(2), result.PrevCursor)
+	assert.Equal(t, float64(4), result.NextCursor)
 
 	// - Marshall test
 	type mockDataStruct struct {
@@ -369,8 +369,8 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, marshallRs.Data, 3)
 	assert.Equal(t, marshallRs.Count, 3)
-	assert.Equal(t, float64(4), marshallRs.PrevCursor)
-	assert.Equal(t, float64(2), marshallRs.NextCursor)
+	assert.Equal(t, float64(2), marshallRs.PrevCursor)
+	assert.Equal(t, float64(4), marshallRs.NextCursor)
 
 	// - Send Response Test
 	err = paginate.SendResponse(ctx, result)
@@ -380,16 +380,16 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	assert.Equal(t, "0-24/3", string(contentRange))
 
 	nextCursor := requestCtx.Response.Header.Peek("next-cursor")
-	assert.Equal(t, "2", string(nextCursor))
+	assert.Equal(t, "4", string(nextCursor))
 
 	prevCursor := requestCtx.Response.Header.Peek("prev-cursor")
-	assert.Equal(t, "4", string(prevCursor))
+	assert.Equal(t, "2", string(prevCursor))
 
 	// tes cursor error
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		// assert uri
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d&order=id.desc", 4)
 		if strings.Contains(uri, "limit=1") {
 			return http.ErrServerClosed
 		}
@@ -431,7 +431,7 @@ func TestExecutor_BffCursorPrev(t *testing.T) {
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		// assert uri
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?id=lt.2&limit=%d&order=id.desc", 4)
 		if strings.Contains(uri, "limit=1") {
 			return http.ErrServerClosed
 		}
@@ -613,7 +613,7 @@ func TestExecutor_NewBffCursorPrev(t *testing.T) {
 	// empty response
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d&order=id.desc", 4)
 		assert.Equal(t, expectedUri, uri)
 		dataByte, err := json.Marshal([]map[string]any{})
 		if err != nil {
@@ -641,7 +641,7 @@ func TestExecutor_NewBffCursorPrev(t *testing.T) {
 	// response data not expexted
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&id=lt.1&limit=%d&order=id.desc", 4)
 		assert.Equal(t, expectedUri, uri)
 		dataByte, err := json.Marshal([]map[string]any{{"name": "vani"}})
 		if err != nil {
@@ -670,7 +670,7 @@ func TestExecutor_NewBffCursorPrev(t *testing.T) {
 func TestExecutor_NewBffCursorPrevDescending(t *testing.T) {
 	closeFn := setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
-		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d", 4)
+		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&limit=%d&order=id.desc", 4)
 		assert.Equal(t, expectedUri, uri)
 		return fasthttp.ErrConnectionClosed
 	})
@@ -684,8 +684,8 @@ func TestExecutor_NewBffCursorPrevDescending(t *testing.T) {
 	closeFn = setMockRequest(func(r1 *fasthttp.Request, r2 *fasthttp.Response) error {
 		uri := r1.URI().String()
 		expectedUri := fmt.Sprintf("http://localhost:8002/rest/v1/data?select=*&order=id.asc&id=gt.1&limit=%d", 4)
-		if strings.Contains(uri, "lt.") {
-			expectedUri = "http://localhost:8002/rest/v1/data?select=*&order=id.asc&id=lt.2&limit=1"
+		if strings.Contains(uri, "limit=1") {
+			expectedUri = "http://localhost:8002/rest/v1/data?select=*&order=id.asc&id=gt.2&limit=1"
 		}
 
 		assert.Equal(t, expectedUri, uri)
