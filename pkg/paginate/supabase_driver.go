@@ -40,12 +40,17 @@ func (s *SupabaseDriver) CursorPaginateNext(ctx context.Context, statement strin
 	// build statement
 	paginateStatement := fmt.Sprintf("limit=%d", limit)
 
+	operator := "gt"
+	if strings.Contains(statement, "desc") {
+		operator = "lt"
+	}
 	if cursor != nil {
+
 		if reflect.TypeOf(cursor).Kind() == reflect.String && len(cursor.(string)) > 0 {
-			paginateStatement = fmt.Sprintf("%s=gt.%v&limit=%d", cursorRefColumn, cursor, limit)
+			paginateStatement = fmt.Sprintf("%s=%s.%v&limit=%d", cursorRefColumn, operator, cursor, limit)
 		}
 		if reflect.TypeOf(cursor).Kind() == reflect.Int && cursor.(int) > 0 {
-			paginateStatement = fmt.Sprintf("%s=gt.%v&limit=%d", cursorRefColumn, cursor, limit)
+			paginateStatement = fmt.Sprintf("%s=%s.%v&limit=%d", cursorRefColumn, operator, cursor, limit)
 		}
 	}
 
@@ -63,12 +68,16 @@ func (s *SupabaseDriver) CursorPaginateNext(ctx context.Context, statement strin
 
 	items := data
 	if len(data) == limit {
-		items = data[:len(data)-1]
+		if operator == "gt" {
+			items = data[:len(data)-1]
+		} else {
+			items = data[1:]
+		}
 	}
 
 	var nextCursor, prevCursor any
 	if cursor != nil {
-		prevCursor = s.extractPrevCursor("next", statement, cursorRefColumn, items)
+		prevCursor = s.extractPrevCursor(statement, cursorRefColumn, items)
 	}
 
 	if len(data) == limit {
@@ -84,12 +93,18 @@ func (s *SupabaseDriver) CursorPaginatePrev(ctx context.Context, statement strin
 
 	// build statement
 	paginateStatement := fmt.Sprintf("limit=%d", limit)
+	operator := "lt"
+	if strings.Contains(statement, "desc") {
+		operator = "gt"
+		statement = strings.ReplaceAll(statement, "desc", "asc")
+	}
+
 	if cursor != nil {
 		if reflect.TypeOf(cursor).Kind() == reflect.String && len(cursor.(string)) > 0 {
-			paginateStatement = fmt.Sprintf("%s=lt.%v&limit=%d", cursorRefColumn, cursor, limit)
+			paginateStatement = fmt.Sprintf("%s=%s.%v&limit=%d", cursorRefColumn, operator, cursor, limit)
 		}
 		if reflect.TypeOf(cursor).Kind() == reflect.Int && cursor.(int) > 0 {
-			paginateStatement = fmt.Sprintf("%s=lt.%v&limit=%d", cursorRefColumn, cursor, limit)
+			paginateStatement = fmt.Sprintf("%s=%s.%v&limit=%d", cursorRefColumn, operator, cursor, limit)
 		}
 	}
 
@@ -100,28 +115,28 @@ func (s *SupabaseDriver) CursorPaginatePrev(ctx context.Context, statement strin
 		finalStatement = fmt.Sprintf("%s?%s", finalStatement, paginateStatement)
 	}
 
-	if !strings.Contains(finalStatement, fmt.Sprintf("%v.desc", cursorRefColumn)) {
-		finalStatement += fmt.Sprintf("&order=%v.desc", cursorRefColumn)
-	}
-
 	data, count, err := s.request(finalStatement, withCount)
 	if err != nil {
 		return data, 0, nil, nil, err
 	}
 
 	items := data
+
 	if len(data) == limit {
-		items = data[:len(data)-1]
+		if operator == "lt" {
+			items = data[:len(data)-1]
+		} else {
+			sortedItems := reverseSlice(items)
+			items = sortedItems[1:]
+		}
 	}
 
 	var nextCursor, prevCursor any
 	if cursor != nil {
-		prevCursor = s.extractPrevCursor("prev", statement, cursorRefColumn, items)
+		prevCursor = s.extractPrevCursor(statement, cursorRefColumn, items)
 	}
 
-	if len(data) == limit {
-		nextCursor = s.extractNextCursor(cursorRefColumn, items)
-	}
+	nextCursor = s.extractNextCursor(cursorRefColumn, items)
 
 	return items, count, nextCursor, prevCursor, nil
 }
@@ -196,7 +211,7 @@ func (s SupabaseDriver) extractNextCursor(cursorRefColumn string, data []Item) a
 	return nil
 }
 
-func (s SupabaseDriver) extractPrevCursor(direction string, statement string, cursorRefColumn string, data []Item) any {
+func (s SupabaseDriver) extractPrevCursor(statement string, cursorRefColumn string, data []Item) any {
 	if len(data) == 0 {
 		return nil
 	}
@@ -209,13 +224,7 @@ func (s SupabaseDriver) extractPrevCursor(direction string, statement string, cu
 	// check is actual have data in database
 	prevCheckQuery := url.Values{}
 	prevCheckQuery.Set("limit", "1")
-
-	if direction == "next" {
-		prevCheckQuery.Set(cursorRefColumn, fmt.Sprintf("lt.%v", cursorRef))
-	} else {
-		prevCheckQuery.Set(cursorRefColumn, fmt.Sprintf("gt.%v", cursorRef))
-		prevCheckQuery.Set("order", fmt.Sprintf("%v.desc", cursorRefColumn))
-	}
+	prevCheckQuery.Set(cursorRefColumn, fmt.Sprintf("lt.%v", cursorRef))
 
 	if len(strings.Split(statement, "?")) == 2 {
 		statement = fmt.Sprintf("%s&%s", statement, prevCheckQuery.Encode())
@@ -224,9 +233,9 @@ func (s SupabaseDriver) extractPrevCursor(direction string, statement string, cu
 	}
 
 	data, _, err := s.request(statement, false)
-
 	if err != nil {
 		logger.HcLog().Error("[paginate] extractPrevCursor ", "error", err)
+		return nil
 	}
 
 	if len(data) == 0 {

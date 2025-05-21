@@ -189,10 +189,23 @@ func SendResponse[T any](ctx raiden.Context, data ExecuteResult[T]) error {
 	ctx.RequestContext().Response.Header.Add("Content-Range", fmt.Sprintf("0-24/%d", data.Count))
 	if data.NextCursor != nil {
 		ctx.RequestContext().Response.Header.Add("Next-Cursor", fmt.Sprintf("%v", data.NextCursor))
+	} else {
+		ctx.RequestContext().Response.Header.Add("Next-Cursor", "")
 	}
 
 	if data.PrevCursor != nil {
 		ctx.RequestContext().Response.Header.Add("Prev-Cursor", fmt.Sprintf("%v", data.PrevCursor))
+	} else {
+		ctx.RequestContext().Response.Header.Add("Prev-Cursor", "")
 	}
 	return ctx.SendJson(data.Data)
+}
+
+func reverseSlice[T any](s []T) []T {
+	n := len(s)
+	reversed := make([]T, n)
+	for i, v := range s {
+		reversed[n-1-i] = v
+	}
+	return reversed
 }
