@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/connector/pgmeta"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase"
@@ -12,11 +13,24 @@ type MigrateItem = migrator.MigrateItem[objects.Function, any]
 type MigrateActionFunc = migrator.MigrateActionFunc[objects.Function, any]
 
 var ActionFunc = MigrateActionFunc{
-	CreateFunc: supabase.CreateFunction,
+	CreateFunc: func(cfg *raiden.Config, param objects.Function) (response objects.Function, err error) {
+		if cfg.Mode == raiden.SvcMode {
+			return pgmeta.CreateFunction(cfg, param)
+		}
+		return supabase.CreateFunction(cfg, param)
+	},
 	UpdateFunc: func(cfg *raiden.Config, param objects.Function, items any) (err error) {
+		if cfg.Mode == raiden.SvcMode {
+			return pgmeta.UpdateFunction(cfg, param)
+		}
 		return supabase.UpdateFunction(cfg, param)
 	},
-	DeleteFunc: supabase.DeleteFunction,
+	DeleteFunc: func(cfg *raiden.Config, param objects.Function) (err error) {
+		if cfg.Mode == raiden.SvcMode {
+			return pgmeta.DeleteFunction(cfg, param)
+		}
+		return supabase.DeleteFunction(cfg, param)
+	},
 }
 
 func BuildMigrateData(extractedLocalData state.ExtractRpcResult, supabaseData []objects.Function) (migrateData []MigrateItem, err error) {
