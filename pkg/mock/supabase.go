@@ -3,6 +3,7 @@ package mock
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/sev-2/raiden"
@@ -225,6 +226,7 @@ func registerMock(cfg *raiden.Config, actionType string, method string, url stri
 	if err != nil {
 		return err
 	}
+
 	httpmock.RegisterResponder(method, url, httpmock.NewStringResponder(httpCode, string(jsonData)))
 
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
@@ -278,6 +280,15 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 		case "executeRpc":
 			method = "POST"
 			url = fmt.Sprintf("%s/rest/v1/rpc/", cfg.SupabasePublicUrl)
+			if cfg.Mode == raiden.SvcMode {
+				baseUrl := cfg.PostgRestUrl
+				// Trim trailing slash for consistency
+				baseUrl = strings.TrimSuffix(baseUrl, "/")
+
+				// Remove '/rest' only if it's at the end
+				baseUrl = strings.TrimSuffix(baseUrl, "/rest")
+				url = fmt.Sprintf("%s/rest/rpc/", baseUrl)
+			}
 		default:
 			method = "POST"
 			url = fmt.Sprintf("%s/v1/projects/%s/database/query", cfg.SupabaseApiUrl, cfg.ProjectId)

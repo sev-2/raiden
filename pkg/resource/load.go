@@ -194,6 +194,12 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 		go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
 			return pgmeta.GetTableRelationshipActions(cfg, "public")
 		})
+
+		wg.Add(1)
+		LoadLogger.Debug("Get Function From Pg Meta")
+		go loadDatabaseResource(&wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
+			return pgmeta.GetFunctions(cfg)
+		})
 	}
 
 	return outChan
