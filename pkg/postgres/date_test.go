@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden/pkg/postgres"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDate_ScanFromString(t *testing.T) {
@@ -17,6 +18,12 @@ func TestDate_ScanFromString(t *testing.T) {
 	if d.Format("2006-01-02") != "2025-05-22" {
 		t.Errorf("expected 2025-05-22, got %s", d.String())
 	}
+}
+
+func TestDate_ScanFromString_Err(t *testing.T) {
+	var d postgres.Date
+	err := d.Scan("2025-05-22-01")
+	assert.Error(t, err)
 }
 
 func TestDate_ScanFromBytes(t *testing.T) {
