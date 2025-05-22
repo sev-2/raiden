@@ -66,7 +66,7 @@ func DeleteFunction(cfg *raiden.Config, fn objects.Function) error {
 
 	_, err = ExecuteQuery[any](cfg.PgMetaUrl, sql, nil, DefaultAuthInterceptor(cfg.JwtToken), nil)
 	if err != nil {
-		return fmt.Errorf("delete Function %s error : %s", fn.Name, err)
+		return fmt.Errorf("delete function %s error : %s", fn.Name, err)
 	}
 
 	MetaLogger.Trace("Delete - delete function", "name", fn.Name)

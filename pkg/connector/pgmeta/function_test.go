@@ -75,6 +75,33 @@ func TestCreateFunction(t *testing.T) {
 	assert.Equal(t, "public", result.Schema)
 }
 
+func TestCreateFunction_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+		JwtToken:  "meta token",
+	}
+
+	// Define the new table to be created
+	newFunction := mockFunctionData
+
+	// Mock the response for the GetTableByName call
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewStringResponse(500, "Internal Server Error"), nil
+		},
+	)
+
+	// Call the function under test
+	_, err := pgmeta.CreateFunction(cfg, newFunction)
+
+	// Assertions
+	assert.EqualError(t, err, fmt.Sprintf("create new function %s error : invalid HTTP response code: 500", mockFunctionData.Name))
+}
+
 func TestGetFunctions(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -92,7 +119,6 @@ func TestGetFunctions(t *testing.T) {
 	httpmock.RegisterResponder("GET", "http://example.com/functions",
 		func(req *http.Request) (*http.Response, error) {
 			return httpmock.NewJsonResponse(200, mockedFunctionsResponse)
-
 		},
 	)
 
@@ -104,6 +130,106 @@ func TestGetFunctions(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 	assert.Equal(t, "get_next_checkout_id", result[0].Name)
 	assert.Equal(t, "public", result[0].Schema)
+}
+
+func TestGetFunctions_Empty(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+		JwtToken:  "meta token",
+	}
+
+	// Mock the response for the GetTableByName call
+	httpmock.RegisterResponder("GET", "http://example.com/functions",
+		func(req *http.Request) (*http.Response, error) {
+			return nil, http.ErrServerClosed
+		},
+	)
+
+	// Call the function under test
+	result, err := pgmeta.GetFunctions(cfg)
+
+	// Assertions
+	assert.Error(t, err)
+	assert.Len(t, result, 0)
+}
+
+func TestGetFunctions_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+		JwtToken:  "meta token",
+	}
+
+	// Mock the response for the GetTableByName call
+	httpmock.RegisterResponder("GET", "http://example.com/functions",
+		func(req *http.Request) (*http.Response, error) {
+			return nil, http.ErrServerClosed
+		},
+	)
+
+	// Call the function under test
+	result, err := pgmeta.GetFunctions(cfg)
+
+	// Assertions
+	assert.Error(t, err)
+	assert.Len(t, result, 0)
+}
+
+func TestGetFunctionsByName_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+		JwtToken:  "meta token",
+	}
+
+	// Mock the response for the GetTableByName call
+	httpmock.RegisterResponder("GET", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return nil, http.ErrServerClosed
+		},
+	)
+
+	// Call the function under test
+	result, err := pgmeta.GetFunctionByName(cfg, "public", mockFunctionData.Name)
+	// Assertions
+	assert.Error(t, err)
+	assert.Equal(t, result.Name, "")
+}
+
+func TestGetFunctionsByName_Empty(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+		JwtToken:  "meta token",
+	}
+
+	// Mock the response for the GetTableByName call
+	mockedFunctionsResponse := []objects.Function{}
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, mockedFunctionsResponse)
+
+		},
+	)
+
+	// Call the function under test
+	result, err := pgmeta.GetFunctionByName(cfg, "public", mockFunctionData.Name)
+	// Assertions
+	assert.EqualError(t, err, fmt.Sprintf("get function %s is not found", mockFunctionData.Name))
+	assert.Equal(t, result.Name, "")
 }
 
 func TestUpdateFunction(t *testing.T) {
@@ -134,6 +260,31 @@ func TestUpdateFunction(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestUpdateFunction_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+		JwtToken:  "meta token",
+	}
+
+	// Mock the response for the GetTableByName call
+	originalData := mockFunctionData
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewStringResponse(500, "Internal Server Error"), nil
+		},
+	)
+
+	// Call the function under test
+	err := pgmeta.UpdateFunction(cfg, originalData)
+
+	// Assertions
+	assert.EqualError(t, err, fmt.Sprintf("update function %s error : invalid HTTP response code: 500", originalData.Name))
+}
+
 func TestDeleteFunction(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -159,4 +310,30 @@ func TestDeleteFunction(t *testing.T) {
 
 	// Assertions
 	assert.NoError(t, err)
+}
+
+func TestDeleteFunction_Err(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	cfg := &raiden.Config{
+		PgMetaUrl: "http://example.com",
+		ProjectId: "test_project",
+		JwtToken:  "meta token",
+	}
+
+	// Mock the response for the GetTableByName call
+	originalData := mockFunctionData
+	httpmock.RegisterResponder("POST", "http://example.com/query",
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewStringResponse(500, "Internal Server Error"), nil
+		},
+	)
+
+	// Call the function under test
+	err := pgmeta.DeleteFunction(cfg, originalData)
+
+	// Assertions
+	assert.EqualError(t, err, fmt.Sprintf("delete function %s error : invalid HTTP response code: 500", originalData.Name))
+
 }
