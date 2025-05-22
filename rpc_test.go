@@ -116,6 +116,48 @@ func TestExecuteRpc(t *testing.T) {
 	assert.NotNil(t, res)
 }
 
+func TestExecuteRpcSvcMode(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget: raiden.DeploymentTargetCloud,
+				ProjectId:        "test-project-id",
+				ProjectName:      "My Great Project",
+				Mode:             raiden.SvcMode,
+				PostgRestUrl:     "http://supabase.cloud.com/rest/",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			rCtx := &fasthttp.RequestCtx{
+				Request: fasthttp.Request{
+					Header: fasthttp.RequestHeader{},
+				},
+			}
+
+			rCtx.Request.Header.Set("Authorization", "Bearer some token")
+			rCtx.Request.Header.Set("apiKey", "some api key")
+			return rCtx
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockExecuteRpcWithExpectedResponse(200, "get_submissions", GetSubmissionsResult{})
+	assert.NoError(t, err)
+
+	rpc := &GetSubmissions{
+		Params: &GetSubmissionsParams{
+			ScouterName:   "test_1",
+			CandidateName: "test_2",
+		},
+	}
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+}
+
 func TestExecuteRpcWithParams(t *testing.T) {
 	requestCtx := &fasthttp.RequestCtx{
 		Request: fasthttp.Request{},
