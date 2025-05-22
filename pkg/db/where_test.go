@@ -400,6 +400,19 @@ func TestIs(t *testing.T) {
 
 		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.unknown", q.GetUrl(), "the url should match")
 	})
+
+	t.Run("multiple is", func(t *testing.T) {
+		q := NewQuery(&mockRaidenContext).
+			Model(articleMockModel).
+			Is("is_featured", nil).
+			Is("rating", nil)
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=is.null&rating=is.null", q.GetUrl(), "the url should match")
+	})
 }
 
 func TestNotIs(t *testing.T) {
@@ -441,5 +454,20 @@ func TestNotIs(t *testing.T) {
 		}
 
 		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=not.is.unknown", q.GetUrl(), "the url should match")
+	})
+
+	t.Run("multiple not is", func(t *testing.T) {
+		articleMockModel.Rating = 5
+
+		q := NewQuery(&mockRaidenContext).
+			Model(articleMockModel).
+			NotIs("is_featured", true).
+			NotIs("rating", nil)
+
+		if q.IsList == nil {
+			t.Error("Expected where clause not to be nil")
+		}
+
+		assert.Equalf(t, "/rest/v1/articles?select=*&is_featured=not.is.true&rating=not.is.null", q.GetUrl(), "the url should match")
 	})
 }

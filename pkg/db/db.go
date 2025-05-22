@@ -173,7 +173,7 @@ func buildQueryURI(q Query) string {
 	}
 
 	if q.IsList != nil && len(*q.IsList) > 0 {
-		list := strings.Join(*q.IsList, ",")
+		list := strings.Join(*q.IsList, "&")
 		output += fmt.Sprintf("&%s", list)
 	}
 
