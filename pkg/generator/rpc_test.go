@@ -178,8 +178,8 @@ func TestExtractRpcWithPrefix(t *testing.T) {
 		where sc.name = in_scouter_name and c.name = in_candidate_name ; end;
 		`,
 		CompleteStatement: `
-		CREATE OR REPLACE FUNCTION public.get_submissions(in_scouter_name character varying, in_candidate_name character varying)\n 
-		RETURNS TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)\n 
+		CREATE OR REPLACE FUNCTION public.get_submissions(in_scouter_name character varying, in_candidate_name character varying, in_register date)\n 
+		RETURNS TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying, in_register date)\n 
 		LANGUAGE plpgsql\n
 		AS $function$ 
 			begin return query 
@@ -199,6 +199,12 @@ func TestExtractRpcWithPrefix(t *testing.T) {
 			{
 				Mode:       "in",
 				Name:       "in_candidate_name",
+				TypeId:     1043,
+				HasDefault: false,
+			},
+			{
+				Mode:       "in",
+				Name:       "in_register",
 				TypeId:     1043,
 				HasDefault: false,
 			},
@@ -227,10 +233,10 @@ func TestExtractRpcWithPrefix(t *testing.T) {
 				HasDefault: false,
 			},
 		},
-		ArgumentTypes:          "in_scouter_name character varying, in_candidate_name character varying",
-		IdentityArgumentTypes:  "in_scouter_name character varying, in_candidate_name character varying",
+		ArgumentTypes:          "in_scouter_name character varying, in_candidate_name character varying, in_register date",
+		IdentityArgumentTypes:  "in_scouter_name character varying, in_candidate_name character varying, in_register date",
 		ReturnTypeID:           2249,
-		ReturnType:             "TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying)",
+		ReturnType:             "TABLE(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying, register date)",
 		ReturnTypeRelationID:   0,
 		IsSetReturningFunction: true,
 		Behavior:               string(raiden.RpcBehaviorVolatile),
@@ -516,6 +522,106 @@ func TestGenerateRpc(t *testing.T) {
 	err2 := generator.GenerateRpc(dir, "test", fns, []objects.Table{}, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/rpc/get_submissions.go")
+}
+
+func TestGenerateRpc_DateType(t *testing.T) {
+	fns := []objects.Function{
+		{
+			Schema:            "public",
+			Name:              "get_latest_active_rates_by_tenant",
+			Language:          "sql",
+			Definition:        "\n  select distinct on (tr.tax_id)\n    tr.id,\n    tr.tax_id,\n    tr.type,\n    tr.rate,\n    tr.start_date,\n    tr.end_date,\n    tr.rate as applicable_rate,\n    t.name as tax_name,\n    t.tenant::text\n  from tax_rates tr\n  join taxes t on tr.tax_id = t.id\n  where t.tenant = input_tenant::public.tenant\n    and tr.start_date <= now()\n    and (tr.end_date is null or tr.end_date > now())\n  order by tr.tax_id, tr.start_date desc\n",
+			CompleteStatement: "CREATE OR REPLACE FUNCTION public.get_latest_active_rates_by_tenant(input_tenant text)\n RETURNS TABLE(id bigint, tax_id bigint, type text, rate numeric, start_date date, end_date date, applicable_rate numeric, tax_name text, tenant text)\n LANGUAGE sql\nAS $function$\n  select distinct on (tr.tax_id)\n    tr.id,\n    tr.tax_id,\n    tr.type,\n    tr.rate,\n    tr.start_date,\n    tr.end_date,\n    tr.rate as applicable_rate,\n    t.name as tax_name,\n    t.tenant::text\n  from tax_rates tr\n  join taxes t on tr.tax_id = t.id\n  where t.tenant = input_tenant::public.tenant\n    and tr.start_date <= now()\n    and (tr.end_date is null or tr.end_date > now())\n  order by tr.tax_id, tr.start_date desc\n$function$\n",
+			Args: []objects.FunctionArg{
+				{
+					Mode:       "in",
+					Name:       "input_tenant",
+					TypeId:     25,
+					HasDefault: false,
+				},
+				{
+					Mode:       "in",
+					Name:       "input_register",
+					TypeId:     25,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "id",
+					TypeId:     20,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "tax_id",
+					TypeId:     20,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "type",
+					TypeId:     25,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "rate",
+					TypeId:     1700,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "start_date",
+					TypeId:     1082,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "end_date",
+					TypeId:     1082,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "applicable_rate",
+					TypeId:     1700,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "tax_name",
+					TypeId:     25,
+					HasDefault: false,
+				},
+				{
+					Mode:       "table",
+					Name:       "tenant",
+					TypeId:     25,
+					HasDefault: false,
+				},
+			},
+			ArgumentTypes:          "input_tenant text, input_register date",
+			IdentityArgumentTypes:  "input_tenant text, input_register date",
+			ReturnTypeID:           2249,
+			ReturnType:             "TABLE(id bigint, tax_id bigint, type text, rate numeric, start_date date, end_date date, applicable_rate numeric, tax_name text, tenant text)",
+			ReturnTypeRelationID:   0,
+			IsSetReturningFunction: true,
+			Behavior:               string(raiden.RpcBehaviorVolatile),
+			SecurityDefiner:        false,
+			ConfigParams:           nil,
+		},
+	}
+
+	dir, err := os.MkdirTemp("", "rpc")
+	assert.NoError(t, err)
+
+	rpcPath := filepath.Join(dir, "internal")
+	err1 := utils.CreateFolder(rpcPath)
+	assert.NoError(t, err1)
+
+	err2 := generator.GenerateRpc(dir, "test", fns, []objects.Table{}, generator.GenerateFn(generator.Generate))
+	assert.NoError(t, err2)
+	assert.FileExists(t, dir+"/internal/rpc/get_latest_active_rates_by_tenant.go")
 }
 
 func TestRpcWithTrigger(t *testing.T) {
