@@ -114,8 +114,10 @@ func ToGoType(pgType DataType, isNullable bool) (goType string) {
 		goType = "float64"
 	case VarcharType, VarcharTypeAlias, CharType, BpcharType, TextType:
 		goType = "string"
-	case TimestampType, TimestampTypeAlias, TimestampTzType, TimestampTzTypeAlias, TimeType, TimeTypeAlias, TimeTzType, TimeTzTypeAlias, DateType:
+	case TimestampType, TimestampTypeAlias, TimestampTzType, TimestampTzTypeAlias, TimeType, TimeTypeAlias, TimeTzType, TimeTzTypeAlias:
 		goType = "postgres.DateTime"
+	case DateType:
+		goType = "postgres.Date"
 	case IntervalType:
 		goType = "time.Duration"
 	case BooleanType:
@@ -160,6 +162,8 @@ func ToPostgresType(goType string) (pgType DataType) {
 		pgType = TextType
 	case "postgres.DateTime":
 		pgType = TimestampType
+	case "postgres.Date":
+		pgType = DateType
 	case "time.Duration":
 		pgType = IntervalType
 	case "bool":

@@ -637,6 +637,8 @@ func (r *ExtractRpcDataResult) GetParams(mapImports map[string]bool) (columns []
 				importPackageName = "github.com/google/uuid"
 			case "json":
 				importPackageName = "encoding/json"
+			case "postgres":
+				importPackageName = "github.com/sev-2/raiden/pkg/postgres"
 			}
 			key := fmt.Sprintf("%q", importPackageName)
 			mapImports[key] = true
@@ -725,6 +727,8 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 					importPackageName = "github.com/google/uuid"
 				case "json":
 					importPackageName = "encoding/json"
+				case "postgres":
+					importPackageName = "github.com/sev-2/raiden/pkg/postgres"
 				}
 				key := fmt.Sprintf("%q", importPackageName)
 				mapImports[key] = true
