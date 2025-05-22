@@ -209,6 +209,8 @@ func MapTableAttributes(projectName string, table objects.Table, mapDataType map
 				"*postgres.Point":    true,
 				"postgres.DateTime":  true,
 				"*postgres.DateTime": true,
+				"postgres.Date":      true,
+				"*postgres.Date":     true,
 			}
 
 			if postgresCustomTypes[column.Type] {

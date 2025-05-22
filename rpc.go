@@ -42,6 +42,7 @@ const (
 	RpcParamDataTypeJSON             RpcParamDataType = "JSON"
 	RpcParamDataTypeJSONB            RpcParamDataType = "JSONB"
 	RpcParamDataTypeUuid             RpcParamDataType = "UUID"
+	RpcParamDataTypeDate             RpcParamDataType = "DATE"
 )
 
 // Define constants for rpc return data type
@@ -66,6 +67,7 @@ const (
 	RpcReturnDataTypeSetOf            RpcReturnDataType = "SETOF"
 	RpcReturnDataTypeVoid             RpcReturnDataType = "VOID"
 	RpcReturnDataTypeTrigger          RpcReturnDataType = "TRIGGER"
+	RpcReturnDataTypeDate             RpcReturnDataType = "DATE"
 )
 
 func RpcParamToGoType(dataType RpcParamDataType) string {
@@ -88,6 +90,8 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "map[string]interface{}"
 	case RpcParamDataTypeUuid:
 		return "uuid.UUID"
+	case RpcParamDataTypeDate:
+		return "postgres.Date"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -133,6 +137,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeJSONB, nil
 	case RpcParamDataTypeUuid:
 		return RpcParamDataTypeUuid, nil
+	case RpcParamDataTypeDate:
+		return RpcParamDataTypeDate, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc param type  : %s", pCheckType)
 	}
@@ -156,6 +162,8 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 		return "time.Time"
 	case RpcReturnDataTypeJSON, RpcReturnDataTypeJSONB:
 		return "map[string]interface{}"
+	case RpcReturnDataTypeDate:
+		return "postgres.Date"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -205,6 +213,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeVoid, nil
 	case RpcReturnDataTypeTrigger:
 		return RpcReturnDataTypeTrigger, nil
+	case RpcReturnDataTypeDate:
+		return RpcReturnDataTypeDate, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return type  : %s", pCheckType)
 	}
@@ -253,6 +263,8 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeVoid", nil
 	case RpcReturnDataTypeTrigger:
 		return "RpcReturnDataTypeTrigger", nil
+	case RpcReturnDataTypeDate:
+		return "RpcReturnDataTypeDate", nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}

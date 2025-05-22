@@ -265,6 +265,7 @@ func TestRpcParamToGoType(t *testing.T) {
 		{raiden.RpcParamDataTypeTimestampTZ, "time.Time"},
 		{raiden.RpcParamDataTypeJSON, "map[string]interface{}"},
 		{raiden.RpcParamDataTypeJSONB, "map[string]interface{}"},
+		{raiden.RpcParamDataTypeDate, "postgres.Date"},
 	}
 
 	for _, tt := range tests {
@@ -289,6 +290,7 @@ func TestGetValidRpcParamType(t *testing.T) {
 		{"bytea", true, raiden.RpcParamDataTypeBytea, false},
 		{"timestamp", true, raiden.RpcParamDataTypeTimestampAlias, false},
 		{"unsupported", false, "", true},
+		{"date", true, raiden.RpcParamDataTypeDate, false},
 	}
 
 	for _, tt := range tests {
@@ -319,6 +321,7 @@ func TestRpcReturnToGoType(t *testing.T) {
 		{raiden.RpcReturnDataTypeTimestampTZ, "time.Time"},
 		{raiden.RpcReturnDataTypeJSON, "map[string]interface{}"},
 		{raiden.RpcReturnDataTypeJSONB, "map[string]interface{}"},
+		{raiden.RpcReturnDataTypeDate, "postgres.Date"},
 	}
 
 	for _, tt := range tests {
@@ -343,6 +346,7 @@ func TestGetValidRpcReturnType(t *testing.T) {
 		{"bytea", true, raiden.RpcReturnDataTypeBytea, false},
 		{"timestamp", true, raiden.RpcReturnDataTypeTimestampAlias, false},
 		{"unsupported", false, "", true},
+		{"date", false, raiden.RpcReturnDataTypeDate, false},
 	}
 
 	for _, tt := range tests {
@@ -370,6 +374,7 @@ func TestGetValidRpcReturnNameDecl(t *testing.T) {
 		{raiden.RpcReturnDataTypeSetOf, false, "RpcReturnDataTypeSetOf", false},
 		{raiden.RpcReturnDataTypeTable, false, "RpcReturnDataTypeTable", false},
 		{raiden.RpcReturnDataTypeVoid, false, "RpcReturnDataTypeVoid", false},
+		{raiden.RpcReturnDataTypeDate, false, "RpcReturnDataTypeDate", false},
 		{raiden.RpcReturnDataType("unsupported"), false, "", true},
 	}
 
