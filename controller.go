@@ -550,7 +550,11 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 
 		// bind value to struct attribute
 		if err := setPayloadValue(payloadValue.Field(i), value); err != nil {
-			return err
+			return &ErrorResponse{
+				StatusCode: fasthttp.StatusBadRequest,
+				Code:       "invalid path or query params",
+				Message:    err.Error(),
+			}
 		}
 	}
 
@@ -559,7 +563,11 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 	requestBody := ctx.Request.Body()
 	if requestBody != nil && string(requestBody) != "" {
 		if err := json.Unmarshal(requestBody, payloadPtr); err != nil {
-			return err
+			return &ErrorResponse{
+				StatusCode: fasthttp.StatusBadRequest,
+				Code:       "invalid request body",
+				Message:    err.Error(),
+			}
 		}
 	}
 
