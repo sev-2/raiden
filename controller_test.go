@@ -487,25 +487,26 @@ func (r *Status) Comment() *string {
 }
 
 type QueryParamRequest struct {
-	StringValue       string         `query:"string_value"`
-	BoolValue         *bool          `query:"bool_value"`
-	IntValue          int            `query:"int_value"`
-	Int8Value         int8           `query:"int8_value"`
-	Int16Value        int16          `query:"int16_value"`
-	Int32Value        int32          `query:"int32_value"`
-	Int64Value        int64          `query:"int64_value"`
-	Int64Ptr          *int64         `query:"int64_ptr"`
-	UintValue         uint           `query:"uint_value"`
-	Uint8Value        uint8          `query:"uint8_value"`
-	Uint16Value       uint16         `query:"uint16_value"`
-	Uint32Value       uint32         `query:"uint32_value"`
-	Uint64Value       uint64         `query:"uint64_value"`
-	Float32Value      *float32       `query:"float32_value"`
-	Float64Value      *float64       `query:"float64_value"`
-	ByteValue         byte           `query:"byte_value"`          // alias for uint8
-	RuneValue         rune           `query:"rune_value"`          // alias for int32
-	PostgresDateValue *postgres.Date `query:"postgres_date_value"` // optional custom date
-	CustomStatusValue Status         `query:"custom_status_value"` // custom type (int/string alias)
+	StringValue           string            `query:"string_value"`
+	BoolValue             *bool             `query:"bool_value"`
+	IntValue              int               `query:"int_value"`
+	Int8Value             int8              `query:"int8_value"`
+	Int16Value            int16             `query:"int16_value"`
+	Int32Value            int32             `query:"int32_value"`
+	Int64Value            int64             `query:"int64_value"`
+	Int64Ptr              *int64            `query:"int64_ptr"`
+	UintValue             uint              `query:"uint_value"`
+	Uint8Value            uint8             `query:"uint8_value"`
+	Uint16Value           uint16            `query:"uint16_value"`
+	Uint32Value           uint32            `query:"uint32_value"`
+	Uint64Value           uint64            `query:"uint64_value"`
+	Float32Value          *float32          `query:"float32_value"`
+	Float64Value          *float64          `query:"float64_value"`
+	ByteValue             byte              `query:"byte_value"`               // alias for uint8
+	RuneValue             rune              `query:"rune_value"`               // alias for int32
+	PostgresDateValue     *postgres.Date    `query:"postgres_date_value"`      // optional custom date
+	PostgresDateTimeValue postgres.DateTime `query:"postgres_date_time_value"` // optional custom date
+	CustomStatusValue     Status            `query:"custom_status_value"`      // custom type (int/string alias)
 }
 
 type QueryParamResponse struct{}
@@ -547,6 +548,7 @@ func TestControllerMarshallAndValidate_QueryParams(t *testing.T) {
 	q.Set("byte_value", "65")   // ASCII 'A'
 	q.Set("rune_value", "9731") // Unicode snowman ☃
 	q.Set("postgres_date_value", "2025-05-23")
+	q.Set("postgres_date_time_value", "2025-05-23 15:04:05")
 	q.Set("custom_status_value", "success")
 
 	err := raiden.MarshallAndValidate(requestCtx, controller)
@@ -576,4 +578,24 @@ func TestControllerMarshallAndValidate_QueryParams(t *testing.T) {
 	assert.NotNil(t, controller.Payload.PostgresDateValue)
 	assert.Equal(t, "2025-05-23", controller.Payload.PostgresDateValue.String())
 	assert.Equal(t, "success", controller.Payload.CustomStatusValue.String())
+
+	q.Set("bool_value", "invalid")
+	err = raiden.MarshallAndValidate(requestCtx, controller)
+	assert.EqualError(t, err, "bool: must be boolean value")
+
+	q.Set("bool_value", "true")
+	q.Set("int_value", "invalid")
+	err = raiden.MarshallAndValidate(requestCtx, controller)
+	assert.EqualError(t, err, "int: must be integer value")
+
+	q.Set("int_value", "11")
+	q.Set("uint_value", "-1")
+	err = raiden.MarshallAndValidate(requestCtx, controller)
+	assert.EqualError(t, err, "uint: must be unsigned integer value")
+
+	q.Set("uint_value", "1")
+	q.Set("float32_value", "invalid")
+	err = raiden.MarshallAndValidate(requestCtx, controller)
+	assert.EqualError(t, err, "float32: must be float value")
+
 }

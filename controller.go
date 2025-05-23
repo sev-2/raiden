@@ -646,9 +646,6 @@ func setNumberValue(fieldValue reflect.Value, value string) error {
 		bitSize = 32
 	case reflect.Int64:
 		bitSize = 64
-	default:
-		fieldValue.SetZero()
-		return nil
 	}
 
 	intValue, err := strconv.ParseInt(value, 10, bitSize)
@@ -672,9 +669,6 @@ func setUnsignedNumberValue(fieldValue reflect.Value, value string) error {
 		bitSize = 32
 	case reflect.Uint64:
 		bitSize = 64
-	default:
-		fieldValue.SetZero()
-		return nil
 	}
 
 	uintValue, err := strconv.ParseUint(value, 10, bitSize)
