@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/valyala/fasthttp"
 )
 
@@ -598,25 +599,133 @@ func createSliceObjectFromAnyData(data any) any {
 
 // The function `setPayloadValue` sets the value of a field in a struct based on its type.
 func setPayloadValue(fieldValue reflect.Value, value string) error {
+	if value == "" {
+		fieldValue.SetZero()
+		return nil
+	}
+
 	switch fieldValue.Kind() {
 	case reflect.String:
 		fieldValue.SetString(value)
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		intValue, err := strconv.Atoi(value)
+	case reflect.Bool:
+		boolValue, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("%s : must be integer value", fieldValue.Type().Name())
+			return fmt.Errorf("%s: must be boolean value", fieldValue.Type().Name())
 		}
-		fieldValue.SetInt(int64(intValue))
+		fieldValue.SetBool(boolValue)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return setNumberValue(fieldValue, value)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return setUnsignedNumberValue(fieldValue, value)
+	case reflect.Float32, reflect.Float64:
+		return setFloatValue(fieldValue, value)
 	case reflect.Ptr:
-		// Handle pointer types
 		if fieldValue.IsNil() {
 			fieldValue.Set(reflect.New(fieldValue.Type().Elem())) // Allocate new value
 		}
 		return setPayloadValue(fieldValue.Elem(), value)
+	case reflect.Struct:
+		return setCustomStruct(fieldValue, value)
 	default:
 		fieldValue.SetZero()
 	}
 
+	return nil
+}
+
+func setNumberValue(fieldValue reflect.Value, value string) error {
+	bitSize := 0
+	switch fieldValue.Kind() {
+	case reflect.Int:
+		bitSize = 0 // int size depends on platform, strconv.ParseInt with bitSize=0 works
+	case reflect.Int8:
+		bitSize = 8
+	case reflect.Int16:
+		bitSize = 16
+	case reflect.Int32:
+		bitSize = 32
+	case reflect.Int64:
+		bitSize = 64
+	default:
+		fieldValue.SetZero()
+		return nil
+	}
+
+	intValue, err := strconv.ParseInt(value, 10, bitSize)
+	if err != nil {
+		return fmt.Errorf("%s: must be integer value", fieldValue.Type().Name())
+	}
+	fieldValue.SetInt(intValue)
+	return nil
+}
+
+func setUnsignedNumberValue(fieldValue reflect.Value, value string) error {
+	var bitSize int
+	switch fieldValue.Kind() {
+	case reflect.Uint:
+		bitSize = 0 // platform dependent size, strconv.ParseUint with 0 is fine
+	case reflect.Uint8:
+		bitSize = 8
+	case reflect.Uint16:
+		bitSize = 16
+	case reflect.Uint32:
+		bitSize = 32
+	case reflect.Uint64:
+		bitSize = 64
+	default:
+		fieldValue.SetZero()
+		return nil
+	}
+
+	uintValue, err := strconv.ParseUint(value, 10, bitSize)
+	if err != nil {
+		return fmt.Errorf("%s: must be unsigned integer value", fieldValue.Type().Name())
+	}
+	fieldValue.SetUint(uintValue)
+	return nil
+}
+
+func setFloatValue(fieldValue reflect.Value, value string) error {
+	bitSize := 32
+	if fieldValue.Kind() == reflect.Float64 {
+		bitSize = 64
+	}
+
+	floatValue, err := strconv.ParseFloat(value, bitSize)
+	if err != nil {
+		return fmt.Errorf("%s: must be float value", fieldValue.Type().Name())
+	}
+	fieldValue.SetFloat(floatValue)
+	return nil
+}
+
+func setCustomStruct(fieldValue reflect.Value, value string) error {
+	typ := fieldValue.Type()
+	switch typ.String() {
+	case "postgres.Date":
+		dt := fieldValue.Addr().Interface().(*postgres.Date)
+		return dt.Scan(value)
+	case "postgres.DateTime":
+		dt := fieldValue.Addr().Interface().(*postgres.DateTime)
+		return dt.UnmarshalJSON([]byte(value))
+	}
+
+	// 🧠 Detect if the type embeds raiden.TypeBase
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.Anonymous && field.Type.String() == "raiden.TypeBase" {
+			embedded := fieldValue.Field(i)
+			if embedded.CanAddr() {
+				method := embedded.Addr().MethodByName("SetValue")
+				if method.IsValid() && method.Type().NumIn() == 1 {
+					method.Call([]reflect.Value{reflect.ValueOf(value)})
+					return nil
+				}
+			}
+		}
+	}
+
+	fieldValue.SetZero()
 	return nil
 }
 

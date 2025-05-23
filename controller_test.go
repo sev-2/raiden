@@ -8,6 +8,7 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/mock"
+	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 )
@@ -461,4 +462,118 @@ func TestController_PassDataRestPost(t *testing.T) {
 	message, isMessageExist := mapData["message"]
 	assert.True(t, isMessageExist)
 	assert.Equal(t, "from before post middleware", message)
+}
+
+// Test Marshall Query Params
+
+type Status struct {
+	raiden.TypeBase
+}
+
+func (t *Status) Name() string {
+	return "status"
+}
+
+func (r *Status) Format() string {
+	return "status"
+}
+
+func (r *Status) Enums() []string {
+	return []string{"success", "failed"}
+}
+
+func (r *Status) Comment() *string {
+	return nil
+}
+
+type QueryParamRequest struct {
+	StringValue       string         `query:"string_value"`
+	BoolValue         *bool          `query:"bool_value"`
+	IntValue          int            `query:"int_value"`
+	Int8Value         int8           `query:"int8_value"`
+	Int16Value        int16          `query:"int16_value"`
+	Int32Value        int32          `query:"int32_value"`
+	Int64Value        int64          `query:"int64_value"`
+	Int64Ptr          *int64         `query:"int64_ptr"`
+	UintValue         uint           `query:"uint_value"`
+	Uint8Value        uint8          `query:"uint8_value"`
+	Uint16Value       uint16         `query:"uint16_value"`
+	Uint32Value       uint32         `query:"uint32_value"`
+	Uint64Value       uint64         `query:"uint64_value"`
+	Float32Value      *float32       `query:"float32_value"`
+	Float64Value      *float64       `query:"float64_value"`
+	ByteValue         byte           `query:"byte_value"`          // alias for uint8
+	RuneValue         rune           `query:"rune_value"`          // alias for int32
+	PostgresDateValue *postgres.Date `query:"postgres_date_value"` // optional custom date
+	CustomStatusValue Status         `query:"custom_status_value"` // custom type (int/string alias)
+}
+
+type QueryParamResponse struct{}
+
+type QueryController struct {
+	raiden.ControllerBase
+	Payload *QueryParamRequest
+	Result  QueryParamResponse
+}
+
+func TestControllerMarshallAndValidate_QueryParams(t *testing.T) {
+	// setup required data
+	controller := &QueryController{}
+
+	// setup request
+	requestCtx := &fasthttp.RequestCtx{
+		Request: fasthttp.Request{},
+	}
+
+	// run test 1
+	q := requestCtx.Request.URI().QueryArgs()
+
+	// Set values for all fields
+	q.Set("string_value", "test string")
+	q.Set("bool_value", "true")
+	q.Set("int_value", "123")
+	q.Set("int8_value", "8")
+	q.Set("int16_value", "16")
+	q.Set("int32_value", "32")
+	q.Set("int64_value", "64")
+	q.Set("int64_ptr", "128")
+	q.Set("uint_value", "200")
+	q.Set("uint8_value", "8")
+	q.Set("uint16_value", "16")
+	q.Set("uint32_value", "32")
+	q.Set("uint64_value", "64")
+	q.Set("float32_value", "3.14")
+	q.Set("float64_value", "6.28")
+	q.Set("byte_value", "65")   // ASCII 'A'
+	q.Set("rune_value", "9731") // Unicode snowman ☃
+	q.Set("postgres_date_value", "2025-05-23")
+	q.Set("custom_status_value", "success")
+
+	err := raiden.MarshallAndValidate(requestCtx, controller)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "test string", controller.Payload.StringValue)
+	assert.NotNil(t, controller.Payload.BoolValue)
+	assert.Equal(t, true, *controller.Payload.BoolValue)
+	assert.Equal(t, 123, controller.Payload.IntValue)
+	assert.Equal(t, int8(8), controller.Payload.Int8Value)
+	assert.Equal(t, int16(16), controller.Payload.Int16Value)
+	assert.Equal(t, int32(32), controller.Payload.Int32Value)
+	assert.Equal(t, int64(64), controller.Payload.Int64Value)
+	assert.NotNil(t, controller.Payload.Int64Ptr)
+	assert.Equal(t, int64(128), *controller.Payload.Int64Ptr)
+	assert.Equal(t, uint(200), controller.Payload.UintValue)
+	assert.Equal(t, uint8(8), controller.Payload.Uint8Value)
+	assert.Equal(t, uint16(16), controller.Payload.Uint16Value)
+	assert.Equal(t, uint32(32), controller.Payload.Uint32Value)
+	assert.Equal(t, uint64(64), controller.Payload.Uint64Value)
+	assert.NotNil(t, controller.Payload.Float32Value)
+	assert.InDelta(t, 3.14, *controller.Payload.Float32Value, 0.001)
+	assert.NotNil(t, controller.Payload.Float64Value)
+	assert.InDelta(t, 6.28, *controller.Payload.Float64Value, 0.001)
+	assert.Equal(t, byte(65), controller.Payload.ByteValue)
+	assert.Equal(t, rune(9731), controller.Payload.RuneValue)
+	assert.NotNil(t, controller.Payload.PostgresDateValue)
+	assert.Equal(t, "2025-05-23", controller.Payload.PostgresDateValue.String())
+	assert.Equal(t, "success", controller.Payload.CustomStatusValue.String())
 }
