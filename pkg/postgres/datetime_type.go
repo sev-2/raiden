@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -54,4 +55,15 @@ func (m DateTime) MarshalJSON() ([]byte, error) {
 // String implements fmt.Stringer
 func (m DateTime) String() string {
 	return m.Time.Format(time.RFC3339)
+}
+
+func (m *DateTime) Parse(value string) error {
+	for _, format := range timeFormats {
+		t, err := time.Parse(format, value)
+		if err == nil {
+			m.Time = t
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid time format: %s", value)
 }
