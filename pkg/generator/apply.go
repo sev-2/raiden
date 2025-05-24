@@ -62,8 +62,8 @@ func main() {
 			// register app resource
 			bootstrap.RegisterModels()
 			bootstrap.RegisterTypes()
-			{{if eq .Mode "bff"}}
 			bootstrap.RegisterRpc()
+			{{if eq .Mode "bff"}}
 			bootstrap.RegisterRoles()
 			bootstrap.RegisterStorages()
 			{{end}}
