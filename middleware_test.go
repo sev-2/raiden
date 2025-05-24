@@ -36,8 +36,14 @@ func TestChain_Then(t *testing.T) {
 	// setup required data
 	controller := &HelloWorldController{}
 
+	router := raiden.Route{
+		Type:       raiden.RouteTypeCustom,
+		Controller: controller,
+		Methods:    []string{fasthttp.MethodGet},
+	}
+
 	// Call Then
-	fn := c.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller, nil)
+	fn := c.Then(&router, nil, nil, nil, nil, "GET", nil)
 
 	// Test the returned function
 	assert.NotNil(t, fn)
@@ -52,7 +58,12 @@ func Test_Tracer(t *testing.T) {
 
 	controller := &HelloWorldController{}
 
-	fn := a.Then(nil, nil, nil, nil, "GET", raiden.RouteTypeCustom, controller, nil)
+	router := raiden.Route{
+		Controller: controller,
+		Methods:    []string{fasthttp.MethodGet},
+	}
+
+	fn := a.Then(&router, nil, nil, nil, nil, "GET", nil)
 	assert.NotNil(t, fn)
 
 	mockCtx := &mock.MockContext{

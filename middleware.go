@@ -22,7 +22,7 @@ type (
 	Chain interface {
 		Append(middlewares ...MiddlewareFn) Chain
 		Prepend(middlewares ...MiddlewareFn) Chain
-		Then(config *Config, tracer trace.Tracer, jobChan chan JobParams, pubSub PubSub, httpMethod string, routeType RouteType, fn Controller, lib map[string]any) fasthttp.RequestHandler
+		Then(route *Route, config *Config, tracer trace.Tracer, jobChan chan JobParams, pubSub PubSub, httpMethod string, lib map[string]any) fasthttp.RequestHandler
 		ServeFsHandle(cfg *Config, fsHandle fasthttp.RequestHandler) fasthttp.RequestHandler
 	}
 
@@ -74,9 +74,9 @@ func (c chain) Prepend(middlewares ...MiddlewareFn) Chain {
 // When the request comes in, it will be passed to m1, then m2, then m3
 // and finally, the given handler
 // (assuming every middleware calls the following one).
-func (c chain) Then(config *Config, tracer trace.Tracer, jobChan chan JobParams, pubSub PubSub, httpMethod string, routeType RouteType, controller Controller, lib map[string]any) fasthttp.RequestHandler {
+func (c chain) Then(route *Route, config *Config, tracer trace.Tracer, jobChan chan JobParams, pubSub PubSub, httpMethod string, lib map[string]any) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		handler := createHandleFunc(httpMethod, routeType, controller)
+		handler := createHandleFunc(httpMethod, route)
 		for i := range c.middlewares {
 			handler = c.middlewares[len(c.middlewares)-1-i](handler)
 		}
