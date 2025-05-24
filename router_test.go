@@ -1,6 +1,7 @@
 package raiden_test
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -132,10 +133,22 @@ func (*UnimplementedController) AfterHead(ctx raiden.Context) error {
 	return http.ErrNotSupported
 }
 
+type RestController struct {
+	raiden.ControllerBase
+	Model SomeModel
+}
+
+func (c *RestController) BeforeGet(ctx raiden.Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusUnauthorized, errors.New("unauthorize"))
+}
+
 type StorageController struct {
 	raiden.ControllerBase
-	Http    string `path:"/assets" type:"storage"`
 	Storage *SomeBucket
+}
+
+func (c *StorageController) BeforeGet(ctx raiden.Context) error {
+	return ctx.SendErrorWithCode(fasthttp.StatusUnauthorized, errors.New("unauthorize"))
 }
 
 func loadConfig() *raiden.Config {
@@ -394,6 +407,80 @@ func Test_Route(t *testing.T) {
 
 }
 
+func Test_RouteRest(t *testing.T) {
+	fsCtx := fasthttp.RequestCtx{}
+	a := raiden.NewChain()
+	mockCtx := &mock.MockContext{
+		TracerFn: func() trace.Tracer {
+			noopProvider := noop.NewTracerProvider()
+			tracer := noopProvider.Tracer("test")
+			return tracer
+		},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+				CorsAllowedOrigins:  "*",
+				CorsAllowedMethods:  "GET, POST, PUT, DELETE, OPTIONS",
+				CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
+			}
+		},
+	}
+
+	controller := &RestController{}
+	router := raiden.Route{
+		Type:       raiden.RouteTypeRest,
+		Controller: controller,
+		Model:      SomeModel{},
+	}
+
+	fn := a.Then(&router, mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "GET", nil)
+	fn(&fsCtx)
+	assert.Equal(t, "{\"code\":\"Unauthorized\",\"message\":\"unauthorize\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
+}
+
+func Test_RouteStorage(t *testing.T) {
+	fsCtx := fasthttp.RequestCtx{}
+	a := raiden.NewChain()
+	mockCtx := &mock.MockContext{
+		TracerFn: func() trace.Tracer {
+			noopProvider := noop.NewTracerProvider()
+			tracer := noopProvider.Tracer("test")
+			return tracer
+		},
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:    raiden.DeploymentTargetCloud,
+				ProjectId:           "test-project-id",
+				ProjectName:         "My Great Project",
+				SupabaseApiBasePath: "/v1",
+				SupabaseApiUrl:      "http://supabase.cloud.com",
+				SupabasePublicUrl:   "http://supabase.cloud.com",
+				CorsAllowedOrigins:  "*",
+				CorsAllowedMethods:  "GET, POST, PUT, DELETE, OPTIONS",
+				CorsAllowedHeaders:  "X-Requested-With, Content-Type, Authorization",
+			}
+		},
+	}
+
+	controller := &StorageController{}
+	router := raiden.Route{
+		Type:       raiden.RouteTypeStorage,
+		Controller: controller,
+		Storage:    &SomeBucket{},
+	}
+
+	fn := a.Then(&router, mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "GET", nil)
+	fn(&fsCtx)
+	assert.Equal(t, "{\"code\":\"Unauthorized\",\"message\":\"unauthorize\"}", string(fsCtx.Response.Body()))
+	fsCtx.Response.SetBody(nil)
+}
+
 func Test_RouteUnimplemented(t *testing.T) {
 	a := raiden.NewChain()
 	controller := &UnimplementedController{}
@@ -415,7 +502,6 @@ func Test_RouteUnimplemented(t *testing.T) {
 	router := raiden.Route{
 		Type:       raiden.RouteTypeCustom,
 		Controller: controller,
-		Methods:    []string{fasthttp.MethodGet},
 	}
 
 	fn := a.Then(&router, mockCtx.ConfigFn(), mockCtx.TracerFn(), nil, nil, "GET", nil)
