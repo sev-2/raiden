@@ -144,6 +144,7 @@ func (c *RestController) BeforeGet(ctx raiden.Context) error {
 
 type StorageController struct {
 	raiden.ControllerBase
+	Http    string `path:"/assets" type:"storage"`
 	Storage *SomeBucket
 }
 
