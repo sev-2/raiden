@@ -266,6 +266,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeDate, nil
 	case RpcReturnDataTypeArrayOfInteger:
 		return RpcReturnDataTypeArrayOfInteger, nil
+	case RpcReturnDataTypeArrayOfNumeric:
+		return RpcReturnDataTypeArrayOfNumeric, nil
 	case RpcReturnDataTypeArrayOfBigInt:
 		return RpcReturnDataTypeArrayOfBigInt, nil
 	case RpcReturnDataTypeArrayOfReal:
