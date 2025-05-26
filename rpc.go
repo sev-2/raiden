@@ -25,49 +25,65 @@ type RpcReturnDataType string
 
 // Define constants for rpc input data type
 const (
-	RpcParamDataTypeInteger          RpcParamDataType = "INTEGER"
-	RpcParamDataTypeNumeric          RpcParamDataType = "NUMERIC"
-	RpcParamDataTypeBigInt           RpcParamDataType = "BIGINT"
-	RpcParamDataTypeReal             RpcParamDataType = "REAL"
-	RpcParamDataTypeDoublePreci      RpcParamDataType = "DOUBLE PRECISION"
-	RpcParamDataTypeText             RpcParamDataType = "TEXT"
-	RpcParamDataTypeVarchar          RpcParamDataType = "CHARACTER VARYING"
-	RpcParamDataTypeVarcharAlias     RpcParamDataType = "VARCHAR"
-	RpcParamDataTypeBoolean          RpcParamDataType = "BOOLEAN"
-	RpcParamDataTypeBytea            RpcParamDataType = "BYTEA"
-	RpcParamDataTypeTimestamp        RpcParamDataType = "TIMESTAMP WITHOUT TIME ZONE"
-	RpcParamDataTypeTimestampAlias   RpcParamDataType = "TIMESTAMP"
-	RpcParamDataTypeTimestampTZ      RpcParamDataType = "TIMESTAMP WITH TIME ZONE"
-	RpcParamDataTypeTimestampTZAlias RpcParamDataType = "TIMESTAMPZ"
-	RpcParamDataTypeJSON             RpcParamDataType = "JSON"
-	RpcParamDataTypeJSONB            RpcParamDataType = "JSONB"
-	RpcParamDataTypeUuid             RpcParamDataType = "UUID"
-	RpcParamDataTypeDate             RpcParamDataType = "DATE"
+	RpcParamDataTypeInteger             RpcParamDataType = "INTEGER"
+	RpcParamDataTypeNumeric             RpcParamDataType = "NUMERIC"
+	RpcParamDataTypeBigInt              RpcParamDataType = "BIGINT"
+	RpcParamDataTypeReal                RpcParamDataType = "REAL"
+	RpcParamDataTypeDoublePreci         RpcParamDataType = "DOUBLE PRECISION"
+	RpcParamDataTypeText                RpcParamDataType = "TEXT"
+	RpcParamDataTypeVarchar             RpcParamDataType = "CHARACTER VARYING"
+	RpcParamDataTypeVarcharAlias        RpcParamDataType = "VARCHAR"
+	RpcParamDataTypeBoolean             RpcParamDataType = "BOOLEAN"
+	RpcParamDataTypeBytea               RpcParamDataType = "BYTEA"
+	RpcParamDataTypeTimestamp           RpcParamDataType = "TIMESTAMP WITHOUT TIME ZONE"
+	RpcParamDataTypeTimestampAlias      RpcParamDataType = "TIMESTAMP"
+	RpcParamDataTypeTimestampTZ         RpcParamDataType = "TIMESTAMP WITH TIME ZONE"
+	RpcParamDataTypeTimestampTZAlias    RpcParamDataType = "TIMESTAMPZ"
+	RpcParamDataTypeJSON                RpcParamDataType = "JSON"
+	RpcParamDataTypeJSONB               RpcParamDataType = "JSONB"
+	RpcParamDataTypeUuid                RpcParamDataType = "UUID"
+	RpcParamDataTypeDate                RpcParamDataType = "DATE"
+	RpcParamDataTypeArrayOfInteger      RpcParamDataType = "INTEGER[]"
+	RpcParamDataTypeArrayOfNumeric      RpcParamDataType = "NUMERIC[]"
+	RpcParamDataTypeArrayOfBigInt       RpcParamDataType = "BIGINT[]"
+	RpcParamDataTypeArrayOfReal         RpcParamDataType = "REAL[]"
+	RpcParamDataTypeArrayOfDoublePreci  RpcParamDataType = "DOUBLE PRECISION[]"
+	RpcParamDataTypeArrayOfText         RpcParamDataType = "TEXT[]"
+	RpcParamDataTypeArrayOfVarchar      RpcParamDataType = "CHARACTER VARYING[]"
+	RpcParamDataTypeArrayOfVarcharAlias RpcParamDataType = "VARCHAR[]"
 )
 
 // Define constants for rpc return data type
 const (
-	RpcReturnDataTypeInteger          RpcReturnDataType = "INTEGER"
-	RpcReturnDataTypeBigInt           RpcReturnDataType = "BIGINT"
-	RpcReturnDataTypeReal             RpcReturnDataType = "REAL"
-	RpcReturnDataTypeDoublePreci      RpcReturnDataType = "DOUBLE PRECISION"
-	RpcReturnDataTypeText             RpcReturnDataType = "TEXT"
-	RpcReturnDataTypeVarchar          RpcReturnDataType = "CHARACTER VARYING"
-	RpcReturnDataTypeVarcharAlias     RpcReturnDataType = "VARCHAR"
-	RpcReturnDataTypeBoolean          RpcReturnDataType = "BOOLEAN"
-	RpcReturnDataTypeBytea            RpcReturnDataType = "BYTEA"
-	RpcReturnDataTypeTimestamp        RpcReturnDataType = "TIMESTAMP WITHOUT TIME ZONE"
-	RpcReturnDataTypeTimestampAlias   RpcReturnDataType = "TIMESTAMP"
-	RpcReturnDataTypeTimestampTZ      RpcReturnDataType = "TIMESTAMP WITH TIME ZONE"
-	RpcReturnDataTypeTimestampTZAlias RpcReturnDataType = "TIMESTAMPZ"
-	RpcReturnDataTypeJSON             RpcReturnDataType = "JSON"
-	RpcReturnDataTypeJSONB            RpcReturnDataType = "JSONB"
-	RpcReturnDataTypeRecord           RpcReturnDataType = "RECORD" // like tuple
-	RpcReturnDataTypeTable            RpcReturnDataType = "TABLE"
-	RpcReturnDataTypeSetOf            RpcReturnDataType = "SETOF"
-	RpcReturnDataTypeVoid             RpcReturnDataType = "VOID"
-	RpcReturnDataTypeTrigger          RpcReturnDataType = "TRIGGER"
-	RpcReturnDataTypeDate             RpcReturnDataType = "DATE"
+	RpcReturnDataTypeInteger             RpcReturnDataType = "INTEGER"
+	RpcReturnDataTypeBigInt              RpcReturnDataType = "BIGINT"
+	RpcReturnDataTypeReal                RpcReturnDataType = "REAL"
+	RpcReturnDataTypeDoublePreci         RpcReturnDataType = "DOUBLE PRECISION"
+	RpcReturnDataTypeText                RpcReturnDataType = "TEXT"
+	RpcReturnDataTypeVarchar             RpcReturnDataType = "CHARACTER VARYING"
+	RpcReturnDataTypeVarcharAlias        RpcReturnDataType = "VARCHAR"
+	RpcReturnDataTypeBoolean             RpcReturnDataType = "BOOLEAN"
+	RpcReturnDataTypeBytea               RpcReturnDataType = "BYTEA"
+	RpcReturnDataTypeTimestamp           RpcReturnDataType = "TIMESTAMP WITHOUT TIME ZONE"
+	RpcReturnDataTypeTimestampAlias      RpcReturnDataType = "TIMESTAMP"
+	RpcReturnDataTypeTimestampTZ         RpcReturnDataType = "TIMESTAMP WITH TIME ZONE"
+	RpcReturnDataTypeTimestampTZAlias    RpcReturnDataType = "TIMESTAMPZ"
+	RpcReturnDataTypeJSON                RpcReturnDataType = "JSON"
+	RpcReturnDataTypeJSONB               RpcReturnDataType = "JSONB"
+	RpcReturnDataTypeRecord              RpcReturnDataType = "RECORD" // like tuple
+	RpcReturnDataTypeTable               RpcReturnDataType = "TABLE"
+	RpcReturnDataTypeSetOf               RpcReturnDataType = "SETOF"
+	RpcReturnDataTypeVoid                RpcReturnDataType = "VOID"
+	RpcReturnDataTypeTrigger             RpcReturnDataType = "TRIGGER"
+	RpcReturnDataTypeDate                RpcReturnDataType = "DATE"
+	RpcReturnDataTypeArrayOfInteger      RpcReturnDataType = "INTEGER[]"
+	RpcReturnDataTypeArrayOfNumeric      RpcReturnDataType = "NUMERIC[]"
+	RpcReturnDataTypeArrayOfBigInt       RpcReturnDataType = "BIGINT[]"
+	RpcReturnDataTypeArrayOfReal         RpcReturnDataType = "REAL[]"
+	RpcReturnDataTypeArrayOfDoublePreci  RpcReturnDataType = "DOUBLE PRECISION[]"
+	RpcReturnDataTypeArrayOfText         RpcReturnDataType = "TEXT[]"
+	RpcReturnDataTypeArrayOfVarchar      RpcReturnDataType = "CHARACTER VARYING[]"
+	RpcReturnDataTypeArrayOfVarcharAlias RpcReturnDataType = "VARCHAR[]"
 )
 
 func RpcParamToGoType(dataType RpcParamDataType) string {
@@ -92,6 +108,14 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "uuid.UUID"
 	case RpcParamDataTypeDate:
 		return "postgres.Date"
+	case RpcParamDataTypeArrayOfInteger, RpcParamDataTypeArrayOfBigInt:
+		return "[]int64"
+	case RpcParamDataTypeArrayOfReal:
+		return "[]float32"
+	case RpcParamDataTypeArrayOfDoublePreci, RpcParamDataTypeArrayOfNumeric:
+		return "[]float64"
+	case RpcParamDataTypeArrayOfText, RpcParamDataTypeArrayOfVarchar, RpcParamDataTypeArrayOfVarcharAlias:
+		return "[]string"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -139,6 +163,23 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 		return RpcParamDataTypeUuid, nil
 	case RpcParamDataTypeDate:
 		return RpcParamDataTypeDate, nil
+	case RpcParamDataTypeArrayOfInteger:
+		return RpcParamDataTypeArrayOfInteger, nil
+	case RpcParamDataTypeArrayOfNumeric:
+		return RpcParamDataTypeArrayOfNumeric, nil
+	case RpcParamDataTypeArrayOfBigInt:
+		return RpcParamDataTypeArrayOfBigInt, nil
+	case RpcParamDataTypeArrayOfReal:
+		return RpcParamDataTypeArrayOfReal, nil
+	case RpcParamDataTypeArrayOfDoublePreci:
+		return RpcParamDataTypeArrayOfDoublePreci, nil
+	case RpcParamDataTypeArrayOfText:
+		return RpcParamDataTypeArrayOfText, nil
+	case RpcParamDataTypeArrayOfVarchar, RpcParamDataTypeArrayOfVarcharAlias:
+		if returnAlias {
+			return RpcParamDataTypeArrayOfVarcharAlias, nil
+		}
+		return RpcParamDataTypeArrayOfVarchar, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc param type  : %s", pCheckType)
 	}
@@ -164,6 +205,14 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 		return "map[string]interface{}"
 	case RpcReturnDataTypeDate:
 		return "postgres.Date"
+	case RpcReturnDataTypeArrayOfInteger, RpcReturnDataTypeArrayOfBigInt:
+		return "[]int64"
+	case RpcReturnDataTypeArrayOfReal:
+		return "[]float32"
+	case RpcReturnDataTypeArrayOfDoublePreci, RpcReturnDataTypeArrayOfNumeric:
+		return "[]float64"
+	case RpcReturnDataTypeArrayOfText, RpcReturnDataTypeArrayOfVarchar, RpcReturnDataTypeArrayOfVarcharAlias:
+		return "[]string"
 	default:
 		return "interface{}" // Return interface{} for unknown types
 	}
@@ -215,6 +264,21 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeTrigger, nil
 	case RpcReturnDataTypeDate:
 		return RpcReturnDataTypeDate, nil
+	case RpcReturnDataTypeArrayOfInteger:
+		return RpcReturnDataTypeArrayOfInteger, nil
+	case RpcReturnDataTypeArrayOfBigInt:
+		return RpcReturnDataTypeArrayOfBigInt, nil
+	case RpcReturnDataTypeArrayOfReal:
+		return RpcReturnDataTypeArrayOfReal, nil
+	case RpcReturnDataTypeArrayOfDoublePreci:
+		return RpcReturnDataTypeArrayOfDoublePreci, nil
+	case RpcReturnDataTypeArrayOfText:
+		return RpcReturnDataTypeArrayOfText, nil
+	case RpcReturnDataTypeArrayOfVarchar, RpcReturnDataTypeArrayOfVarcharAlias:
+		if returnAlias {
+			return RpcReturnDataTypeArrayOfVarcharAlias, nil
+		}
+		return RpcReturnDataTypeArrayOfVarchar, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return type  : %s", pCheckType)
 	}
@@ -265,6 +329,21 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeTrigger", nil
 	case RpcReturnDataTypeDate:
 		return "RpcReturnDataTypeDate", nil
+	case RpcReturnDataTypeArrayOfInteger:
+		return "RpcReturnDataTypeArrayOfInteger", nil
+	case RpcReturnDataTypeArrayOfBigInt:
+		return "RpcReturnDataTypeArrayOfBigInt", nil
+	case RpcReturnDataTypeArrayOfReal:
+		return "RpcReturnDataTypeArrayOfReal", nil
+	case RpcReturnDataTypeArrayOfDoublePreci:
+		return "RpcReturnDataTypeArrayOfDoublePreci", nil
+	case RpcReturnDataTypeArrayOfText:
+		return "RpcReturnDataTypeArrayOfText", nil
+	case RpcReturnDataTypeArrayOfVarchar, RpcReturnDataTypeArrayOfVarcharAlias:
+		if returnAlias {
+			return "RpcReturnDataTypeArrayOfVarcharAlias", nil
+		}
+		return "RpcReturnDataTypeArrayOfVarchar", nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}

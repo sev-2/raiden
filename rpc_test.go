@@ -266,6 +266,13 @@ func TestRpcParamToGoType(t *testing.T) {
 		{raiden.RpcParamDataTypeJSON, "map[string]interface{}"},
 		{raiden.RpcParamDataTypeJSONB, "map[string]interface{}"},
 		{raiden.RpcParamDataTypeDate, "postgres.Date"},
+		{raiden.RpcParamDataTypeArrayOfInteger, "[]int64"},
+		{raiden.RpcParamDataTypeArrayOfBigInt, "[]int64"},
+		{raiden.RpcParamDataTypeArrayOfReal, "[]float32"},
+		{raiden.RpcParamDataTypeArrayOfDoublePreci, "[]float64"},
+		{raiden.RpcParamDataTypeArrayOfText, "[]string"},
+		{raiden.RpcParamDataTypeArrayOfVarchar, "[]string"},
+		{raiden.RpcParamDataTypeArrayOfVarcharAlias, "[]string"},
 	}
 
 	for _, tt := range tests {
@@ -291,6 +298,13 @@ func TestGetValidRpcParamType(t *testing.T) {
 		{"timestamp", true, raiden.RpcParamDataTypeTimestampAlias, false},
 		{"unsupported", false, "", true},
 		{"date", true, raiden.RpcParamDataTypeDate, false},
+		{"integer[]", false, raiden.RpcParamDataTypeArrayOfInteger, false},
+		{"bigint[]", false, raiden.RpcParamDataTypeArrayOfBigInt, false},
+		{"real[]", false, raiden.RpcParamDataTypeArrayOfReal, false},
+		{"double precision[]", false, raiden.RpcParamDataTypeArrayOfDoublePreci, false},
+		{"text[]", false, raiden.RpcParamDataTypeArrayOfText, false},
+		{"varchar[]", false, raiden.RpcParamDataTypeArrayOfVarchar, false},
+		{"varchar[]", true, raiden.RpcParamDataTypeArrayOfVarcharAlias, false},
 	}
 
 	for _, tt := range tests {
@@ -322,6 +336,13 @@ func TestRpcReturnToGoType(t *testing.T) {
 		{raiden.RpcReturnDataTypeJSON, "map[string]interface{}"},
 		{raiden.RpcReturnDataTypeJSONB, "map[string]interface{}"},
 		{raiden.RpcReturnDataTypeDate, "postgres.Date"},
+		{raiden.RpcReturnDataTypeArrayOfInteger, "[]int64"},
+		{raiden.RpcReturnDataTypeArrayOfBigInt, "[]int64"},
+		{raiden.RpcReturnDataTypeArrayOfReal, "[]float32"},
+		{raiden.RpcReturnDataTypeArrayOfDoublePreci, "[]float64"},
+		{raiden.RpcReturnDataTypeArrayOfText, "[]string"},
+		{raiden.RpcReturnDataTypeArrayOfVarchar, "[]string"},
+		{raiden.RpcReturnDataTypeArrayOfVarcharAlias, "[]string"},
 	}
 
 	for _, tt := range tests {
@@ -347,6 +368,13 @@ func TestGetValidRpcReturnType(t *testing.T) {
 		{"timestamp", true, raiden.RpcReturnDataTypeTimestampAlias, false},
 		{"unsupported", false, "", true},
 		{"date", false, raiden.RpcReturnDataTypeDate, false},
+		{"integer[]", false, raiden.RpcReturnDataTypeArrayOfInteger, false},
+		{"bigint[]", false, raiden.RpcReturnDataTypeArrayOfBigInt, false},
+		{"real[]", false, raiden.RpcReturnDataTypeArrayOfReal, false},
+		{"double precision[]", false, raiden.RpcReturnDataTypeArrayOfDoublePreci, false},
+		{"text[]", false, raiden.RpcReturnDataTypeArrayOfText, false},
+		{"varchar[]", false, raiden.RpcReturnDataTypeArrayOfVarchar, false},
+		{"varchar[]", true, raiden.RpcReturnDataTypeArrayOfVarcharAlias, false},
 	}
 
 	for _, tt := range tests {
@@ -375,6 +403,13 @@ func TestGetValidRpcReturnNameDecl(t *testing.T) {
 		{raiden.RpcReturnDataTypeTable, false, "RpcReturnDataTypeTable", false},
 		{raiden.RpcReturnDataTypeVoid, false, "RpcReturnDataTypeVoid", false},
 		{raiden.RpcReturnDataTypeDate, false, "RpcReturnDataTypeDate", false},
+		{raiden.RpcReturnDataTypeArrayOfInteger, false, "RpcReturnDataTypeArrayOfInteger", false},
+		{raiden.RpcReturnDataTypeArrayOfBigInt, false, "RpcReturnDataTypeArrayOfBigInt", false},
+		{raiden.RpcReturnDataTypeArrayOfReal, false, "RpcReturnDataTypeArrayOfReal", false},
+		{raiden.RpcReturnDataTypeArrayOfDoublePreci, false, "RpcReturnDataTypeArrayOfDoublePreci", false},
+		{raiden.RpcReturnDataTypeArrayOfText, false, "RpcReturnDataTypeArrayOfText", false},
+		{raiden.RpcReturnDataTypeArrayOfVarchar, false, "RpcReturnDataTypeArrayOfVarchar", false},
+		{raiden.RpcReturnDataTypeArrayOfVarcharAlias, true, "RpcReturnDataTypeArrayOfVarcharAlias", false},
 		{raiden.RpcReturnDataType("unsupported"), false, "", true},
 	}
 
