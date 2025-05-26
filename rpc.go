@@ -652,6 +652,10 @@ func extractRpcParam(paramType reflect.Type) (params RpcParams, err error) {
 			return params, err
 		}
 
+		if ct.Name == "" {
+			ct.Name = utils.ToSnakeCase(field.Name)
+		}
+
 		p := RpcParam{
 			Name: ct.Name,
 			Type: RpcParamDataType(ct.Type),
@@ -808,7 +812,9 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 				if ct, err := UnmarshalRpcParamTag(columnTagStr); err == nil {
 					key = ct.Name
 				}
-			} else {
+			}
+
+			if key == "" {
 				key = utils.ToSnakeCase(fieldType.Name)
 			}
 
