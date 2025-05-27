@@ -507,6 +507,7 @@ type QueryParamRequest struct {
 	PostgresDateValue     *postgres.Date    `query:"postgres_date_value"`      // optional custom date
 	PostgresDateTimeValue postgres.DateTime `query:"postgres_date_time_value"` // optional custom date
 	CustomStatusValue     Status            `query:"custom_status_value"`      // custom type (int/string alias)
+	PointValue            postgres.Point    `query:"point_value"`              // custom type (int/string alias)
 }
 
 type QueryParamResponse struct{}
@@ -550,6 +551,7 @@ func TestControllerMarshallAndValidate_QueryParams(t *testing.T) {
 	q.Set("postgres_date_value", "2025-05-23")
 	q.Set("postgres_date_time_value", "2025-05-23 15:04:05")
 	q.Set("custom_status_value", "success")
+	q.Set("point_value", "(144.9631,-37.8136)")
 
 	err := raiden.MarshallAndValidate(requestCtx, controller)
 	assert.NoError(t, err)
@@ -578,6 +580,8 @@ func TestControllerMarshallAndValidate_QueryParams(t *testing.T) {
 	assert.NotNil(t, controller.Payload.PostgresDateValue)
 	assert.Equal(t, "2025-05-23", controller.Payload.PostgresDateValue.String())
 	assert.Equal(t, "success", controller.Payload.CustomStatusValue.String())
+	assert.Equal(t, float64(144.9631), controller.Payload.PointValue.X)
+	assert.Equal(t, float64(-37.8136), controller.Payload.PointValue.Y)
 
 	q.Set("bool_value", "invalid")
 	err = raiden.MarshallAndValidate(requestCtx, controller)
