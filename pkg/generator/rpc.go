@@ -373,11 +373,12 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 		}
 
 		paramsInCount++
+		fieldName := fa.Name
 		if strings.HasPrefix(strings.ToLower(fa.Name), raiden.DefaultRpcParamPrefix) {
 			paramsUsePrefix = append(paramsUsePrefix, fa.Name)
+			fieldName = strings.TrimPrefix(fieldName, raiden.DefaultRpcParamPrefix)
 		}
 
-		fieldName := strings.ReplaceAll(fa.Name, raiden.DefaultRpcParamPrefix, "")
 		p := raiden.RpcParam{
 			Name: fieldName,
 			Type: raiden.RpcParamDataTypeText,
