@@ -363,6 +363,72 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 	}
 }
 
+//
+
+type RpcParamKV struct {
+	Key   string
+	Value any
+}
+
+type RpcParamMap struct {
+	pairs []RpcParamKV
+}
+
+// Set adds or updates a key-value pair
+func (om *RpcParamMap) Set(key string, value any) {
+	for i, pair := range om.pairs {
+		if pair.Key == key {
+			om.pairs[i].Value = value
+			return
+		}
+	}
+	om.pairs = append(om.pairs, RpcParamKV{Key: key, Value: value})
+}
+
+// Get retrieves a value by key
+func (om *RpcParamMap) Get(key string) (any, bool) {
+	for _, pair := range om.pairs {
+		if pair.Key == key {
+			return pair.Value, true
+		}
+	}
+	return nil, false
+}
+
+// MarshalJSON implements json.Marshaler interface to preserve order
+func (om RpcParamMap) MarshalJSON() ([]byte, error) {
+	m := make(map[string]json.RawMessage, len(om.pairs))
+	order := make([]string, len(om.pairs))
+
+	for i, pair := range om.pairs {
+		b, err := json.Marshal(pair.Value)
+		if err != nil {
+			return nil, err
+		}
+		m[pair.Key] = b
+		order[i] = pair.Key
+	}
+
+	// Manually construct ordered JSON object
+	buf := []byte{'{'}
+	for i, key := range order {
+		if i > 0 {
+			buf = append(buf, ',')
+		}
+		buf = append(buf, rpcParamsMapJsonString(key)...)
+		buf = append(buf, ':')
+		buf = append(buf, m[key]...)
+	}
+	buf = append(buf, '}')
+	return buf, nil
+}
+
+// jsonString quotes a string as a JSON key
+func rpcParamsMapJsonString(s string) []byte {
+	b, _ := json.Marshal(s)
+	return b
+}
+
 // ----- Define type, variable and constant -----
 type (
 	RpcSecurityType string
@@ -894,7 +960,7 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 		return nil, err
 	}
 
-	mapParams := map[string]any{}
+	mapParams := RpcParamMap{}
 	for i := 0; i < paramsType.NumField(); i++ {
 		if paramValue.IsValid() {
 			fieldType, fieldValue := paramsType.Field(i), paramValue.Field(i)
@@ -914,7 +980,7 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 			if rpc.UseParamPrefix() {
 				key = fmt.Sprintf("%s%s", DefaultRpcParamPrefix, key)
 			}
-			mapParams[strings.ToLower(key)] = fieldValue.Interface()
+			mapParams.Set(strings.ToLower(key), fieldValue.Interface())
 		}
 	}
 

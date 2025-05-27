@@ -1,7 +1,9 @@
 package raiden_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -466,5 +468,61 @@ func TestUnmarshalRpcParamTag(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		}
+	}
+}
+
+func TestRpcParamMap_SetAndGet(t *testing.T) {
+	om := &raiden.RpcParamMap{}
+
+	om.Set("foo", 42)
+	om.Set("bar", "hello")
+
+	val, ok := om.Get("foo")
+	assert.True(t, ok)
+	assert.Equal(t, 42, val)
+
+	val, ok = om.Get("bar")
+	assert.True(t, ok)
+	assert.Equal(t, "hello", val)
+
+	_, ok = om.Get("baz")
+	assert.False(t, ok)
+}
+
+func TestOrderedMap_Overwrite(t *testing.T) {
+	om := &raiden.RpcParamMap{}
+
+	om.Set("key", 1)
+	om.Set("key", 2)
+
+	val, ok := om.Get("key")
+	assert.True(t, ok)
+	assert.Equal(t, 2, val)
+
+	data, err := json.Marshal(om)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"key":2}`, string(data))
+}
+
+func TestOrderedMap_MarshalJSONOrder(t *testing.T) {
+	om := &raiden.RpcParamMap{}
+
+	om.Set("first", 1)
+	om.Set("second", 2)
+	om.Set("third", map[string]any{"nested": true})
+
+	data, err := json.Marshal(om)
+	assert.NoError(t, err)
+
+	jsonStr := string(data)
+
+	expectedOrder := []string{`"first":1`, `"second":2`, `"third":{"nested":true}`}
+	lastIndex := -1
+
+	for _, field := range expectedOrder {
+		index := strings.Index(jsonStr, field)
+		assert.GreaterOrEqual(t, index, 0, "field %s not found", field)
+		assert.Greater(t, index, lastIndex, "field %s appeared out of order", field)
+		lastIndex = index
 	}
 }
