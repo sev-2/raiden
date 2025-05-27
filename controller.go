@@ -710,6 +710,9 @@ func setCustomStruct(fieldValue reflect.Value, value string) error {
 	case "postgres.DateTime":
 		dt := fieldValue.Addr().Interface().(*postgres.DateTime)
 		return dt.UnmarshalJSON([]byte(value))
+	case "postgres.Point":
+		dt := fieldValue.Addr().Interface().(*postgres.Point)
+		return dt.UnmarshalJSON([]byte(value))
 	}
 
 	// 🧠 Detect if the type embeds raiden.TypeBase

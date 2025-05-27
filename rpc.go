@@ -43,6 +43,7 @@ const (
 	RpcParamDataTypeJSONB               RpcParamDataType = "JSONB"
 	RpcParamDataTypeUuid                RpcParamDataType = "UUID"
 	RpcParamDataTypeDate                RpcParamDataType = "DATE"
+	RpcParamDataTypePoint               RpcParamDataType = "POINT"
 	RpcParamDataTypeArrayOfInteger      RpcParamDataType = "INTEGER[]"
 	RpcParamDataTypeArrayOfNumeric      RpcParamDataType = "NUMERIC[]"
 	RpcParamDataTypeArrayOfBigInt       RpcParamDataType = "BIGINT[]"
@@ -76,6 +77,7 @@ const (
 	RpcReturnDataTypeVoid                RpcReturnDataType = "VOID"
 	RpcReturnDataTypeTrigger             RpcReturnDataType = "TRIGGER"
 	RpcReturnDataTypeDate                RpcReturnDataType = "DATE"
+	RpcReturnDataTypePoint               RpcReturnDataType = "POINT"
 	RpcReturnDataTypeArrayOfInteger      RpcReturnDataType = "INTEGER[]"
 	RpcReturnDataTypeArrayOfNumeric      RpcReturnDataType = "NUMERIC[]"
 	RpcReturnDataTypeArrayOfBigInt       RpcReturnDataType = "BIGINT[]"
@@ -108,6 +110,8 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "uuid.UUID"
 	case RpcParamDataTypeDate:
 		return "postgres.Date"
+	case RpcParamDataTypePoint:
+		return "postgres.Point"
 	case RpcParamDataTypeArrayOfInteger, RpcParamDataTypeArrayOfBigInt:
 		return "[]int64"
 	case RpcParamDataTypeArrayOfReal:
@@ -180,6 +184,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 			return RpcParamDataTypeArrayOfVarcharAlias, nil
 		}
 		return RpcParamDataTypeArrayOfVarchar, nil
+	case RpcParamDataTypePoint:
+		return RpcParamDataTypePoint, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc param type  : %s", pCheckType)
 	}
@@ -205,6 +211,8 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 		return "map[string]interface{}"
 	case RpcReturnDataTypeDate:
 		return "postgres.Date"
+	case RpcReturnDataTypePoint:
+		return "postgres.Point"
 	case RpcReturnDataTypeArrayOfInteger, RpcReturnDataTypeArrayOfBigInt:
 		return "[]int64"
 	case RpcReturnDataTypeArrayOfReal:
@@ -281,6 +289,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 			return RpcReturnDataTypeArrayOfVarcharAlias, nil
 		}
 		return RpcReturnDataTypeArrayOfVarchar, nil
+	case RpcReturnDataTypePoint:
+		return RpcReturnDataTypePoint, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return type  : %s", pCheckType)
 	}
@@ -346,6 +356,8 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 			return "RpcReturnDataTypeArrayOfVarcharAlias", nil
 		}
 		return "RpcReturnDataTypeArrayOfVarchar", nil
+	case RpcReturnDataTypePoint:
+		return "RpcReturnDataTypePoint", nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}
