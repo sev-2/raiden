@@ -19,7 +19,7 @@ type Submission struct{}
 
 type GetSubmissionsParams struct {
 	ScouterName   string `json:"scouter_name" column:"name:scouter_name;type:varchar"`
-	CandidateName string `json:"candidate_name" column:"name:candidate_name;type:text"`
+	CandidateName string `json:"candidate_name" column:"type:text"`
 }
 type GetSubmissionsItem struct {
 	Id        int64     `json:"id" column:"name:id;type:integer"`
