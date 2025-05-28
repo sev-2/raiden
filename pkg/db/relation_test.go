@@ -110,4 +110,30 @@ func TestWith(t *testing.T) {
 		})
 
 	})
+
+	t.Run("invalid relation", func(t *testing.T) {
+		t.Run("invalid relation name", func(t *testing.T) {
+			assert.Panics(t, func() {
+				NewQuery(&mockRaidenContext).
+					Model(articleMockModel).
+					Preload("InvalidRelation")
+			}, "Expected panic for invalid relation name")
+		})
+
+		t.Run("invalid relation when data type is not a struct", func(t *testing.T) {
+			assert.Panics(t, func() {
+				NewQuery(&mockRaidenContext).
+					Model(articleMockModel).
+					Preload("Title")
+			}, "Expected panic for invalid relation with non-struct data type")
+		})
+
+		t.Run("invalid relation when data type is not a slice of struct", func(t *testing.T) {
+			assert.Panics(t, func() {
+				NewQuery(&mockRaidenContext).
+					Model(articleMockModel).
+					Preload("Tags")
+			}, "Expected panic for invalid relation with non-slice of struct data type")
+		})
+	})
 }

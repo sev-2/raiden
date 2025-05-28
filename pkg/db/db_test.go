@@ -23,6 +23,7 @@ type ArticleMockModel struct {
 	Rating     int64     `json:"rating,omitempty" column:"name:rating;type:bigint;nullable:false"`
 	IsFeatured bool      `json:"is_featured,omitempty" column:"name:is_featured;type:bool;nullable:false"`
 	CreatedAt  time.Time `json:"created_at,omitempty" column:"name:created_at;type:timestampz;nullable:false;default:now()"`
+	Tags       []string  `json:"tags,omitempty" column:"name:tags;type:text[];nullable:true"`
 
 	Metadata string `json:"-" schema:"public" tableName:"articles" rlsEnable:"true" rlsForced:"false"`
 
