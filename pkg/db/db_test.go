@@ -59,9 +59,10 @@ type UsersMockModel struct {
 
 	Acl string `json:"-" read:"" write:""`
 
-	Team     *TeamsMockModel     `json:"team,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:team_id"`
-	Articles []*ArticleMockModel `json:"articles,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:article_id"`
-	Orders   []*OrdersMockModel  `json:"orders,omitempty" join:"joinType:manyToMany;through:orders;sourcePrimaryKey:id;sourceForeignKey:address_id;targetPrimaryKey:id;targetForeign:address_id"`
+	Team      *TeamsMockModel     `json:"team,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:team_id"`
+	Articles  []*ArticleMockModel `json:"articles,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:article_id"`
+	Orders    []*OrdersMockModel  `json:"orders,omitempty" join:"joinType:manyToMany;through:orders;sourcePrimaryKey:id;sourceForeignKey:address_id;targetPrimaryKey:id;targetForeign:address_id"`
+	Addresses []*AddressMockModel `json:"addresses,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:user_id"`
 }
 
 type TeamsMockModel struct {
@@ -92,6 +93,19 @@ type OrganizationsMockModel struct {
 	Acl string `json:"-" read:"" write:""`
 
 	Teams []*TeamsMockModel `json:"teams,omitempty" join:"joinType:hasMany;primaryKey:id;foreignKey:organization_id"`
+}
+
+type AddressMockModel struct {
+	ModelBase
+	Id        int64     `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false"`
+	UserId    int64     `json:"user_id,omitempty" column:"name:user_id;type:bigint;nullable:false"`
+	Address   string    `json:"address,omitempty" column:"name:address;type:text;nullable:false"`
+	CreatedAt time.Time `json:"created_at,omitempty" column:"name:created_at;type:timestampz;nullable:false;default:now()"`
+
+	Metadata string `json:"-" schema:"public" tableName:"addresses" rlsEnable:"true" rlsForced:"false"`
+	Acl      string `json:"-" read:"" write:""`
+
+	User *UsersMockModel `json:"user,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:user_id"`
 }
 
 var (

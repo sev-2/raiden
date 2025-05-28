@@ -170,10 +170,21 @@ func instantiateFieldByPath(model interface{}, fieldPath string) (interface{}, e
 			fieldVal = fieldVal.Elem()
 		}
 
-		if fieldVal.Kind() != reflect.Struct {
+		// Support slice of structs (e.g., []SomeStruct) for one to many relations
+		if fieldVal.Kind() == reflect.Slice {
+			elemType := fieldVal.Type().Elem()
+			if elemType.Kind() == reflect.Ptr {
+				elemType = elemType.Elem()
+			}
+			if elemType.Kind() == reflect.Struct {
+				// Create a new instance of the struct type
+				fieldVal = reflect.New(elemType).Elem()
+			} else {
+				return nil, fmt.Errorf("slice element of field %s is not a struct", fieldName)
+			}
+		} else if fieldVal.Kind() != reflect.Struct {
 			return nil, fmt.Errorf("field %s is not a struct", fieldName)
 		}
-
 		val = fieldVal
 	}
 
