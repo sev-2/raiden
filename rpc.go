@@ -1008,7 +1008,22 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 	}
 
 	if string(ctx.RequestContext().QueryArgs().QueryString()) != "" {
-		apiUrl = fmt.Sprintf("%s?%s", apiUrl, string(ctx.RequestContext().QueryArgs().QueryString()))
+		queryParamsStr := string(ctx.RequestContext().QueryArgs().QueryString())
+		queryParamsSlice := strings.Split(queryParamsStr, "&")
+
+		// Remove query params that use for RPC params
+		for i, param := range queryParamsSlice {
+			kv := strings.SplitN(param, "=", 2)
+			if len(kv) == 2 {
+				key := strings.ToLower(kv[0])
+				if _, exists := mapParams.Get(key); exists {
+					queryParamsSlice = append(queryParamsSlice[:i], queryParamsSlice[i+1:]...)
+				}
+			}
+		}
+
+		queryParams := strings.Join(queryParamsSlice, "&")
+		apiUrl = fmt.Sprintf("%s?%s", apiUrl, queryParams)
 	}
 
 	httpReq, err := ConvertRequestCtxToHTTPRequest(ctx.RequestContext())

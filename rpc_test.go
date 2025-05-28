@@ -96,6 +96,8 @@ func TestExecuteRpc(t *testing.T) {
 
 			rCtx.Request.Header.Set("Authorization", "Bearer some token")
 			rCtx.Request.Header.Set("apiKey", "some api key")
+			rCtx.Request.URI().QueryArgs().Set("scouter_name", "test_1")
+
 			return rCtx
 		},
 	}
