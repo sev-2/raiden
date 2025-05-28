@@ -1016,7 +1016,7 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 			kv := strings.SplitN(param, "=", 2)
 			if len(kv) == 2 {
 				key := strings.ToLower(kv[0])
-				if _, exists := mapParams[key]; exists {
+				if _, exists := mapParams.Get(key); exists {
 					queryParamsSlice = append(queryParamsSlice[:i], queryParamsSlice[i+1:]...)
 				}
 			}
