@@ -1000,11 +1000,7 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 		baseUrl := ctx.Config().PostgRestUrl
 		// Trim trailing slash for consistency
 		baseUrl = strings.TrimSuffix(baseUrl, "/")
-
-		// Remove '/rest' only if it's at the end
-		baseUrl = strings.TrimSuffix(baseUrl, "/rest")
-
-		apiUrl = fmt.Sprintf("%s/rest/rpc/%s", baseUrl, rpc.GetName())
+		apiUrl = fmt.Sprintf("%s/rpc/%s", baseUrl, rpc.GetName())
 	}
 
 	if string(ctx.RequestContext().QueryArgs().QueryString()) != "" {
