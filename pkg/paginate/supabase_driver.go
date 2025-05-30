@@ -72,7 +72,7 @@ func (s *SupabaseDriver) CursorPaginateNext(ctx context.Context, statement strin
 	}
 
 	var nextCursor, prevCursor any
-	if cursor != nil {
+	if cursor != nil && cursor != "" {
 		prevCursor = s.extractPrevCursor(statement, cursorRefColumn, items, limit)
 	}
 
