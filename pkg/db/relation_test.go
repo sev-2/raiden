@@ -111,6 +111,44 @@ func TestWith(t *testing.T) {
 
 	})
 
+	t.Run("match url query for nested relations", func(t *testing.T) {
+		t.Run("nested many to one relation without where condition", func(t *testing.T) {
+			url := NewQuery(&mockRaidenContext).
+				Model(userMockModel).
+				Preload("Team.Organization").
+				GetUrl()
+
+			assert.Equal(t, "/rest/v1/users?select=*,team:teams!team_id(*,organization:organizations!organization_id(*))", url)
+		})
+
+		t.Run("nested many to one relation with where condition", func(t *testing.T) {
+			url := NewQuery(&mockRaidenContext).
+				Model(userMockModel).
+				Preload("Team.Organization", "name", "eq", "Tech").
+				GetUrl()
+
+			assert.Equal(t, "/rest/v1/users?select=*,team:teams!team_id(*,organization:organizations!organization_id(*))&teams.organizations.name=eq.Tech", url)
+		})
+
+		t.Run("nested one to many relation without where condition", func(t *testing.T) {
+			url := NewQuery(&mockRaidenContext).
+				Model(articleMockModel).
+				Preload("User.Articles").
+				GetUrl()
+
+			assert.Equal(t, "/rest/v1/articles?select=*,user:users!user_id(*,articles!article_id(*))", url)
+		})
+
+		t.Run("nested one to many relation with where condition", func(t *testing.T) {
+			url := NewQuery(&mockRaidenContext).
+				Model(articleMockModel).
+				Preload("User.Articles", "rating", "eq", "5").
+				GetUrl()
+
+			assert.Equal(t, "/rest/v1/articles?select=*,user:users!user_id(*,articles!article_id(*))&users.articles.rating=eq.5", url)
+		})
+	})
+
 	t.Run("invalid relation", func(t *testing.T) {
 		t.Run("invalid relation name", func(t *testing.T) {
 			assert.Panics(t, func() {

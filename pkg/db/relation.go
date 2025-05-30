@@ -35,9 +35,9 @@ func (q *Query) Preload(table string, args ...string) *Query {
 		raiden.Panic("unsupported nested relations more than 3 levels")
 	}
 
+	var relatedModel interface{}
 	for i, relation := range relations {
 		var currentModelStruct reflect.Type
-		var relatedModel interface{}
 		var err error
 		if i == 0 {
 			currentModelStruct = reflect.TypeOf(q.model)
@@ -97,7 +97,7 @@ func (q *Query) Preload(table string, args ...string) *Query {
 	// After we have the relation map, we can construct the select query
 	// If the table is `Users.Team.Organization`,
 	// the select query will be `users(teams(organizations(*)))`
-	for _, r := range reverseSortString(relations) {
+	for _, r := range relations {
 		d := relationMap[r]
 		alias := d["alias"]
 		table := d["table"]
@@ -112,7 +112,9 @@ func (q *Query) Preload(table string, args ...string) *Query {
 
 		if len(selects) > 0 {
 			lastQuery := selects[len(selects)-1]
-			selects[len(selects)-1] = fmt.Sprintf("%s(%s,%s)", related, "*", lastQuery)
+
+			// teams(*) -> teams(*,organizations(*))
+			selects[len(selects)-1] = strings.Replace(lastQuery, "(*)", fmt.Sprintf("(*,%s(*))", related), 1)
 		} else {
 			selects = append(selects, fmt.Sprintf("%s(%s)", related, "*"))
 		}
