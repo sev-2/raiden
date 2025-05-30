@@ -42,6 +42,14 @@ func (r *GetSubmissions) GetName() string {
 	return "get_submissions"
 }
 
+func (r *GetSubmissions) GetLanguange() string {
+	return "plpgsql"
+}
+
+func (r *GetSubmissions) GetSchema() string {
+	return "public"
+}
+
 func (r *GetSubmissions) UseParamPrefix() bool {
 	return false
 }
@@ -71,7 +79,7 @@ func TestCreateQuery(t *testing.T) {
 	assert.Equal(t, "get_submissions", rpc.GetName())
 	assert.Equal(t, "public", rpc.GetSchema())
 
-	expectedCompleteQuery := "create or replace function public.get_submissions(scouter_name character varying, candidate_name text) returns table(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying) language plpgsql set search_path = '' as $function$ begin return query select s.id, s.created_at, sc.name as sc_name, c.name as c_name from submission s inner join scouter sc on s.scouter_id = sc.scouter_id inner join candidate c on s.candidate_id = c.candidate_id where sc.name = scouter_name and c.name = candidate_name ; end; $function$"
+	expectedCompleteQuery := "create or replace function public.get_submissions(scouter_name character varying, candidate_name text) returns table(id integer, created_at timestamp without time zone, sc_name character varying, c_name character varying) language plpgsql set search_path = 'public' as $function$ begin return query select s.id, s.created_at, sc.name as sc_name, c.name as c_name from submission s inner join scouter sc on s.scouter_id = sc.scouter_id inner join candidate c on s.candidate_id = c.candidate_id where sc.name = scouter_name and c.name = candidate_name ; end; $function$"
 	assert.Equal(t, expectedCompleteQuery, rpc.GetCompleteStmt())
 }
 

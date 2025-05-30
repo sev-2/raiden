@@ -55,6 +55,7 @@ type (
 		Schema   string
 		Security string
 		Behavior string
+		Language string
 
 		Models     string
 		Definition string
@@ -99,6 +100,10 @@ type {{ .Name }} struct {
 
 func (r *{{ .Name }}) GetName() string {
 	return "{{ .Name | ToSnakeCase }}"
+}
+
+func (r *{{ .Name }}) GetLanguage() string {
+	return "{{ .Language }}"
 }
 
 {{- if ne .Schema "public" }}
@@ -216,6 +221,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 		Package:        "rpc",
 		Imports:        importsPath,
 		Name:           utils.SnakeCaseToPascalCase(function.Name),
+		Language:       strings.ToLower(result.Rpc.Language),
 		Params:         rpcParams,
 		UseParamPrefix: result.UseParamPrefix,
 		ReturnType:     returnTypeDecl,
@@ -308,6 +314,7 @@ func ExtractRpcFunction(fn *objects.Function, tables []objects.Table) (result Ex
 	result.Rpc.CompleteStatement = fn.CompleteStatement
 	result.Rpc.SecurityType = securityType
 	result.Rpc.ReturnType = returnType
+	result.Rpc.Language = fn.Language
 
 	result.OriginalReturnType = fn.ReturnType
 	result.MapScannedTable = mapScannedTable

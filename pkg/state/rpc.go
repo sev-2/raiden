@@ -59,6 +59,7 @@ func BindRpcFunction(rpc raiden.Rpc, fn *objects.Function) (err error) {
 
 	fn.Name = rpc.GetName()
 	fn.Schema = rpc.GetSchema()
+	fn.Language = rpc.GetLanguage()
 	fn.CompleteStatement = rpc.GetCompleteStmt()
 
 	// validate definition query
