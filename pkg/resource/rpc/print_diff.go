@@ -99,7 +99,7 @@ func GenerateDiffMessage(name string, value, changeValue string) (string, error)
 
 	var head, body, end string
 	if sHead != tHead {
-		head = fmt.Sprintf("%s %s %s \n%s %s   %s", symbol, fromIndent, tHead, symbol, toIndent, sHead)
+		head = fmt.Sprintf("%s %s %s \n%s %s   %s \n", symbol, fromIndent, tHead, symbol, toIndent, sHead)
 	} else {
 		head = tHead
 	}
@@ -143,16 +143,42 @@ func splitFunction(query string) (head, body, end string) {
 		query = strings.ReplaceAll(query, "$function$begin", "$function$ begin")
 	}
 
+	if strings.Contains(query, "$function$declare") {
+		query = strings.ReplaceAll(query, "$function$declare", "$function$ declare")
+	}
+
 	if strings.Contains(query, "end$function$") {
 		query = strings.ReplaceAll(query, "end$function$", "end $function$")
 	}
 
 	splitSql := strings.Split(query, "$function$ begin")
+	if len(splitSql) == 1 {
+		splitSql = strings.Split(query, "$function$ declare")
+	}
+
 	end = "end $function$"
+
+	if strings.Contains(query, "end; $function$") {
+		end = "end; $function$"
+	}
+
 	if len(splitSql) == 2 {
-		head = splitSql[0] + " $function$ begin"
+		head = splitSql[0] + " $function$ "
+		head = strings.ReplaceAll(head, "  ", "")
 		head = strings.Join(strings.Fields(head), " ")
-		body = strings.Replace(splitSql[1], end, "", 1)
+
+		if strings.Contains(query, "$function$ begin") {
+			body = "begin"
+		}
+
+		if strings.Contains(query, "$function$ declare") {
+			body = "declare"
+		}
+
+		body += splitSql[1]
+
+		body = strings.ReplaceAll(body, "  ", "")
+		body = strings.ReplaceAll(body, end, " ")
 		body = strings.Join(strings.Fields(body), " ")
 	}
 

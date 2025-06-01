@@ -363,8 +363,6 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 	}
 }
 
-//
-
 type RpcParamKV struct {
 	Key   string
 	Value any
@@ -454,6 +452,8 @@ type (
 		GetModels() map[string]RpcModel
 		SetName(name string)
 		GetName() string
+		SetLanguage(language string)
+		GetLanguage() string
 		SetParams(params []RpcParam)
 		GetParams() []RpcParam
 		UseParamPrefix() bool
@@ -484,6 +484,7 @@ type (
 		Behavior          RpcBehaviorType
 		CompleteStatement string
 		Models            map[string]RpcModel
+		Language          string
 	}
 
 	RpcParamTag struct {
@@ -506,7 +507,7 @@ const (
 	RpcSecurityTypeDefiner RpcSecurityType = "DEFINER"
 	RpcSecurityTypeInvoker RpcSecurityType = "INVOKER"
 
-	RpcTemplate = `CREATE OR REPLACE FUNCTION :function_name(:params) RETURNS :return_type LANGUAGE plpgsql :behavior :security set search_path = '' AS $function$ :definition $function$`
+	RpcTemplate = `CREATE OR REPLACE FUNCTION :function_name(:params) RETURNS :return_type LANGUAGE :language :behavior :security set search_path = :search_path AS $function$ :definition $function$`
 )
 
 func MarshalRpcParamTag(paramTag *RpcParamTag) (string, error) {
@@ -576,6 +577,14 @@ func (r *RpcBase) GetName() string {
 	return r.Name
 }
 
+func (r *RpcBase) SetLanguage(language string) {
+	r.Language = language
+}
+
+func (r *RpcBase) GetLanguage() string {
+	return r.Language
+}
+
 func (r *RpcBase) BindModel(model any, alias string) Rpc {
 	r.initModel()
 
@@ -593,6 +602,7 @@ func (r *RpcBase) BindModel(model any, alias string) Rpc {
 }
 
 func (r *RpcBase) BindModels() {}
+
 func (r *RpcBase) GetModels() map[string]RpcModel {
 	return r.Models
 }
@@ -718,8 +728,18 @@ func BuildRpc(rpc Rpc) (err error) {
 	}
 	rpcName = fmt.Sprintf("%s.%s", rpc.GetSchema(), rpcName)
 
+	// set rpc name
+	rpcLanguage := rpc.GetLanguage()
+	if rpcLanguage == "" {
+		rpcLanguage = "plpgsql"
+	}
+	rpc.SetLanguage(rpcLanguage)
+
 	// replace definition and set rpc base name
 	q = strings.ReplaceAll(q, ":function_name", rpcName)
+
+	// build language
+	q = strings.ReplaceAll(q, ":language", rpcLanguage)
 
 	// build Param
 	pt, found := rpcType.FieldByName("Params")
@@ -759,6 +779,9 @@ func BuildRpc(rpc Rpc) (err error) {
 	if rpc.GetSecurity() == "" {
 		rpc.SetSecurity(RpcSecurityTypeInvoker)
 	}
+
+	// set search path
+	q = strings.Replace(q, ":search_path", fmt.Sprintf("'%s'", rpc.GetSchema()), 1)
 
 	if rpc.GetSecurity() == RpcSecurityTypeDefiner {
 		rpc.SetSecurity(RpcSecurityTypeDefiner)

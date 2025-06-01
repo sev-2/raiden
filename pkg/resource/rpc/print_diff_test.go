@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -90,6 +91,83 @@ func TestGenerateDiffMessage(t *testing.T) {
 	diffMessage, err := rpc.GenerateDiffMessage("test_function", value, changeValue)
 	assert.NoError(t, err)
 	assert.Contains(t, diffMessage, "$function")
+}
+
+func TestGenerateDiffMessage_UpdateFunction(t *testing.T) {
+	value := `
+	CREATE OR REPLACE FUNCTION checkout (
+		p_order_amount decimal,
+		p_total_amount decimal,
+		p_status text,
+	)
+	RETURNS json
+	LANGUAGE plpgsql
+	AS $function$ DECLARE
+		v_transaction_id bigint;
+		v_owner_type owner_type_enum;
+		v_transaction_status transaction_status;
+	BEGIN
+		-- Cast string input to enum types
+		v_transaction_status := p_status::transaction_status;
+
+		-- Insert into transactions
+		INSERT INTO transactions (
+			order_amount, total_amount, status
+			created_at, updated_at
+		) VALUES (
+			p_order_amount, p_total_amount, v_transaction_status,
+			NOW(), NOW()
+		)
+		RETURNING id INTO v_transaction_id;
+
+		-- Return result as JSON
+		RETURN json_build_object('transaction_id', v_transaction_id);
+	EXCEPTION WHEN OTHERS THEN
+		RAISE NOTICE 'Transaction failed: %', SQLERRM;
+		RAISE;
+	END;
+	$function$;
+	`
+	changeValue := `
+	CREATE OR REPLACE FUNCTION checkout (
+		p_order_amount decimal,
+		p_total_amount decimal,
+		p_tax_amount decimal,
+		p_status text,
+	)
+	RETURNS json
+	LANGUAGE plpgsql
+	AS $function$ DECLARE
+		v_transaction_id bigint;
+		v_owner_type owner_type_enum;
+		v_transaction_status transaction_status;
+	BEGIN
+		-- Cast string input to enum types
+		v_transaction_status := p_status::transaction_status;
+
+		-- Insert into transactions
+		INSERT INTO transactions (
+			order_amount, total_amount, p_tax_amount, status
+			created_at, updated_at
+		) VALUES (
+			p_order_amount, p_total_amount,tax_amo v_transaction_status,
+			NOW(), NOW()
+		)
+		RETURNING id INTO v_transaction_id;
+
+		-- Return result as JSON
+		RETURN json_build_object('transaction_id', v_transaction_id);
+	EXCEPTION WHEN OTHERS THEN
+		RAISE NOTICE 'Transaction failed: %', SQLERRM;
+		RAISE;
+	END;
+	$function$;
+	`
+
+	diffMessage, err := rpc.GenerateDiffMessage("test_function", strings.ToLower(value), strings.ToLower(changeValue))
+	assert.NoError(t, err)
+	assert.Contains(t, diffMessage, "from: create or replace function checkout")
+	assert.Contains(t, diffMessage, "from: declare v_transaction_id bigint")
 }
 
 // TestGenerateDiffChangeMessage tests the GenerateDiffChangeMessage function
