@@ -559,10 +559,10 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 	}
 
 	// check for content type
-	// only unmarshalls type application/json or empty
+	// only unmarshalls type application/json
 	headerContentType := ctx.Request.Header.Peek(fasthttp.HeaderContentType)
 	contentType := string(headerContentType)
-	if contentType == "" || contentType == "application/json" {
+	if contentType == "application/json" {
 		// unmarshal data from request body to payload
 		// only marshall to field with tag json
 		requestBody := ctx.Request.Body()

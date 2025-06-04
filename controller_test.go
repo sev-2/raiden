@@ -142,6 +142,7 @@ func TestController_Handler(t *testing.T) {
 	requestCtx := &fasthttp.RequestCtx{
 		Request: fasthttp.Request{},
 	}
+	requestCtx.Request.Header.Set(fasthttp.HeaderContentType, "application/json")
 	requestCtx.Request.SetBodyRaw([]byte(jsonBodyString))
 	requestCtx.Request.URI().QueryArgs().Set("type", "greeting")
 
