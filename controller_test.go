@@ -603,3 +603,39 @@ func TestControllerMarshallAndValidate_QueryParams(t *testing.T) {
 	assert.EqualError(t, err, "float32: must be float value")
 
 }
+
+func TestMarshallAndValidate_MultiplatformData(t *testing.T) {
+	// success
+	ctxForm := newMockCtx()
+	type RequestMultiplatform struct {
+		Resource string `path:"resource" validate:"required"`
+	}
+	type ControllerMultiplatform struct {
+		raiden.ControllerBase
+		Payload *RequestMultiplatform
+	}
+	controllerMultiplatform := &ControllerMultiplatform{}
+
+	ctxForm.Request.Header.Set(fasthttp.HeaderContentType, "multipart/form-data; boundary=X-BOUNDARY")
+	ctxForm.Request.SetBodyString("--X-BOUNDARY\r\nContent-Disposition: form-data; name=\"resource\"\r\n\r\nresource_value\r\n--X-BOUNDARY--\r\n")
+	err := raiden.MarshallAndValidate(ctxForm.RequestContext(), controllerMultiplatform)
+	assert.NoError(t, err)
+	form, errForm := ctxForm.Request.MultipartForm()
+	assert.NoError(t, errForm)
+	assert.Equal(t, "resource_value", form.Value["resource"][0])
+
+	// invalid payload application json
+	type RequestMultiplatformError struct {
+		Resource string `path:"resource" validate:"required"`
+	}
+	type ControllerMultiplatformError struct {
+		raiden.ControllerBase
+		Payload *RequestMultiplatformError
+	}
+	controllerMultiplatformError := &ControllerMultiplatformError{}
+
+	ctxForm.Request.Header.Set(fasthttp.HeaderContentType, "application/json")
+	ctxForm.Request.SetBodyString("--X-BOUNDARY\r\nContent-Disposition: form-data; name=\"resource\"\r\n\r\nresource_value\r\n--X-BOUNDARY--\r\n")
+	err = raiden.MarshallAndValidate(ctxForm.RequestContext(), controllerMultiplatformError)
+	assert.Error(t, err)
+}
