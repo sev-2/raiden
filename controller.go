@@ -562,18 +562,17 @@ func MarshallAndValidate(ctx *fasthttp.RequestCtx, controller any) error {
 	// only unmarshalls type application/json or empty
 	headerContentType := ctx.Request.Header.Peek(fasthttp.HeaderContentType)
 	contentType := string(headerContentType)
-	if contentType != "" && contentType != "application/json" {
-		return nil
-	}
-	// unmarshal data from request body to payload
-	// only marshall to field with tag json
-	requestBody := ctx.Request.Body()
-	if requestBody != nil && string(requestBody) != "" {
-		if err := json.Unmarshal(requestBody, payloadPtr); err != nil {
-			return &ErrorResponse{
-				StatusCode: fasthttp.StatusBadRequest,
-				Code:       "invalid request body",
-				Message:    err.Error(),
+	if contentType == "" || contentType == "application/json" {
+		// unmarshal data from request body to payload
+		// only marshall to field with tag json
+		requestBody := ctx.Request.Body()
+		if requestBody != nil && string(requestBody) != "" {
+			if err := json.Unmarshal(requestBody, payloadPtr); err != nil {
+				return &ErrorResponse{
+					StatusCode: fasthttp.StatusBadRequest,
+					Code:       "invalid request body",
+					Message:    err.Error(),
+				}
 			}
 		}
 	}

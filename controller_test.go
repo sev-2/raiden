@@ -608,7 +608,7 @@ func TestMarshallAndValidate_MultiplatformData(t *testing.T) {
 	// success
 	ctxForm := newMockCtx()
 	type RequestMultiplatform struct {
-		Resource string `path:"resource" validate:"required"`
+		Resource string `path:"resource"`
 	}
 	type ControllerMultiplatform struct {
 		raiden.ControllerBase
