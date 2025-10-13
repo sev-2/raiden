@@ -1966,3 +1966,197 @@ func TestDeleteType_SelfHosted(t *testing.T) {
 	err1 := supabase.DeleteType(cfg, localType)
 	assert.NoError(t, err1)
 }
+
+func TestGetTableByName_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetTableByName(cfg, "some-table", "some-schema", true)
+	assert.Error(t, err)
+
+	remoteTable := objects.Table{
+		ID:   1,
+		Name: "some-table",
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetTableByNameWithExpectedResponse(200, remoteTable)
+	assert.NoError(t, err0)
+
+	table, err1 := supabase.GetTableByName(cfg, "some-table", "some-schema", true)
+	assert.NoError(t, err1)
+	assert.Equal(t, remoteTable.Name, table.Name)
+}
+
+func TestGetTableByName_Cloud_NotFound(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	// Test when table is not found (no table in response)
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	// Mocking empty response to trigger "not found" error
+	err0 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{}) // GetTableByName calls GetTables internally
+	assert.NoError(t, err0)
+
+	_, err1 := supabase.GetTableByName(cfg, "nonexistent-table", "some-schema", true)
+	assert.Error(t, err1)
+	assert.Contains(t, err1.Error(), "is not found")
+}
+
+func TestUpdateBucket_NoChanges(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	bucket := objects.Bucket{
+		ID: "test-bucket",
+	}
+	updateParam := objects.UpdateBucketParam{
+		ChangeItems: []objects.UpdateBucketType{}, // Empty - should cause early return
+	}
+
+	err := supabase.UpdateBucket(cfg, bucket, updateParam)
+	assert.NoError(t, err) // Should return without error due to early return
+}
+
+func TestGetTables_Cloud_ErrorHandling(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	// Test error scenario
+	_, err := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err)
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	// Mock error response
+	err0 := mock.MockGetTablesWithExpectedResponse(500, []objects.Table{})
+	assert.NoError(t, err0)
+
+	_, err1 := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err1)
+}
+
+func TestGetTables_SelfHosted_ErrorHandling(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	// Test error scenario
+	_, err := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err)
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	// Mock error response
+	err0 := mock.MockGetTablesWithExpectedResponse(500, []objects.Table{})
+	assert.NoError(t, err0)
+
+	_, err1 := supabase.GetTables(cfg, []string{"test-schema"})
+	assert.Error(t, err1)
+}
+
+func TestUpdateRole_WithInheritChanges(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	var validUntil = objects.NewSupabaseTime(time.Now())
+
+	_, errT := validUntil.MarshalJSON()
+	assert.NoError(t, errT)
+
+	localRole := objects.Role{
+		Name:            "some-role",
+		CanLogin:        true,
+		IsSuperuser:     true,
+		ValidUntil:      validUntil,
+		ConnectionLimit: 11,
+		Config: map[string]interface{}{
+			"somekey":  "somevalue",
+			"otherkey": "othervalue",
+		},
+	}
+
+	// Create update param with inherit items only
+	updateParamInheritOnly := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "parent-role"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+			{
+				Role: objects.Role{Name: "another-parent-role"},
+				Type: objects.UpdateRoleInheritRevoke,
+			},
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	// This should test the path where only inherit changes are made
+	err1 := supabase.UpdateRole(cfg, localRole, updateParamInheritOnly)
+	assert.NoError(t, err1)
+
+	// Test with both normal changes and inherit changes
+	updateParamBoth := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateRoleName,
+			objects.UpdateConnectionLimit,
+		},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "parent-role-2"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+		},
+	}
+
+	err2 := supabase.UpdateRole(cfg, localRole, updateParamBoth)
+	assert.NoError(t, err2)
+}
+
+func TestUpdateRole_WithInheritChanges_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	var validUntil = objects.NewSupabaseTime(time.Now())
+
+	_, errT := validUntil.MarshalJSON()
+	assert.NoError(t, errT)
+
+	localRole := objects.Role{
+		Name:            "some-role-selfhosted",
+		CanLogin:        true,
+		ValidUntil:      validUntil,
+		ConnectionLimit: 11,
+	}
+
+	// Create update param with inherit items only
+	updateParamInheritOnly := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "parent-role"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err0)
+
+	err1 := supabase.UpdateRole(cfg, localRole, updateParamInheritOnly)
+	assert.NoError(t, err1)
+}

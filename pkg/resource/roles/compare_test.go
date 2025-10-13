@@ -2,6 +2,7 @@ package roles_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/sev-2/raiden/pkg/resource/roles"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -105,5 +106,57 @@ func TestCompareItem_InheritRolesCaseInsensitive(t *testing.T) {
 	if assert.Len(t, diffResult.DiffItems.ChangeInheritItems, 1) {
 		assert.Equal(t, objects.UpdateRoleInheritGrant, diffResult.DiffItems.ChangeInheritItems[0].Type)
 		assert.Equal(t, "another_role", diffResult.DiffItems.ChangeInheritItems[0].Role.Name)
+	}
+}
+
+func TestCompareItem_FieldDifferences(t *testing.T) {
+	ptrA := "value-a"
+	ptrB := "value-b"
+	future := objects.NewSupabaseTime(time.Now().Add(48 * time.Hour))
+	past := objects.NewSupabaseTime(time.Now().Add(-48 * time.Hour))
+
+	source := objects.Role{
+		Name:            "role",
+		ConnectionLimit: 5,
+		CanBypassRLS:    true,
+		CanCreateDB:     true,
+		CanCreateRole:   true,
+		CanLogin:        true,
+		Config:          map[string]any{"ptr": &ptrA},
+		InheritRole:     true,
+		InheritRoles:    []*objects.Role{{Name: "child_a"}},
+		ValidUntil:      future,
+	}
+
+	target := objects.Role{
+		Name:            "role",
+		ConnectionLimit: 7,
+		CanBypassRLS:    false,
+		CanCreateDB:     false,
+		CanCreateRole:   false,
+		CanLogin:        false,
+		Config:          map[string]any{"ptr": &ptrB},
+		InheritRole:     false,
+		InheritRoles:    []*objects.Role{{Name: "child_b"}},
+		ValidUntil:      past,
+	}
+
+	diffResult := roles.CompareItem(source, target)
+	assert.True(t, diffResult.IsConflict)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateConnectionLimit)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateRoleCanBypassRls)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateRoleCanCreateDb)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateRoleCanCreateRole)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateRoleCanLogin)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateRoleConfig)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateRoleInheritRole)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdateRoleValidUntil)
+	if assert.Len(t, diffResult.DiffItems.ChangeInheritItems, 2) {
+		typesFound := []objects.UpdateRoleInheritType{
+			diffResult.DiffItems.ChangeInheritItems[0].Type,
+			diffResult.DiffItems.ChangeInheritItems[1].Type,
+		}
+		assert.Contains(t, typesFound, objects.UpdateRoleInheritGrant)
+		assert.Contains(t, typesFound, objects.UpdateRoleInheritRevoke)
 	}
 }

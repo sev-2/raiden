@@ -47,6 +47,15 @@ type MockNewTable struct {
 	OtherTable *MockOtherTable `json:"other_table,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:table_id"`
 }
 
+type MockPolicyTable struct {
+	raiden.ModelBase
+
+	ID int64 `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement"`
+
+	Metadata string `json:"-" schema:"public" tableName:"policy_table" rlsEnable:"true" rlsForced:"false"`
+	Acl      string `json:"-" read:"missing_role" write:""`
+}
+
 type MockNewRole struct {
 	raiden.RoleBase
 }
@@ -359,6 +368,46 @@ func TestApply_AllowedTable(t *testing.T) {
 
 	errReset := state.Save(&state.State{})
 	assert.NoError(t, errReset)
+}
+
+func TestApply_RoleValidationError(t *testing.T) {
+	flags := &resource.Flags{
+		AllowedSchema: "public",
+	}
+	config := loadConfig()
+
+	resource.RegisterModels(MockPolicyTable{})
+
+	policy := objects.Policy{
+		ID:    10,
+		Name:  "policy_table_select",
+		Table: "policy_table",
+		Roles: []string{"missing_role"},
+	}
+
+	local := &state.LocalState{
+		State: state.State{
+			Tables: []state.TableState{
+				{
+					Table: objects.Table{
+						ID:     11,
+						Name:   "policy_table",
+						Schema: "public",
+					},
+					Policies: []objects.Policy{policy},
+				},
+			},
+		},
+	}
+
+	assert.NoError(t, state.Save(&local.State))
+	defer func() {
+		assert.NoError(t, state.Save(&state.State{}))
+	}()
+
+	err := resource.Apply(flags, config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing_role")
 }
 
 func TestMigrate(t *testing.T) {

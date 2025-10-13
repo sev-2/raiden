@@ -66,6 +66,118 @@ func TestPrintDiff(t *testing.T) {
 	assert.Contains(t, outb.String(), "End found diff")
 }
 
+// TestPrintDiff_EmptyChanges tests PrintDiff with empty changes
+func TestPrintDiff_EmptyChanges(t *testing.T) {
+	diffData := storages.CompareDiffResult{
+		IsConflict:     true,
+		SourceResource: objects.Bucket{Name: "source_bucket"},
+		TargetResource: objects.Bucket{Name: "target_bucket"},
+		DiffItems: objects.UpdateBucketParam{
+			ChangeItems: []objects.UpdateBucketType{}, // Empty changes - should return early
+		},
+	}
+
+	storages.PrintDiff(diffData) // Should return early without printing
+}
+
+// TestPrintDiff_PublicChange tests PrintDiff with public change
+func TestPrintDiff_PublicChange(t *testing.T) {
+	if os.Getenv("TEST_RUN") == "1" {
+		diffData := storages.CompareDiffResult{
+			IsConflict:     true,
+			SourceResource: objects.Bucket{Name: "source_bucket", Public: true},
+			TargetResource: objects.Bucket{Name: "target_bucket", Public: false},
+			DiffItems: objects.UpdateBucketParam{
+				ChangeItems: []objects.UpdateBucketType{
+					objects.UpdateBucketIsPublic,
+				},
+			},
+		}
+
+		storages.PrintDiff(diffData)
+		return
+	}
+
+	var outb, errb bytes.Buffer
+	cmd := exec.Command(os.Args[0], "-test.run=TestPrintDiff_PublicChange")
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+
+	cmd.Env = append(os.Environ(), "TEST_RUN=1")
+	err := cmd.Start()
+	assert.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+	err1 := cmd.Process.Signal(syscall.SIGTERM)
+	assert.NoError(t, err1)
+}
+
+// TestPrintDiff_AllowedMimeTypesChange tests PrintDiff with allowed mime types change
+func TestPrintDiff_AllowedMimeTypesChange(t *testing.T) {
+	if os.Getenv("TEST_RUN") == "1" {
+		diffData := storages.CompareDiffResult{
+			IsConflict:     true,
+			SourceResource: objects.Bucket{Name: "source_bucket", AllowedMimeTypes: []string{"image/png"}},
+			TargetResource: objects.Bucket{Name: "target_bucket", AllowedMimeTypes: []string{"image/jpg"}},
+			DiffItems: objects.UpdateBucketParam{
+				ChangeItems: []objects.UpdateBucketType{
+					objects.UpdateBucketAllowedMimeTypes,
+				},
+			},
+		}
+
+		storages.PrintDiff(diffData)
+		return
+	}
+
+	var outb, errb bytes.Buffer
+	cmd := exec.Command(os.Args[0], "-test.run=TestPrintDiff_AllowedMimeTypesChange")
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+
+	cmd.Env = append(os.Environ(), "TEST_RUN=1")
+	err := cmd.Start()
+	assert.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+	err1 := cmd.Process.Signal(syscall.SIGTERM)
+	assert.NoError(t, err1)
+}
+
+// TestPrintDiff_FileSizeLimitChange tests PrintDiff with file size limit change
+func TestPrintDiff_FileSizeLimitChange(t *testing.T) {
+	if os.Getenv("TEST_RUN") == "1" {
+		size100 := 100
+		size200 := 200
+		diffData := storages.CompareDiffResult{
+			IsConflict:     true,
+			SourceResource: objects.Bucket{Name: "source_bucket", FileSizeLimit: &size100},
+			TargetResource: objects.Bucket{Name: "target_bucket", FileSizeLimit: &size200},
+			DiffItems: objects.UpdateBucketParam{
+				ChangeItems: []objects.UpdateBucketType{
+					objects.UpdateBucketFileSizeLimit,
+				},
+			},
+		}
+
+		storages.PrintDiff(diffData)
+		return
+	}
+
+	var outb, errb bytes.Buffer
+	cmd := exec.Command(os.Args[0], "-test.run=TestPrintDiff_FileSizeLimitChange")
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+
+	cmd.Env = append(os.Environ(), "TEST_RUN=1")
+	err := cmd.Start()
+	assert.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+	err1 := cmd.Process.Signal(syscall.SIGTERM)
+	assert.NoError(t, err1)
+}
+
 // TestGetDiffChangeMessage tests the GetDiffChangeMessage function
 func TestGetDiffChangeMessage(t *testing.T) {
 	items := []storages.MigrateItem{

@@ -132,3 +132,78 @@ func TestMigrate_CreateRoleWithInheritance(t *testing.T) {
 		t.Fatal("expected state update from migrate")
 	}
 }
+
+func TestMigrateRole_UpdateAndDelete(t *testing.T) {
+	cfg := &raiden.Config{}
+	stateChan := make(chan any, 2)
+
+	// Test update path
+	updateCalled := false
+	deleteCalled := false
+	actions := roles.MigrateActionFunc{
+		CreateFunc: func(_ *raiden.Config, role objects.Role) (objects.Role, error) {
+			return role, nil
+		},
+		UpdateFunc: func(_ *raiden.Config, role objects.Role, param objects.UpdateRoleParam) error {
+			updateCalled = true
+			return nil
+		},
+		DeleteFunc: func(_ *raiden.Config, role objects.Role) error {
+			deleteCalled = true
+			return nil
+		},
+	}
+
+	// Test with Update type
+	migrateItems := []roles.MigrateItem{
+		{
+			Type:    migrator.MigrateTypeUpdate,
+			NewData: objects.Role{Name: "test_role"},
+		},
+	}
+
+	errs := roles.Migrate(cfg, migrateItems, stateChan, actions)
+	assert.Empty(t, errs)
+	assert.True(t, updateCalled)
+
+	// Test with Delete type - reset the flag
+	updateCalled = false
+	migrateItemsDelete := []roles.MigrateItem{
+		{
+			Type:    migrator.MigrateTypeDelete,
+			OldData: objects.Role{Name: "delete_role"},
+		},
+	}
+
+	errs2 := roles.Migrate(cfg, migrateItemsDelete, stateChan, actions)
+	assert.Empty(t, errs2)
+	assert.True(t, deleteCalled)
+}
+
+func TestMigrate_InvalidType(t *testing.T) {
+	cfg := &raiden.Config{}
+	stateChan := make(chan any)
+
+	actions := roles.MigrateActionFunc{
+		CreateFunc: func(_ *raiden.Config, role objects.Role) (objects.Role, error) {
+			return role, nil
+		},
+		UpdateFunc: func(_ *raiden.Config, role objects.Role, param objects.UpdateRoleParam) error {
+			return nil
+		},
+		DeleteFunc: func(_ *raiden.Config, role objects.Role) error {
+			return nil
+		},
+	}
+
+	// Test with unknown type - should call the default case in migrateRole
+	migrateItems := []roles.MigrateItem{
+		{
+			Type:    "invalid_type", // Not a valid type
+			NewData: objects.Role{Name: "test_role"},
+		},
+	}
+
+	errs := roles.Migrate(cfg, migrateItems, stateChan, actions)
+	assert.Empty(t, errs) // Should not have errors since default case returns nil
+}
