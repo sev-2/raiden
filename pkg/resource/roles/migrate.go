@@ -1,6 +1,8 @@
 package roles
 
 import (
+	"strings"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/state"
@@ -47,10 +49,17 @@ func BuildMigrateData(extractedLocalData state.ExtractRoleResult, supabaseData [
 	if len(extractedLocalData.New) > 0 {
 		for i := range extractedLocalData.New {
 			t := extractedLocalData.New[i]
-			migrateData = append(migrateData, MigrateItem{
+			migrateItem := MigrateItem{
 				Type:    migrator.MigrateTypeCreate,
 				NewData: t,
-			})
+			}
+
+			inheritItems := buildGrantInheritItems(t)
+			if len(inheritItems) > 0 {
+				migrateItem.MigrationItems.ChangeInheritItems = inheritItems
+			}
+
+			migrateData = append(migrateData, migrateItem)
 		}
 	}
 
@@ -108,5 +117,128 @@ func BuildMigrateItem(supabaseData []objects.Role, localData []objects.Role) (mi
 }
 
 func Migrate(config *raiden.Config, roles []MigrateItem, stateChan chan any, actions MigrateActionFunc) []error {
-	return migrator.MigrateResource(config, roles, stateChan, actions, migrator.DefaultMigrator)
+	return migrator.MigrateResource(config, roles, stateChan, actions, migrateRole)
+}
+
+func migrateRole(params migrator.MigrateFuncParam[objects.Role, objects.UpdateRoleParam]) error {
+	switch params.Data.Type {
+	case migrator.MigrateTypeCreate:
+		return migrateCreateRole(params)
+	case migrator.MigrateTypeUpdate:
+		if err := params.ActionFuncs.UpdateFunc(params.Config, params.Data.NewData, params.Data.MigrationItems); err != nil {
+			return err
+		}
+
+		params.StateChan <- &params.Data
+		return nil
+	case migrator.MigrateTypeDelete:
+		if err := params.ActionFuncs.DeleteFunc(params.Config, params.Data.OldData); err != nil {
+			return err
+		}
+
+		params.StateChan <- &params.Data
+		return nil
+	default:
+		return nil
+	}
+}
+
+func migrateCreateRole(params migrator.MigrateFuncParam[objects.Role, objects.UpdateRoleParam]) error {
+	desired := params.Data.NewData
+	created, err := params.ActionFuncs.CreateFunc(params.Config, desired)
+	if err != nil {
+		return err
+	}
+
+	// make sure inherit metadata is reflected in created record
+	created.InheritRole = desired.InheritRole
+	created.InheritRoles = cloneInheritRoles(desired.InheritRoles)
+
+	inheritItems := params.Data.MigrationItems.ChangeInheritItems
+	if len(inheritItems) == 0 {
+		inheritItems = buildGrantInheritItems(desired)
+	}
+
+	if len(inheritItems) > 0 {
+		updateParam := objects.UpdateRoleParam{
+			OldData:            created,
+			ChangeInheritItems: inheritItems,
+		}
+		if err := params.ActionFuncs.UpdateFunc(params.Config, created, updateParam); err != nil {
+			return err
+		}
+	}
+
+	params.Data.NewData = created
+	params.StateChan <- &params.Data
+	return nil
+}
+
+func buildGrantInheritItems(role objects.Role) []objects.UpdateRoleInheritItem {
+	if len(role.InheritRoles) == 0 {
+		return nil
+	}
+
+	items := make([]objects.UpdateRoleInheritItem, 0, len(role.InheritRoles))
+	unique := make(map[string]struct{})
+
+	for i := range role.InheritRoles {
+		inherit := role.InheritRoles[i]
+		if inherit == nil {
+			continue
+		}
+
+		name := strings.TrimSpace(inherit.Name)
+		if name == "" {
+			continue
+		}
+
+		key := strings.ToLower(name)
+		if _, exist := unique[key]; exist {
+			continue
+		}
+		unique[key] = struct{}{}
+
+		items = append(items, objects.UpdateRoleInheritItem{
+			Role: objects.Role{Name: name},
+			Type: objects.UpdateRoleInheritGrant,
+		})
+	}
+
+	return items
+}
+
+func cloneInheritRoles(inherits []*objects.Role) []*objects.Role {
+	if len(inherits) == 0 {
+		return nil
+	}
+
+	cloned := make([]*objects.Role, 0, len(inherits))
+	unique := make(map[string]struct{})
+
+	for i := range inherits {
+		r := inherits[i]
+		if r == nil {
+			continue
+		}
+
+		name := strings.TrimSpace(r.Name)
+		if name == "" {
+			continue
+		}
+
+		key := strings.ToLower(name)
+		if _, exist := unique[key]; exist {
+			continue
+		}
+		unique[key] = struct{}{}
+
+		cloned = append(cloned, &objects.Role{Name: name})
+	}
+
+	if len(cloned) == 0 {
+		return nil
+	}
+
+	return cloned
 }

@@ -48,7 +48,7 @@ type MockNewTable struct {
 }
 
 type MockNewRole struct {
-	raiden.Role
+	raiden.RoleBase
 }
 
 func (m MockNewRole) Name() string {
@@ -67,7 +67,7 @@ func (m MockNewRole) CanCreateRole() bool {
 	return true
 }
 
-func (m MockNewRole) InheritRole() bool {
+func (m MockNewRole) IsInheritRole() bool {
 	return true
 }
 
@@ -81,6 +81,10 @@ func (m MockNewRole) ValidUntil() *objects.SupabaseTime {
 
 func (m MockNewRole) CanBypassRls() bool {
 	return true
+}
+
+func (m MockNewRole) InheritRoles() []raiden.Role {
+	return nil
 }
 
 func loadConfig() *raiden.Config {
@@ -175,8 +179,37 @@ func TestApply(t *testing.T) {
 	})
 	assert.NoError(t, err0)
 
+	errMembership := mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{})
+	assert.NoError(t, errMembership)
+
 	err1 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{})
 	assert.NoError(t, err1)
+
+	err2 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
+		{
+			Name:   "test_table",
+			Schema: "public",
+			Columns: []objects.Column{
+				{
+					ID:     "1",
+					Schema: "public",
+					Name:   "id",
+				},
+			},
+		},
+		{
+			Name:   "other_table",
+			Schema: "public",
+			Columns: []objects.Column{
+				{
+					ID:     "1",
+					Schema: "public",
+					Name:   "id",
+				},
+			},
+		},
+	})
+	assert.NoError(t, err2)
 
 	resource.RegisterModels(MockNewTable{})
 	resource.RegisterModels(MockOtherTable{})
@@ -268,6 +301,9 @@ func TestApply_AllowedTable(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err0)
+
+	errMembership := mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{})
+	assert.NoError(t, errMembership)
 
 	err1 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{})
 	assert.NoError(t, err1)
@@ -471,6 +507,13 @@ func TestMigrate(t *testing.T) {
 				NewData: objects.Role{
 					Name:     "test_role",
 					CanLogin: true,
+				},
+				MigrationItems: objects.UpdateRoleParam{
+					OldData: objects.Role{
+						Name:     "test_role",
+						CanLogin: false,
+					},
+					ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleCanLogin},
 				},
 			},
 			{

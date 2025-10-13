@@ -14,6 +14,10 @@ type MockRole struct {
 	raiden.RoleBase
 }
 
+type MockChildRole struct {
+	raiden.RoleBase
+}
+
 func (r *MockRole) Name() string {
 	return "test_role"
 }
@@ -22,8 +26,12 @@ func (r *MockRole) ConnectionLimit() int {
 	return 10
 }
 
-func (r *MockRole) InheritRole() bool {
+func (r *MockRole) IsInheritRole() bool {
 	return true
+}
+
+func (r *MockRole) InheritRoles() []raiden.Role {
+	return []raiden.Role{&MockChildRole{}}
 }
 
 func (r *MockRole) IsReplicationRole() bool {
@@ -48,6 +56,10 @@ func (r *MockRole) CanLogin() bool {
 
 func (r *MockRole) ValidUntil() *objects.SupabaseTime {
 	return objects.NewSupabaseTime(time.Now())
+}
+
+func (r *MockChildRole) Name() string {
+	return "child_role"
 }
 
 func TestExtractRole(t *testing.T) {
@@ -86,6 +98,9 @@ func TestBindToSupabaseRole(t *testing.T) {
 	assert.True(t, r.CanLogin)
 	assert.True(t, r.InheritRole)
 	assert.NotNil(t, r.ValidUntil)
+	if assert.Len(t, r.InheritRoles, 1) {
+		assert.Equal(t, "child_role", r.InheritRoles[0].Name)
+	}
 }
 
 func TestBuildRoleFromState(t *testing.T) {

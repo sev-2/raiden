@@ -14,7 +14,7 @@ func TestRoleBase_ConnectionLimit(t *testing.T) {
 
 func TestRoleBase_InheritRole(t *testing.T) {
 	roleBase := raiden.RoleBase{}
-	assert.Equal(t, true, roleBase.InheritRole())
+	assert.Equal(t, true, roleBase.IsInheritRole())
 }
 
 func TestRoleBase_CanBypassRls(t *testing.T) {

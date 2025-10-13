@@ -81,3 +81,29 @@ func TestCompareItem(t *testing.T) {
 	assert.Equal(t, "role1", diffResult.SourceResource.Name)
 	assert.Equal(t, "role1_updated", diffResult.TargetResource.Name)
 }
+
+func TestCompareItem_InheritRolesCaseInsensitive(t *testing.T) {
+	source := objects.Role{
+		ID:   1,
+		Name: "role1",
+		InheritRoles: []*objects.Role{
+			{Name: "Parent_Role"},
+			{Name: "another_role"},
+		},
+	}
+
+	target := objects.Role{
+		ID:   1,
+		Name: "role1",
+		InheritRoles: []*objects.Role{
+			{Name: "parent_role"},
+		},
+	}
+
+	diffResult := roles.CompareItem(source, target)
+	assert.True(t, diffResult.IsConflict)
+	if assert.Len(t, diffResult.DiffItems.ChangeInheritItems, 1) {
+		assert.Equal(t, objects.UpdateRoleInheritGrant, diffResult.DiffItems.ChangeInheritItems[0].Type)
+		assert.Equal(t, "another_role", diffResult.DiffItems.ChangeInheritItems[0].Role.Name)
+	}
+}

@@ -18,7 +18,7 @@ import (
 )
 
 type MockOtherRole struct {
-	raiden.Role
+	raiden.RoleBase
 }
 
 func (m MockOtherRole) Name() string {
@@ -37,7 +37,7 @@ func (m MockOtherRole) CanCreateRole() bool {
 	return true
 }
 
-func (m MockOtherRole) InheritRole() bool {
+func (m MockOtherRole) IsInheritRole() bool {
 	return true
 }
 
@@ -51,6 +51,10 @@ func (m MockOtherRole) CanBypassRls() bool {
 
 func (r MockOtherRole) ValidUntil() *objects.SupabaseTime {
 	return objects.NewSupabaseTime(time.Now())
+}
+
+func (m MockOtherRole) InheritRoles() []raiden.Role {
+	return nil
 }
 
 type MockOtherBucket struct {
@@ -254,6 +258,12 @@ func TestImport(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err3)
+
+	assert.NoError(t, mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{}))
+
+	assert.NoError(t, mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{}))
+
+	assert.NoError(t, mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{}))
 
 	errImport2 := resource.Import(flags, config)
 	assert.NoError(t, errImport2)
@@ -606,6 +616,22 @@ func TestImportUpdateStateOnly(t *testing.T) {
 	})
 	assert.NoError(t, err3)
 
+	err4 := mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{
+		{
+			ParentID:    18136,
+			ParentRole:  "student",
+			InheritID:   18138,
+			InheritRole: "admin",
+		},
+		{
+			ParentID:    18137,
+			ParentRole:  "instructor",
+			InheritID:   18138,
+			InheritRole: "admin",
+		},
+	})
+	assert.NoError(t, err4)
+
 	// reset state
 	err := state.Save(&state.State{})
 	assert.NoError(t, err)
@@ -678,6 +704,23 @@ func TestImportAllTableStateOnly(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err3)
+
+	err4 := mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{
+		{
+			ParentID:    18136,
+			ParentRole:  "student",
+			InheritID:   18138,
+			InheritRole: "admin",
+		},
+		{
+			ParentID:    18137,
+			ParentRole:  "instructor",
+			InheritID:   18138,
+			InheritRole: "admin",
+		},
+	})
+
+	assert.NoError(t, err4)
 
 	// reset state
 	err := state.Save(&state.State{})

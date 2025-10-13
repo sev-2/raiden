@@ -118,7 +118,7 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 	}
 
 	if flags.AllowedSchema != "" {
-		args = append(args, "--schema "+flags.AllowedSchema)
+		args = append(args, "--schema", flags.AllowedSchema)
 	}
 
 	if flags.DryRun {

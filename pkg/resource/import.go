@@ -47,6 +47,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	spResource.Tables = tables.AttachIndexAndAction(spResource.Tables, spResource.Indexes, spResource.RelationActions)
+	spResource.Roles = roles.AttachInherithRole(mapNativeRole, spResource.Roles, spResource.RoleMemberships)
 
 	// create import state
 	ImportLogger.Debug("get native roles")

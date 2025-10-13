@@ -179,7 +179,7 @@ func TestKnownRoles(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.roleName, func(t *testing.T) {
 			assert.Equal(t, test.roleName, test.knownRole.Name())
-			assert.NotNil(t, test.knownRole.InheritRole())
+			assert.NotNil(t, test.knownRole.IsInheritRole())
 			assert.NotNil(t, test.knownRole.CanLogin())
 			assert.NotNil(t, test.knownRole.ConnectionLimit())
 			assert.NotNil(t, test.knownRole.CanBypassRls())

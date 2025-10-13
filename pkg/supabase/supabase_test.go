@@ -892,6 +892,50 @@ func TestGetRoles_SelfHosted(t *testing.T) {
 	assert.Equal(t, len(remoteRoles), len(roles))
 }
 
+func TestGetRoleMemberships_Cloud(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetRoleMemberships(cfg, nil)
+	assert.Error(t, err)
+
+	remoteMemberships := []objects.RoleMembership{
+		{ParentID: 1, ParentRole: "student", InheritID: 2, InheritRole: "admin"},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetRoleMembershipsWithExpectedResponse(200, remoteMemberships)
+	assert.NoError(t, err0)
+
+	memberships, err1 := supabase.GetRoleMemberships(cfg, nil)
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteMemberships), len(memberships))
+}
+
+func TestGetRoleMemberships_SelfHosted(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetRoleMemberships(cfg, nil)
+	assert.Error(t, err)
+
+	remoteMemberships := []objects.RoleMembership{
+		{ParentID: 1, ParentRole: "student", InheritID: 2, InheritRole: "admin"},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetRoleMembershipsWithExpectedResponse(200, remoteMemberships)
+	assert.NoError(t, err0)
+
+	memberships, err1 := supabase.GetRoleMemberships(cfg, nil)
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteMemberships), len(memberships))
+}
+
 func TestGetRoleByName_Cloud(t *testing.T) {
 	cfg := loadCloudConfig()
 

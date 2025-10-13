@@ -163,6 +163,19 @@ func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 	})
 }
 
+func GetRoleMemberships(cfg *raiden.Config, includedSchema []string) ([]objects.RoleMembership, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get role memberships from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "role membership", func() ([]objects.RoleMembership, error) {
+			return cloud.GetRoleMemberships(cfg, includedSchema)
+		})
+	}
+	SupabaseLogger.Debug("Get role memberships from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "role membership", func() ([]objects.RoleMembership, error) {
+		return meta.GetRoleMemberships(cfg, includedSchema)
+	})
+}
+
 func GetRoleByName(cfg *raiden.Config, name string) (objects.Role, error) {
 	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
 		SupabaseLogger.Debug("Get role by name from supabase cloud", "project-id", cfg.ProjectId)

@@ -160,6 +160,8 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
 	ApplyLogger.Debug("finish filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
 
+	resource.Roles = roles.AttachInherithRole(mapNativeRole, resource.Roles, resource.RoleMemberships)
+
 	ApplyLogger.Trace("remove native role for supabase list role")
 	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)
 

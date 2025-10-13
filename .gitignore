@@ -1,3 +1,6 @@
+.gocache
+.gomodcache
+
 build/
 examples/
 deployments/
@@ -10,3 +13,5 @@ profile.out
 *sa.json
 
 app.yaml
+
+AGENTS.md

@@ -528,7 +528,7 @@ func Load() (*State, error) {
 	defer file.Close()
 
 	state := &State{}
-	gob.Register(map[string]interface{}{})
+	gob.Register(map[string]any{})
 	decoder := gob.NewDecoder(file)
 	if err := decoder.Decode(state); err != nil {
 		return nil, err

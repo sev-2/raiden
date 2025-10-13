@@ -83,6 +83,12 @@ func (m *MockSupabase) MockGetRoleByNameWithExpectedResponse(httpCode int, role 
 	return registerMock(m.Cfg, actionType, method, url, httpCode, []objects.Role{role})
 }
 
+func (m *MockSupabase) MockGetRoleMembershipsWithExpectedResponse(httpCode int, memberships []objects.RoleMembership) error {
+	actionType, method, url := getMethodAndUrl(m.Cfg, "getRoleMemberships")
+
+	return registerMock(m.Cfg, actionType, method, url, httpCode, memberships)
+}
+
 func (m *MockSupabase) MockCreateRoleWithExpectedResponse(httpCode int, role objects.Role) error {
 	actionType, method, url := getMethodAndUrl(m.Cfg, "common")
 
@@ -239,6 +245,10 @@ func registerMock(cfg *raiden.Config, actionType string, method string, url stri
 			httpmock.RegisterMatcherResponder(method, url,
 				httpmock.BodyContainsString("rolname AS name"),
 				httpmock.NewStringResponder(httpCode, string(jsonData)))
+		case "getRoleMemberships":
+			httpmock.RegisterMatcherResponder(method, url,
+				httpmock.BodyContainsString("inherit.rolname    AS inherit_role"),
+				httpmock.NewStringResponder(httpCode, string(jsonData)))
 		case "getPolicies":
 			httpmock.RegisterMatcherResponder(method, url,
 				httpmock.BodyContainsString("pol.polname AS name"),
@@ -311,6 +321,13 @@ func getMethodAndUrl(cfg *raiden.Config, actionType string) (string, string, str
 		case "getRoles":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+		case "getRoleMemberships":
+			method = "POST"
+			if cfg.Mode == raiden.SvcMode {
+				url = fmt.Sprintf("%s/query", cfg.PgMetaUrl)
+			} else {
+				url = fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
+			}
 		case "getPolicies":
 			method = "GET"
 			url = fmt.Sprintf("%s%s/policies", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)

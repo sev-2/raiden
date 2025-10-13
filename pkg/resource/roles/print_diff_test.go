@@ -72,6 +72,10 @@ func TestPrintDiff(t *testing.T) {
 			objects.UpdateRoleIsSuperUser,
 			objects.UpdateRoleValidUntil,
 		},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{Role: objects.Role{Name: "student"}, Type: objects.UpdateRoleInheritGrant},
+			{Role: objects.Role{Name: "instructor"}, Type: objects.UpdateRoleInheritRevoke},
+		},
 	}
 
 	successDiffData := roles.CompareDiffResult{
@@ -158,6 +162,9 @@ func TestGetDiffChangeMessage(t *testing.T) {
 					objects.UpdateRoleIsSuperUser,
 					objects.UpdateRoleValidUntil,
 				},
+				ChangeInheritItems: []objects.UpdateRoleInheritItem{
+					{Role: objects.Role{Name: "student"}, Type: objects.UpdateRoleInheritGrant},
+				},
 			},
 		},
 		{
@@ -170,6 +177,8 @@ func TestGetDiffChangeMessage(t *testing.T) {
 	assert.Contains(t, diffMessage, "New Role")
 	assert.Contains(t, diffMessage, "Update Role")
 	assert.Contains(t, diffMessage, "Delete Role")
+	assert.Contains(t, diffMessage, "Inherited Roles")
+	assert.Contains(t, diffMessage, "add inherited role")
 }
 
 // TestGenerateDiffMessage tests the GenerateDiffMessage role

@@ -56,6 +56,9 @@ func BindToSupabaseRole(r *objects.Role, role raiden.Role) {
 	name := role.Name()
 	if name == "" {
 		rv := reflect.TypeOf(role)
+		if rv.Kind() == reflect.Ptr {
+			rv = rv.Elem()
+		}
 		name = utils.ToSnakeCase(rv.Name())
 	}
 
@@ -65,8 +68,41 @@ func BindToSupabaseRole(r *objects.Role, role raiden.Role) {
 	r.CanCreateDB = role.CanCreateDB()
 	r.CanCreateRole = role.CanCreateRole()
 	r.CanLogin = role.CanLogin()
-	r.InheritRole = role.InheritRole()
+	r.InheritRole = role.IsInheritRole()
 	r.ValidUntil = role.ValidUntil()
+
+	r.InheritRoles = nil
+	if inherits := role.InheritRoles(); len(inherits) > 0 {
+		inheritMap := make(map[string]struct{})
+		for _, inherit := range inherits {
+			if inherit == nil {
+				continue
+			}
+
+			inheritName := inherit.Name()
+			if inheritName == "" {
+				iv := reflect.TypeOf(inherit)
+				if iv != nil {
+					if iv.Kind() == reflect.Ptr {
+						iv = iv.Elem()
+					}
+					inheritName = utils.ToSnakeCase(iv.Name())
+				}
+			}
+
+			if inheritName == "" {
+				continue
+			}
+
+			if _, exist := inheritMap[inheritName]; exist {
+				continue
+			}
+			inheritMap[inheritName] = struct{}{}
+
+			inheritRole := &objects.Role{Name: inheritName}
+			r.InheritRoles = append(r.InheritRoles, inheritRole)
+		}
+	}
 
 	// need role with superuser to create new superuser role and set replication
 	// r.IsReplicationRole = role.IsReplicationRole()
