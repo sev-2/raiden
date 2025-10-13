@@ -1,5 +1,6 @@
 .gocache
 .gomodcache
+.cache/
 
 build/
 examples/
