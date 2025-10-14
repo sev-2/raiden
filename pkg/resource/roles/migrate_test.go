@@ -37,6 +37,34 @@ func TestBuildMigrateData(t *testing.T) {
 	assert.Equal(t, 4, len(migrateData))
 }
 
+func TestBuildMigrateData_InheritRoleItems(t *testing.T) {
+	child := objects.Role{
+		Name:        "child_role",
+		InheritRole: true,
+		InheritRoles: []*objects.Role{
+			{Name: "parent_role"},
+			{Name: "Parent_Role"},
+			{Name: ""},
+			nil,
+		},
+	}
+
+	flatData := state.ExtractRoleResult{New: []objects.Role{child}}
+
+	migrateData, err := roles.BuildMigrateData(flatData, nil)
+	assert.NoError(t, err)
+
+	if assert.Len(t, migrateData, 1) {
+		item := migrateData[0]
+		assert.Equal(t, migrator.MigrateTypeCreate, item.Type)
+		if assert.Len(t, item.MigrationItems.ChangeInheritItems, 1) {
+			inheritItem := item.MigrationItems.ChangeInheritItems[0]
+			assert.Equal(t, objects.UpdateRoleInheritGrant, inheritItem.Type)
+			assert.Equal(t, "parent_role", inheritItem.Role.Name)
+		}
+	}
+}
+
 func TestBuildMigrateItem(t *testing.T) {
 	localRoles := []objects.Role{
 		{Name: "role1"},
@@ -51,6 +79,41 @@ func TestBuildMigrateItem(t *testing.T) {
 	migrateData, err := roles.BuildMigrateItem(supabaseRoles, localRoles)
 	assert.NoError(t, err)
 	fmt.Println(migrateData)
+}
+
+func TestBuildMigrateItem_InheritDiff(t *testing.T) {
+	supabaseRoles := []objects.Role{
+		{ID: 1, Name: "child_role", InheritRole: true, InheritRoles: []*objects.Role{{Name: "legacy_parent"}}},
+		{ID: 2, Name: "legacy_parent"},
+	}
+
+	localRoles := []objects.Role{
+		{ID: 1, Name: "child_role", InheritRole: true, InheritRoles: []*objects.Role{{Name: "new_parent"}}}, // Same ID to match with supabase child_role
+		{ID: 3, Name: "new_parent"},
+	}
+
+	migrateData, err := roles.BuildMigrateItem(supabaseRoles, localRoles)
+	assert.NoError(t, err)
+
+	var updateItem *roles.MigrateItem
+	for i := range migrateData {
+		if migrateData[i].Type == migrator.MigrateTypeUpdate {
+			updateItem = &migrateData[i]
+			break
+		}
+	}
+
+	if assert.NotNil(t, updateItem) {
+		param := updateItem.MigrationItems
+		if assert.Len(t, param.ChangeInheritItems, 2) {
+			actions := map[objects.UpdateRoleInheritType]string{}
+			for _, item := range param.ChangeInheritItems {
+				actions[item.Type] = item.Role.Name
+			}
+			assert.Equal(t, "legacy_parent", actions[objects.UpdateRoleInheritRevoke])
+			assert.Equal(t, "new_parent", actions[objects.UpdateRoleInheritGrant])
+		}
+	}
 }
 
 func TestMigrate(t *testing.T) {

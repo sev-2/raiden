@@ -27,6 +27,7 @@ func TestCompare(t *testing.T) {
 func TestCompareList(t *testing.T) {
 	source := []objects.Role{
 		{
+			ID:              1, // Same ID to match with target
 			Name:            "role1",
 			CanBypassRLS:    true,
 			CanLogin:        true,
@@ -38,6 +39,7 @@ func TestCompareList(t *testing.T) {
 			ValidUntil:      &objects.SupabaseTime{},
 		},
 		{
+			ID:     2, // Same ID to match with target
 			Name:   "role2",
 			Config: map[string]interface{}{"not-key": "value"},
 		},
@@ -45,6 +47,7 @@ func TestCompareList(t *testing.T) {
 
 	target := []objects.Role{
 		{
+			ID:              1, // Same ID to match with source (same logical role, different name)
 			Name:            "role1_updated",
 			CanBypassRLS:    false,
 			CanLogin:        false,
@@ -56,6 +59,7 @@ func TestCompareList(t *testing.T) {
 			ValidUntil:      &objects.SupabaseTime{},
 		},
 		{
+			ID:     2, // Same ID to match with source
 			Name:   "role2",
 			Config: map[string]interface{}{"key": "value"},
 		},
@@ -65,7 +69,9 @@ func TestCompareList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(diffResult))
 	assert.Equal(t, "role1", diffResult[0].SourceResource.Name)
-	assert.Equal(t, "role2", diffResult[0].TargetResource.Name)
+	assert.Equal(t, "role1_updated", diffResult[0].TargetResource.Name) // Updated assertion to match target name
+	assert.Equal(t, "role2", diffResult[1].SourceResource.Name)
+	assert.Equal(t, "role2", diffResult[1].TargetResource.Name)
 }
 
 func TestCompareItem(t *testing.T) {
