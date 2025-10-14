@@ -790,216 +790,119 @@ func TestPrintApplyChangeReport(t *testing.T) {
 	migrateData := resource.MigrateData{
 		Tables: []tables.MigrateItem{
 			{Type: migrator.MigrateTypeCreate, NewData: objects.Table{Name: "test_table"}},
-			{Type: migrator.MigrateTypeUpdate,
-				OldData: objects.Table{Name: "old_table"},
-				NewData: objects.Table{Name: "new_table"}},
-			{Type: migrator.MigrateTypeDelete, OldData: objects.Table{Name: "delete_table"}},
-		},
-		Roles: []roles.MigrateItem{
-			{Type: migrator.MigrateTypeCreate, NewData: objects.Role{Name: "test_role"}},
-			{Type: migrator.MigrateTypeUpdate,
-				OldData: objects.Role{Name: "old_role"},
-				NewData: objects.Role{Name: "new_role"}},
-			{Type: migrator.MigrateTypeDelete, OldData: objects.Role{Name: "delete_role"}},
-		},
-		Rpc: []rpc.MigrateItem{
-			{Type: migrator.MigrateTypeCreate, NewData: objects.Function{Name: "test_function"}},
-			{Type: migrator.MigrateTypeUpdate,
-				OldData: objects.Function{Name: "old_function"},
-				NewData: objects.Function{Name: "new_function"}},
-			{Type: migrator.MigrateTypeDelete, OldData: objects.Function{Name: "delete_function"}},
-		},
-		Policies: []policies.MigrateItem{
-			{Type: migrator.MigrateTypeCreate, NewData: objects.Policy{Name: "test_policy", Schema: "public", Table: "test_table"}},
-			{Type: migrator.MigrateTypeUpdate,
-				OldData: objects.Policy{Name: "old_policy", Schema: "public", Table: "old_table"},
-				NewData: objects.Policy{Name: "new_policy", Schema: "public", Table: "new_table"}},
-			{Type: migrator.MigrateTypeDelete, OldData: objects.Policy{Name: "delete_policy", Schema: "public", Table: "delete_table"}},
-		},
-		Storages: []storages.MigrateItem{
-			{Type: migrator.MigrateTypeCreate, NewData: objects.Bucket{Name: "test_storage"}},
-			{Type: migrator.MigrateTypeUpdate,
-				OldData: objects.Bucket{Name: "old_storage"},
-				NewData: objects.Bucket{Name: "new_storage"}},
-			{Type: migrator.MigrateTypeDelete, OldData: objects.Bucket{Name: "delete_storage"}},
-		},
-		Types: []types.MigrateItem{
-			{Type: migrator.MigrateTypeCreate, NewData: objects.Type{Name: "test_type", Format: "enum", Schema: "public"}},
-			{Type: migrator.MigrateTypeUpdate,
-				OldData: objects.Type{Name: "old_type", Format: "enum", Schema: "public"},
-				NewData: objects.Type{Name: "new_type", Format: "enum", Schema: "public"}},
-			{Type: migrator.MigrateTypeDelete, OldData: objects.Type{Name: "delete_type", Format: "enum", Schema: "public"}},
 		},
 	}
 
 	resource.PrintApplyChangeReport(migrateData)
 }
 
-func TestApply_WithVariousPolicyCombinations(t *testing.T) {
+func TestApply_StateFileNotFound(t *testing.T) {
 	flags := &resource.Flags{
-		DryRun:        true,
+		DryRun:        false,
+		AllowedSchema: "public",
+	}
+	config := loadConfig()
+	
+	// Make sure no state file exists
+	_ = state.Save(&state.State{})
+	
+	// Temporarily delete state file to trigger error
+	err := state.Delete()
+	assert.NoError(t, err)
+
+	err = resource.Apply(flags, config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "state file is not found")
+}
+
+func TestApply_ValidateTableRelationsError(t *testing.T) {
+	flags := &resource.Flags{
+		DryRun:        false,
 		AllowedSchema: "public",
 	}
 	config := loadConfig()
 
-	// Test case 1: New policies only
-	localState1 := &state.LocalState{
+	// Create a table with invalid relation
+	localState := &state.LocalState{
 		State: state.State{
 			Tables: []state.TableState{
 				{
 					Table: objects.Table{
-						Name:   "policy_table_new",
+						Name:   "test_table",
 						Schema: "public",
-					},
-					Policies: []objects.Policy{
-						{
-							Name:   "new_select_policy",
-							Schema: "public",
-							Table:  "policy_table_new",
-							Action: "SELECT",
-							Roles:  []string{"anon"},
+						Columns: []objects.Column{
+							{Name: "id", DataType: "uuid"},
+							{Name: "foreign_key_id", DataType: "uuid"},
 						},
-					},
+						Relationships: []objects.TablesRelationship{
+							{
+								ConstraintName:    "invalid_fk",
+								SourceSchema:      "public",
+								SourceTableName:   "test_table",
+								SourceColumnName:  "nonexistent_column", // Column does not exist
+								TargetTableSchema: "public",
+								TargetTableName:   "target_table",
+								TargetColumnName:  "id",
+							},
+						},
 				},
 			},
 		},
 	}
 
-	err := state.Save(&localState1.State)
+	err := state.Save(&localState.State)
 	assert.NoError(t, err)
 	defer func() {
 		assert.NoError(t, state.Save(&state.State{}))
 	}()
 
-	// Register model that has policies
-	resource.RegisterModels(MockPolicyTable{})
-
 	err = resource.Apply(flags, config)
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "column nonexistent_column is not exist")
+}
 
-	// Test case 2: Existing policies with updates and deletes
-	localState2 := &state.LocalState{
+func TestApply_RolesOnly(t *testing.T) {
+	flags := &resource.Flags{
+		RolesOnly:     true,
+		AllowedSchema: "public",
+	}
+	config := loadConfig()
+
+	localState := &state.LocalState{
 		State: state.State{
-			Tables: []state.TableState{
+			Roles: []state.RoleState{
 				{
-					Table: objects.Table{
-						ID:     1,
-						Name:   "policy_table_existing",
-						Schema: "public",
-					},
-					Policies: []objects.Policy{
-						{
-							ID:     1,
-							Name:   "existing_select_policy",
-							Schema: "public",
-							Table:  "policy_table_existing",
-							Action: "SELECT",
-							Roles:  []string{"anon"},
-						},
-						{
-							ID:     2,
-							Name:   "delete_policy",
-							Schema: "public",
-							Table:  "policy_table_existing",
-							Action: "INSERT",
-							Roles:  []string{"anon"},
-						},
-					},
+					Role: objects.Role{Name: "test_role"},
 				},
 			},
 		},
 	}
 
-	err = state.Save(&localState2.State)
+	err := state.Save(&localState.State)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, state.Save(&state.State{}))
+	}()
+
+	mock := &mock.MockSupabase{Cfg: config}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err = mock.MockGetRolesWithExpectedResponse(200, []objects.Role{})
+	assert.NoError(t, err)
+
+	err = mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{})
 	assert.NoError(t, err)
 
 	err = resource.Apply(flags, config)
-	assert.Error(t, err)
+	assert.NoError(t, err)
+}
 
-	// Test case 3: Storage policies
-	localState3 := &state.LocalState{
-		State: state.State{
-			Storage: []state.StorageState{
-				{
-					Storage: objects.Bucket{
-						ID:   "test-bucket-id",
-						Name: "test_bucket",
-					},
-					Policies: []objects.Policy{
-						{
-							Name:   "storage_select_policy",
-							Schema: "storage",
-							Table:  "objects",
-							Action: "SELECT",
-							Roles:  []string{"anon"},
-						},
-					},
-				},
-			},
-		},
+func TestApply_ValidateTableRelationsEmptyNameError(t *testing.T) {
+	tables := []objects.Table{
+		{Name: ""}, // Empty table name
 	}
-
-	err = state.Save(&localState3.State)
-	assert.NoError(t, err)
-
-	err = resource.Apply(flags, config)
+	err := validateTableRelations(tables...)
 	assert.Error(t, err)
-
-	// Test case 4: Storage with existing policies
-	localState4 := &state.LocalState{
-		State: state.State{
-			Storage: []state.StorageState{
-				{
-					Storage: objects.Bucket{
-						ID:   "test-bucket-id-existing",
-						Name: "test_bucket_existing",
-					},
-					Policies: []objects.Policy{
-						{
-							ID:     1,
-							Name:   "existing_storage_select_policy",
-							Schema: "storage",
-							Table:  "objects",
-							Action: "SELECT",
-							Roles:  []string{"anon"},
-						},
-						{
-							ID:     2,
-							Name:   "delete_storage_policy",
-							Schema: "storage",
-							Table:  "objects",
-							Action: "INSERT",
-							Roles:  []string{"anon"},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	err = state.Save(&localState4.State)
-	assert.NoError(t, err)
-
-	err = resource.Apply(flags, config)
-	assert.Error(t, err)
-
-	// Test case 5: Delete storage policies
-	localState5 := &state.LocalState{
-		State: state.State{
-			Storage: []state.StorageState{
-				{
-					Storage: objects.Bucket{
-						ID:   "test-bucket-id-delete",
-						Name: "test_bucket_delete",
-					},
-				},
-			},
-		},
-	}
-
-	err = state.Save(&localState5.State)
-	assert.NoError(t, err)
-
-	err = resource.Apply(flags, config)
-	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid table name for create or update")
 }

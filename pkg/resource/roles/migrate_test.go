@@ -1,6 +1,7 @@
 package roles_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -269,4 +270,163 @@ func TestMigrate_InvalidType(t *testing.T) {
 
 	errs := roles.Migrate(cfg, migrateItems, stateChan, actions)
 	assert.Empty(t, errs) // Should not have errors since default case returns nil
+}
+
+func TestMigrate_UpdateWithError(t *testing.T) {
+	cfg := &raiden.Config{}
+	stateChan := make(chan any, 1)
+
+	// Test update path with error
+	actions := roles.MigrateActionFunc{
+		CreateFunc: func(_ *raiden.Config, role objects.Role) (objects.Role, error) {
+			return role, nil
+		},
+		UpdateFunc: func(_ *raiden.Config, role objects.Role, param objects.UpdateRoleParam) error {
+			return errors.New("update failed") // Simulate update error
+		},
+		DeleteFunc: func(_ *raiden.Config, role objects.Role) error {
+			return nil
+		},
+	}
+
+	migrateItems := []roles.MigrateItem{
+		{
+			Type:    migrator.MigrateTypeUpdate,
+			NewData: objects.Role{Name: "test_role"},
+		},
+	}
+
+	errs := roles.Migrate(cfg, migrateItems, stateChan, actions)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Error(), "update failed")
+}
+
+func TestMigrate_DeleteWithError(t *testing.T) {
+	cfg := &raiden.Config{}
+	stateChan := make(chan any, 1)
+
+	// Test delete path with error
+	actions := roles.MigrateActionFunc{
+		CreateFunc: func(_ *raiden.Config, role objects.Role) (objects.Role, error) {
+			return role, nil
+		},
+		UpdateFunc: func(_ *raiden.Config, role objects.Role, param objects.UpdateRoleParam) error {
+			return nil
+		},
+		DeleteFunc: func(_ *raiden.Config, role objects.Role) error {
+			return errors.New("delete failed") // Simulate delete error
+		},
+	}
+
+	migrateItems := []roles.MigrateItem{
+		{
+			Type:    migrator.MigrateTypeDelete,
+			OldData: objects.Role{Name: "delete_role"},
+		},
+	}
+
+	errs := roles.Migrate(cfg, migrateItems, stateChan, actions)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Error(), "delete failed")
+}
+
+func TestMigrate_CreateWithError(t *testing.T) {
+	cfg := &raiden.Config{}
+	stateChan := make(chan any, 1)
+
+	createCalled := false
+	updateCalled := false
+
+	// Test create path where update after create fails
+	actions := roles.MigrateActionFunc{
+		CreateFunc: func(_ *raiden.Config, role objects.Role) (objects.Role, error) {
+			createCalled = true
+			return objects.Role{ID: 99, Name: role.Name, InheritRole: role.InheritRole, InheritRoles: role.InheritRoles}, nil
+		},
+		UpdateFunc: func(_ *raiden.Config, role objects.Role, param objects.UpdateRoleParam) error {
+			updateCalled = true
+			if len(param.ChangeInheritItems) > 0 {
+				return errors.New("inherit update failed") // Simulate inherit update error
+			}
+			return nil
+		},
+		DeleteFunc: func(_ *raiden.Config, role objects.Role) error {
+			return nil
+		},
+	}
+
+	migrateItems := []roles.MigrateItem{
+		{
+			Type: migrator.MigrateTypeCreate,
+			NewData: objects.Role{
+				Name:        "child_role",
+				InheritRole: true,
+				InheritRoles: []*objects.Role{
+					{Name: "parent_role"},
+				},
+			},
+		},
+	}
+
+	errs := roles.Migrate(cfg, migrateItems, stateChan, actions)
+	assert.Len(t, errs, 1) // Should have error from inherit update
+	assert.Contains(t, errs[0].Error(), "inherit update failed")
+	assert.True(t, createCalled)
+	assert.True(t, updateCalled)
+}
+
+func TestMigrate_CreateRoleEdgeCaseInheritance(t *testing.T) {
+	cfg := &raiden.Config{}
+	stateChan := make(chan any, 1)
+
+	createCalled := false
+	updateCalled := false
+	actions := roles.MigrateActionFunc{
+		CreateFunc: func(_ *raiden.Config, role objects.Role) (objects.Role, error) {
+			createCalled = true
+			// Return a role with ID to simulate successful creation
+			result := objects.Role{
+				ID:           100,
+				Name:         role.Name,
+				InheritRole:  role.InheritRole,
+				InheritRoles: role.InheritRoles, // Preserve original inherit roles
+			}
+			return result, nil
+		},
+		UpdateFunc: func(_ *raiden.Config, role objects.Role, param objects.UpdateRoleParam) error {
+			updateCalled = true
+			return nil
+		},
+		DeleteFunc: func(_ *raiden.Config, role objects.Role) error {
+			return nil
+		},
+	}
+
+	// Test with inherit roles that will exercise the cloneInheritRoles function's edge cases:
+	// - nil roles in the slice (if possible to create during migration)
+	// - empty names
+	// - duplicate names (case insensitive)
+	migrateItems := []roles.MigrateItem{
+		{
+			Type: migrator.MigrateTypeCreate,
+			NewData: objects.Role{
+				Name:        "edge_case_role",
+				InheritRole: true,
+				InheritRoles: []*objects.Role{
+					{Name: "parent_role"},
+					{Name: ""},            // empty name - should be skipped
+					{Name: "  "},          // whitespace-only - should be skipped
+					{Name: "PARENT_ROLE"}, // duplicate case-insensitive - should be deduplicated
+					{Name: "another_role"},
+					{Name: "ANOTHER_ROLE"}, // another duplicate - should be deduplicated
+				},
+			},
+		},
+	}
+
+	// Execute migration
+	errs := roles.Migrate(cfg, migrateItems, stateChan, actions)
+	assert.Empty(t, errs)
+	assert.True(t, createCalled)
+	assert.True(t, updateCalled)
 }

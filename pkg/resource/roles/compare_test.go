@@ -166,3 +166,54 @@ func TestCompareItem_FieldDifferences(t *testing.T) {
 		assert.Contains(t, typesFound, objects.UpdateRoleInheritRevoke)
 	}
 }
+
+func TestCompareNoConflict(t *testing.T) {
+	// Test case with no conflicts that should return no error
+	source := []objects.Role{
+		{
+			ID:           1,
+			Name:         "role1",
+			CanBypassRLS: true,
+			CanLogin:     true,
+		},
+	}
+
+	target := []objects.Role{
+		{
+			ID:           1,
+			Name:         "role1",
+			CanBypassRLS: true, // Same as source
+			CanLogin:     true, // Same as source
+		},
+	}
+
+	err := roles.Compare(source, target)
+	assert.NoError(t, err) // Should not return error because no conflicts
+}
+
+func TestCompareWithError(t *testing.T) {
+	// Test case with conflicts that should return an error
+	source := []objects.Role{
+		{
+			ID:              1,
+			Name:            "role1",
+			CanBypassRLS:    true,
+			CanLogin:        true,
+			ConnectionLimit: 10,
+		},
+	}
+
+	target := []objects.Role{
+		{
+			ID:              1,
+			Name:            "role1", // Same name, but other fields different
+			CanBypassRLS:    false,
+			CanLogin:        false,
+			ConnectionLimit: 20, // Different from source
+		},
+	}
+
+	err := roles.Compare(source, target)
+	assert.Error(t, err) // Should return error because of conflicts
+	assert.Contains(t, err.Error(), "canceled import process, you have conflict in role")
+}
