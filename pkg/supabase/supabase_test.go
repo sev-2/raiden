@@ -936,6 +936,64 @@ func TestGetRoleMemberships_SelfHosted(t *testing.T) {
 	assert.Equal(t, len(remoteMemberships), len(memberships))
 }
 
+func TestGetRoleMemberships_Cloud_ErrorHandling(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	_, err := supabase.GetRoleMemberships(cfg, nil)
+	assert.Error(t, err)
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	// Mock error response
+	err0 := mock.MockGetRoleMembershipsWithExpectedResponse(500, []objects.RoleMembership{})
+	assert.NoError(t, err0)
+
+	_, err1 := supabase.GetRoleMemberships(cfg, nil)
+	assert.Error(t, err1)
+	assert.Contains(t, err1.Error(), "get role membership error")
+}
+
+func TestGetRoleMemberships_SelfHosted_ErrorHandling(t *testing.T) {
+	cfg := loadSelfHostedConfig()
+
+	_, err := supabase.GetRoleMemberships(cfg, nil)
+	assert.Error(t, err)
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	// Mock error response
+	err0 := mock.MockGetRoleMembershipsWithExpectedResponse(500, []objects.RoleMembership{})
+	assert.NoError(t, err0)
+
+	_, err1 := supabase.GetRoleMemberships(cfg, nil)
+	assert.Error(t, err1)
+	assert.Contains(t, err1.Error(), "get role membership error")
+}
+
+func TestGetRoleMemberships_WithSchemas(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	remoteMemberships := []objects.RoleMembership{
+		{ParentID: 1, ParentRole: "student", InheritID: 2, InheritRole: "admin"},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err0 := mock.MockGetRoleMembershipsWithExpectedResponse(200, remoteMemberships)
+	assert.NoError(t, err0)
+
+	schemas := []string{"public", "private"}
+	memberships, err1 := supabase.GetRoleMemberships(cfg, schemas)
+	assert.NoError(t, err1)
+	assert.Equal(t, len(remoteMemberships), len(memberships))
+}
+
 func TestGetRoleByName_Cloud(t *testing.T) {
 	cfg := loadCloudConfig()
 
@@ -2159,4 +2217,227 @@ func TestUpdateRole_WithInheritChanges_SelfHosted(t *testing.T) {
 
 	err1 := supabase.UpdateRole(cfg, localRole, updateParamInheritOnly)
 	assert.NoError(t, err1)
+}
+
+// Test specifically for updateRoleInheritances functionality - test with various inheritance operations
+func TestUpdateRoleInheritances_GrantAndRevoke(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	localRole := objects.Role{
+		Name:            "test-role",
+		CanLogin:        true,
+		IsSuperuser:     false,
+		ConnectionLimit: 5,
+	}
+
+	// Create update param with multiple inherit items (both grant and revoke)
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "admin-role"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+			{
+				Role: objects.Role{Name: "user-role"},
+				Type: objects.UpdateRoleInheritRevoke,
+			},
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err)
+
+	err = supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.NoError(t, err)
+}
+
+// Test with invalid inheritance items (empty role names should be filtered)
+func TestUpdateRoleInheritances_InvalidItemsFiltered(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	localRole := objects.Role{
+		Name: "test-role",
+	}
+
+	// Create update param with some invalid items (empty role names)
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "valid-role"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+			{
+				Role: objects.Role{Name: ""}, // Invalid - empty name should be skipped
+				Type: objects.UpdateRoleInheritGrant,
+			},
+			{
+				Role: objects.Role{Name: "another-valid-role"},
+				Type: objects.UpdateRoleInheritRevoke,
+			},
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err)
+
+	err = supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.NoError(t, err)
+}
+
+// Test updateRoleInheritances with only grant operations
+func TestUpdateRoleInheritances_OnlyGrant(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	localRole := objects.Role{
+		Name: "test-role",
+	}
+
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "admin-role"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+			{
+				Role: objects.Role{Name: "moderator-role"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err)
+
+	err = supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.NoError(t, err)
+}
+
+// Test updateRoleInheritances with only revoke operations
+func TestUpdateRoleInheritances_OnlyRevoke(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	localRole := objects.Role{
+		Name: "test-role",
+	}
+
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "old-role"},
+				Type: objects.UpdateRoleInheritRevoke,
+			},
+			{
+				Role: objects.Role{Name: "former-role"},
+				Type: objects.UpdateRoleInheritRevoke,
+			},
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err)
+
+	err = supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.NoError(t, err)
+}
+
+// Test updateRoleInheritances with no inheritance changes but with other changes
+func TestUpdateRoleInheritances_WithOtherChangesOnly(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	localRole := objects.Role{
+		Name:            "test-role",
+		ConnectionLimit: 10,
+	}
+
+	// Update parameter with other changes but no inheritance changes
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateConnectionLimit,
+		},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{}, // Empty list
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	err := mock.MockUpdateRoleWithExpectedResponse(200)
+	assert.NoError(t, err)
+
+	err = supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.NoError(t, err)
+}
+
+// Test updateRoleInheritances with no changes at all (should return error)
+func TestUpdateRoleInheritances_NoChangesAtAll(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	localRole := objects.Role{
+		Name: "test-role",
+	}
+
+	// Update parameter with no changes at all
+	updateParam := objects.UpdateRoleParam{
+		OldData:            localRole,
+		ChangeItems:        []objects.UpdateRoleType{},         // No regular changes
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{},  // No inheritance changes
+	}
+
+	// No mock needed since it should fail before making the API call
+
+	err := supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "update role test-role has no changes")
+}
+
+// Test error scenario for UpdateRole with inheritance changes
+func TestUpdateRoleInheritances_ErrorHandling(t *testing.T) {
+	cfg := loadCloudConfig()
+
+	localRole := objects.Role{
+		Name: "test-role",
+	}
+
+	updateParam := objects.UpdateRoleParam{
+		OldData: localRole,
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{
+				Role: objects.Role{Name: "some-role"},
+				Type: objects.UpdateRoleInheritGrant,
+			},
+		},
+	}
+
+	mock := mock.MockSupabase{Cfg: cfg}
+	mock.Activate()
+	defer mock.Deactivate()
+
+	// Mock an error response for the role inheritance operation
+	err := mock.MockUpdateRoleWithExpectedResponse(500)
+	assert.NoError(t, err)
+
+	err = supabase.UpdateRole(cfg, localRole, updateParam)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "grant role some-role for test-role error")
 }
