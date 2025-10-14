@@ -7,6 +7,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type sampleRole struct {
+	raiden.RoleBase
+	name string
+}
+
+func (r *sampleRole) Name() string {
+	return r.name
+}
+
 func TestRoleBase_ConnectionLimit(t *testing.T) {
 	roleBase := raiden.RoleBase{}
 	assert.Equal(t, 60, roleBase.ConnectionLimit())
@@ -15,6 +24,13 @@ func TestRoleBase_ConnectionLimit(t *testing.T) {
 func TestRoleBase_InheritRole(t *testing.T) {
 	roleBase := raiden.RoleBase{}
 	assert.Equal(t, true, roleBase.IsInheritRole())
+}
+
+func TestRoleBase_InheritRoles(t *testing.T) {
+	roleBase := raiden.RoleBase{}
+	roles := roleBase.InheritRoles()
+	assert.NotNil(t, roles)
+	assert.Len(t, roles, 0)
 }
 
 func TestRoleBase_CanBypassRls(t *testing.T) {
@@ -48,4 +64,13 @@ func TestDefaultRoleValidUntilLayout(t *testing.T) {
 
 func TestDefaultRoleConnectionLimit(t *testing.T) {
 	assert.Equal(t, 60, raiden.DefaultRoleConnectionLimit)
+}
+
+func TestRoleInterfaceDefaults(t *testing.T) {
+	var r raiden.Role = &sampleRole{name: "reader"}
+	assert.Equal(t, "reader", r.Name())
+	assert.Equal(t, raiden.DefaultRoleConnectionLimit, r.ConnectionLimit())
+	assert.True(t, r.IsInheritRole())
+	assert.Len(t, r.InheritRoles(), 0)
+	assert.Nil(t, r.ValidUntil())
 }
