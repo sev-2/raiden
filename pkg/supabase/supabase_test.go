@@ -2400,8 +2400,8 @@ func TestUpdateRoleInheritances_NoChangesAtAll(t *testing.T) {
 	// Update parameter with no changes at all
 	updateParam := objects.UpdateRoleParam{
 		OldData:            localRole,
-		ChangeItems:        []objects.UpdateRoleType{},         // No regular changes
-		ChangeInheritItems: []objects.UpdateRoleInheritItem{},  // No inheritance changes
+		ChangeItems:        []objects.UpdateRoleType{},        // No regular changes
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{}, // No inheritance changes
 	}
 
 	// No mock needed since it should fail before making the API call
