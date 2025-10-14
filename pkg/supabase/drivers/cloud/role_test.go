@@ -11,7 +11,7 @@ import (
 func TestRoleFindConfigFn(t *testing.T) {
 	// Test with a role that has config
 	roleWithConfig := map[string]any{
-		"name": "test_role",
+		"name":   "test_role",
 		"config": []any{"key1=value1", "key2=value2"},
 	}
 
@@ -31,7 +31,7 @@ func TestRoleFindConfigFn(t *testing.T) {
 
 func TestRoleConfigsToMapFn(t *testing.T) {
 	configArr := []any{"key1=value1", "key2=value2", "invalid_config"}
-	
+
 	configMap := roleConfigsToMapFn(configArr)
 	assert.Equal(t, 2, len(configMap))
 	assert.Equal(t, "value1", configMap["key1"])
@@ -56,7 +56,7 @@ func TestRoleResultDecoratorFn(t *testing.T) {
 
 	result := roleResultDecoratorFn(roles)
 	decoratedRoles := result.([]any)
-	
+
 	// Check first role
 	role1 := decoratedRoles[0].(map[string]any)
 	config1 := role1["config"].(map[string]any)

@@ -134,9 +134,9 @@ func TestRoleMembershipsGroupByInheritId(t *testing.T) {
 		{ParentID: 2, ParentRole: "parent2", InheritID: 10, InheritRole: "child1"}, // Same inherit ID
 		{ParentID: 3, ParentRole: "parent3", InheritID: 20, InheritRole: "child2"},
 	}
-	
+
 	grouped := memberships.GroupByInheritId()
-	assert.Equal(t, 2, len(grouped)) // 2 different inherit IDs: 10 and 20
+	assert.Equal(t, 2, len(grouped))     // 2 different inherit IDs: 10 and 20
 	assert.Equal(t, 2, len(grouped[10])) // 2 parents for inherit ID 10
 	assert.Equal(t, 1, len(grouped[20])) // 1 parent for inherit ID 20
 }
@@ -148,7 +148,7 @@ func TestRolesToMap(t *testing.T) {
 		{ID: 1, Name: "role1"},
 		{ID: 2, Name: "role2"},
 	}
-	
+
 	roleMap := roles.ToMap()
 	assert.Equal(t, 2, len(roleMap))
 	assert.Equal(t, "role1", roleMap[1].Name)

@@ -33,13 +33,13 @@ func TestGetRoleMembershipsQuery(t *testing.T) {
 func TestGenerateGetRoleMembershipsQuery(t *testing.T) {
 	// Test with empty included schemas
 	query := GenerateGetRoleMembershipsQuery([]string{})
-	
+
 	assert.Contains(t, query, "pg_namespace n")
 	assert.Contains(t, query, "pg_roles r")
-	
+
 	// Test with specific schemas
 	query = GenerateGetRoleMembershipsQuery([]string{"public", "auth"})
-	
+
 	assert.Contains(t, query, "'public'")
 	assert.Contains(t, query, "'auth'")
 	assert.Contains(t, query, "n.nspname = ANY(ARRAY['public','auth'])")
@@ -48,11 +48,11 @@ func TestGenerateGetRoleMembershipsQuery(t *testing.T) {
 func TestGenerateGetRoleMembershipsQueryMultipleSchemas(t *testing.T) {
 	schemas := []string{"public", "auth", "storage", "extensions"}
 	query := GenerateGetRoleMembershipsQuery(schemas)
-	
+
 	for _, schema := range schemas {
 		assert.Contains(t, query, "'"+schema+"'")
 	}
-	
+
 	// Check that the query contains the expected structure
 	assert.Contains(t, query, "n.nspname = ANY(ARRAY['public','auth','storage','extensions'])")
 }
@@ -61,7 +61,7 @@ func TestGenerateGetRoleMembershipsQuerySpecialCharacters(t *testing.T) {
 	// Test with schema names that might have special characters
 	schemas := []string{"schema-with-dash", "schema_with_underscore", "schema123"}
 	query := GenerateGetRoleMembershipsQuery(schemas)
-	
+
 	for _, schema := range schemas {
 		assert.Contains(t, query, "'"+schema+"'")
 	}
@@ -69,12 +69,12 @@ func TestGenerateGetRoleMembershipsQuerySpecialCharacters(t *testing.T) {
 
 func TestRoleQueryStructure(t *testing.T) {
 	// Test that the role queries have proper structure
-	
+
 	// Check GetRolesQuery structure
 	assert.Contains(t, GetRolesQuery, "SELECT")
 	assert.Contains(t, GetRolesQuery, "FROM")
 	assert.Contains(t, GetRolesQuery, "pg_roles")
-	
+
 	// Check getRoleMembershipsQuery structure
 	assert.Contains(t, getRoleMembershipsQuery, "WITH")
 	assert.Contains(t, getRoleMembershipsQuery, "SELECT")
@@ -89,14 +89,14 @@ func TestRoleQueryConstantsExist(t *testing.T) {
 }
 
 func TestSQLInjectionProtection(t *testing.T) {
-	// Test that the query generation properly handles schema names 
+	// Test that the query generation properly handles schema names
 	// to prevent SQL injection (using the formatting approach)
-	
+
 	schemas := []string{"normal_schema", "schema'; DROP TABLE users; --"}
 	query := GenerateGetRoleMembershipsQuery(schemas)
-	
+
 	// The malicious schema should be quoted properly to prevent injection
-	// Note: This is a basic test, in real implementation we rely on the fmt.Sprintf 
+	// Note: This is a basic test, in real implementation we rely on the fmt.Sprintf
 	// and proper quoting functions in the code
 	assert.Contains(t, query, "'schema'; DROP TABLE users; --'")
 }

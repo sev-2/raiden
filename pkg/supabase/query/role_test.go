@@ -99,8 +99,8 @@ func TestBuildUpdateRoleQuery(t *testing.T) {
 	assert.Contains(t, query, "SUPERUSER")
 	assert.Contains(t, query, "NOINHERIT") // since InheritRole is false
 	assert.Contains(t, query, "BYPASSRLS")
-	assert.Contains(t, query, "NOCREATEDB") // since CanCreateDB is false
-	assert.Contains(t, query, "CREATEROLE") // since CanCreateRole is true
+	assert.Contains(t, query, "NOCREATEDB")          // since CanCreateDB is false
+	assert.Contains(t, query, "CREATEROLE")          // since CanCreateRole is true
 	assert.Contains(t, query, "log_statement = all") // config part
 }
 
