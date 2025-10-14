@@ -36,6 +36,8 @@ func ToSnakeCase(s string) string {
 			result.WriteRune(char + ('a' - 'A'))
 		case char == '-':
 			result.WriteRune('_')
+		case char == ' ':
+			result.WriteRune('_')
 		default:
 			result.WriteRune(char)
 		}

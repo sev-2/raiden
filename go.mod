@@ -104,6 +104,7 @@ require (
 	cloud.google.com/go/pubsub v1.45.3
 	github.com/fasthttp/router v1.4.22
 	github.com/go-playground/validator/v10 v10.17.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-colorable v0.1.13 // indirect

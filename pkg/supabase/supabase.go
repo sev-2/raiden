@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -379,7 +378,9 @@ func AdminUpdateUserData(cfg *raiden.Config, userId string, data objects.User) (
 		})
 	}
 	SupabaseLogger.Debug("Update user data in self hosted", "user-id", userId)
-	return objects.User{}, errors.New("update user data in self hosted in not implemented, stay update :)")
+	return decorateActionWithDataErr("update", "user", func() (objects.User, error) {
+		return data, meta.UpdateUserData(cfg, userId, data)
+	})
 }
 
 func GetBuckets(cfg *raiden.Config) (buckets []objects.Bucket, err error) {

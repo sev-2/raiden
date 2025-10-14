@@ -1,54 +1,26 @@
 package acl
 
 import (
-	"fmt"
+	"net/http"
+	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
-	"github.com/sev-2/raiden/pkg/state"
+	"github.com/sev-2/raiden/pkg/jwt"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
+
+var Logger hclog.Logger = logger.HcLog().Named("acl")
+
+const ServiceRoleName = "service_role"
 
 func SetUserRole(cfg *raiden.Config, userId string, role raiden.Role) error {
 	if err := validateRole(role.Name()); err != nil {
 		return err
 	}
 	return doSetRole(cfg, userId, role.Name())
-}
-
-func GetAvailableRole() (roles []objects.Role, err error) {
-	st, err := state.Load()
-	if err != nil {
-		return roles, err
-	}
-
-	for i := range st.Roles {
-		r := st.Roles[i]
-		roles = append(roles, r.Role)
-	}
-	return
-}
-
-func validateRole(roleName string) (err error) {
-	avRoles, err := GetAvailableRole()
-	if err != nil {
-		return err
-	}
-
-	found := false
-	for i := range avRoles {
-		r := avRoles[i]
-		if r.Name == roleName {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("role %s is not available in database", roleName)
-	}
-
-	return nil
 }
 
 func doSetRole(cfg *raiden.Config, userId string, roleName string) error {
@@ -59,4 +31,82 @@ func doSetRole(cfg *raiden.Config, userId string, roleName string) error {
 		return err
 	}
 	return nil
+}
+
+func Authenticated(ctx raiden.Context) error {
+	authHeader := string(ctx.RequestContext().Request.Header.Peek("Authorization"))
+
+	if authHeader == "" || !strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
+		return &raiden.ErrorResponse{
+			StatusCode: http.StatusUnauthorized,
+			Code:       "unauthorize",
+			Message:    "unauthorize - invalid format",
+		}
+	}
+
+	token := strings.TrimPrefix(strings.ToLower(authHeader), "bearer ")
+	if len(token) == 0 {
+		return &raiden.ErrorResponse{
+			StatusCode: http.StatusUnauthorized,
+			Code:       "unauthorize",
+			Message:    "unauthorize - required token",
+		}
+	}
+
+	_, err := jwt.Validate[jwt.JWTClaims](token, ctx.Config().JwtSecret)
+	if err != nil {
+		Logger.Error("validation failed", "message", err)
+		return &raiden.ErrorResponse{
+			StatusCode: http.StatusUnauthorized,
+			Code:       "unauthorize",
+			Message:    "unauthorize - invalid token",
+		}
+	}
+
+	return nil
+}
+
+func GetAuthenticatedData(ctx raiden.Context, serviceOnly bool) (*jwt.JWTClaims, error) {
+	authHeader := string(ctx.RequestContext().Request.Header.Peek("Authorization"))
+
+	if authHeader == "" || !strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
+		return nil, &raiden.ErrorResponse{
+			StatusCode: http.StatusUnauthorized,
+			Code:       "unauthorize",
+			Message:    "unauthorize - invalid format",
+		}
+	}
+
+	token := strings.TrimSpace(authHeader)
+	token = strings.TrimPrefix(token, "Bearer ")
+	token = strings.TrimPrefix(token, "bearer ")
+
+	if len(token) == 0 {
+		return nil, &raiden.ErrorResponse{
+			StatusCode: http.StatusUnauthorized,
+			Code:       "unauthorize",
+			Message:    "unauthorize - required token",
+		}
+	}
+
+	data, err := jwt.Validate[jwt.JWTClaims](token, ctx.Config().JwtSecret)
+	if err != nil {
+		Logger.Error("validation failed", "message", err)
+		return nil, &raiden.ErrorResponse{
+			StatusCode: http.StatusUnauthorized,
+			Code:       "unauthorize",
+			Message:    "unauthorize - invalid token",
+		}
+	}
+
+	if serviceOnly && data.Role != ServiceRoleName {
+		Logger.Error("invalid role", "message", "access for service only")
+		return nil, &raiden.ErrorResponse{
+			StatusCode: http.StatusForbidden,
+			Code:       "forbidden",
+			Message:    "You do not have permission to access this resource.",
+		}
+	}
+
+	return data, nil
 }
