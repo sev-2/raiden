@@ -1,232 +1,363 @@
-package meta
+package meta_test
 
 import (
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"sync/atomic"
 	"testing"
 
+	"github.com/jarcoal/httpmock"
+	"github.com/sev-2/raiden"
+	meta "github.com/sev-2/raiden/pkg/supabase/drivers/local/meta"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/sev-2/raiden/pkg/supabase/query/sql"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// Test role struct functionality
-func TestRoleStruct(t *testing.T) {
-	role := objects.Role{
-		ID:                1,
-		Name:              "test_role",
-		CanBypassRLS:      true,
-		CanCreateDB:       true,
-		CanCreateRole:     true,
-		CanLogin:          true,
-		Config:            map[string]any{"key": "value"},
-		ConnectionLimit:   10,
-		InheritRole:       true,
-		IsReplicationRole: false,
-		IsSuperuser:       false,
-		ValidUntil:        nil,
-		Password:          "password",
-		ActiveConnections: 2,
+func newTestConfig() *raiden.Config {
+	return &raiden.Config{
+		SupabaseApiUrl:       "http://meta.test",
+		SupabaseApiBasePath:  "/pg",
+		SupabaseApiTokenType: "Bearer",
+		SupabaseApiToken:     "token",
 	}
-
-	assert.Equal(t, 1, role.ID)
-	assert.Equal(t, "test_role", role.Name)
-	assert.True(t, role.CanBypassRLS)
-	assert.True(t, role.CanCreateDB)
-	assert.True(t, role.CanCreateRole)
-	assert.True(t, role.CanLogin)
-	assert.Equal(t, map[string]any{"key": "value"}, role.Config)
-	assert.Equal(t, 10, role.ConnectionLimit)
-	assert.True(t, role.InheritRole)
-	assert.False(t, role.IsReplicationRole)
-	assert.False(t, role.IsSuperuser)
-	assert.Equal(t, "password", role.Password)
-	assert.Equal(t, 2, role.ActiveConnections)
 }
 
-func TestRoleMembershipsStruct(t *testing.T) {
-	rm := objects.RoleMembership{
-		ParentID:    1,
-		ParentRole:  "parent_role",
-		InheritID:   2,
-		InheritRole: "inherit_role",
-	}
-
-	assert.Equal(t, 1, rm.ParentID)
-	assert.Equal(t, "parent_role", rm.ParentRole)
-	assert.Equal(t, 2, rm.InheritID)
-	assert.Equal(t, "inherit_role", rm.InheritRole)
+func rolesURL(cfg *raiden.Config) string {
+	return fmt.Sprintf("%s%s/roles", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 }
 
-func TestUpdateRoleTypeConstants(t *testing.T) {
-	assert.Equal(t, objects.UpdateConnectionLimit, objects.UpdateConnectionLimit)
-	assert.Equal(t, objects.UpdateRoleName, objects.UpdateRoleName)
-	assert.Equal(t, objects.UpdateRoleIsReplication, objects.UpdateRoleIsReplication)
-	assert.Equal(t, objects.UpdateRoleIsSuperUser, objects.UpdateRoleIsSuperUser)
-	assert.Equal(t, objects.UpdateRoleInheritRole, objects.UpdateRoleInheritRole)
-	assert.Equal(t, objects.UpdateRoleCanCreateDb, objects.UpdateRoleCanCreateDb)
-	assert.Equal(t, objects.UpdateRoleCanCreateRole, objects.UpdateRoleCanCreateRole)
-	assert.Equal(t, objects.UpdateRoleCanLogin, objects.UpdateRoleCanLogin)
-	assert.Equal(t, objects.UpdateRoleCanBypassRls, objects.UpdateRoleCanBypassRls)
-	assert.Equal(t, objects.UpdateRoleConfig, objects.UpdateRoleConfig)
-	assert.Equal(t, objects.UpdateRoleValidUntil, objects.UpdateRoleValidUntil)
+func queryURL(cfg *raiden.Config) string {
+	return fmt.Sprintf("%s%s/query", cfg.SupabaseApiUrl, cfg.SupabaseApiBasePath)
 }
 
-func TestUpdateRoleInheritTypeConstants(t *testing.T) {
-	assert.Equal(t, objects.UpdateRoleInheritGrant, objects.UpdateRoleInheritGrant)
-	assert.Equal(t, objects.UpdateRoleInheritRevoke, objects.UpdateRoleInheritRevoke)
+func setupHTTPMock(t *testing.T) {
+	httpmock.Activate()
+	t.Cleanup(httpmock.DeactivateAndReset)
 }
 
-func TestUpdateRoleInheritancesFiltering(t *testing.T) {
-	// Test with some valid and invalid items
-	items := []objects.UpdateRoleInheritItem{
-		{Role: objects.Role{Name: "valid_role_1"}, Type: objects.UpdateRoleInheritGrant},
-		{Role: objects.Role{Name: ""}, Type: objects.UpdateRoleInheritGrant}, // Invalid - empty name
-		{Role: objects.Role{Name: "valid_role_2"}, Type: objects.UpdateRoleInheritRevoke},
-		{Role: objects.Role{Name: ""}, Type: objects.UpdateRoleInheritRevoke}, // Invalid - empty name
-	}
+func TestGetRolesSuccess(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
 
-	// Test the filtering logic used in updateRoleInheritances
-	validItems := make([]objects.UpdateRoleInheritItem, 0, len(items))
-	for i := range items {
-		it := items[i]
-		if it.Role.Name == "" {
-			continue
+	httpmock.RegisterResponder(http.MethodGet, rolesURL(cfg), func(req *http.Request) (*http.Response, error) {
+		assert.Equal(t, "Bearer token", req.Header.Get("Authorization"))
+		return httpmock.NewStringResponse(200, `[
+            {"name":"role1","config":{"search_path":"public"}},
+            {"name":"role2"}
+        ]`), nil
+	})
+
+	roles, err := meta.GetRoles(cfg)
+	require.NoError(t, err)
+	require.Len(t, roles, 2)
+	assert.Equal(t, "role1", roles[0].Name)
+	assert.Equal(t, "public", roles[0].Config["search_path"])
+	assert.Equal(t, "role2", roles[1].Name)
+}
+
+func TestGetRolesServerError(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodGet, rolesURL(cfg), httpmock.NewStringResponder(500, `{}`))
+
+	roles, err := meta.GetRoles(cfg)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get roles error")
+	assert.Empty(t, roles)
+}
+
+func TestGetRoleMembershipsSuccess(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "public")
+		assert.Contains(t, string(body), "private")
+		return httpmock.NewStringResponse(200, `[
+            {"parent_id":1,"parent_role":"parent","inherit_id":2,"inherit_role":"child"}
+        ]`), nil
+	})
+
+	memberships, err := meta.GetRoleMemberships(cfg, []string{"public", "private"})
+	require.NoError(t, err)
+	require.Len(t, memberships, 1)
+	assert.Equal(t, "child", memberships[0].InheritRole)
+}
+
+func TestGetRoleMembershipsServerError(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), httpmock.NewStringResponder(500, `{}`))
+
+	memberships, err := meta.GetRoleMemberships(cfg, []string{"public"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get role membership error")
+	assert.Empty(t, memberships)
+}
+
+func TestGetRoleByNameSuccess(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "rolname = 'role1'")
+		return httpmock.NewStringResponse(200, `[
+            {"name":"role1","config":{"search_path":"public"}}
+        ]`), nil
+	})
+
+	role, err := meta.GetRoleByName(cfg, "role1")
+	require.NoError(t, err)
+	assert.Equal(t, "role1", role.Name)
+	assert.Equal(t, "public", role.Config["search_path"])
+}
+
+func TestGetRoleByNameNotFound(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), httpmock.NewStringResponder(200, `[]`))
+
+	role, err := meta.GetRoleByName(cfg, "missing")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "is not found")
+	assert.Equal(t, objects.Role{}, role)
+}
+
+func TestGetRoleByNameServerError(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), httpmock.NewStringResponder(500, `{}`))
+
+	role, err := meta.GetRoleByName(cfg, "missing")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get role error")
+	assert.Equal(t, objects.Role{}, role)
+}
+
+func TestCreateRoleSuccess(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	var calls int32
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		call := atomic.AddInt32(&calls, 1)
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		if call == 1 {
+			assert.Contains(t, string(body), "CREATE ROLE")
+			return httpmock.NewStringResponse(200, `{}`), nil
 		}
-		validItems = append(validItems, it)
-	}
+		assert.Contains(t, string(body), "rolname = 'tester'")
+		return httpmock.NewStringResponse(200, `[
+            {"name":"tester","config":{"search_path":"admin"}}
+        ]`), nil
+	})
 
-	assert.Equal(t, 2, len(validItems)) // Only 2 valid items should remain
-	assert.Equal(t, "valid_role_1", validItems[0].Role.Name)
-	assert.Equal(t, "valid_role_2", validItems[1].Role.Name)
+	role, err := meta.CreateRole(cfg, objects.Role{Name: "tester", Config: map[string]any{"search_path": "admin"}})
+	require.NoError(t, err)
+	assert.Equal(t, "tester", role.Name)
+	assert.Equal(t, "admin", role.Config["search_path"])
+	assert.Equal(t, int32(2), atomic.LoadInt32(&calls))
 }
 
-func TestRoleUpdateParam(t *testing.T) {
-	role := objects.Role{
-		Name: "test_role",
-	}
+func TestCreateRoleServerError(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
 
-	updateParam := objects.UpdateRoleParam{
-		OldData: role,
-		ChangeItems: []objects.UpdateRoleType{
-			objects.UpdateRoleName,
-			objects.UpdateRoleCanLogin,
-		},
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), httpmock.NewStringResponder(500, `{}`))
+
+	role, err := meta.CreateRole(cfg, objects.Role{Name: "tester"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "create new role")
+	assert.Equal(t, objects.Role{}, role)
+}
+
+func TestDeleteRoleSuccess(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), httpmock.NewStringResponder(200, `{}`))
+
+	err := meta.DeleteRole(cfg, objects.Role{Name: "tester"})
+	assert.NoError(t, err)
+}
+
+func TestDeleteRoleServerError(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), httpmock.NewStringResponder(500, `{}`))
+
+	err := meta.DeleteRole(cfg, objects.Role{Name: "tester"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "delete role")
+}
+
+func TestUpdateRoleNoChanges(t *testing.T) {
+	cfg := newTestConfig()
+
+	err := meta.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{OldData: objects.Role{Name: "tester"}})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "has no changes")
+}
+
+func TestUpdateRoleSuccess(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	var updateCalls int32
+	var inheritCalls int32
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		if strings.Contains(string(body), "GRANT") {
+			atomic.AddInt32(&inheritCalls, 1)
+		} else {
+			atomic.AddInt32(&updateCalls, 1)
+		}
+		return httpmock.NewStringResponse(200, `{}`), nil
+	})
+
+	err := meta.UpdateRole(cfg, objects.Role{Name: ""}, objects.UpdateRoleParam{
+		OldData:     objects.Role{Name: "tester"},
+		ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleConfig},
 		ChangeInheritItems: []objects.UpdateRoleInheritItem{
-			{
-				Role: objects.Role{Name: "parent_role"},
-				Type: objects.UpdateRoleInheritGrant,
-			},
+			{Role: objects.Role{Name: "reader"}, Type: objects.UpdateRoleInheritGrant},
 		},
-	}
+	})
 
-	assert.Equal(t, role, updateParam.OldData)
-	assert.Equal(t, 2, len(updateParam.ChangeItems))
-	assert.Equal(t, objects.UpdateRoleName, updateParam.ChangeItems[0])
-	assert.Equal(t, objects.UpdateRoleCanLogin, updateParam.ChangeItems[1])
-	assert.Equal(t, 1, len(updateParam.ChangeInheritItems))
-	assert.Equal(t, "parent_role", updateParam.ChangeInheritItems[0].Role.Name)
-	assert.Equal(t, objects.UpdateRoleInheritGrant, updateParam.ChangeInheritItems[0].Type)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&updateCalls))
+	assert.Equal(t, int32(1), atomic.LoadInt32(&inheritCalls))
 }
 
-func TestRoleMembershipsGroupByInheritId(t *testing.T) {
-	// Test RoleMemberships GroupByInheritId function which is defined in the objects package
-	// but can be tested in context of role functionality
-	memberships := objects.RoleMemberships{
-		{ParentID: 1, ParentRole: "parent1", InheritID: 10, InheritRole: "child1"},
-		{ParentID: 2, ParentRole: "parent2", InheritID: 10, InheritRole: "child1"}, // Same inherit ID
-		{ParentID: 3, ParentRole: "parent3", InheritID: 20, InheritRole: "child2"},
-	}
+func TestUpdateRoleInheritanceOnly(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
 
-	grouped := memberships.GroupByInheritId()
-	assert.Equal(t, 2, len(grouped))     // 2 different inherit IDs: 10 and 20
-	assert.Equal(t, 2, len(grouped[10])) // 2 parents for inherit ID 10
-	assert.Equal(t, 1, len(grouped[20])) // 1 parent for inherit ID 20
+	var inheritCalls int32
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "GRANT")
+		atomic.AddInt32(&inheritCalls, 1)
+		return httpmock.NewStringResponse(200, `{}`), nil
+	})
+
+	err := meta.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{
+		OldData: objects.Role{Name: "tester"},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{Role: objects.Role{Name: "reader"}, Type: objects.UpdateRoleInheritGrant},
+		},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&inheritCalls))
 }
 
-func TestRolesToMap(t *testing.T) {
-	// Test Roles ToMap function which is defined in the objects package
-	// but can be tested in context of role functionality
-	roles := objects.Roles{
-		{ID: 1, Name: "role1"},
-		{ID: 2, Name: "role2"},
-	}
+func TestUpdateRoleSkipsEmptyInheritance(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
 
-	roleMap := roles.ToMap()
-	assert.Equal(t, 2, len(roleMap))
-	assert.Equal(t, "role1", roleMap[1].Name)
-	assert.Equal(t, "role2", roleMap[2].Name)
-}
-
-// Since updateRoleInheritances is an internal function, let's create a more comprehensive test
-// that tests the core logic by simulating its behavior
-func TestUpdateRoleInheritances(t *testing.T) {
-	// Since we can't easily test the full function with external dependencies,
-	// we'll test the core logic components that we can validate
-
-	// 1. Test that validItems filtering works correctly
-	items := []objects.UpdateRoleInheritItem{
-		{Role: objects.Role{Name: "valid_role_1"}, Type: objects.UpdateRoleInheritGrant},
-		{Role: objects.Role{Name: ""}, Type: objects.UpdateRoleInheritGrant}, // Invalid - empty name
-		{Role: objects.Role{Name: "valid_role_2"}, Type: objects.UpdateRoleInheritRevoke},
-		{Role: objects.Role{Name: ""}, Type: objects.UpdateRoleInheritRevoke},            // Invalid - empty name
-		{Role: objects.Role{Name: "valid_role_3"}, Type: objects.UpdateRoleInheritGrant}, // Additional valid item
-	}
-
-	// Test the filtering logic from updateRoleInheritances
-	validItems := make([]objects.UpdateRoleInheritItem, 0, len(items))
-	for i := range items {
-		it := items[i]
-		if it.Role.Name == "" {
-			continue
+	var inheritCalls int32
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		if strings.Contains(string(body), "GRANT") {
+			atomic.AddInt32(&inheritCalls, 1)
 		}
-		validItems = append(validItems, it)
-	}
+		return httpmock.NewStringResponse(200, `{}`), nil
+	})
 
-	assert.Equal(t, 3, len(validItems)) // Only 3 valid items should remain
-	assert.Equal(t, "valid_role_1", validItems[0].Role.Name)
-	assert.Equal(t, "valid_role_2", validItems[1].Role.Name)
-	assert.Equal(t, "valid_role_3", validItems[2].Role.Name)
+	err := meta.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{
+		OldData:     objects.Role{Name: "tester"},
+		ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleCanLogin},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{Role: objects.Role{Name: ""}, Type: objects.UpdateRoleInheritGrant},
+		},
+	})
 
-	// 2. Test different inheritance types
-	assert.Equal(t, objects.UpdateRoleInheritGrant, validItems[0].Type)
-	assert.Equal(t, objects.UpdateRoleInheritRevoke, validItems[1].Type)
-	assert.Equal(t, objects.UpdateRoleInheritGrant, validItems[2].Type)
-
-	// 3. Test when no valid items remain
-	emptyItems := []objects.UpdateRoleInheritItem{
-		{Role: objects.Role{Name: ""}, Type: objects.UpdateRoleInheritGrant},
-		{Role: objects.Role{Name: ""}, Type: objects.UpdateRoleInheritRevoke},
-	}
-
-	emptyValidItems := make([]objects.UpdateRoleInheritItem, 0, len(emptyItems))
-	for i := range emptyItems {
-		it := emptyItems[i]
-		if it.Role.Name == "" {
-			continue
-		}
-		emptyValidItems = append(emptyValidItems, it)
-	}
-
-	assert.Equal(t, 0, len(emptyValidItems)) // No items should remain
+	assert.NoError(t, err)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&inheritCalls))
 }
 
-// Test GetRoleMemberships function logic by testing the query generation
-func TestGetRoleMemberships(t *testing.T) {
-	// Test with nil/empty schemas
-	schemas := []string{}
-	query := sql.GenerateGetRoleMembershipsQuery(schemas)
-	assert.Contains(t, query, "pg_auth_members")
+func TestUpdateRoleInheritanceInvalidType(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
 
-	// Test with specific schemas
-	schemas = []string{"public", "private"}
-	query = sql.GenerateGetRoleMembershipsQuery(schemas)
-	assert.Contains(t, query, "pg_namespace")
-	for _, schema := range schemas {
-		assert.Contains(t, query, schema)
-	}
+	var updateCalls int32
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&updateCalls, 1)
+		return httpmock.NewStringResponse(200, `{}`), nil
+	})
 
-	// Test with single schema
-	schemas = []string{"public"}
-	query = sql.GenerateGetRoleMembershipsQuery(schemas)
-	assert.Contains(t, query, "pg_namespace")
-	assert.Contains(t, query, "public")
+	err := meta.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{
+		OldData:     objects.Role{Name: "tester"},
+		ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleConfig},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{Role: objects.Role{Name: "reader"}, Type: objects.UpdateRoleInheritType("invalid")},
+		},
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported role inherit action")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&updateCalls))
+}
+
+func TestUpdateRoleInheritanceExecuteError(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		if strings.Contains(string(body), "GRANT") {
+			return httpmock.NewStringResponse(500, `{}`), nil
+		}
+		return httpmock.NewStringResponse(200, `{}`), nil
+	})
+
+	err := meta.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{
+		OldData:     objects.Role{Name: "tester"},
+		ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleConfig},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{Role: objects.Role{Name: "reader"}, Type: objects.UpdateRoleInheritGrant},
+		},
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "grant role reader for tester error")
+}
+
+func TestUpdateRoleAggregatedErrors(t *testing.T) {
+	cfg := newTestConfig()
+	setupHTTPMock(t)
+
+	httpmock.RegisterResponder(http.MethodPost, queryURL(cfg), httpmock.NewStringResponder(500, `{}`))
+
+	err := meta.UpdateRole(cfg, objects.Role{}, objects.UpdateRoleParam{
+		OldData:     objects.Role{Name: "tester"},
+		ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleConfig},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{Role: objects.Role{Name: "first"}, Type: objects.UpdateRoleInheritGrant},
+			{Role: objects.Role{Name: "second"}, Type: objects.UpdateRoleInheritRevoke},
+		},
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "update role tester error")
+	assert.Contains(t, err.Error(), "grant role first for tester error")
+	assert.Contains(t, err.Error(), "revoke role second for tester error")
 }
