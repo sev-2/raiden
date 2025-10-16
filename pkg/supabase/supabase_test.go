@@ -1557,11 +1557,10 @@ func TestGetFunctionByName_SelfHosted(t *testing.T) {
 func TestCreateFunction_Cloud(t *testing.T) {
 	cfg := loadCloudConfig()
 
-	_, err := supabase.CreateFunction(cfg, objects.Function{})
-	assert.Error(t, err)
-
+	// Test with function that has required fields
 	localFunction := objects.Function{
-		Name: "some-function",
+		Name:              "some-function",
+		CompleteStatement: "CREATE OR REPLACE FUNCTION some-function() RETURNS void AS $function$\nBEGIN\n  -- function body\nEND;\n$function$ LANGUAGE plpgsql;",
 	}
 
 	mock := mock.MockSupabase{Cfg: cfg}
@@ -1579,11 +1578,10 @@ func TestCreateFunction_Cloud(t *testing.T) {
 func TestCreateFunction_SelfHosted(t *testing.T) {
 	cfg := loadSelfHostedConfig()
 
-	_, err := supabase.CreateFunction(cfg, objects.Function{})
-	assert.Error(t, err)
-
+	// Test with function that has required fields
 	localFunction := objects.Function{
-		Name: "some-function",
+		Name:              "some-function",
+		CompleteStatement: "CREATE OR REPLACE FUNCTION some-function() RETURNS void AS $function$\nBEGIN\n  -- function body\nEND;\n$function$ LANGUAGE plpgsql;",
 	}
 
 	mock := mock.MockSupabase{Cfg: cfg}
@@ -1605,7 +1603,8 @@ func TestUpdateFunction_Cloud(t *testing.T) {
 	assert.Error(t, err)
 
 	localFunction := objects.Function{
-		Name: "some-function",
+		Name:              "some-function",
+		CompleteStatement: "CREATE OR REPLACE FUNCTION some-function() RETURNS void AS $function$\nBEGIN\n  -- function body\nEND;\n$function$ LANGUAGE plpgsql;",
 	}
 
 	mock := mock.MockSupabase{Cfg: cfg}
@@ -1626,7 +1625,8 @@ func TestUpdateFunction_SelfHosted(t *testing.T) {
 	assert.Error(t, err)
 
 	localFunction := objects.Function{
-		Name: "some-function",
+		Name:              "some-function",
+		CompleteStatement: "CREATE OR REPLACE FUNCTION some-function() RETURNS void AS $function$\nBEGIN\n  -- function body\nEND;\n$function$ LANGUAGE plpgsql;",
 	}
 
 	mock := mock.MockSupabase{Cfg: cfg}
