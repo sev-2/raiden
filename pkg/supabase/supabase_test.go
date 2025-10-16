@@ -1733,7 +1733,7 @@ func TestAdminUpdateUser_SelfHosted(t *testing.T) {
 	cfg := loadSelfHostedConfig()
 
 	_, err := supabase.AdminUpdateUserData(cfg, "some-id", objects.User{})
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
 
 func TestGetBuckets_All(t *testing.T) {

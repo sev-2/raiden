@@ -16,18 +16,20 @@ import (
 
 // Flags is struct to binding options when import and apply is run binart
 type Flags struct {
-	ProjectPath     string
-	RpcOnly         bool
-	RolesOnly       bool
-	ModelsOnly      bool
-	StoragesOnly    bool
-	PoliciesOnly    bool
-	AllowedSchema   string
-	DebugMode       bool
-	TraceMode       bool
-	Generate        generate.Flags
-	UpdateStateOnly bool
-	DryRun          bool
+	ProjectPath        string
+	RpcOnly            bool
+	RolesOnly          bool
+	ModelsOnly         bool
+	StoragesOnly       bool
+	PoliciesOnly       bool
+	AllowedSchema      string
+	DebugMode          bool
+	TraceMode          bool
+	Generate           generate.Flags
+	GenerateController bool
+	ForceImport        bool
+	UpdateStateOnly    bool
+	DryRun             bool
 }
 
 // LoadAll is function to check is all resource need to import or apply

@@ -2,6 +2,7 @@ package query
 
 import (
 	"testing"
+	"time"
 
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
@@ -23,14 +24,14 @@ func TestBuildCreateRoleQuery(t *testing.T) {
 	query := BuildCreateRoleQuery(role)
 
 	// Check that the query contains expected parts
-	assert.Contains(t, query, "CREATE ROLE test_role")
+	assert.Contains(t, query, "CREATE ROLE \"test_role\"")
 	assert.Contains(t, query, "CREATEDB")
 	assert.Contains(t, query, "CREATEROLE")
 	assert.Contains(t, query, "BYPASSRLS")
 	assert.Contains(t, query, "LOGIN")
 	assert.Contains(t, query, "INHERIT")
 	assert.Contains(t, query, "CONNECTION LIMIT 5")
-	assert.Contains(t, query, "ALTER ROLE test_role SET search_path = public")
+	assert.Contains(t, query, "ALTER ROLE \"test_role\" SET \"search_path\" = 'public'")
 }
 
 func TestBuildCreateRoleQueryWithDifferentValues(t *testing.T) {
@@ -48,7 +49,7 @@ func TestBuildCreateRoleQueryWithDifferentValues(t *testing.T) {
 	query := BuildCreateRoleQuery(role)
 
 	// Check that the query contains expected parts for default (false) values
-	assert.Contains(t, query, "CREATE ROLE limited_role")
+	assert.Contains(t, query, "CREATE ROLE \"limited_role\"")
 	assert.Contains(t, query, "NOCREATEDB")
 	assert.Contains(t, query, "NOCREATEROLE")
 	assert.Contains(t, query, "NOBYPASSRLS")
@@ -93,15 +94,15 @@ func TestBuildUpdateRoleQuery(t *testing.T) {
 	query := BuildUpdateRoleQuery(newRole, updateParam)
 
 	// Check that the query contains expected update parts
-	assert.Contains(t, query, "ALTER ROLE original_role")
+	assert.Contains(t, query, "ALTER ROLE \"original_role\"")
 	assert.Contains(t, query, "CONNECTION LIMIT 10")
 	assert.Contains(t, query, "NOLOGIN") // since CanLogin is false
 	assert.Contains(t, query, "SUPERUSER")
 	assert.Contains(t, query, "NOINHERIT") // since InheritRole is false
 	assert.Contains(t, query, "BYPASSRLS")
-	assert.Contains(t, query, "NOCREATEDB")          // since CanCreateDB is false
-	assert.Contains(t, query, "CREATEROLE")          // since CanCreateRole is true
-	assert.Contains(t, query, "log_statement = all") // config part
+	assert.Contains(t, query, "NOCREATEDB")                // since CanCreateDB is false
+	assert.Contains(t, query, "CREATEROLE")                // since CanCreateRole is true
+	assert.Contains(t, query, "\"log_statement\" = 'all'") // config part
 }
 
 func TestBuildUpdateRoleQueryWithRename(t *testing.T) {
@@ -123,7 +124,25 @@ func TestBuildUpdateRoleQueryWithRename(t *testing.T) {
 	query := BuildUpdateRoleQuery(newRole, updateParam)
 
 	// Check that the query contains rename command
-	assert.Contains(t, query, "RENAME TO new_role_name")
+	assert.Contains(t, query, "RENAME TO \"new_role_name\"")
+}
+
+func TestBuildUpdateRoleQueryWithValidUntil(t *testing.T) {
+	future := time.Now().Add(24 * time.Hour)
+	newRole := objects.Role{
+		Name:       "original_role",
+		ValidUntil: objects.NewSupabaseTime(future),
+	}
+
+	updateParam := objects.UpdateRoleParam{
+		OldData: objects.Role{Name: "original_role"},
+		ChangeItems: []objects.UpdateRoleType{
+			objects.UpdateRoleValidUntil,
+		},
+	}
+
+	query := BuildUpdateRoleQuery(newRole, updateParam)
+	assert.Contains(t, query, "VALID UNTIL '")
 }
 
 func TestBuildDeleteRoleQuery(t *testing.T) {

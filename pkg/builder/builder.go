@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -45,12 +46,24 @@ func colNameFromPtr(model any, fieldPtr any) string {
 	}
 
 	mv := reflect.ValueOf(model)
-	if mv.Kind() != reflect.Ptr || mv.IsNil() {
-		panic("builder: model must be a non-nil pointer to struct")
+	switch mv.Kind() {
+	case reflect.Ptr:
+		if mv.IsNil() {
+			// create zero value for metadata purposes
+			mv = reflect.New(mv.Type().Elem())
+		}
+		mv = mv.Elem()
+	case reflect.Struct:
+		// make addressable copy so we can inspect metadata
+		addr := reflect.New(mv.Type())
+		addr.Elem().Set(mv)
+		mv = addr.Elem()
+	default:
+		panic(fmt.Sprintf("builder: model must be struct or pointer to struct (got %T)", model))
 	}
-	mv = mv.Elem()
+
 	if mv.Kind() != reflect.Struct {
-		panic("builder: model must point to a struct")
+		panic(fmt.Sprintf("builder: model must resolve to struct (got %T)", model))
 	}
 
 	fp := reflect.ValueOf(fieldPtr)
@@ -66,35 +79,49 @@ func colNameFromPtr(model any, fieldPtr any) string {
 			continue
 		}
 		if fv.Addr().Pointer() == target {
-			sf := mt.Field(i)
-
-			// 1) column tag: name:...
-			if col := parseColumnName(sf.Tag.Get("column")); col != "" {
-				return col
-			}
-			// 2) json tag
-			if col := tagPrimary(sf.Tag.Get("json")); col != "" {
-				return col
-			}
-			// 3) fallback: snake_case(FieldName)
-			return utils.ToSnakeCase(sf.Name)
+			return columnNameFromStructField(mt.Field(i))
 		}
 	}
 
+	// Fallback: attempt to resolve by matching field type
+	fieldType := fp.Type().Elem()
+	var candidates []reflect.StructField
+	for i := 0; i < mt.NumField(); i++ {
+		sf := mt.Field(i)
+		if sf.Type == fieldType {
+			candidates = append(candidates, sf)
+		}
+	}
+
+	if len(candidates) == 1 {
+		return columnNameFromStructField(candidates[0])
+	}
+
 	panic("builder: could not match fieldPtr to any addressable struct field")
+}
+
+func columnNameFromStructField(sf reflect.StructField) string {
+	if col := parseColumnName(sf.Tag.Get("column")); col != "" {
+		return col
+	}
+	if col := tagPrimary(sf.Tag.Get("json")); col != "" {
+		return col
+	}
+	return utils.ToSnakeCase(sf.Name)
 }
 
 func parseColumnName(colTag string) string {
 	if colTag == "" {
 		return ""
 	}
+
 	for _, p := range strings.Split(colTag, ";") {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			continue
 		}
-		if strings.HasPrefix(p, "name:") {
-			return strings.TrimSpace(strings.TrimPrefix(p, "name:"))
+		if after, ok := strings.CutPrefix(p, "name:"); ok {
+			return strings.TrimSpace(after)
 		}
 	}
 	return ""

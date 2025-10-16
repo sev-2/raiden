@@ -11,13 +11,28 @@ import (
 func BuildCreatePolicyQuery(policy objects.Policy) string {
 	name := fmt.Sprintf("%q", strings.ToLower(policy.Name))
 
+	action := strings.ToUpper(policy.Action)
+	if action == "" {
+		action = "PERMISSIVE"
+	}
+	command := strings.ToUpper(string(policy.Command))
+	if command == "" {
+		command = string(objects.PolicyCommandAll)
+	}
+	schemaIdent := pq.QuoteIdentifier(policy.Schema)
+	tableIdent := pq.QuoteIdentifier(policy.Table)
+	tableFQN := fmt.Sprintf("%s.%s", schemaIdent, tableIdent)
+	tableFQNText := fmt.Sprintf("%s.%s", policy.Schema, policy.Table)
+
 	definitionClause := ""
-	if policy.Definition != "" {
+	if command != string(objects.PolicyCommandInsert) && policy.Definition != "" {
 		definitionClause = "USING (" + policy.Definition + ")"
 	}
 	checkClause := ""
 	if policy.Check != nil && *policy.Check != "" {
 		checkClause = "WITH CHECK (" + *policy.Check + ")"
+	} else if command == string(objects.PolicyCommandInsert) {
+		checkClause = "WITH CHECK (true)"
 	}
 
 	roleList := ""
@@ -29,10 +44,14 @@ func BuildCreatePolicyQuery(policy objects.Policy) string {
 		roleList += pq.QuoteIdentifier(role)
 
 		grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
-			IF NOT HAS_TABLE_PRIVILEGE('%s', '%s.%s', '%s') THEN
-				GRANT %s ON %s.%s TO %s;
+			IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
+				GRANT %s ON %s TO %s;
 			END IF;
-		`, role, policy.Schema, policy.Table, policy.Command, policy.Command, policy.Schema, policy.Table, role))
+		`, role, tableFQNText, command, command, tableFQN, pq.QuoteIdentifier(role)))
+	}
+
+	if roleList == "" {
+		roleList = "PUBLIC"
 	}
 
 	createQuery := fmt.Sprintf(`
@@ -41,22 +60,31 @@ func BuildCreatePolicyQuery(policy objects.Policy) string {
 	FOR %s
 	TO %s
 	%s %s;
-	`, name, policy.Schema, policy.Table, policy.Action, policy.Command, roleList, definitionClause, checkClause)
+	`, name, schemaIdent, tableIdent, action, command, roleList, definitionClause, checkClause)
 
-	grantAccessQuery := ""
-	grantAccessQuery = fmt.Sprintf(`
+	grantStatements := strings.Join(grantAccessTables, "\n")
+
+	grantAccessQuery := fmt.Sprintf(`
 		DO $$
 		BEGIN
 			%s
 			%s
 		END $$;
-	`, createQuery, strings.Join(grantAccessTables, "\n"))
+	`, createQuery, grantStatements)
 
 	return grantAccessQuery
 }
 
 func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.UpdatePolicyParam) string {
-	alter := fmt.Sprintf("ALTER POLICY %q ON %s.%s", updatePolicyParams.Name, policy.Schema, policy.Table)
+	schemaIdent := pq.QuoteIdentifier(policy.Schema)
+	tableIdent := pq.QuoteIdentifier(policy.Table)
+	tableFQN := fmt.Sprintf("%s.%s", schemaIdent, tableIdent)
+	tableFQNText := fmt.Sprintf("%s.%s", policy.Schema, policy.Table)
+	command := strings.ToUpper(string(policy.Command))
+	if command == "" {
+		command = string(objects.PolicyCommandAll)
+	}
+	alter := fmt.Sprintf("ALTER POLICY %q ON %s.%s", updatePolicyParams.Name, schemaIdent, tableIdent)
 	grantAccessTables := []string{}
 
 	var nameSql, definitionSql, checkSql, rolesSql string
@@ -73,20 +101,26 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 			}
 			checkSql = fmt.Sprintf("%s WITH CHECK (%s);", alter, *policy.Check)
 		case objects.UpdatePolicyDefinition:
-			if policy.Definition != "" {
+			if command != string(objects.PolicyCommandInsert) && policy.Definition != "" {
 				definitionSql = fmt.Sprintf("%s USING (%s);", alter, policy.Definition)
 			}
 		case objects.UpdatePolicyRoles:
 			if len(policy.Roles) > 0 {
-				rolesSql = fmt.Sprintf("%s TO %s;", alter, strings.Join(policy.Roles, ","))
+				quotedRoles := make([]string, 0, len(policy.Roles))
+				for _, role := range policy.Roles {
+					quotedRoles = append(quotedRoles, pq.QuoteIdentifier(role))
+				}
+				rolesSql = fmt.Sprintf("%s TO %s;", alter, strings.Join(quotedRoles, ", "))
+			} else {
+				rolesSql = fmt.Sprintf("%s TO PUBLIC;", alter)
 			}
 
 			for _, role := range policy.Roles {
 				grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
-					IF NOT HAS_TABLE_PRIVILEGE('%s', '%s.%s', '%s') THEN
-						GRANT %s ON %s.%s TO %s;
-					END IF;
-				`, role, policy.Schema, policy.Table, policy.Command, policy.Command, policy.Schema, policy.Table, role))
+				IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
+					GRANT %s ON %s TO %s;
+				END IF;
+			`, role, tableFQNText, command, command, tableFQN, pq.QuoteIdentifier(role)))
 			}
 		}
 	}

@@ -22,13 +22,15 @@ var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 var buildDir = "build"
 
 type Flags struct {
-	RpcOnly       bool
-	RolesOnly     bool
-	ModelsOnly    bool
-	StoragesOnly  bool
-	PolicyOnly    bool
-	AllowedSchema string
-	DryRun        bool
+	RpcOnly            bool
+	RolesOnly          bool
+	ModelsOnly         bool
+	StoragesOnly       bool
+	PolicyOnly         bool
+	AllowedSchema      string
+	GenerateController bool
+	ForceImport        bool
+	DryRun             bool
 }
 
 func (f *Flags) Bind(cmd *cobra.Command) {
@@ -38,6 +40,8 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.PolicyOnly, "policy-only", "", false, "import policy only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storage only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
+	cmd.Flags().BoolVar(&f.GenerateController, "generate-controller", false, "generate rest controllers for imported tables")
+	cmd.Flags().BoolVar(&f.ForceImport, "force", false, "skip diff checks and overwrite local resource state")
 	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run import in simulate mode without actual import resource as code")
 
 }
@@ -129,6 +133,14 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 
 	if flags.AllowedSchema != "" {
 		args = append(args, "--schema", flags.AllowedSchema)
+	}
+
+	if flags.GenerateController {
+		args = append(args, "--generate-controller")
+	}
+
+	if flags.ForceImport {
+		args = append(args, "--force")
 	}
 
 	if flags.DryRun {

@@ -26,6 +26,7 @@ type Flags struct {
 	RolesOnly     bool
 	ModelsOnly    bool
 	StoragesOnly  bool
+	PoliciesOnly  bool
 	AllowedSchema string
 	DryRun        bool
 }
@@ -35,12 +36,13 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storage only")
+	cmd.Flags().BoolVar(&f.PoliciesOnly, "policies-only", false, "apply policies only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
 	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run apply in simulate mode without actual running apply change")
 }
 
 func (f *Flags) LoadAll() bool {
-	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly
+	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.StoragesOnly && !f.PoliciesOnly
 }
 
 func PreRun(projectPath string) error {
@@ -71,6 +73,10 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 		if flags.StoragesOnly {
 			generatedResources = append(generatedResources, "storages")
 		}
+
+		if flags.PoliciesOnly {
+			generatedResources = append(generatedResources, "policies")
+		}
 	}
 
 	ApplyLogger.Info("prepare apply", "resource", strings.Join(generatedResources, ","))
@@ -80,7 +86,7 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 	mainFilePath := filepath.Join(projectPath, mainFile)
 
 	// set output
-	output := GetBuildFilePath(projectPath, runtime.GOOS, "import")
+	output := GetBuildFilePath(projectPath, runtime.GOOS, "apply")
 
 	if utils.IsFileExists(output) {
 		if err := utils.DeleteFile(output); err != nil {
@@ -115,6 +121,10 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 
 	if flags.StoragesOnly {
 		args = append(args, "--storages-only")
+	}
+
+	if flags.PoliciesOnly {
+		args = append(args, "--policies-only")
 	}
 
 	if flags.AllowedSchema != "" {

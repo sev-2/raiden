@@ -1,6 +1,7 @@
 package meta
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/sev-2/raiden"
@@ -10,8 +11,15 @@ import (
 
 func UpdateUserData(cfg *raiden.Config, userId string, t objects.User) error {
 	MetaLogger.Trace("start update user data", "id", userId)
-	updateSql := query.UpdateUserData(userId, t)
-	_, err := ExecuteQuery[any](getBaseUrl(cfg), updateSql, nil, DefaultInterceptor(cfg), nil)
+	updateSql, err := query.UpdateUserData(userId, t)
+	if err != nil {
+		if errors.Is(err, query.ErrNoUserFieldsToUpdate) {
+			MetaLogger.Trace("skip update user data, no fields to update", "id", userId)
+			return nil
+		}
+		return err
+	}
+	_, err = ExecuteQuery[any](getBaseUrl(cfg), updateSql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update user data with id '%s' error : %s", userId, err)
 	}

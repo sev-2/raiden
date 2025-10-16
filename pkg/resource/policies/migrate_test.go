@@ -58,6 +58,26 @@ func TestBuildMigrateItem(t *testing.T) {
 	assert.Equal(t, "Policy1", migrateData[0].NewData.Name)
 }
 
+func TestBuildMigrateData_DuplicateNameDifferentSchema(t *testing.T) {
+	extractedLocalData := state.ExtractPolicyResult{
+		Existing: []objects.Policy{
+			{Name: "Shared", Schema: "public", Table: "table_a", Roles: []string{"role1"}},
+		},
+	}
+
+	supabaseData := []objects.Policy{
+		{Name: "Shared", Schema: "admin", Table: "table_b", Roles: []string{"role2"}},
+		{Name: "Shared", Schema: "public", Table: "table_a", Roles: []string{"role1"}},
+	}
+
+	migrateData, err := policies.BuildMigrateData(extractedLocalData, supabaseData)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(migrateData))
+	assert.Equal(t, migrator.MigrateTypeIgnore, migrateData[0].Type)
+	assert.Equal(t, "public", migrateData[0].NewData.Schema)
+	assert.Equal(t, "table_a", migrateData[0].NewData.Table)
+}
+
 func TestMigrate(t *testing.T) {
 	config := &raiden.Config{}
 	stateChan := make(chan any)

@@ -1,9 +1,11 @@
 package policies
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 func Compare(sourcePolicies, targetPolicies []objects.Policy) error {
@@ -77,12 +79,28 @@ func CompareItem(source, target objects.Policy) (diffResult CompareDiffResult) {
 		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdatePolicyCommand)
 	}
 
-	if source.Definition != target.Definition {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdatePolicyDefinition)
+	if shouldCompareDefinition(source.Command, target.Command) {
+		qualifiers := []utils.ExpressionQualifier{
+			{Schema: source.Schema, Table: source.Table},
+			{Schema: target.Schema, Table: target.Table},
+		}
+		sourceDefinition := utils.NormalizeExpression(source.Definition, qualifiers...)
+		targetDefinition := utils.NormalizeExpression(target.Definition, qualifiers...)
+		if sourceDefinition != targetDefinition {
+			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdatePolicyDefinition)
+		}
 	}
 
-	if (source.Check == nil && target.Check != nil) || (source.Check != nil && target.Check == nil) || (source.Check != nil && target.Check != nil && *source.Check != *target.Check) {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdatePolicyCheck)
+	if shouldCompareCheck(source.Command, target.Command) {
+		qualifiers := []utils.ExpressionQualifier{
+			{Schema: source.Schema, Table: source.Table},
+			{Schema: target.Schema, Table: target.Table},
+		}
+		sourceCheck, hasSource := utils.NormalizeOptionalExpression(source.Check, qualifiers...)
+		targetCheck, hasTarget := utils.NormalizeOptionalExpression(target.Check, qualifiers...)
+		if hasSource != hasTarget || (hasSource && sourceCheck != targetCheck) {
+			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdatePolicyCheck)
+		}
 	}
 
 	if !stringsEqualUnordered(source.Roles, target.Roles) {
@@ -92,6 +110,36 @@ func CompareItem(source, target objects.Policy) (diffResult CompareDiffResult) {
 	diffResult.IsConflict = len(updateItem.ChangeItems) > 0
 	diffResult.DiffItems = updateItem
 	return
+}
+
+func shouldCompareDefinition(sourceCmd, targetCmd objects.PolicyCommand) bool {
+	return commandUsesDefinition(sourceCmd) || commandUsesDefinition(targetCmd)
+}
+
+func shouldCompareCheck(sourceCmd, targetCmd objects.PolicyCommand) bool {
+	return commandUsesCheck(sourceCmd) || commandUsesCheck(targetCmd)
+}
+
+func commandUsesDefinition(cmd objects.PolicyCommand) bool {
+	switch normalizePolicyCommand(cmd) {
+	case string(objects.PolicyCommandInsert):
+		return false
+	default:
+		return true
+	}
+}
+
+func commandUsesCheck(cmd objects.PolicyCommand) bool {
+	switch normalizePolicyCommand(cmd) {
+	case string(objects.PolicyCommandSelect), string(objects.PolicyCommandDelete):
+		return false
+	default:
+		return true
+	}
+}
+
+func normalizePolicyCommand(cmd objects.PolicyCommand) string {
+	return strings.ToUpper(strings.TrimSpace(string(cmd)))
 }
 
 func stringsEqualUnordered(a, b []string) bool {
@@ -114,4 +162,14 @@ func stringsEqualUnordered(a, b []string) bool {
 		}
 	}
 	return len(seen) == 0
+}
+
+func policyKey(p objects.Policy) string {
+	sch := strings.ToLower(p.Schema)
+	table := strings.ToLower(p.Table)
+	name := strings.ToLower(p.Name)
+	if sch == "" && table == "" {
+		return name
+	}
+	return fmt.Sprintf("%s.%s.%s", sch, table, name)
 }

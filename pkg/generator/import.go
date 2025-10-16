@@ -57,6 +57,7 @@ func main() {
 			// register app resource
 			bootstrap.RegisterModels()
 			bootstrap.RegisterTypes()
+			bootstrap.RegisterPolicies()
 			{{if eq .Mode "bff"}}
 			bootstrap.RegisterRpc()
 			bootstrap.RegisterRoles()
@@ -89,6 +90,8 @@ func main() {
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storages only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
+	cmd.Flags().BoolVar(&f.GenerateController, "generate-controller", false, "generate rest controllers for imported tables")
+	cmd.Flags().BoolVar(&f.ForceImport, "force", false, "skip diff checks and overwrite local resource state")
 	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run import in simulate mode without actual import resource as code")
 
 	f.Generate.Bind(cmd)

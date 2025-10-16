@@ -108,7 +108,7 @@ func TestCompareItem(t *testing.T) {
 		Schema:     "public",
 		Table:      "table1",
 		Action:     "PERMISSIVE",
-		Command:    objects.PolicyCommandSelect,
+		Command:    objects.PolicyCommandUpdate,
 		Definition: "def1",
 		Check:      &check1,
 		Roles:      []string{"role1", "role2"},
@@ -119,7 +119,7 @@ func TestCompareItem(t *testing.T) {
 		Schema:     "public",
 		Table:      "table1",
 		Action:     "PERMISSIVE",
-		Command:    objects.PolicyCommandSelect,
+		Command:    objects.PolicyCommandUpdate,
 		Definition: "def1",
 		Check:      &check1,
 		Roles:      []string{"role1", "role2"},
@@ -152,4 +152,126 @@ func TestCompareItem(t *testing.T) {
 	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyTable)
 	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyAction)
 	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyCommand)
+}
+
+func TestCompareItem_SkipDefinitionAndCheckByCommand(t *testing.T) {
+	checkValue := "allowed"
+	insertSource := objects.Policy{
+		Name:       "InsertOnly",
+		Schema:     "public",
+		Table:      "table_insert",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandInsert,
+		Definition: "def_should_be_ignored",
+		Check:      &checkValue,
+		Roles:      []string{"role1"},
+	}
+
+	insertTarget := insertSource
+	insertTarget.Definition = "updated_definition"
+
+	diffInsert := policies.CompareItem(insertSource, insertTarget)
+	assert.False(t, diffInsert.IsConflict)
+	assert.NotContains(t, diffInsert.DiffItems.ChangeItems, objects.UpdatePolicyDefinition)
+
+	selectSource := objects.Policy{
+		Name:       "SelectOnly",
+		Schema:     "public",
+		Table:      "table_select",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandSelect,
+		Definition: "definition_in_use",
+		Check:      &checkValue,
+		Roles:      []string{"role1"},
+	}
+
+	diffCheckValue := "should_be_ignored"
+	selectTarget := selectSource
+	selectTarget.Check = &diffCheckValue
+
+	diffSelect := policies.CompareItem(selectSource, selectTarget)
+	assert.False(t, diffSelect.IsConflict)
+	assert.NotContains(t, diffSelect.DiffItems.ChangeItems, objects.UpdatePolicyCheck)
+}
+
+func TestCompareItem_NormalizesPolicyClauses(t *testing.T) {
+	localCheck := `"name" = 'course'`
+	remoteCheck := `((name) = 'course')`
+
+	localDefinition := `(auth.uid = owner_id)`
+	remoteDefinition := `((auth.uid) = owner_id)`
+
+	source := objects.Policy{
+		Name:       "PolicyNormalized",
+		Schema:     "public",
+		Table:      "table_normalized",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandUpdate,
+		Definition: localDefinition,
+		Check:      &localCheck,
+	}
+
+	target := source
+	target.Definition = remoteDefinition
+	target.Check = &remoteCheck
+
+	diff := policies.CompareItem(source, target)
+	assert.False(t, diff.IsConflict)
+	assert.NotContains(t, diff.DiffItems.ChangeItems, objects.UpdatePolicyDefinition)
+	assert.NotContains(t, diff.DiffItems.ChangeItems, objects.UpdatePolicyCheck)
+
+	castDefinition := `((("public"."table_normalized"."owner_id")::text) = (auth.uid)::text)`
+	castCheck := `((("public"."table_normalized"."name")::text) = 'course'::text)`
+
+	target.Definition = castDefinition
+	target.Check = &castCheck
+
+	diffWithCasts := policies.CompareItem(source, target)
+	assert.False(t, diffWithCasts.IsConflict)
+	assert.Empty(t, diffWithCasts.DiffItems.ChangeItems)
+}
+
+func TestCompareList_DuplicateNameDifferentSchema(t *testing.T) {
+	check := "check"
+	sourcePolicies := []objects.Policy{
+		{
+			Name:       "Shared",
+			Schema:     "public",
+			Table:      "table_a",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "def",
+			Check:      &check,
+			Roles:      []string{"role1"},
+		},
+	}
+
+	targetPolicies := []objects.Policy{
+		{
+			Name:       "Shared",
+			Schema:     "admin",
+			Table:      "table_b",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "def",
+			Check:      &check,
+			Roles:      []string{"role1"},
+		},
+		{
+			Name:       "Shared",
+			Schema:     "public",
+			Table:      "table_a",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "def",
+			Check:      &check,
+			Roles:      []string{"role1"},
+		},
+	}
+
+	diffResult := policies.CompareList(sourcePolicies, targetPolicies)
+	assert.Equal(t, 1, len(diffResult))
+	assert.Equal(t, "public", diffResult[0].TargetResource.Schema)
+	assert.Equal(t, "table_a", diffResult[0].TargetResource.Table)
+	assert.False(t, diffResult[0].IsConflict)
 }

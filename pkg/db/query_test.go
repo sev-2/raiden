@@ -55,7 +55,7 @@ func TestQuery_GetQueryURI(t *testing.T) {
 		ModelBase
 		ID   int64  `json:"id" column:"name:id;type:bigint;primaryKey"`
 		Name string `json:"name" column:"name:name;type:text"`
-		
+
 		Metadata string `json:"-" schema:"public" tableName:"mock_models"`
 	}
 
@@ -82,7 +82,7 @@ func TestNewQueryChainability(t *testing.T) {
 		ModelBase
 		ID   int64  `json:"id" column:"name:id;type:bigint;primaryKey"`
 		Name string `json:"name" column:"name:name;type:text"`
-		
+
 		Metadata string `json:"-" schema:"public" tableName:"mock_models"`
 	}
 

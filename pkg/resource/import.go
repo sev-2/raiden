@@ -98,8 +98,28 @@ func Import(flags *Flags, config *raiden.Config) error {
 	dryRunError := []string{}
 	mapModelValidationTags := make(map[string]state.ModelValidationTag)
 
+	if flags.ForceImport {
+		ImportLogger.Warn("force import enabled: skipping diff checks and overwriting local state")
+	}
+
+	if flags.All() || flags.ModelsOnly {
+		for i := range appTables.New {
+			nt := appTables.New[i]
+			if nt.ValidationTags != nil {
+				mapModelValidationTags[nt.Table.Name] = nt.ValidationTags
+			}
+		}
+
+		for i := range appTables.Existing {
+			et := appTables.Existing[i]
+			if et.ValidationTags != nil {
+				mapModelValidationTags[et.Table.Name] = et.ValidationTags
+			}
+		}
+	}
+
 	// compare resource
-	if (flags.All() || flags.ModelsOnly) && len(appType.Existing) > 0 {
+	if !flags.ForceImport && (flags.All() || flags.ModelsOnly) && len(appType.Existing) > 0 {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare types")
 		}
@@ -115,28 +135,20 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
-	ImportLogger.Info("compare supabase resource and local resource")
-	if (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
+	if flags.ForceImport {
+		ImportLogger.Info("skip diff comparison and overwrite local state")
+	} else {
+		ImportLogger.Info("compare supabase resource and local resource")
+	}
+	if !flags.ForceImport && (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare table")
 		}
 
-		for i := range appTables.New {
-			nt := appTables.New[i]
-			if nt.ValidationTags != nil {
-				mapModelValidationTags[nt.Table.Name] = nt.ValidationTags
-			}
-		}
-
-		// compare table
-		var compareTables []objects.Table
+		compareTables := make([]objects.Table, 0, len(appTables.Existing))
 		for i := range appTables.Existing {
 			et := appTables.Existing[i]
 			compareTables = append(compareTables, et.Table)
-
-			if et.ValidationTags != nil {
-				mapModelValidationTags[et.Table.Name] = et.ValidationTags
-			}
 		}
 
 		if err := tables.Compare(tables.CompareModeImport, spResource.Tables, compareTables); err != nil {
@@ -151,7 +163,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
-	if (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
+	if !flags.ForceImport && (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare role")
 		}
@@ -167,7 +179,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
-	if (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
+	if !flags.ForceImport && (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare rpc")
 		}
@@ -183,7 +195,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
-	if (flags.All() || flags.StoragesOnly) && len(appStorage.Existing) > 0 {
+	if !flags.ForceImport && (flags.All() || flags.StoragesOnly) && len(appStorage.Existing) > 0 {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare storage")
 		}
@@ -207,7 +219,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
-	if (flags.All() || flags.PoliciesOnly) && len(appPolicies.Existing) > 0 {
+	if !flags.ForceImport && (flags.All() || flags.PoliciesOnly) && len(appPolicies.Existing) > 0 {
 		if !flags.DryRun {
 			ImportLogger.Debug("start compare policies")
 		}
@@ -238,14 +250,13 @@ func Import(flags *Flags, config *raiden.Config) error {
 			return updateStateOnly(&importState, spResource, mapModelValidationTags)
 		} else {
 			// generate resource
-			if err := generateImportResource(config, &importState, flags.ProjectPath, spResource, mapModelValidationTags); err != nil {
+			if err := generateImportResource(config, &importState, flags.ProjectPath, spResource, mapModelValidationTags, flags.GenerateController); err != nil {
 				return err
 			}
 			PrintImportReport(importReport, false)
 		}
 
 	} else {
-
 		if len(dryRunError) > 0 {
 			errMessage := strings.Join(dryRunError, "\n")
 			ImportLogger.Error("got error", "err-msg", errMessage)
@@ -258,7 +269,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 }
 
 // ----- Generate import data -----
-func generateImportResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *Resource, mapModelValidationTags map[string]state.ModelValidationTag) error {
+func generateImportResource(config *raiden.Config, importState *state.LocalState, projectPath string, resource *Resource, mapModelValidationTags map[string]state.ModelValidationTag, generateController bool) error {
 	if err := generator.CreateInternalFolder(projectPath); err != nil {
 		return err
 	}
@@ -309,7 +320,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 				errChan <- err
 			}
 
-			if config.Mode == raiden.BffMode {
+			if generateController && config.Mode == raiden.BffMode {
 				if err := generator.GenerateRestControllers(projectPath, config.ProjectName, tableInputs, generator.Generate); err != nil {
 					errChan <- err
 				}

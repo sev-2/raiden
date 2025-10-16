@@ -145,7 +145,7 @@ func (p PolicyBase) Name() string {
 func (p PolicyBase) Model() any {
 	return nil
 }
-func (p PolicyBase) Storage() any {
+func (p PolicyBase) Storage() Bucket {
 	return nil
 }
 func (p PolicyBase) Roles() []Role {
@@ -174,10 +174,6 @@ func BuildPolicy(p Policy) (*objects.Policy, error) {
 		return nil, errors.New("policy must define resouce, implement Model() or Storage() function")
 	}
 
-	if err := utils.EmptyOrError(p.Model(), "model required to set"); err != nil {
-		return nil, err
-	}
-
 	if err := utils.EmptyOrError(p.Command(), "command is rquired to set"); err != nil {
 		return nil, err
 	}
@@ -188,7 +184,7 @@ func BuildPolicy(p Policy) (*objects.Policy, error) {
 	if p.Model() != nil {
 		schema, table = builder.TableFromModel(p.Model())
 		schema = utils.EmptyOrDefault(schema, DefaultPolicySchema)
-		if err := utils.EmptyOrError(p.Model(), "invalid model, table is not recognize"); err != nil {
+		if err := utils.EmptyOrError(table, "invalid model, table is not recognize"); err != nil {
 			return nil, err
 		}
 	}

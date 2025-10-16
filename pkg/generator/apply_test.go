@@ -29,5 +29,10 @@ func TestGenerateApplyMainFunction(t *testing.T) {
 
 	err1 := generator.GenerateApplyMainFunction(dir, conf, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err1)
-	assert.FileExists(t, dir+"/cmd/apply/main.go")
+	applyFile := dir + "/cmd/apply/main.go"
+	assert.FileExists(t, applyFile)
+
+	content, readErr := os.ReadFile(applyFile)
+	assert.NoError(t, readErr)
+	assert.Contains(t, string(content), "policies-only")
 }

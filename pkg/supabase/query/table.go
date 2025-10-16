@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/lib/pq"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/supabase/query/sql"
@@ -16,15 +17,17 @@ func BuildCreateTableQuery(newTable objects.Table) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	schemaIdent := pq.QuoteIdentifier(newTable.Schema)
+	tableIdent := pq.QuoteIdentifier(newTable.Name)
 
 	var rlsEnableQuery string
 	if newTable.RLSEnabled {
-		rlsEnableQuery = fmt.Sprintf("ALTER TABLE %s.%s ENABLE ROW LEVEL SECURITY;", newTable.Schema, newTable.Name)
+		rlsEnableQuery = fmt.Sprintf("ALTER TABLE %s.%s ENABLE ROW LEVEL SECURITY;", schemaIdent, tableIdent)
 	}
 
 	var rlsForcedQuery string
 	if newTable.RLSForced {
-		rlsForcedQuery = fmt.Sprintf("ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;", newTable.Schema, newTable.Name)
+		rlsForcedQuery = fmt.Sprintf("ALTER TABLE %s.%s FORCE ROW LEVEL SECURITY;", schemaIdent, tableIdent)
 	}
 
 	sql := fmt.Sprintf(`
@@ -39,14 +42,14 @@ func BuildCreateTableQuery(newTable objects.Table) (string, error) {
 
 func BuildUpdateTableQuery(newTable objects.Table, updateItem objects.UpdateTableParam) string {
 	var enableRlsQuery, forceRlsQuery, primaryKeysQuery, replicaIdentityQuery, schemaQuery, nameQuery string
-	alter := fmt.Sprintf("ALTER TABLE %s.%s", updateItem.OldData.Schema, updateItem.OldData.Name)
+	alter := fmt.Sprintf("ALTER TABLE %s.%s", pq.QuoteIdentifier(updateItem.OldData.Schema), pq.QuoteIdentifier(updateItem.OldData.Name))
 	for _, uType := range updateItem.ChangeItems {
 		switch uType {
 		case objects.UpdateTableSchema:
-			schemaQuery = fmt.Sprintf("%s SET SCHEMA %s;", alter, newTable.Schema)
+			schemaQuery = fmt.Sprintf("%s SET SCHEMA %s;", alter, pq.QuoteIdentifier(newTable.Schema))
 		case objects.UpdateTableName:
 			if newTable.Name != "" {
-				nameQuery = fmt.Sprintf("%s RENAME TO %s;", alter, newTable.Name)
+				nameQuery = fmt.Sprintf("%s RENAME TO %s;", alter, pq.QuoteIdentifier(newTable.Name))
 			}
 		case objects.UpdateTableRlsEnable:
 			if newTable.RLSEnabled {
@@ -56,9 +59,9 @@ func BuildUpdateTableQuery(newTable objects.Table, updateItem objects.UpdateTabl
 			}
 		case objects.UpdateTableRlsForced:
 			if newTable.RLSForced {
-				enableRlsQuery = fmt.Sprintf("%s FORCE ROW LEVEL SECURITY;", alter)
+				forceRlsQuery = fmt.Sprintf("%s FORCE ROW LEVEL SECURITY;", alter)
 			} else {
-				enableRlsQuery = fmt.Sprintf("%s NO FORCE ROW LEVEL SECURITY;", alter)
+				forceRlsQuery = fmt.Sprintf("%s NO FORCE ROW LEVEL SECURITY;", alter)
 			}
 		case objects.UpdateTableReplicaIdentity:
 			// TODO : implement if needed
@@ -82,10 +85,9 @@ func BuildUpdateTableQuery(newTable objects.Table, updateItem objects.UpdateTabl
 			if len(newTable.PrimaryKeys) > 0 {
 				var pkArr []string
 				for _, v := range newTable.PrimaryKeys {
-					pkArr = append(pkArr, v.Name)
-					primaryKeysQuery += fmt.Sprintf("%s ADD PRIMARY KEY (%s);", alter, strings.Join(pkArr, ","))
+					pkArr = append(pkArr, pq.QuoteIdentifier(v.Name))
 				}
-
+				primaryKeysQuery += fmt.Sprintf("%s ADD PRIMARY KEY (%s);", alter, strings.Join(pkArr, ", "))
 			}
 		}
 	}
@@ -105,7 +107,9 @@ func BuildUpdateTableQuery(newTable objects.Table, updateItem objects.UpdateTabl
 }
 
 func BuildDeleteTableQuery(table objects.Table, cascade bool) string {
-	sql := fmt.Sprintf("DROP TABLE %s.%s", table.Schema, table.Name)
+	schemaIdent := pq.QuoteIdentifier(table.Schema)
+	tableIdent := pq.QuoteIdentifier(table.Name)
+	sql := fmt.Sprintf("DROP TABLE %s.%s", schemaIdent, tableIdent)
 	if cascade {
 		sql += " CASCADE"
 	} else {
@@ -116,6 +120,8 @@ func BuildDeleteTableQuery(table objects.Table, cascade bool) string {
 }
 
 func buildCreateTableQuery(schema string, table objects.Table) (q string, err error) {
+	schemaIdent := pq.QuoteIdentifier(schema)
+	tableIdent := pq.QuoteIdentifier(table.Name)
 	var tableContains []string
 
 	// add column definition
@@ -131,14 +137,14 @@ func buildCreateTableQuery(schema string, table objects.Table) (q string, err er
 	// append primary key
 	var primaryKeys []string
 	for _, pk := range table.PrimaryKeys {
-		primaryKeys = append(primaryKeys, pk.Name)
+		primaryKeys = append(primaryKeys, pq.QuoteIdentifier(pk.Name))
 	}
 
 	if len(primaryKeys) > 0 {
 		tableContains = append(tableContains, fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ",")))
 	}
 
-	q = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s (%s);", schema, table.Name, strings.Join(tableContains, ","))
+	q = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s (%s);", schemaIdent, tableIdent, strings.Join(tableContains, ","))
 	return
 }
 
@@ -149,44 +155,37 @@ func BuildCreateColumnQuery(column objects.Column, isPrimary bool) (q string, er
 		return q, err
 	}
 
-	isPrimaryKeyClause := ""
+	schemaIdent := pq.QuoteIdentifier(column.Schema)
+	tableIdent := pq.QuoteIdentifier(column.Table)
+	statement := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN %s", schemaIdent, tableIdent, colDef)
 	if isPrimary {
-		isPrimaryKeyClause = "PRIMARY KEY"
+		statement += " PRIMARY KEY"
 	}
+	statement += ";"
 
-	// TODO : implement check setup
-	// checkSql := ""
-	// if column.Check != nil {
-	// 	checkSql = fmt.Sprintf("CHECK (%s)", *column.Check)
-	// }
-
-	// TODO : implement comment setup
-	// commentSql := ""
-	// if column.Comment != nil {
-	// 	commentSql = fmt.Sprintf("COMMENT ON COLUMN %s.%s.%s IS %s", ident(schema), ident(table.Name), ident(name), literal(*column.Comment))
-	// }
-
-	q = fmt.Sprintf(`
-	BEGIN;
-	  ALTER TABLE %s.%s ADD COLUMN %s %s;
-	COMMIT;`, column.Schema, column.Table, colDef, isPrimaryKeyClause)
+	q = fmt.Sprintf("BEGIN; %s COMMIT;", statement)
 	return
 }
 
 func BuildUpdateColumnQuery(oldColumn, newColumn objects.Column, updateItem objects.UpdateColumnItem) (q string) {
 	// Prepare SQL statements
 	var sqlStatements []string
-	var alter = fmt.Sprintf("ALTER TABLE %s.%s", newColumn.Schema, newColumn.Table)
+	schemaIdent := pq.QuoteIdentifier(newColumn.Schema)
+	tableIdent := pq.QuoteIdentifier(newColumn.Table)
+	var alter = fmt.Sprintf("ALTER TABLE %s.%s", schemaIdent, tableIdent)
+	currentColumnIdent := pq.QuoteIdentifier(oldColumn.Name)
 	for _, uType := range updateItem.UpdateItems {
 		switch uType {
 		case objects.UpdateColumnName:
 			if newColumn.Name != "" {
+				newColumnIdent := pq.QuoteIdentifier(newColumn.Name)
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"%s RENAME COLUMN %s TO %s;", alter, newColumn.Name, newColumn.Name,
+						"%s RENAME COLUMN %s TO %s;", alter, currentColumnIdent, newColumnIdent,
 					),
 				)
+				currentColumnIdent = newColumnIdent
 			}
 		case objects.UpdateColumnDataType:
 			dataType := newColumn.DataType
@@ -198,21 +197,22 @@ func BuildUpdateColumnQuery(oldColumn, newColumn objects.Column, updateItem obje
 			sqlStatements = append(
 				sqlStatements,
 				fmt.Sprintf(
-					"%s ALTER COLUMN %s SET DATA TYPE %s USING %s::%s;", alter, oldColumn.Name, dataType, oldColumn.Name, dataType,
+					"%s ALTER COLUMN %s SET DATA TYPE %s USING %s::%s;", alter, currentColumnIdent, dataType, currentColumnIdent, dataType,
 				),
 			)
 		case objects.UpdateColumnUnique:
+			constraintIdent := pq.QuoteIdentifier(fmt.Sprintf("%s_%s_unique", newColumn.Table, newColumn.Name))
 			if newColumn.IsUnique {
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"%s ADD CONSTRAINT %s UNIQUE (%s);", alter, fmt.Sprintf("%s_%s_unique", newColumn.Table, newColumn.Name), newColumn.Name),
+						"%s ADD CONSTRAINT %s UNIQUE (%s);", alter, constraintIdent, pq.QuoteIdentifier(newColumn.Name)),
 				)
 			} else {
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"%s DROP CONSTRAINT %s;", alter, fmt.Sprintf("%s_%s_unique", newColumn.Table, newColumn.Name),
+						"%s DROP CONSTRAINT %s;", alter, constraintIdent,
 					),
 				)
 			}
@@ -221,14 +221,14 @@ func BuildUpdateColumnQuery(oldColumn, newColumn objects.Column, updateItem obje
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"%s ALTER COLUMN %s DROP NOT NULL;", alter, newColumn.Name,
+						"%s ALTER COLUMN %s DROP NOT NULL;", alter, currentColumnIdent,
 					),
 				)
 			} else {
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"%s ALTER COLUMN %s SET NOT NULL;", alter, newColumn.Name,
+						"%s ALTER COLUMN %s SET NOT NULL;", alter, currentColumnIdent,
 					),
 				)
 			}
@@ -254,7 +254,7 @@ func BuildUpdateColumnQuery(oldColumn, newColumn objects.Column, updateItem obje
 				}
 			}
 
-			defaultValue := fmt.Sprintf("'%v'", value)
+			defaultValue := pq.QuoteLiteral(value)
 			if _, e := strconv.ParseInt(value, 10, 64); e == nil {
 				defaultValue = value
 			} else if _, e := strconv.ParseUint(value, 10, 64); e == nil {
@@ -270,7 +270,7 @@ func BuildUpdateColumnQuery(oldColumn, newColumn objects.Column, updateItem obje
 			sqlStatements = append(
 				sqlStatements,
 				fmt.Sprintf(
-					"%s ALTER COLUMN %s SET DEFAULT %s;", alter, newColumn.Name, defaultValue,
+					"%s ALTER COLUMN %s SET DEFAULT %s;", alter, currentColumnIdent, defaultValue,
 				),
 			)
 
@@ -279,14 +279,14 @@ func BuildUpdateColumnQuery(oldColumn, newColumn objects.Column, updateItem obje
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"%s ALTER COLUMN %s ADD GENERATED %s AS IDENTITY;", alter, newColumn.Name, newColumn.IdentityGeneration,
+						"%s ALTER COLUMN %s ADD GENERATED %s AS IDENTITY;", alter, currentColumnIdent, newColumn.IdentityGeneration,
 					),
 				)
 			} else {
 				sqlStatements = append(
 					sqlStatements,
 					fmt.Sprintf(
-						"%s ALTER COLUMN %s DROP IDENTITY IF EXISTS;", alter, newColumn.Name,
+						"%s ALTER COLUMN %s DROP IDENTITY IF EXISTS;", alter, currentColumnIdent,
 					),
 				)
 			}
@@ -364,26 +364,26 @@ func buildColumnDef(column objects.Column) (string, error) {
 		dataType = column.Format
 	}
 
-	q := fmt.Sprintf("%s %s %s %s %s", column.Name, dataType, defaultValueClause, isNullableClause, isUniqueClause)
+	q := strings.TrimSpace(fmt.Sprintf("%s %s %s %s %s", pq.QuoteIdentifier(column.Name), dataType, defaultValueClause, isNullableClause, isUniqueClause))
 	return q, nil
 }
 
 func BuildDeleteColumnQuery(column objects.Column) (q string) {
-	return fmt.Sprintf("ALTER TABLE %s.%s DROP COLUMN %s;", column.Schema, column.Table, column.Name)
+	return fmt.Sprintf("ALTER TABLE %s.%s DROP COLUMN %s;", pq.QuoteIdentifier(column.Schema), pq.QuoteIdentifier(column.Table), pq.QuoteIdentifier(column.Name))
 }
 
 func BuildFkQuery(updateType objects.UpdateRelationType, relation *objects.TablesRelationship) (string, error) {
-	alter := fmt.Sprintf("ALTER TABLE IF EXISTS %s.%s", relation.SourceSchema, relation.SourceTableName)
+	alter := fmt.Sprintf("ALTER TABLE IF EXISTS %s.%s", pq.QuoteIdentifier(relation.SourceSchema), pq.QuoteIdentifier(relation.SourceTableName))
 	switch updateType {
 	case objects.UpdateRelationCreate:
-		tmp := `
-		do $$
-		BEGIN
-			IF NOT EXISTS (SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE CONSTRAINT_NAME = '%s' AND TABLE_NAME = '%s') THEN
-				%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s (%s) %s %s;
-			END IF;
-		END $$;
-		`
+		sourceColumn := pq.QuoteIdentifier(relation.SourceColumnName)
+		targetSchema := pq.QuoteIdentifier(relation.TargetTableSchema)
+		targetTable := pq.QuoteIdentifier(relation.TargetTableName)
+		targetColumn := pq.QuoteIdentifier(relation.TargetColumnName)
+		constraintIdent := pq.QuoteIdentifier(relation.ConstraintName)
+		constraintLiteral := pq.QuoteLiteral(relation.ConstraintName)
+		sourceTableLiteral := pq.QuoteLiteral(relation.SourceTableName)
+		sourceSchemaLiteral := pq.QuoteLiteral(relation.SourceSchema)
 
 		var onUpdate, onDelete string
 
@@ -394,7 +394,7 @@ func BuildFkQuery(updateType objects.UpdateRelationType, relation *objects.Table
 					action = string(objects.RelationActionMapLabel[objects.RelationAction(action)])
 				}
 
-				onUpdate = fmt.Sprintf("ON UPDATE %s", strings.ToUpper(action))
+				onUpdate = fmt.Sprintf(" ON UPDATE %s", strings.ToUpper(action))
 			}
 
 			if relation.Action.DeletionAction != "" {
@@ -403,16 +403,35 @@ func BuildFkQuery(updateType objects.UpdateRelationType, relation *objects.Table
 					action = string(objects.RelationActionMapLabel[objects.RelationAction(action)])
 				}
 
-				onDelete = fmt.Sprintf("ON DELETE %s", strings.ToUpper(action))
+				onDelete = fmt.Sprintf(" ON DELETE %s", strings.ToUpper(action))
 			}
 		}
 
-		return fmt.Sprintf(tmp, relation.ConstraintName, relation.SourceTableName,
-			alter, relation.ConstraintName, relation.SourceColumnName,
-			relation.TargetTableSchema, relation.TargetTableName, relation.TargetColumnName, onUpdate, onDelete,
+		return fmt.Sprintf(`DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM information_schema.table_constraints
+		WHERE constraint_name = %s
+		  AND table_schema = %s
+		  AND table_name = %s
+	) THEN
+		%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s (%s)%s%s;
+	END IF;
+END $$;`,
+			constraintLiteral,
+			sourceSchemaLiteral,
+			sourceTableLiteral,
+			alter,
+			constraintIdent,
+			sourceColumn,
+			targetSchema,
+			targetTable,
+			targetColumn,
+			onUpdate,
+			onDelete,
 		), nil
 	case objects.UpdateRelationDelete:
-		return fmt.Sprintf("%s DROP CONSTRAINT IF EXISTS %s;", alter, relation.ConstraintName), nil
+		return fmt.Sprintf("%s DROP CONSTRAINT IF EXISTS %s;", alter, pq.QuoteIdentifier(relation.ConstraintName)), nil
 	default:
 		return "", fmt.Errorf("update relation with type '%s' is not available", updateType)
 	}
@@ -424,44 +443,16 @@ func BuildFKIndexQuery(updateType objects.UpdateRelationType, relation *objects.
 	}
 
 	indexName := fmt.Sprintf("ix_%s_%s", relation.SourceTableName, relation.SourceColumnName)
+	indexIdent := pq.QuoteIdentifier(indexName)
+	schemaIdent := pq.QuoteIdentifier(relation.SourceSchema)
+	tableIdent := pq.QuoteIdentifier(relation.SourceTableName)
+	columnIdent := pq.QuoteIdentifier(relation.SourceColumnName)
 
 	switch updateType {
 	case objects.UpdateRelationCreate:
-		tmp := `
-		DO $$
-		BEGIN
-			-- Check if the index already exists
-			IF NOT EXISTS (
-				SELECT 1 
-				FROM pg_class c
-				JOIN pg_namespace n ON n.oid = c.relnamespace
-				WHERE c.relname = '%s'  -- Replace with your index name
-				AND n.nspname = '%s'  -- Replace with the schema name if necessary
-			) THEN
-				-- Create the index if it does not exist
-				CREATE INDEX %s ON %s.%s (%s);
-			END IF;
-		END $$;
-		`
-		return fmt.Sprintf(tmp, indexName, relation.SourceSchema, indexName, relation.SourceSchema, relation.SourceTableName, relation.SourceColumnName), nil
+		return fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s.%s (%s);", indexIdent, schemaIdent, tableIdent, columnIdent), nil
 	case objects.UpdateRelationDelete:
-		tmp := `
-		DO $$
-		BEGIN
-			-- Check if the index already exists
-			IF NOT EXISTS (
-				SELECT 1 
-				FROM pg_class c
-				JOIN pg_namespace n ON n.oid = c.relnamespace
-				WHERE c.relname = '%s'  -- Replace with your index name
-				AND n.nspname = '%s'  -- Replace with the schema name if necessary
-			) THEN
-			 	-- Drop the index if it exists
-        		EXECUTE 'DROP INDEX %s.%s';  -- Ensure to specify the correct schema
-			END IF;
-		END $$;
-		`
-		return fmt.Sprintf(tmp, indexName, relation.SourceSchema, relation.SourceSchema, indexName), nil
+		return fmt.Sprintf("DROP INDEX IF EXISTS %s.%s;", schemaIdent, indexIdent), nil
 	default:
 		return "", fmt.Errorf("update index with type '%s' is not available", updateType)
 	}

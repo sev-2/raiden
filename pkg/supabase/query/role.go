@@ -10,6 +10,9 @@ import (
 )
 
 func BuildCreateRoleQuery(role objects.Role) string {
+	roleIdent := pq.QuoteIdentifier(role.Name)
+	roleLiteral := pq.QuoteLiteral(role.Name)
+
 	var createRolClauses []string
 
 	canCreateDBClause := "NOCREATEDB"
@@ -72,17 +75,21 @@ func BuildCreateRoleQuery(role objects.Role) string {
 		var configStrings []string
 		for k, v := range role.Config {
 			if k != "" && v != "" {
-				configStrings = append(configStrings, fmt.Sprintf("ALTER ROLE %s SET %s = %s;", role.Name, k, v))
+				configStrings = append(configStrings, fmt.Sprintf("ALTER ROLE %s SET %s = %s;", roleIdent, pq.QuoteIdentifier(k), pq.QuoteLiteral(fmt.Sprint(v))))
 			}
 		}
 		configClause = strings.Join(configStrings, " ")
 	}
 
+	if configClause == "" {
+		configClause = ""
+	}
+
 	return fmt.Sprintf(`
 	BEGIN;
-	do $$
+	DO $$
 	BEGIN
-		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%s') THEN
+		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = %s) THEN
 			CREATE ROLE %s WITH %s;
 			GRANT %s TO authenticator;
 			GRANT anon TO %s;
@@ -91,18 +98,19 @@ func BuildCreateRoleQuery(role objects.Role) string {
 	%s
 	GRANT %s TO authenticator;
 	COMMIT;`,
-		role.Name,
-		role.Name,
+		roleLiteral,
+		roleIdent,
 		strings.Join(createRolClauses, "\n"),
-		role.Name,
-		role.Name,
+		roleIdent,
+		roleIdent,
 		configClause,
-		role.Name,
+		roleIdent,
 	)
 }
 
 func BuildUpdateRoleQuery(newRole objects.Role, updateRoleParam objects.UpdateRoleParam) string {
-	alter := fmt.Sprintf("ALTER ROLE %s ", updateRoleParam.OldData.Name)
+	alter := fmt.Sprintf("ALTER ROLE %s", pq.QuoteIdentifier(updateRoleParam.OldData.Name))
+	newRoleIdent := pq.QuoteIdentifier(newRole.Name)
 
 	var updateRoleClause, nameClause, configClause string
 	var updateRoleClauses []string
@@ -112,8 +120,8 @@ func BuildUpdateRoleQuery(newRole objects.Role, updateRoleParam objects.UpdateRo
 		case objects.UpdateConnectionLimit:
 			updateRoleClauses = append(updateRoleClauses, fmt.Sprintf("CONNECTION LIMIT %d", newRole.ConnectionLimit))
 		case objects.UpdateRoleName:
-			if updateRoleParam.OldData.Name != newRole.Name {
-				nameClause = fmt.Sprintf("%s RENAME TO %s", alter, newRole.Name)
+			if updateRoleParam.OldData.Name != newRole.Name && newRole.Name != "" {
+				nameClause = fmt.Sprintf("ALTER ROLE %s RENAME TO %s;", pq.QuoteIdentifier(updateRoleParam.OldData.Name), newRoleIdent)
 			}
 		case objects.UpdateRoleIsReplication:
 			if newRole.CanLogin {
@@ -158,13 +166,15 @@ func BuildUpdateRoleQuery(newRole objects.Role, updateRoleParam objects.UpdateRo
 				updateRoleClauses = append(updateRoleClauses, "NOLOGIN")
 			}
 		case objects.UpdateRoleValidUntil:
-			validUntilClause := fmt.Sprintf("VALID UNTIL '%s'", newRole.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout))
-			updateRoleClauses = append(updateRoleClauses, validUntilClause)
+			if newRole.ValidUntil != nil {
+				validUntilClause := fmt.Sprintf("VALID UNTIL '%s'", newRole.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout))
+				updateRoleClauses = append(updateRoleClauses, validUntilClause)
+			}
 		case objects.UpdateRoleConfig:
 			var configStrings []string
 			for k, v := range newRole.Config {
 				if k != "" && v != "" {
-					configStrings = append(configStrings, fmt.Sprintf("%s SET %s = %s;", alter, k, v))
+					configStrings = append(configStrings, fmt.Sprintf("%s SET %s = %s;", alter, pq.QuoteIdentifier(k), pq.QuoteLiteral(fmt.Sprint(v))))
 				}
 			}
 			configClause = strings.Join(configStrings, "\n")
@@ -175,18 +185,17 @@ func BuildUpdateRoleQuery(newRole objects.Role, updateRoleParam objects.UpdateRo
 		updateRoleClause = fmt.Sprintf("%s %s;", alter, strings.Join(updateRoleClauses, "\n"))
 	}
 
-	return fmt.Sprintf(`
-		BEGIN; %s %s %s COMMIT;
-	`, updateRoleClause, configClause, nameClause)
+	return fmt.Sprintf("BEGIN; %s %s %s COMMIT;", updateRoleClause, configClause, nameClause)
 }
 
 func BuildDeleteRoleQuery(role objects.Role) string {
+	roleLiteral := pq.QuoteLiteral(role.Name)
 	return fmt.Sprintf(`
 DO $$
 DECLARE
 	rec RECORD;
 	role_exists BOOLEAN;
-	role_name TEXT := '%[1]s';
+	role_name TEXT := %[1]s;
 	target_owner TEXT := 'postgres';
 BEGIN
 	SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name)
@@ -241,7 +250,7 @@ BEGIN
 	EXCEPTION WHEN OTHERS THEN
 		RAISE NOTICE 'Cannot drop role: %%', SQLERRM;
 	END;
-END $$;`, role.Name)
+END $$;`, roleLiteral)
 }
 
 func BuildRoleInheritQuery(roleName string, inheritRoleName string, action objects.UpdateRoleInheritType) (string, error) {
