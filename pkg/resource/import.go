@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -29,7 +30,23 @@ var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 // [x] import function
 // [x] import storage
 // [x] import policy
-func Import(flags *Flags, config *raiden.Config) error {
+func Import(flags *Flags, config *raiden.Config) (err error) {
+	var (
+		report         ImportReport
+		reportComputed bool
+		reportPrinted  bool
+		skipReport     bool
+	)
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("import panic: %v", r)
+		}
+		if err == nil && reportComputed && !reportPrinted && !skipReport {
+			PrintImportReport(report, flags.DryRun)
+			reportPrinted = true
+		}
+	}()
+
 	if flags.DryRun {
 		ImportLogger.Info("running import in dry run mode")
 	}
@@ -236,7 +253,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	// import report
-	importReport := ImportReport{
+	report = ImportReport{
 		Role:     roles.GetNewCountData(spResource.Roles, appRoles),
 		Table:    tables.GetNewCountData(spResource.Tables, appTables),
 		Storage:  storages.GetNewCountData(spResource.Storages, appStorage),
@@ -244,6 +261,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 		Types:    types.GetNewCountData(spResource.Types, appType),
 		Policies: policies.GetNewCountData(spResource.Policies, appPolicies),
 	}
+	reportComputed = true
 
 	if !flags.DryRun {
 		if flags.UpdateStateOnly {
@@ -253,16 +271,19 @@ func Import(flags *Flags, config *raiden.Config) error {
 			if err := generateImportResource(config, &importState, flags.ProjectPath, spResource, mapModelValidationTags, flags.GenerateController); err != nil {
 				return err
 			}
-			PrintImportReport(importReport, false)
+			PrintImportReport(report, false)
+			reportPrinted = true
 		}
 
 	} else {
 		if len(dryRunError) > 0 {
 			errMessage := strings.Join(dryRunError, "\n")
 			ImportLogger.Error("got error", "err-msg", errMessage)
+			skipReport = true
 			return nil
 		}
-		PrintImportReport(importReport, true)
+		PrintImportReport(report, true)
+		reportPrinted = true
 	}
 
 	return nil

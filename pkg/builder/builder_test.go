@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	builder "github.com/sev-2/raiden/pkg/builder"
+	"github.com/sev-2/raiden/pkg/db"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,4 +37,14 @@ func TestColOfWithStructValue(t *testing.T) {
 	m := sampleModel{}
 	col := builder.ColOf(m, &m.Field)
 	require.Equal(t, "field", col)
+}
+
+func TestColOfWithEmbeddedStruct(t *testing.T) {
+	type course struct {
+		db.ModelBase
+		Owner *string `column:"name:owner"`
+	}
+
+	c := course{}
+	require.Equal(t, "owner", builder.ColOf(&c, &c.Owner))
 }

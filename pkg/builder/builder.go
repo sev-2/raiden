@@ -73,14 +73,9 @@ func colNameFromPtr(model any, fieldPtr any) string {
 	target := fp.Pointer()
 
 	mt := mv.Type()
-	for i := 0; i < mv.NumField(); i++ {
-		fv := mv.Field(i)
-		if !fv.CanAddr() {
-			continue
-		}
-		if fv.Addr().Pointer() == target {
-			return columnNameFromStructField(mt.Field(i))
-		}
+	bestMatch, fallbackMatch := resolveColumnFromStruct(mv, mt, target)
+	if bestMatch != nil && bestMatch.score > 0 {
+		return bestMatch.column
 	}
 
 	// Fallback: attempt to resolve by matching field type
@@ -97,7 +92,99 @@ func colNameFromPtr(model any, fieldPtr any) string {
 		return columnNameFromStructField(candidates[0])
 	}
 
+	if fallbackMatch != nil && fallbackMatch.column != "" {
+		return fallbackMatch.column
+	}
+
 	panic("builder: could not match fieldPtr to any addressable struct field")
+}
+
+type fieldMatch struct {
+	column string
+	score  int
+}
+
+func resolveColumnFromStruct(v reflect.Value, t reflect.Type, target uintptr) (best *fieldMatch, fallback *fieldMatch) {
+	updateBest := func(candidate *fieldMatch) {
+		if candidate == nil {
+			return
+		}
+		if best == nil || candidate.score > best.score {
+			best = candidate
+		}
+	}
+
+	updateFallback := func(candidate *fieldMatch) {
+		if candidate == nil {
+			return
+		}
+		if fallback == nil {
+			fallback = candidate
+		}
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		fv := v.Field(i)
+		sf := t.Field(i)
+
+		var candidate *fieldMatch
+		if fv.CanAddr() && fv.Addr().Pointer() == target {
+			score := fieldMatchScore(sf)
+			candidate = &fieldMatch{column: columnNameFromStructField(sf), score: score}
+			if score <= 0 {
+				updateFallback(candidate)
+			}
+		}
+
+		switch fv.Kind() {
+		case reflect.Struct:
+			if nestedBest, nestedFallback := resolveColumnFromStruct(fv, sf.Type, target); nestedBest != nil || nestedFallback != nil {
+				updateBest(nestedBest)
+				if nestedBest == nil {
+					updateFallback(nestedFallback)
+				}
+			}
+		case reflect.Ptr:
+			if !fv.IsNil() && fv.Elem().Kind() == reflect.Struct {
+				if nestedBest, nestedFallback := resolveColumnFromStruct(fv.Elem(), fv.Elem().Type(), target); nestedBest != nil || nestedFallback != nil {
+					updateBest(nestedBest)
+					if nestedBest == nil {
+						updateFallback(nestedFallback)
+					}
+				}
+			}
+		}
+
+		if candidate != nil {
+			if candidate.score > 0 {
+				updateBest(candidate)
+			} else {
+				updateFallback(candidate)
+			}
+		}
+	}
+
+	return best, fallback
+}
+
+func fieldMatchScore(sf reflect.StructField) int {
+	score := 0
+	columnTag := strings.TrimSpace(sf.Tag.Get("column"))
+	jsonTag := strings.TrimSpace(sf.Tag.Get("json"))
+
+	if columnTag != "" {
+		score += 200
+	}
+	if jsonTag != "" && jsonTag != "-" {
+		score += 50
+	}
+	if !sf.Anonymous {
+		score += 10
+	}
+	if score == 0 && columnTag == "" && !sf.Anonymous {
+		score = 1
+	}
+	return score
 }
 
 func columnNameFromStructField(sf reflect.StructField) string {

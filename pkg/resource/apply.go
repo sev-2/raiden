@@ -88,9 +88,22 @@ type MigrateData struct {
 //	[x] delete storage
 //	[x] add storage acl
 //	[x] update storage acl
-func Apply(flags *Flags, config *raiden.Config) error {
+func Apply(flags *Flags, config *raiden.Config) (err error) {
+	var (
+		reportPrinted bool
+		migrateData   MigrateData
+	)
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("apply panic: %v", r)
+		}
+		if err == nil && !reportPrinted {
+			PrintApplyChangeReport(migrateData)
+			reportPrinted = true
+		}
+	}()
+
 	// declare default variable
-	var migrateData MigrateData
 	var localState state.LocalState
 
 	if flags.DryRun {
@@ -238,6 +251,7 @@ func Apply(flags *Flags, config *raiden.Config) error {
 		ApplyLogger.Info("finish migrate resource")
 	}
 	PrintApplyChangeReport(migrateData)
+	reportPrinted = true
 	return nil
 }
 

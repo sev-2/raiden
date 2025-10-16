@@ -13,18 +13,16 @@ func GetPolicy(role []string) (objects.Policies, error) {
 		return nil, err
 	}
 	var policies objects.Policies
-	for _, table := range currentState.Tables {
+	for _, p := range currentState.Policies {
 
 		if len(role) == 0 {
-			policies = append(policies, table.Policies...)
+			policies = append(policies, p.Policy)
 			continue
 		}
 
-		for _, p := range table.Policies {
-			for _, rc := range role {
-				if slices.Contains(p.Roles, rc) {
-					policies = append(policies, p)
-				}
+		for _, rc := range role {
+			if slices.Contains(p.Policy.Roles, rc) {
+				policies = append(policies, p.Policy)
 			}
 
 		}

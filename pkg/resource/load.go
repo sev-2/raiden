@@ -94,6 +94,7 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 func loadBffResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, outChan chan any) {
 	if flags.All() || flags.ModelsOnly || flags.StoragesOnly {
 		LoadLogger.Debug("get Policy from server")
+		wg.Add(1)
 		go loadPoliciesWithCleanup(wg, cfg, outChan)
 
 		LoadLogger.Debug("get Role from server")
@@ -151,6 +152,7 @@ func loadBffResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, outC
 		loadStorages(wg, cfg, outChan)
 
 		LoadLogger.Debug("get Policy from server")
+		wg.Add(1)
 		go loadPoliciesWithCleanup(wg, cfg, outChan)
 	}
 
@@ -197,8 +199,6 @@ func loadTableResourcesForPgMeta(wg *sync.WaitGroup, cfg *raiden.Config, outChan
 }
 
 func loadPoliciesWithCleanup(wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any) {
-	wg.Add(1)
-
 	defer wg.Done()
 
 	rs, e := supabase.GetPolicies(cfg)
