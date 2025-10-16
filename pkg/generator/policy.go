@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -195,7 +196,7 @@ func (p *{{ .Name | ToGoIdentifier }}) Check() b.Clause {
 
 func GeneratePolicies(
 	basePath string, projectName string, policies []objects.Policy,
-	tableMap map[string]string, storageMap map[string]string,
+	tableMap map[string]objects.Table, storageMap map[string]string,
 	roleMap map[string]string, nativeRoleMap map[string]raiden.Role,
 	generateFn GenerateFn,
 ) (err error) {
@@ -218,7 +219,7 @@ func GeneratePolicies(
 
 func GeneratePolicy(
 	folderPath string, projectName string, policy objects.Policy,
-	tableMap map[string]string, storageMap map[string]string,
+	tableMap map[string]objects.Table, storageMap map[string]string,
 	roleMap map[string]string, nativeRoleMap map[string]raiden.Role,
 	generateFn GenerateFn,
 ) error {
@@ -245,7 +246,9 @@ func GeneratePolicy(
 	// convert policy command to appropriate format (PascalCase)
 	command := utils.SnakeCaseToPascalCase(strings.ToLower(string(policy.Command)))
 
-	var model, storage, roles, mode, check, definition string
+	var model, storage, roles, mode string
+	checkClause := "b.Clause(\"\")"
+	definitionClause := "b.Clause(\"\")"
 	if policy.Schema == supabase.DefaultStorageSchema {
 		storage = policy.Table
 		if _, exist := storageMap[storage]; !exist {
@@ -255,8 +258,10 @@ func GeneratePolicy(
 		imports = append(imports, fmt.Sprintf("%q", storagesImportPath))
 	} else {
 		model = policy.Table
-		if _, exist := tableMap[model]; !exist {
-			return fmt.Errorf("generator : table %s is not found", policy.Table)
+		if model != "" {
+			if _, exist := tableMap[model]; !exist {
+				return fmt.Errorf("generator : table %s is not found", policy.Table)
+			}
 		}
 		modelsImportPath := fmt.Sprintf("%s/%s", utils.ToGoModuleName(projectName), ModelDir)
 		imports = append(imports, fmt.Sprintf("%q", modelsImportPath))
@@ -299,12 +304,14 @@ func GeneratePolicy(
 		mode = "raiden.ModeRestrictive"
 	}
 
-	if policy.Check != nil && *policy.Check != "" {
-		check = *policy.Check
+	qualifier := builder.ClauseQualifier{Schema: policy.Schema, Table: policy.Table}
+	receiverName, columnSet := resolvePolicyColumns(model, storage, tableMap)
+	if policy.Check != nil && strings.TrimSpace(*policy.Check) != "" {
+		checkClause = generateClauseCode(*policy.Check, qualifier, receiverName, columnSet)
 	}
 
-	if policy.Definition != "" {
-		definition = policy.Definition
+	if strings.TrimSpace(policy.Definition) != "" {
+		definitionClause = generateClauseCode(policy.Definition, qualifier, receiverName, columnSet)
 	}
 
 	// execute the template and write to the file
@@ -317,8 +324,8 @@ func GeneratePolicy(
 		Roles:      roles,
 		Mode:       mode,
 		Command:    command,
-		Check:      fmt.Sprintf("%q", check),
-		Definition: fmt.Sprintf("%q", definition),
+		Check:      checkClause,
+		Definition: definitionClause,
 	}
 
 	// set input
@@ -332,4 +339,47 @@ func GeneratePolicy(
 
 	PolicyLogger.Debug("generate policy", "path", input.OutputPath)
 	return generateFn(input, nil)
+}
+
+func resolvePolicyColumns(modelName, storageName string, tableMap map[string]objects.Table) (string, []objects.Column) {
+	if modelName != "" {
+		if table, ok := tableMap[modelName]; ok {
+			return "p.model", table.Columns
+		}
+	}
+	if storageName != "" {
+		if table, ok := tableMap[storageName]; ok {
+			return "p.storage", table.Columns
+		}
+	}
+	return "", nil
+}
+
+func generateClauseCode(sql string, qualifier builder.ClauseQualifier, receiver string, columns []objects.Column) string {
+	_, clauseCode, ok := builder.UnmarshalClause(sql, qualifier)
+	if !ok {
+		normalized := builder.NormalizeClauseSQL(sql, qualifier)
+		return fmt.Sprintf("b.Clause(%q)", normalized)
+	}
+	if receiver != "" && len(columns) > 0 {
+		return injectColumnReferences(clauseCode, receiver, columns)
+	}
+	return clauseCode
+}
+
+func injectColumnReferences(code, receiver string, columns []objects.Column) string {
+	if len(columns) == 0 {
+		return code
+	}
+	result := code
+	for _, col := range columns {
+		quoted := fmt.Sprintf("\"%s\"", col.Name)
+		if !strings.Contains(result, quoted) {
+			continue
+		}
+		fieldName := utils.SnakeCaseToPascalCase(col.Name)
+		replacement := fmt.Sprintf("b.ColOf(&%s, &%s.%s)", receiver, receiver, fieldName)
+		result = strings.ReplaceAll(result, quoted, replacement)
+	}
+	return result
 }

@@ -1,6 +1,8 @@
 package policies
 
 import (
+	"strings"
+
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -33,4 +35,14 @@ func GetNewCountData(supabaseData []objects.Policy, localData state.ExtractPolic
 	}
 
 	return newCount
+}
+
+func policyKey(p objects.Policy) string {
+	sch := strings.ToLower(p.Schema)
+	table := strings.ToLower(p.Table)
+	name := strings.ToLower(p.Name)
+	if sch == "" && table == "" {
+		return name
+	}
+	return sch + "." + table + "." + name
 }

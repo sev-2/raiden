@@ -1,11 +1,10 @@
 package policies
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/sev-2/raiden/pkg/utils"
 )
 
 func Compare(sourcePolicies, targetPolicies []objects.Policy) error {
@@ -80,24 +79,24 @@ func CompareItem(source, target objects.Policy) (diffResult CompareDiffResult) {
 	}
 
 	if shouldCompareDefinition(source.Command, target.Command) {
-		qualifiers := []utils.ExpressionQualifier{
+		qualifiers := []builder.ClauseQualifier{
 			{Schema: source.Schema, Table: source.Table},
 			{Schema: target.Schema, Table: target.Table},
 		}
-		sourceDefinition := utils.NormalizeExpression(source.Definition, qualifiers...)
-		targetDefinition := utils.NormalizeExpression(target.Definition, qualifiers...)
+		sourceDefinition := builder.NormalizeClauseSQL(source.Definition, qualifiers...)
+		targetDefinition := builder.NormalizeClauseSQL(target.Definition, qualifiers...)
 		if sourceDefinition != targetDefinition {
 			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdatePolicyDefinition)
 		}
 	}
 
 	if shouldCompareCheck(source.Command, target.Command) {
-		qualifiers := []utils.ExpressionQualifier{
+		qualifiers := []builder.ClauseQualifier{
 			{Schema: source.Schema, Table: source.Table},
 			{Schema: target.Schema, Table: target.Table},
 		}
-		sourceCheck, hasSource := utils.NormalizeOptionalExpression(source.Check, qualifiers...)
-		targetCheck, hasTarget := utils.NormalizeOptionalExpression(target.Check, qualifiers...)
+		sourceCheck, hasSource := normalizeOptionalClause(source.Check, qualifiers...)
+		targetCheck, hasTarget := normalizeOptionalClause(target.Check, qualifiers...)
 		if hasSource != hasTarget || (hasSource && sourceCheck != targetCheck) {
 			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdatePolicyCheck)
 		}
@@ -118,6 +117,17 @@ func shouldCompareDefinition(sourceCmd, targetCmd objects.PolicyCommand) bool {
 
 func shouldCompareCheck(sourceCmd, targetCmd objects.PolicyCommand) bool {
 	return commandUsesCheck(sourceCmd) || commandUsesCheck(targetCmd)
+}
+
+func normalizeOptionalClause(clause *string, qualifiers ...builder.ClauseQualifier) (string, bool) {
+	if clause == nil {
+		return "", false
+	}
+	trimmed := strings.TrimSpace(*clause)
+	if trimmed == "" {
+		return "", false
+	}
+	return builder.NormalizeClauseSQL(trimmed, qualifiers...), true
 }
 
 func commandUsesDefinition(cmd objects.PolicyCommand) bool {
@@ -162,14 +172,4 @@ func stringsEqualUnordered(a, b []string) bool {
 		}
 	}
 	return len(seen) == 0
-}
-
-func policyKey(p objects.Policy) string {
-	sch := strings.ToLower(p.Schema)
-	table := strings.ToLower(p.Table)
-	name := strings.ToLower(p.Name)
-	if sch == "" && table == "" {
-		return name
-	}
-	return fmt.Sprintf("%s.%s.%s", sch, table, name)
 }

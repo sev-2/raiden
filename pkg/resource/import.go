@@ -393,10 +393,10 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 				return false
 			}, stateChan)
 
-			tableMap, storageMap, roleMap := make(map[string]string), make(map[string]string), make(map[string]string)
+			tableMap, storageMap, roleMap := make(map[string]objects.Table), make(map[string]string), make(map[string]string)
 			if len(resource.Tables) > 0 {
 				for _, i := range resource.Tables {
-					tableMap[i.Name] = i.Name
+					tableMap[i.Name] = i
 				}
 			}
 
