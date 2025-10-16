@@ -93,79 +93,30 @@ func loadResource(cfg *raiden.Config, flags *Flags) <-chan any {
 
 func loadBffResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, outChan chan any) {
 	if flags.All() || flags.ModelsOnly || flags.StoragesOnly {
-		wg.Add(1)
 		LoadLogger.Debug("get Policy from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) (objects.Policies, error) {
-			rs, e := supabase.GetPolicies(cfg)
-			if e != nil {
-				return rs, e
-			}
+		go loadPoliciesWithCleanup(wg, cfg, outChan)
 
-			// cleanup policy expression
-			var cleanedPolicies objects.Policies
-			for i := range rs {
-				p := rs[i]
-				policies.CleanupAclExpression(&p)
-				cleanedPolicies = append(cleanedPolicies, p)
-			}
-
-			return cleanedPolicies, nil
-		})
-
-		wg.Add(1)
 		LoadLogger.Debug("get Role from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
-			return supabase.GetRoles(cfg)
-		})
+		loadRolesAndMembership(wg, cfg, outChan, supabase.DefaultIncludedSchema)
 	}
 
 	if (flags.All() || flags.ModelsOnly) && cfg.AllowedTables != "" {
-		wg.Add(1)
 		LoadLogger.Debug("get Types from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Type, error) {
-			return supabase.GetTypes(cfg, []string{raiden.DefaultTypeSchema})
-		})
+		loadTypes(wg, cfg, outChan, []string{raiden.DefaultTypeSchema})
 
-		wg.Add(1)
-		LoadLogger.Debug("get Table from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
-			return supabase.GetTables(cfg, supabase.DefaultIncludedSchema)
-		})
-
-		wg.Add(1)
-		LoadLogger.Debug("get Index from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
-			return supabase.GetIndexes(cfg, supabase.DefaultIncludedSchema[0])
-		})
-
-		wg.Add(1)
-		LoadLogger.Debug("get Table Relation Actions from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
-			return supabase.GetTableRelationshipActions(cfg, supabase.DefaultIncludedSchema[0])
-		})
+		LoadLogger.Debug("get Table, Index, and Relation Actions from server")
+		loadTableResources(wg, cfg, outChan, supabase.DefaultIncludedSchema)
 	}
 
 	if flags.All() || flags.RolesOnly {
-		wg.Add(1)
-		LoadLogger.Debug("get Role from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
-			return supabase.GetRoles(cfg)
-		})
-
-		wg.Add(1)
-		LoadLogger.Debug("get Role Membership from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.RoleMembership, error) {
-			return supabase.GetRoleMemberships(cfg, supabase.DefaultIncludedSchema)
-		})
+		LoadLogger.Debug("get Role and Role Membership from server")
+		loadRolesAndMembership(wg, cfg, outChan, supabase.DefaultIncludedSchema)
 	}
 
 	if flags.All() || flags.RpcOnly {
 		if flags.RpcOnly {
-			wg.Add(1)
 			LoadLogger.Debug("get Types from server")
-			go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Type, error) {
-				return supabase.GetTypes(cfg, []string{raiden.DefaultTypeSchema})
-			})
+			loadTypes(wg, cfg, outChan, []string{raiden.DefaultTypeSchema})
 
 			wg.Add(1)
 			LoadLogger.Debug("get Table from server")
@@ -182,27 +133,33 @@ func loadBffResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, outC
 	}
 
 	if flags.All() || flags.StoragesOnly {
-		wg.Add(1)
 		LoadLogger.Debug("get Bucket from server")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Bucket, error) {
-			return supabase.GetBuckets(cfg)
-		})
+		loadStorages(wg, cfg, outChan)
 	}
+
+	if flags.All() || flags.PoliciesOnly {
+		LoadLogger.Debug("get Role and Role Membership from server")
+		loadRolesAndMembership(wg, cfg, outChan, supabase.DefaultIncludedSchema)
+
+		LoadLogger.Debug("get Types from server")
+		loadTypes(wg, cfg, outChan, []string{raiden.DefaultTypeSchema})
+
+		LoadLogger.Debug("get Table, Index, and Relation Actions from server")
+		loadTableResources(wg, cfg, outChan, supabase.DefaultIncludedSchema)
+
+		LoadLogger.Debug("get Bucket from server")
+		loadStorages(wg, cfg, outChan)
+
+		LoadLogger.Debug("get Policy from server")
+		go loadPoliciesWithCleanup(wg, cfg, outChan)
+	}
+
 }
 
 func loadServiceResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, outChan chan any) {
 	if flags.All() || flags.RolesOnly {
-		wg.Add(1)
-		LoadLogger.Debug("Get Role From Pg Meta")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
-			return supabase.GetRoles(cfg)
-		})
-
-		wg.Add(1)
-		LoadLogger.Debug("Get Role Membership From Pg Meta")
-		go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.RoleMembership, error) {
-			return supabase.GetRoleMemberships(cfg, supabase.DefaultIncludedSchema)
-		})
+		LoadLogger.Debug("Get Role and Role Membership From Pg Meta")
+		loadRolesAndMembership(wg, cfg, outChan, supabase.DefaultIncludedSchema)
 	}
 
 	wg.Add(1)
@@ -211,29 +168,101 @@ func loadServiceResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, 
 		return pgmeta.GetTypes(cfg, []string{raiden.DefaultTypeSchema})
 	})
 
-	wg.Add(1)
-	LoadLogger.Debug("Get Table From Pg Meta")
-	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
-		return pgmeta.GetTables(cfg, []string{"public"}, true)
-	})
-
-	wg.Add(1)
-	LoadLogger.Debug("Get Index From Pg Meta")
-	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
-		return pgmeta.GetIndexes(cfg, "public")
-	})
-
-	wg.Add(1)
-	LoadLogger.Debug("Get Table Relation Actions From Pg Meta")
-	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
-		return pgmeta.GetTableRelationshipActions(cfg, "public")
-	})
+	LoadLogger.Debug("Get Table, Index, and Relation Actions From Pg Meta")
+	loadTableResourcesForPgMeta(wg, cfg, outChan)
 
 	wg.Add(1)
 	LoadLogger.Debug("Get Function From Pg Meta")
 	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Function, error) {
 		return pgmeta.GetFunctions(cfg)
 	})
+}
+
+func loadTableResourcesForPgMeta(wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any) {
+	wg.Add(3)
+	// Load tables
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
+		return pgmeta.GetTables(cfg, []string{"public"}, true)
+	})
+
+	// Load indexes
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
+		return pgmeta.GetIndexes(cfg, "public")
+	})
+
+	// Load relation actions
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
+		return pgmeta.GetTableRelationshipActions(cfg, "public")
+	})
+}
+
+func loadPoliciesWithCleanup(wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any) {
+	wg.Add(1)
+
+	defer wg.Done()
+
+	rs, e := supabase.GetPolicies(cfg)
+	if e != nil {
+		outChan <- e
+		return
+	}
+
+	// cleanup policy expression
+	var cleanedPolicies objects.Policies
+	for i := range rs {
+		p := rs[i]
+		policies.CleanupAclExpression(&p)
+		cleanedPolicies = append(cleanedPolicies, p)
+	}
+
+	outChan <- cleanedPolicies
+}
+
+func loadRolesAndMembership(wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any, schemas []string) {
+	wg.Add(2)
+	// Load roles
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Role, error) {
+		return supabase.GetRoles(cfg)
+	})
+
+	// Load role memberships
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.RoleMembership, error) {
+		return supabase.GetRoleMemberships(cfg, schemas)
+	})
+}
+
+func loadTableResources(wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any, schemas []string) {
+	wg.Add(3)
+
+	// Load tables
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Table, error) {
+		return supabase.GetTables(cfg, schemas)
+	})
+
+	// Load indexes
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Index, error) {
+		return supabase.GetIndexes(cfg, schemas[0])
+	})
+
+	// Load relation actions
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.TablesRelationshipAction, error) {
+		return supabase.GetTableRelationshipActions(cfg, schemas[0])
+	})
+}
+
+func loadTypes(wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any, schemas []string) {
+	wg.Add(1)
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Type, error) {
+		return supabase.GetTypes(cfg, schemas)
+	})
+}
+
+func loadStorages(wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any) {
+	wg.Add(1)
+	go loadDatabaseResource(wg, cfg, outChan, func(cfg *raiden.Config) ([]objects.Bucket, error) {
+		return supabase.GetBuckets(cfg)
+	})
+
 }
 
 func loadDatabaseResource[T any](wg *sync.WaitGroup, cfg *raiden.Config, outChan chan any, callback func(cfg *raiden.Config) (T, error)) {

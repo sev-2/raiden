@@ -26,6 +26,7 @@ type Flags struct {
 	RolesOnly     bool
 	ModelsOnly    bool
 	StoragesOnly  bool
+	PolicyOnly    bool
 	AllowedSchema string
 	DryRun        bool
 }
@@ -34,6 +35,7 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.RpcOnly, "rpc-only", "", false, "import rpc only")
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
+	cmd.Flags().BoolVarP(&f.PolicyOnly, "policy-only", "", false, "import policy only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storage only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
 	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run import in simulate mode without actual import resource as code")
@@ -41,7 +43,7 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 }
 
 func (f *Flags) LoadAll() bool {
-	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly
+	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.PolicyOnly
 }
 
 func PreRun(projectPath string) error {
@@ -71,6 +73,10 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 
 		if flags.StoragesOnly {
 			generatedResources = append(generatedResources, "storage")
+		}
+
+		if flags.PolicyOnly {
+			generatedResources = append(generatedResources, "policy")
 		}
 	}
 
@@ -111,6 +117,10 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 
 	if flags.RolesOnly {
 		args = append(args, "--roles-only")
+	}
+
+	if flags.PolicyOnly {
+		args = append(args, "--policy-only")
 	}
 
 	if flags.StoragesOnly {

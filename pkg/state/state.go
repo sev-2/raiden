@@ -19,11 +19,12 @@ var StateLogger = logger.HcLog().Named("raiden.state")
 
 type (
 	State struct {
-		Tables  []TableState
-		Roles   []RoleState
-		Rpc     []RpcState
-		Storage []StorageState
-		Types   []TypeState
+		Tables   []TableState
+		Roles    []RoleState
+		Rpc      []RpcState
+		Storage  []StorageState
+		Types    []TypeState
+		Policies []PolicyState
 	}
 
 	TableState struct {
@@ -48,6 +49,13 @@ type (
 		RpcPath    string
 		RpcStruct  string
 		LastUpdate time.Time
+	}
+
+	PolicyState struct {
+		Policy       objects.Policy
+		PolicyPath   string
+		PolicyStruct string
+		LastUpdate   time.Time
 	}
 
 	StorageState struct {
@@ -85,12 +93,6 @@ type (
 		State      State
 		NeedUpdate bool
 		Mutex      sync.RWMutex
-	}
-
-	ExtractedPolicies struct {
-		Existing []objects.Policy
-		New      []objects.Policy
-		Delete   []objects.Policy
 	}
 
 	TypeState struct {
@@ -350,6 +352,61 @@ func (s *LocalState) DeleteType(typeId int) {
 		return
 	}
 	s.State.Types = append(s.State.Types[:index], s.State.Types[index+1:]...)
+	s.NeedUpdate = true
+}
+
+func (s *LocalState) AddPolicy(t PolicyState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+	s.State.Policies = append(s.State.Policies, t)
+	s.NeedUpdate = true
+}
+
+func (s *LocalState) FindPolicy(policyId int) (index int, tState PolicyState, found bool) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	found = false
+
+	for i := range s.State.Policies {
+		r := s.State.Policies[i]
+
+		if r.Policy.ID == policyId {
+			found = true
+			tState = r
+			index = i
+			return
+		}
+	}
+	return
+}
+
+func (s *LocalState) UpdatePolicy(index int, state PolicyState) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	s.State.Policies[index] = state
+	s.NeedUpdate = true
+}
+
+func (s *LocalState) DeletePolicy(policyId int) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	index := -1
+	for i := range s.State.Policies {
+		r := s.State.Policies[i]
+
+		if r.Policy.ID == policyId {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return
+	}
+	s.State.Policies = append(s.State.Policies[:index], s.State.Policies[index+1:]...)
 	s.NeedUpdate = true
 }
 

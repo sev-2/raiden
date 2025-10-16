@@ -786,6 +786,86 @@ func TestUpdateLocalStateFromApply(t *testing.T) {
 	}
 }
 
+func TestUpdateLocalStateFromApply_UpsertPolicyState(t *testing.T) {
+	projectPath := "/path/to/project"
+	localState := &state.LocalState{}
+	stateChan := make(chan any)
+	done := resource.UpdateLocalStateFromApply(projectPath, localState, stateChan)
+
+	go func() {
+		stateChan <- &policies.MigrateItem{
+			Type: migrator.MigrateTypeCreate,
+			NewData: objects.Policy{
+				ID:     1,
+				Name:   "policy_a",
+				Schema: "public",
+				Table:  "tests",
+			},
+		}
+		stateChan <- &policies.MigrateItem{
+			Type: migrator.MigrateTypeUpdate,
+			OldData: objects.Policy{
+				ID:     1,
+				Name:   "policy_a",
+				Schema: "public",
+				Table:  "tests",
+			},
+			NewData: objects.Policy{
+				ID:     1,
+				Name:   "policy_a_updated",
+				Schema: "public",
+				Table:  "tests",
+			},
+		}
+		close(stateChan)
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout waiting for UpdateLocalStateFromApply to complete")
+	}
+
+	assert.Len(t, localState.State.Policies, 1)
+	assert.Equal(t, "policy_a_updated", localState.State.Policies[0].Policy.Name)
+}
+
+func TestUpdateLocalStateFromApply_DeletePolicyState(t *testing.T) {
+	projectPath := "/path/to/project"
+	localState := &state.LocalState{
+		State: state.State{
+			Policies: []state.PolicyState{
+				{Policy: objects.Policy{ID: 10, Name: "policy_b", Schema: "public", Table: "tests"}},
+			},
+		},
+	}
+	stateChan := make(chan any)
+	done := resource.UpdateLocalStateFromApply(projectPath, localState, stateChan)
+
+	go func() {
+		stateChan <- &policies.MigrateItem{
+			Type: migrator.MigrateTypeDelete,
+			OldData: objects.Policy{
+				ID:     10,
+				Name:   "policy_b",
+				Schema: "public",
+				Table:  "tests",
+			},
+		}
+		close(stateChan)
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout waiting for UpdateLocalStateFromApply to complete")
+	}
+
+	assert.Len(t, localState.State.Policies, 0)
+}
+
 func TestPrintApplyChangeReport(t *testing.T) {
 	migrateData := resource.MigrateData{
 		Tables: []tables.MigrateItem{

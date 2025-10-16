@@ -2,11 +2,17 @@ package generator
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
+	"text/template"
 	"unicode"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
+	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type Rls struct {
@@ -108,4 +114,222 @@ func cleanupRlsTagStorage(name, tag string) string {
 	cleanTag = strings.Replace(cleanTag, "OR", "", 1)
 	cleanTag = strings.TrimLeftFunc(cleanTag, unicode.IsSpace)
 	return cleanTag
+}
+
+var PolicyLogger hclog.Logger = logger.HcLog().Named("generator.policy")
+
+// ----- Define type, variable and constant -----
+type GeneratePolicyData struct {
+	Imports    []string
+	Package    string
+	Name       string
+	Model      string
+	Storage    string
+	Roles      string
+	Command    string
+	Mode       string
+	Check      string
+	Definition string
+}
+
+const (
+	PolicyDir      = "internal/policies"
+	PolicyTemplate = `package {{ .Package }}
+
+{{- if gt (len .Imports) 0 }}
+
+import (
+{{- range .Imports}}
+	{{.}}
+{{- end}}
+)
+
+{{- end }}
+
+type {{ .Name | ToGoIdentifier }} struct {
+	raiden.PolicyBase
+	{{- if ne .Model "" }}
+	model models.{{.Model | ToGoIdentifier}}{{- end}}
+	{{- if ne .Storage "" }}
+	storage storages.{{.Storage | ToGoIdentifier}}{{- end}}
+}
+
+func (p *{{ .Name | ToGoIdentifier }}) Name() string {
+	return "{{ .Name }}"
+}
+{{- if ne .Model "" }}
+
+func (p *{{ .Name | ToGoIdentifier }}) Model() any {
+	return &p.model;
+}
+{{- end}}
+{{- if ne .Storage "" }}
+
+func (p *{{ .Name | ToGoIdentifier }}) Storage() any {
+	return &p.storage;
+}
+{{- end}}
+
+func (p *{{ .Name | ToGoIdentifier }}) Roles() []raiden.Role {
+	return {{ .Roles }}
+}
+
+func (p *{{ .Name | ToGoIdentifier }}) Command() raiden.PolicyCommand {
+	return raiden.PolicyCommand{{ .Command }}
+}
+
+func (p *{{ .Name | ToGoIdentifier }}) Mode() raiden.PolicyMode {
+	return {{ .Mode }}
+}
+
+func (p *{{ .Name | ToGoIdentifier }}) Definition() b.Clause {
+	return {{ .Definition }}
+}
+
+func (p *{{ .Name | ToGoIdentifier }}) Check() b.Clause {
+	return {{ .Check }}
+}
+
+`
+)
+
+func GeneratePolicies(
+	basePath string, projectName string, policies []objects.Policy,
+	tableMap map[string]string, storageMap map[string]string,
+	roleMap map[string]string, nativeRoleMap map[string]raiden.Role,
+	generateFn GenerateFn,
+) (err error) {
+	folderPath := filepath.Join(basePath, PolicyDir)
+	PolicyLogger.Trace("create policies folder if not exist", folderPath)
+	if exist := utils.IsFolderExists(folderPath); !exist {
+		if err := utils.CreateFolder(folderPath); err != nil {
+			return err
+		}
+	}
+
+	for _, v := range policies {
+		if err := GeneratePolicy(folderPath, projectName, v, tableMap, storageMap, roleMap, nativeRoleMap, generateFn); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func GeneratePolicy(
+	folderPath string, projectName string, policy objects.Policy,
+	tableMap map[string]string, storageMap map[string]string,
+	roleMap map[string]string, nativeRoleMap map[string]raiden.Role,
+	generateFn GenerateFn,
+) error {
+	// define binding func
+	funcMaps := []template.FuncMap{
+		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
+	}
+
+	// define file path
+	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(policy.Name), "go"))
+
+	// set imports path
+	var imports []string
+
+	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
+	imports = append(imports, raidenPath)
+
+	builderPath := fmt.Sprintf("b %q", "github.com/sev-2/raiden/pkg/builder")
+	imports = append(imports, builderPath)
+
+	roleImportPath := fmt.Sprintf("%s/%s", utils.ToGoModuleName(projectName), RoleDir)
+	imports = append(imports, fmt.Sprintf("%q", roleImportPath))
+
+	// convert policy command to appropriate format (PascalCase)
+	command := utils.SnakeCaseToPascalCase(strings.ToLower(string(policy.Command)))
+
+	var model, storage, roles, mode, check, definition string
+	if policy.Schema == supabase.DefaultStorageSchema {
+		storage = policy.Table
+		if _, exist := storageMap[storage]; !exist {
+			return fmt.Errorf("generator : bucket %s is not found", policy.Table)
+		}
+		storagesImportPath := fmt.Sprintf("%s/%s", utils.ToGoModuleName(projectName), StorageDir)
+		imports = append(imports, fmt.Sprintf("%q", storagesImportPath))
+	} else {
+		model = policy.Table
+		if _, exist := tableMap[model]; !exist {
+			return fmt.Errorf("generator : table %s is not found", policy.Table)
+		}
+		modelsImportPath := fmt.Sprintf("%s/%s", utils.ToGoModuleName(projectName), ModelDir)
+		imports = append(imports, fmt.Sprintf("%q", modelsImportPath))
+	}
+
+	if len(policy.Roles) > 0 {
+		roleArr := []string{}
+		isImportNativeRole := false
+
+		for _, r := range policy.Roles {
+			isFound := false
+
+			if _, exist := roleMap[r]; exist {
+				roleArr = append(roleArr, fmt.Sprintf("&roles.%s{},", utils.SnakeCaseToPascalCase(r)))
+				isFound = true
+			}
+
+			if _, exist := nativeRoleMap[r]; exist {
+				roleArr = append(roleArr, fmt.Sprintf("&native_role.%s{},", utils.SnakeCaseToPascalCase(r)))
+				isFound, isImportNativeRole = true, true
+			}
+
+			if !isFound {
+				return fmt.Errorf("generator : role %s is not found", r)
+			}
+		}
+
+		if isImportNativeRole {
+			nativeRolePath := fmt.Sprintf("native_role %q", "github.com/sev-2/raiden/pkg/postgres/roles")
+			imports = append(imports, nativeRolePath)
+		}
+		roles = fmt.Sprintf("[]raiden.Role{\n        %s\n    }", strings.Join(roleArr, "\n        "))
+	} else {
+		roles = "[]raiden.Role{}"
+	}
+
+	if strings.EqualFold(policy.Action, raiden.ModePermissive.ActionString()) {
+		mode = "raiden.ModePermissive"
+	} else {
+		mode = "raiden.ModeRestrictive"
+	}
+
+	if policy.Check != nil && *policy.Check != "" {
+		check = *policy.Check
+	}
+
+	if policy.Definition != "" {
+		definition = policy.Definition
+	}
+
+	// execute the template and write to the file
+	data := GeneratePolicyData{
+		Package:    "policies",
+		Imports:    imports,
+		Name:       policy.Name,
+		Model:      model,
+		Storage:    storage,
+		Roles:      roles,
+		Mode:       mode,
+		Command:    command,
+		Check:      fmt.Sprintf("%q", check),
+		Definition: fmt.Sprintf("%q", definition),
+	}
+
+	// set input
+	input := GenerateInput{
+		BindData:     data,
+		Template:     PolicyTemplate,
+		TemplateName: "policyTemplate",
+		OutputPath:   filePath,
+		FuncMap:      funcMaps,
+	}
+
+	PolicyLogger.Debug("generate policy", "path", input.OutputPath)
+	return generateFn(input, nil)
 }

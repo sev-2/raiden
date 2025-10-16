@@ -13,7 +13,7 @@ import (
 
 type ExtractStorageItem struct {
 	Storage           objects.Bucket
-	ExtractedPolicies ExtractedPolicies
+	ExtractedPolicies ExtractPolicyResult
 }
 
 type ExtractStorageResult struct {
@@ -45,7 +45,7 @@ func ExtractStorage(storageStates []StorageState, appStorages []raiden.Bucket) (
 	for _, state := range mapStorageState {
 		result.Delete = append(result.Delete, ExtractStorageItem{
 			Storage: state.Storage,
-			ExtractedPolicies: ExtractedPolicies{
+			ExtractedPolicies: ExtractPolicyResult{
 				Delete: state.Policies,
 			},
 		})

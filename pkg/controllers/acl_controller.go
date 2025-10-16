@@ -59,7 +59,7 @@ type AclRoleItemResponse struct {
 
 type AclRoleController struct {
 	raiden.ControllerBase
-	Http    string `path:"/acl/role" type:"custom"`
+	Http    string `path:"/acl/roles" type:"custom"`
 	Payload *AclRoleRequest
 	Result  AclRoleResponse
 }
@@ -94,18 +94,18 @@ func (c *AclRoleController) Get(ctx raiden.Context) error {
 	return ctx.SendJson(c.Result)
 }
 
-type AclUserPermissionRequest struct{}
+type AclUserPolicyRequest struct{}
 
-type AclUserPermissionResponse []string
+type AclUserPolicyResponse []string
 
-type AclUserPermissionController struct {
+type AclUserPolicyController struct {
 	raiden.ControllerBase
-	Http    string `path:"/acl/user/permission" type:"custom"`
-	Payload *AclUserPermissionRequest
-	Result  AclUserPermissionResponse
+	Http    string `path:"/acl/user/policies" type:"custom"`
+	Payload *AclUserPolicyRequest
+	Result  AclUserPolicyResponse
 }
 
-func (c *AclUserPermissionController) Get(ctx raiden.Context) error {
+func (c *AclUserPolicyController) Get(ctx raiden.Context) error {
 	data, errAccess := acl.GetAuthenticatedData(ctx, false)
 	if errAccess != nil {
 		return errAccess
@@ -136,19 +136,19 @@ func (c *AclUserPermissionController) Get(ctx raiden.Context) error {
 		}
 	}
 
-	permissions, err := acl.GetPermissions(filterRole)
+	policies, err := acl.GetPolicy(filterRole)
 	if err != nil {
 		raiden.Error("failed to get permission", "message", err)
-		return ctx.SendError("failed to get permissions")
+		return ctx.SendError("failed to get policies")
 	}
 
-	for _, p := range permissions {
+	for _, p := range policies {
 		key := fmt.Sprintf("%s.%s.%s", strings.ToLower(p.Table), strings.ToLower(string(p.Command)), utils.ToSnakeCase(p.Name))
 		c.Result = append(c.Result, key)
 	}
 
 	if c.Result == nil {
-		c.Result = make(AclUserPermissionResponse, 0)
+		c.Result = make(AclUserPolicyResponse, 0)
 	}
 
 	return ctx.SendJson(c.Result)

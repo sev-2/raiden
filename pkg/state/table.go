@@ -18,7 +18,7 @@ type ModelValidationTag map[string]string
 type ExtractTableItem struct {
 	Table             objects.Table
 	ValidationTags    ModelValidationTag
-	ExtractedPolicies ExtractedPolicies
+	ExtractedPolicies ExtractPolicyResult
 }
 
 type ExtractTableItems []ExtractTableItem
@@ -63,7 +63,7 @@ func ExtractTable(tableStates []TableState, appTable []any, mapDataType map[stri
 
 		result.Delete = append(result.Delete, ExtractTableItem{
 			Table: v.Table,
-			ExtractedPolicies: ExtractedPolicies{
+			ExtractedPolicies: ExtractPolicyResult{
 				Delete: deletedPolicy,
 			},
 		})

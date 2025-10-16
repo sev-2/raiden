@@ -7,28 +7,28 @@ import (
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )
 
-func GetPermissions(role []string) (objects.Policies, error) {
+func GetPolicy(role []string) (objects.Policies, error) {
 	currentState, err := state.Load()
 	if err != nil {
 		return nil, err
 	}
-	var permissions objects.Policies
+	var policies objects.Policies
 	for _, table := range currentState.Tables {
 
 		if len(role) == 0 {
-			permissions = append(permissions, table.Policies...)
+			policies = append(policies, table.Policies...)
 			continue
 		}
 
 		for _, p := range table.Policies {
 			for _, rc := range role {
 				if slices.Contains(p.Roles, rc) {
-					permissions = append(permissions, p)
+					policies = append(policies, p)
 				}
 			}
 
 		}
 	}
 
-	return permissions, nil
+	return policies, nil
 }

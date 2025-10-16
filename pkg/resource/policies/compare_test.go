@@ -16,12 +16,20 @@ func TestCompareList(t *testing.T) {
 	sourcePolicies := []objects.Policy{
 		{
 			Name:       "Policy1",
+			Schema:     "public",
+			Table:      "table1",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
 			Definition: "def1",
 			Check:      &check1,
 			Roles:      []string{"role1", "role2"},
 		},
 		{
 			Name:       "Policy2",
+			Schema:     "public",
+			Table:      "table2",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
 			Definition: "def2",
 			Check:      &check2,
 			Roles:      []string{"role1"},
@@ -31,12 +39,20 @@ func TestCompareList(t *testing.T) {
 	targetPolicies := []objects.Policy{
 		{
 			Name:       "Policy1",
+			Schema:     "public",
+			Table:      "table1",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
 			Definition: "def1",
 			Check:      &check1,
 			Roles:      []string{"role1", "role2"},
 		},
 		{
 			Name:       "Policy2",
+			Schema:     "public",
+			Table:      "table2",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
 			Definition: "diff_def",
 			Check:      &diffCheck,
 			Roles:      []string{"role3"},
@@ -50,12 +66,20 @@ func TestCompareList(t *testing.T) {
 		Name: "",
 		SourceResource: objects.Policy{
 			Name:       "Policy1",
+			Schema:     "public",
+			Table:      "table1",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
 			Definition: "def1",
 			Check:      &check1,
 			Roles:      []string{"role1", "role2"},
 		},
 		TargetResource: objects.Policy{
 			Name:       "Policy1",
+			Schema:     "public",
+			Table:      "table1",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
 			Definition: "def1",
 			Check:      &check1,
 			Roles:      []string{"role1", "role2"},
@@ -64,6 +88,11 @@ func TestCompareList(t *testing.T) {
 		DiffItems: objects.UpdatePolicyParam{
 			Name:        "Policy1",
 			ChangeItems: []objects.UpdatePolicyType(nil),
+			OldSchema:   "public",
+			OldTable:    "table1",
+			OldAction:   "PERMISSIVE",
+			OldCommand:  objects.PolicyCommandSelect,
+			OldRoles:    []string{"role1", "role2"},
 		},
 	}
 
@@ -76,6 +105,10 @@ func TestCompareItem(t *testing.T) {
 
 	sourcePolicy := objects.Policy{
 		Name:       "Policy1",
+		Schema:     "public",
+		Table:      "table1",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandSelect,
 		Definition: "def1",
 		Check:      &check1,
 		Roles:      []string{"role1", "role2"},
@@ -83,6 +116,10 @@ func TestCompareItem(t *testing.T) {
 
 	targetPolicy := objects.Policy{
 		Name:       "Policy1",
+		Schema:     "public",
+		Table:      "table1",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandSelect,
 		Definition: "def1",
 		Check:      &check1,
 		Roles:      []string{"role1", "role2"},
@@ -103,4 +140,16 @@ func TestCompareItem(t *testing.T) {
 	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyDefinition)
 	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyCheck)
 	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyRoles)
+
+	// Test schema/action/command differences
+	sourcePolicy.Schema = "private"
+	sourcePolicy.Table = "table_other"
+	sourcePolicy.Action = "RESTRICTIVE"
+	sourcePolicy.Command = objects.PolicyCommandInsert
+
+	diffResult = policies.CompareItem(sourcePolicy, targetPolicy)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicySchema)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyTable)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyAction)
+	assert.Contains(t, diffResult.DiffItems.ChangeItems, objects.UpdatePolicyCommand)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/resource/policies"
 	"github.com/sev-2/raiden/pkg/resource/roles"
 	"github.com/sev-2/raiden/pkg/resource/rpc"
 	"github.com/sev-2/raiden/pkg/resource/storages"
@@ -27,6 +28,7 @@ var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 // [x] import role
 // [x] import function
 // [x] import storage
+// [x] import policy
 func Import(flags *Flags, config *raiden.Config) error {
 	if flags.DryRun {
 		ImportLogger.Info("running import in dry run mode")
@@ -81,7 +83,7 @@ func Import(flags *Flags, config *raiden.Config) error {
 	}
 
 	ImportLogger.Info("extract data from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, appType, err := extractAppResource(flags, localState)
+	appTables, appRoles, appRpcFunctions, appStorage, appType, appPolicies, err := extractAppResource(flags, localState)
 	if err != nil {
 		return err
 	}
@@ -205,13 +207,30 @@ func Import(flags *Flags, config *raiden.Config) error {
 		}
 	}
 
+	if (flags.All() || flags.PoliciesOnly) && len(appPolicies.Existing) > 0 {
+		if !flags.DryRun {
+			ImportLogger.Debug("start compare policies")
+		}
+		if err := policies.Compare(spResource.Policies, appPolicies.Existing); err != nil {
+			if flags.DryRun {
+				dryRunError = append(dryRunError, err.Error())
+			} else {
+				return err
+			}
+		}
+		if !flags.DryRun {
+			ImportLogger.Debug("finish compare policies")
+		}
+	}
+
 	// import report
 	importReport := ImportReport{
-		Role:    roles.GetNewCountData(spResource.Roles, appRoles),
-		Table:   tables.GetNewCountData(spResource.Tables, appTables),
-		Storage: storages.GetNewCountData(spResource.Storages, appStorage),
-		Rpc:     rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
-		Types:   types.GetNewCountData(spResource.Types, appType),
+		Role:     roles.GetNewCountData(spResource.Roles, appRoles),
+		Table:    tables.GetNewCountData(spResource.Tables, appTables),
+		Storage:  storages.GetNewCountData(spResource.Storages, appStorage),
+		Rpc:      rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
+		Types:    types.GetNewCountData(spResource.Types, appType),
+		Policies: policies.GetNewCountData(spResource.Policies, appPolicies),
 	}
 
 	if !flags.DryRun {
@@ -350,6 +369,49 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 			}
 			ImportLogger.Info("finish generate storages")
 		}
+
+		// generate all policies from cloud / pg-meta
+		if len(resource.Policies) > 0 {
+			ImportLogger.Info("start generate policies")
+			captureFunc := ImportDecorateFunc(resource.Policies, func(item objects.Policy, input generator.GenerateInput) bool {
+				if i, ok := input.BindData.(generator.GeneratePolicyData); ok {
+					if i.Name == item.Name {
+						return true
+					}
+				}
+				return false
+			}, stateChan)
+
+			tableMap, storageMap, roleMap := make(map[string]string), make(map[string]string), make(map[string]string)
+			if len(resource.Tables) > 0 {
+				for _, i := range resource.Tables {
+					tableMap[i.Name] = i.Name
+				}
+			}
+
+			if len(resource.Storages) > 0 {
+				for _, i := range resource.Storages {
+					storageMap[i.Name] = i.Name
+				}
+			}
+
+			if len(resource.Roles) > 0 {
+				for _, i := range resource.Roles {
+					roleMap[i.Name] = i.Name
+				}
+			}
+
+			nativeRoleMap, _ := loadMapNativeRole()
+
+			if err := generator.GeneratePolicies(
+				projectPath, config.ProjectName, resource.Policies,
+				tableMap, storageMap, roleMap, nativeRoleMap,
+				captureFunc,
+			); err != nil {
+				errChan <- err
+			}
+			ImportLogger.Info("finish generate policies")
+		}
 	}()
 
 	go func() {
@@ -417,6 +479,17 @@ func updateStateOnly(importState *state.LocalState, resource *Resource, mapModel
 				StorageStruct: utils.SnakeCaseToPascalCase(s.Bucket.Name),
 				Policies:      s.Policies,
 				LastUpdate:    time.Now(),
+			})
+		}
+	}
+
+	if len(resource.Policies) > 0 {
+		for i := range resource.Policies {
+			p := resource.Policies[i]
+			importState.AddPolicy(state.PolicyState{
+				Policy:       p,
+				PolicyStruct: utils.SnakeCaseToPascalCase(p.Name),
+				LastUpdate:   time.Now(),
 			})
 		}
 	}
@@ -513,6 +586,14 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 						LastUpdate: time.Now(),
 					}
 					localState.AddType(typeState)
+				case objects.Policy:
+					policyState := state.PolicyState{
+						Policy:       parseItem,
+						PolicyPath:   genInput.OutputPath,
+						PolicyStruct: utils.SnakeCaseToPascalCase(parseItem.Name),
+						LastUpdate:   time.Now(),
+					}
+					localState.AddPolicy(policyState)
 				}
 			}
 		}
@@ -523,28 +604,29 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 
 // ----- Print import report -----
 type ImportReport struct {
-	Table   int
-	Role    int
-	Rpc     int
-	Storage int
-	Types   int
+	Table    int
+	Role     int
+	Rpc      int
+	Storage  int
+	Types    int
+	Policies int
 }
 
 func PrintImportReport(report ImportReport, dryRun bool) {
 	var message string
 	if !dryRun {
 		message = "import process is complete, your code is up to date"
-		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
+		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 || report.Policies > 0 {
 			message = "import process is complete, adding several new resources to the codebase"
-			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
+			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage, "Policies", report.Policies)
 			return
 		}
 		ImportLogger.Info(message)
 	} else {
 		message = "finish running import in dry run mode, your code is up to date"
-		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 {
+		if report.Role > 0 || report.Rpc > 0 || report.Storage > 0 || report.Table > 0 || report.Policies > 0 {
 			message = "finish running import in dry run mode and add several resource"
-			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage)
+			ImportLogger.Info(message, "Table", report.Table, "Role", report.Role, "Rpc", report.Rpc, "Storage", report.Storage, "Policies", report.Policies)
 			return
 		}
 		ImportLogger.Info(message)

@@ -58,13 +58,36 @@ func TestGenerateDiffChangeUpdateMessage(t *testing.T) {
 	newCheck := "new_check"
 
 	item := policies.MigrateItem{
-		NewData: objects.Policy{Name: "Policy2", Definition: "new_def", Check: &newCheck},
-		OldData: objects.Policy{Name: "Policy2", Definition: "old_def", Check: &oldCheck},
+		NewData: objects.Policy{
+			Name:       "Policy2",
+			Schema:     "public",
+			Table:      "table_new",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandInsert,
+			Definition: "new_def",
+			Check:      &newCheck,
+			Roles:      []string{"role1", "role2"},
+		},
+		OldData: objects.Policy{
+			Name:       "Policy2",
+			Schema:     "old",
+			Table:      "table_old",
+			Action:     "RESTRICTIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "old_def",
+			Check:      &oldCheck,
+			Roles:      []string{"role1"},
+		},
 		MigrationItems: objects.UpdatePolicyParam{
 			ChangeItems: []objects.UpdatePolicyType{
 				objects.UpdatePolicyName,
 				objects.UpdatePolicyDefinition,
 				objects.UpdatePolicyCheck,
+				objects.UpdatePolicyRoles,
+				objects.UpdatePolicySchema,
+				objects.UpdatePolicyTable,
+				objects.UpdatePolicyAction,
+				objects.UpdatePolicyCommand,
 			},
 		},
 	}
@@ -75,4 +98,9 @@ func TestGenerateDiffChangeUpdateMessage(t *testing.T) {
 	assert.Contains(t, diffMessage, "- name : Policy2 >>> Policy2")
 	assert.Contains(t, diffMessage, "- definition : old_def >>> new_def")
 	assert.Contains(t, diffMessage, "- check : old_check >>> new_check")
+	assert.Contains(t, diffMessage, "- roles : role1 >>> role1,role2")
+	assert.Contains(t, diffMessage, "- schema : old >>> public")
+	assert.Contains(t, diffMessage, "- table : table_old >>> table_new")
+	assert.Contains(t, diffMessage, "- action : RESTRICTIVE >>> PERMISSIVE")
+	assert.Contains(t, diffMessage, "- command : SELECT >>> INSERT")
 }

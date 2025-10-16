@@ -118,11 +118,11 @@ func Apply(flags *Flags, config *raiden.Config) error {
 	}
 
 	ApplyLogger.Info("extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, appTypes, err := extractAppResource(flags, latestLocalState)
+	appTables, appRoles, appRpcFunctions, appStorage, appTypes, appPoliciesState, err := extractAppResource(flags, latestLocalState)
 	if err != nil {
 		return err
 	}
-	appPolicies := mergeAllPolicy(appTables, appStorage)
+	appPolicies := mergeAllPolicy(appTables, appStorage, appPoliciesState)
 
 	// validate table relation
 	var validateTable []objects.Table
@@ -419,72 +419,104 @@ func validateTableRelations(migratedTables ...objects.Table) error {
 	return nil
 }
 
-func mergeAllPolicy(et state.ExtractTableResult, es state.ExtractStorageResult) (rs state.ExtractedPolicies) {
+func mergeAllPolicy(et state.ExtractTableResult, es state.ExtractStorageResult, ep state.ExtractPolicyResult) (rs state.ExtractPolicyResult) {
+	makeKey := func(p objects.Policy) string {
+		return fmt.Sprintf("%s.%s.%s", p.Schema, p.Table, p.Name)
+	}
+
+	appendUnique := func(dst *[]objects.Policy, tracker map[string]struct{}, policies ...objects.Policy) {
+		for i := range policies {
+			policy := policies[i]
+			key := makeKey(policy)
+			if _, exist := tracker[key]; exist {
+				continue
+			}
+
+			*dst = append(*dst, policy)
+			tracker[key] = struct{}{}
+		}
+	}
+
+	newTracker := map[string]struct{}{}
+	existingTracker := map[string]struct{}{}
+	deleteTracker := map[string]struct{}{}
+
 	for i := range et.New {
 		t := et.New[i]
-		if len(t.ExtractedPolicies.New) > 0 {
-			rs.New = append(rs.New, t.ExtractedPolicies.New...)
-		}
+		appendUnique(&rs.New, newTracker, t.ExtractedPolicies.New...)
 	}
 
 	for i := range et.Existing {
 		t := et.Existing[i]
-
-		if len(t.ExtractedPolicies.New) > 0 {
-			rs.New = append(rs.New, t.ExtractedPolicies.New...)
-		}
-
-		if len(t.ExtractedPolicies.Existing) > 0 {
-			rs.Existing = append(rs.Existing, t.ExtractedPolicies.Existing...)
-		}
-
-		if len(t.ExtractedPolicies.Delete) > 0 {
-			rs.Delete = append(rs.Delete, t.ExtractedPolicies.Delete...)
-		}
+		appendUnique(&rs.New, newTracker, t.ExtractedPolicies.New...)
+		appendUnique(&rs.Existing, existingTracker, t.ExtractedPolicies.Existing...)
+		appendUnique(&rs.Delete, deleteTracker, t.ExtractedPolicies.Delete...)
 	}
 
 	for i := range es.New {
 		t := es.New[i]
-		if len(t.ExtractedPolicies.New) > 0 {
-			rs.New = append(rs.New, t.ExtractedPolicies.New...)
-		}
+		appendUnique(&rs.New, newTracker, t.ExtractedPolicies.New...)
 	}
 
 	for i := range es.Existing {
 		t := es.Existing[i]
-
-		if len(t.ExtractedPolicies.New) > 0 {
-			rs.New = append(rs.New, t.ExtractedPolicies.New...)
-		}
-
-		if len(t.ExtractedPolicies.Existing) > 0 {
-			rs.Existing = append(rs.Existing, t.ExtractedPolicies.Existing...)
-		}
-
-		if len(t.ExtractedPolicies.Delete) > 0 {
-			rs.Delete = append(rs.Delete, t.ExtractedPolicies.Delete...)
-		}
+		appendUnique(&rs.New, newTracker, t.ExtractedPolicies.New...)
+		appendUnique(&rs.Existing, existingTracker, t.ExtractedPolicies.Existing...)
+		appendUnique(&rs.Delete, deleteTracker, t.ExtractedPolicies.Delete...)
 	}
 
 	for i := range es.Delete {
 		t := es.Delete[i]
-		if len(t.ExtractedPolicies.New) > 0 {
-			rs.Delete = append(rs.Delete, t.ExtractedPolicies.New...)
-		}
-
-		if len(t.ExtractedPolicies.Existing) > 0 {
-			rs.Delete = append(rs.Delete, t.ExtractedPolicies.Existing...)
-		}
-
-		if len(t.ExtractedPolicies.Delete) > 0 {
-			rs.Delete = append(rs.Delete, t.ExtractedPolicies.Delete...)
-		}
+		appendUnique(&rs.Delete, deleteTracker, t.ExtractedPolicies.New...)
+		appendUnique(&rs.Delete, deleteTracker, t.ExtractedPolicies.Existing...)
+		appendUnique(&rs.Delete, deleteTracker, t.ExtractedPolicies.Delete...)
 	}
+
+	appendUnique(&rs.New, newTracker, ep.New...)
+	appendUnique(&rs.Existing, existingTracker, ep.Existing...)
+	appendUnique(&rs.Delete, deleteTracker, ep.Delete...)
 
 	return
 }
 
-func validateRoleIsExist(appPolicies state.ExtractedPolicies, appRoles state.ExtractRoleResult, nativeRole map[string]raiden.Role) error {
+func upsertPolicyState(localState *state.LocalState, projectPath string, policy objects.Policy) {
+	if policy.ID == 0 || policy.Name == "" {
+		return
+	}
+
+	policyStruct := utils.SnakeCaseToPascalCase(policy.Name)
+	policyPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.PolicyDir, utils.ToSnakeCase(policy.Name))
+
+	newState := state.PolicyState{
+		Policy:       policy,
+		PolicyPath:   policyPath,
+		PolicyStruct: policyStruct,
+		LastUpdate:   time.Now(),
+	}
+
+	if index, current, found := localState.FindPolicy(policy.ID); found {
+		if newState.PolicyPath == "" {
+			newState.PolicyPath = current.PolicyPath
+		}
+		if newState.PolicyStruct == "" {
+			newState.PolicyStruct = current.PolicyStruct
+		}
+		localState.UpdatePolicy(index, newState)
+		return
+	}
+
+	localState.AddPolicy(newState)
+}
+
+func deletePolicyState(localState *state.LocalState, policy objects.Policy) {
+	if policy.ID == 0 {
+		return
+	}
+
+	localState.DeletePolicy(policy.ID)
+}
+
+func validateRoleIsExist(appPolicies state.ExtractPolicyResult, appRoles state.ExtractRoleResult, nativeRole map[string]raiden.Role) error {
 	// prepare role data
 	var allRoles []objects.Role
 	allRoles = append(allRoles, appRoles.New...)
@@ -606,74 +638,69 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 					}
 
 					if m.NewData.Schema == supabase.DefaultStorageSchema && m.NewData.Table == supabase.DefaultObjectTable {
-						fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name)
-						if !found {
-							continue
+						if fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name); found {
+							tState.Policies = append(tState.Policies, m.NewData)
+							tState.LastUpdate = time.Now()
+							localState.UpdateStorage(fIndex, tState)
+							ApplyLogger.Trace("new permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
 						}
-						tState.Policies = append(tState.Policies, m.NewData)
-						tState.LastUpdate = time.Now()
-						localState.UpdateStorage(fIndex, tState)
-						ApplyLogger.Trace("new permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
 					} else {
-						fIndex, tState, found := localState.FindTable(m.NewData.TableID)
-						if !found {
-							continue
+						if fIndex, tState, found := localState.FindTable(m.NewData.TableID); found {
+							tState.Policies = append(tState.Policies, m.NewData)
+							tState.LastUpdate = time.Now()
+							ApplyLogger.Trace("new permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
+							localState.UpdateTable(fIndex, tState)
 						}
-						tState.Policies = append(tState.Policies, m.NewData)
-						tState.LastUpdate = time.Now()
-						ApplyLogger.Trace("new permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
-						localState.UpdateTable(fIndex, tState)
 					}
+					upsertPolicyState(localState, projectPath, m.NewData)
 				case migrator.MigrateTypeDelete:
 					if m.OldData.Name == "" {
 						continue
 					}
 
 					if m.OldData.Schema == supabase.DefaultStorageSchema && m.OldData.Table == supabase.DefaultObjectTable {
-						fIndex, tState, found := localState.FindStorageByPermissionName(m.OldData.Name)
-						if !found {
-							continue
-						}
+						if fIndex, tState, found := localState.FindStorageByPermissionName(m.OldData.Name); found {
 
-						// find policy index
-						pi := -1
-						for i := range tState.Policies {
-							p := tState.Policies[i]
-							if p.ID == m.OldData.ID {
-								pi = i
-								break
+							// find policy index
+							pi := -1
+							for i := range tState.Policies {
+								p := tState.Policies[i]
+								if p.ID == m.OldData.ID {
+									pi = i
+									break
+								}
 							}
-						}
 
-						if pi > -1 {
-							tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
-							tState.LastUpdate = time.Now()
-							localState.UpdateStorage(fIndex, tState)
-							ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Storage.Name, "permission", m.OldData.Name)
+							if pi > -1 {
+								tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+								tState.LastUpdate = time.Now()
+								localState.UpdateStorage(fIndex, tState)
+								ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Storage.Name, "permission", m.OldData.Name)
+							}
 						}
 					} else {
-						fIndex, tState, found := localState.FindTable(m.OldData.TableID)
-						if !found {
-							continue
-						}
+						if fIndex, tState, found := localState.FindTable(m.OldData.TableID); found {
 
-						// find policy index
-						pi := -1
-						for i := range tState.Policies {
-							p := tState.Policies[i]
-							if p.ID == m.OldData.ID {
-								pi = i
-								break
+							// find policy index
+							pi := -1
+							for i := range tState.Policies {
+								p := tState.Policies[i]
+								if p.ID == m.OldData.ID {
+									pi = i
+									break
+								}
+							}
+
+							if pi > -1 {
+								tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+								tState.LastUpdate = time.Now()
+								localState.UpdateTable(fIndex, tState)
+								ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.OldData.Name)
 							}
 						}
-
-						if pi > -1 {
-							tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
-							tState.LastUpdate = time.Now()
-							localState.UpdateTable(fIndex, tState)
-							ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.OldData.Name)
-						}
 					}
+
+					deletePolicyState(localState, m.OldData)
 
 				case migrator.MigrateTypeUpdate:
 					if m.NewData.Name == "" {
@@ -681,47 +708,47 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 					}
 					if m.NewData.Schema == supabase.DefaultStorageSchema && m.NewData.Table == supabase.DefaultObjectTable {
 						fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name)
-						if !found {
-							continue
-						}
+						if found {
 
-						// find policy index
-						pi := -1
-						for i := range tState.Policies {
-							p := tState.Policies[i]
-							if p.ID == m.OldData.ID {
-								pi = i
-								break
+							// find policy index
+							pi := -1
+							for i := range tState.Policies {
+								p := tState.Policies[i]
+								if p.ID == m.OldData.ID {
+									pi = i
+									break
+								}
 							}
+							if pi > -1 {
+								tState.Policies[pi] = m.NewData
+								tState.LastUpdate = time.Now()
+								ApplyLogger.Debug("update permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
+							}
+							localState.UpdateStorage(fIndex, tState)
 						}
-						if pi > -1 {
-							tState.Policies[pi] = m.NewData
-							tState.LastUpdate = time.Now()
-							ApplyLogger.Debug("update permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
-						}
-						localState.UpdateStorage(fIndex, tState)
 					} else {
 						fIndex, tState, found := localState.FindTable(m.NewData.TableID)
-						if !found {
-							continue
-						}
+						if found {
 
-						// find policy index
-						pi := -1
-						for i := range tState.Policies {
-							p := tState.Policies[i]
-							if p.ID == m.OldData.ID {
-								pi = i
-								break
+							// find policy index
+							pi := -1
+							for i := range tState.Policies {
+								p := tState.Policies[i]
+								if p.ID == m.OldData.ID {
+									pi = i
+									break
+								}
+							}
+							if pi > -1 {
+								tState.Policies[pi] = m.NewData
+								tState.LastUpdate = time.Now()
+								localState.UpdateTable(fIndex, tState)
+								ApplyLogger.Trace("update permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
 							}
 						}
-						if pi > -1 {
-							tState.Policies[pi] = m.NewData
-							tState.LastUpdate = time.Now()
-							localState.UpdateTable(fIndex, tState)
-							ApplyLogger.Trace("update permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
-						}
 					}
+
+					upsertPolicyState(localState, projectPath, m.NewData)
 
 				}
 			case *rpc.MigrateItem:

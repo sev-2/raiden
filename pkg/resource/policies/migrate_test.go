@@ -12,7 +12,7 @@ import (
 )
 
 func TestBuildMigrateData(t *testing.T) {
-	extractedLocalData := state.ExtractedPolicies{
+	extractedLocalData := state.ExtractPolicyResult{
 		New: []objects.Policy{
 			{Name: "Policy1", Definition: "def1", Roles: []string{"role1"}},
 		},

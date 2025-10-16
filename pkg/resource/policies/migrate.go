@@ -18,7 +18,7 @@ var ActionFunc = MigrateActionFunc{
 	DeleteFunc: supabase.DeletePolicy,
 }
 
-func BuildMigrateData(extractedLocalData state.ExtractedPolicies, supabaseData []objects.Policy) (migrateData []MigrateItem, err error) {
+func BuildMigrateData(extractedLocalData state.ExtractPolicyResult, supabaseData []objects.Policy) (migrateData []MigrateItem, err error) {
 	Logger.Info("start build policy migrate data")
 	// compare and bind existing table to migrate data
 	mapSpPolicies := make(map[string]bool)
@@ -112,6 +112,7 @@ func BuildMigrateItem(supabaseData, localData []objects.Policy) (migrateData []M
 		migrateData = append(migrateData, MigrateItem{
 			Type:           migrateType,
 			NewData:        r.SourceResource,
+			OldData:        r.TargetResource,
 			MigrationItems: r.DiffItems,
 		})
 	}

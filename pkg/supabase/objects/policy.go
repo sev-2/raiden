@@ -3,7 +3,6 @@ package objects
 import "strings"
 
 type PolicyCommand string
-
 type Policy struct {
 	ID         int           `json:"id"`
 	Schema     string        `json:"schema"`
@@ -22,6 +21,7 @@ const (
 	PolicyCommandInsert PolicyCommand = "INSERT"
 	PolicyCommandUpdate PolicyCommand = "UPDATE"
 	PolicyCommandDelete PolicyCommand = "DELETE"
+	PolicyCommandAll    PolicyCommand = "ALL"
 )
 
 type Policies []Policy
@@ -66,9 +66,18 @@ const (
 	UpdatePolicyDefinition UpdatePolicyType = "definition"
 	UpdatePolicyCheck      UpdatePolicyType = "check"
 	UpdatePolicyRoles      UpdatePolicyType = "roles"
+	UpdatePolicySchema     UpdatePolicyType = "schema"
+	UpdatePolicyTable      UpdatePolicyType = "table"
+	UpdatePolicyAction     UpdatePolicyType = "action"
+	UpdatePolicyCommand    UpdatePolicyType = "command"
 )
 
 type UpdatePolicyParam struct {
 	Name        string
 	ChangeItems []UpdatePolicyType
+	OldSchema   string
+	OldTable    string
+	OldAction   string
+	OldCommand  PolicyCommand
+	OldRoles    []string
 }
