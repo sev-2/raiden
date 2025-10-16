@@ -45,10 +45,6 @@ func PrintDiff(diffData CompareDiffResult) {
 	printScope := color.New(color.FgHiBlack).PrintfFunc()
 
 	changes := make([]string, 0)
-	policyName := diffData.SourceResource.Name
-	if policyName == "" {
-		policyName = diffData.TargetResource.Name
-	}
 
 	for _, v := range diffData.DiffItems.ChangeItems {
 		switch v {

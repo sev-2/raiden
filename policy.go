@@ -171,7 +171,7 @@ func BuildPolicy(p Policy) (*objects.Policy, error) {
 	}
 
 	if p.Model() == nil && p.Storage() == nil {
-		return nil, errors.New("policy must define resouce, implement Model() or Storage() function")
+		return nil, errors.New("policy must define resoruce, implement Model() or Storage() function")
 	}
 
 	if err := utils.EmptyOrError(p.Command(), "command is rquired to set"); err != nil {
