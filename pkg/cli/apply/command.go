@@ -36,7 +36,6 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "import roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "import models only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "import storage only")
-	cmd.Flags().BoolVar(&f.PoliciesOnly, "policies-only", false, "apply policies only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to import, use coma separator for multiple schema")
 	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run apply in simulate mode without actual running apply change")
 }
@@ -121,10 +120,6 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 
 	if flags.StoragesOnly {
 		args = append(args, "--storages-only")
-	}
-
-	if flags.PoliciesOnly {
-		args = append(args, "--policies-only")
 	}
 
 	if flags.AllowedSchema != "" {

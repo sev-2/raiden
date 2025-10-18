@@ -35,6 +35,57 @@ type MigrateData struct {
 	Types    []types.MigrateItem
 }
 
+type applyDeps struct {
+	loadNativeRoles     func() (map[string]raiden.Role, error)
+	loadState           func() (*state.State, error)
+	extractApp          func(*Flags, *state.State) (state.ExtractTableResult, state.ExtractRoleResult, state.ExtractRpcResult, state.ExtractStorageResult, state.ExtractTypeResult, error)
+	loadRemote          func(*Flags, *raiden.Config) (*Resource, error)
+	migrate             func(*raiden.Config, *state.LocalState, string, *MigrateData) []error
+	buildRoleMigrate    func(state.ExtractRoleResult, []objects.Role) ([]roles.MigrateItem, error)
+	buildTableMigrate   func(state.ExtractTableResult, []objects.Table, []string) ([]tables.MigrateItem, error)
+	buildRpcMigrate     func(state.ExtractRpcResult, []objects.Function) ([]rpc.MigrateItem, error)
+	buildStorageMigrate func(state.ExtractStorageResult, []objects.Bucket) ([]storages.MigrateItem, error)
+	buildPolicyMigrate  func(state.ExtractPolicyResult, []objects.Policy) ([]policies.MigrateItem, error)
+	buildTypeMigrate    func(state.ExtractTypeResult, []objects.Type) ([]types.MigrateItem, error)
+	printReport         func(MigrateData)
+}
+
+var defaultApplyDeps = applyDeps{
+	loadNativeRoles:     loadMapNativeRole,
+	loadState:           state.Load,
+	extractApp:          extractAppResource,
+	loadRemote:          Load,
+	migrate:             Migrate,
+	buildRoleMigrate:    roles.BuildMigrateData,
+	buildTableMigrate:   tables.BuildMigrateData,
+	buildRpcMigrate:     rpc.BuildMigrateData,
+	buildStorageMigrate: storages.BuildMigrateData,
+	buildPolicyMigrate:  policies.BuildMigrateData,
+	buildTypeMigrate:    types.BuildMigrateData,
+	printReport:         PrintApplyChangeReport,
+}
+
+// applyJob encapsulates the sequential steps required to build and run a migration plan.
+// Each helper focuses on a single concern so we can stub them in tests.
+
+type applyJob struct {
+	flags            *Flags
+	config           *raiden.Config
+	deps             applyDeps
+	mapNativeRole    map[string]raiden.Role
+	latestLocalState *state.State
+	localState       state.LocalState
+	appTables        state.ExtractTableResult
+	appRoles         state.ExtractRoleResult
+	appRpcFunctions  state.ExtractRpcResult
+	appStorage       state.ExtractStorageResult
+	appTypes         state.ExtractTypeResult
+	appPolicies      state.ExtractPolicyResult
+	resource         *Resource
+	migrateData      MigrateData
+	reportPrinted    bool
+}
+
 // Migrate resource :
 //
 // [x] migrate table
@@ -89,170 +140,249 @@ type MigrateData struct {
 //	[x] add storage acl
 //	[x] update storage acl
 func Apply(flags *Flags, config *raiden.Config) (err error) {
-	var (
-		reportPrinted bool
-		migrateData   MigrateData
-	)
+	return runApply(flags, config, defaultApplyDeps)
+}
+
+func runApply(flags *Flags, config *raiden.Config, deps applyDeps) (err error) {
+	job := &applyJob{
+		flags:  flags,
+		config: config,
+		deps:   deps,
+	}
+
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("apply panic: %v", r)
-		}
-		if err == nil && !reportPrinted {
-			PrintApplyChangeReport(migrateData)
-			reportPrinted = true
+		if err == nil && !job.reportPrinted {
+			job.printReport()
 		}
 	}()
 
-	// declare default variable
-	var localState state.LocalState
+	if err = job.run(); err != nil {
+		return err
+	}
+	return nil
+}
 
-	if flags.DryRun {
+func (j *applyJob) run() error {
+	if j.flags.DryRun {
 		ApplyLogger.Info("running apply in dry run mode")
 	}
 
-	// load map native role
-	ApplyLogger.Info("load Native log")
-	mapNativeRole, err := loadMapNativeRole()
-	if err != nil {
+	if err := j.loadNativeRoles(); err != nil {
 		return err
 	}
 
-	// load app resource
+	if err := j.loadLocalState(); err != nil {
+		return err
+	}
+
+	if err := j.extractAppResources(); err != nil {
+		return err
+	}
+
+	j.buildPoliciesSnapshot()
+
+	if err := j.validateLocalData(); err != nil {
+		return err
+	}
+
+	if err := j.loadRemoteResource(); err != nil {
+		return err
+	}
+
+	j.prepareRemoteResource()
+
+	if err := j.buildMigrateData(); err != nil {
+		return err
+	}
+
+	if err := j.runMigrations(); err != nil {
+		return err
+	}
+
+	j.printReport()
+	return nil
+}
+
+func (j *applyJob) loadNativeRoles() error {
+	ApplyLogger.Info("load Native log")
+	mapNativeRole, err := j.deps.loadNativeRoles()
+	if err != nil {
+		return err
+	}
+	j.mapNativeRole = mapNativeRole
+	return nil
+}
+
+func (j *applyJob) loadLocalState() error {
 	ApplyLogger.Info("load resource from local state")
-	latestLocalState, err := state.Load()
+	latestLocalState, err := j.deps.loadState()
 	if err != nil {
 		return err
 	}
 
 	if latestLocalState == nil {
 		return errors.New("state file is not found, please run raiden imports first")
-	} else {
-		localState.State = *latestLocalState
 	}
 
+	j.latestLocalState = latestLocalState
+	j.localState.State = *latestLocalState
+	return nil
+}
+
+func (j *applyJob) extractAppResources() error {
 	ApplyLogger.Info("extract table, role, and rpc from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, appTypes, appPoliciesState, err := extractAppResource(flags, latestLocalState)
+	appTables, appRoles, appRpcFunctions, appStorage, appTypes, err := j.deps.extractApp(j.flags, j.latestLocalState)
 	if err != nil {
 		return err
 	}
-	appPolicies := mergeAllPolicy(appTables, appStorage, appPoliciesState)
 
-	// validate table relation
+	j.appTables = appTables
+	j.appRoles = appRoles
+	j.appRpcFunctions = appRpcFunctions
+	j.appStorage = appStorage
+	j.appTypes = appTypes
+	return nil
+}
+
+// buildPoliciesSnapshot merges table and storage policies to feed downstream diffing.
+func (j *applyJob) buildPoliciesSnapshot() {
+	j.appPolicies = mergeAllPolicy(j.appTables, j.appStorage)
+}
+
+// validateLocalData checks local relations and policy role references before contacting Supabase.
+func (j *applyJob) validateLocalData() error {
 	var validateTable []objects.Table
-	validateTable = append(validateTable, appTables.New.ToFlatTable()...)
-	validateTable = append(validateTable, appTables.Existing.ToFlatTable()...)
+	validateTable = append(validateTable, j.appTables.New.ToFlatTable()...)
+	validateTable = append(validateTable, j.appTables.Existing.ToFlatTable()...)
 	ApplyLogger.Info("validate local table relation")
 	if err := validateTableRelations(validateTable...); err != nil {
 		return err
 	}
 
-	// validate role in policies is exist
 	ApplyLogger.Info("validate local role")
-	if err := validateRoleIsExist(appPolicies, appRoles, mapNativeRole); err != nil {
+	if err := validateRoleIsExist(j.appPolicies, j.appRoles, j.mapNativeRole); err != nil {
 		return err
 	}
 
-	// load supabase resource
+	return nil
+}
+
+func (j *applyJob) loadRemoteResource() error {
 	ApplyLogger.Info("load resource from supabase")
-	resource, err := Load(flags, config)
+	resource, err := j.deps.loadRemote(j.flags, j.config)
 	if err != nil {
 		return err
 	}
+	j.resource = resource
+	return nil
+}
 
-	// filter table for with allowed schema
-	ApplyLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+func (j *applyJob) prepareRemoteResource() {
+	ApplyLogger.Debug("start filter table and function by allowed schema", "allowed-schema", j.flags.AllowedSchema)
 	ApplyLogger.Trace("filter table by schema")
-	resource.Tables = filterTableBySchema(resource.Tables, strings.Split(flags.AllowedSchema, ",")...)
-	if config.Mode == raiden.BffMode {
-		if config.AllowedTables != "*" {
-			allowedTable := strings.Split(config.AllowedTables, ",")
-			resource.Tables = filterAllowedTables(resource.Tables, strings.Split(flags.AllowedSchema, ","), allowedTable...)
-		}
+	j.resource.Tables = filterTableBySchema(j.resource.Tables, strings.Split(j.flags.AllowedSchema, ",")...)
+	if j.config.Mode == raiden.BffMode && j.config.AllowedTables != "*" {
+		allowedTable := strings.Split(j.config.AllowedTables, ",")
+		j.resource.Tables = filterAllowedTables(j.resource.Tables, strings.Split(j.flags.AllowedSchema, ","), allowedTable...)
 	}
 	ApplyLogger.Trace("filter function by schema")
-	resource.Functions = filterFunctionBySchema(resource.Functions, strings.Split(flags.AllowedSchema, ",")...)
-	ApplyLogger.Debug("finish filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	j.resource.Functions = filterFunctionBySchema(j.resource.Functions, strings.Split(j.flags.AllowedSchema, ",")...)
+	ApplyLogger.Debug("finish filter table and function by allowed schema", "allowed-schema", j.flags.AllowedSchema)
 
-	resource.Roles = roles.AttachInherithRole(mapNativeRole, resource.Roles, resource.RoleMemberships)
-
+	j.resource.Roles = roles.AttachInherithRole(j.mapNativeRole, j.resource.Roles, j.resource.RoleMemberships)
 	ApplyLogger.Trace("remove native role for supabase list role")
-	resource.Roles = filterUserRole(resource.Roles, mapNativeRole)
+	j.resource.Roles = filterUserRole(j.resource.Roles, j.mapNativeRole)
+}
 
+// buildMigrateData converts extracted state into migrator inputs for each resource type.
+func (j *applyJob) buildMigrateData() error {
 	ApplyLogger.Info("start build migrate data")
-	if flags.All() || flags.RolesOnly {
-		if data, err := roles.BuildMigrateData(appRoles, resource.Roles); err != nil {
+
+	if j.flags.All() || j.flags.RolesOnly {
+		data, err := j.deps.buildRoleMigrate(j.appRoles, j.resource.Roles)
+		if err != nil {
 			return err
-		} else {
-			migrateData.Roles = data
 		}
+		j.migrateData.Roles = data
 	}
 
-	if flags.All() || flags.ModelsOnly {
+	if j.flags.All() || j.flags.ModelsOnly {
 		allowedTable := []string{}
 
-		if config.Mode == raiden.SvcMode && config.AllowedTables != "*" {
-			allowedTable = strings.Split(config.AllowedTables, ",")
+		if j.config.Mode == raiden.SvcMode && j.config.AllowedTables != "*" {
+			allowedTable = strings.Split(j.config.AllowedTables, ",")
 		}
 
-		resource.Tables = tables.AttachIndexAndAction(resource.Tables, resource.Indexes, resource.RelationActions)
-		if data, err := tables.BuildMigrateData(appTables, resource.Tables, allowedTable); err != nil {
+		j.resource.Tables = tables.AttachIndexAndAction(j.resource.Tables, j.resource.Indexes, j.resource.RelationActions)
+		data, err := j.deps.buildTableMigrate(j.appTables, j.resource.Tables, allowedTable)
+		if err != nil {
 			return err
-		} else {
-			migrateData.Tables = data
 		}
+		j.migrateData.Tables = data
 	}
 
-	if flags.All() || flags.RpcOnly {
-		if data, err := rpc.BuildMigrateData(appRpcFunctions, resource.Functions); err != nil {
+	if j.flags.All() || j.flags.RpcOnly {
+		data, err := j.deps.buildRpcMigrate(j.appRpcFunctions, j.resource.Functions)
+		if err != nil {
 			return err
-		} else {
-			migrateData.Rpc = data
 		}
+		j.migrateData.Rpc = data
 	}
 
-	if flags.All() || flags.StoragesOnly {
-		if data, err := storages.BuildMigrateData(appStorage, resource.Storages); err != nil {
+	if j.flags.All() || j.flags.StoragesOnly {
+		data, err := j.deps.buildStorageMigrate(j.appStorage, j.resource.Storages)
+		if err != nil {
 			return err
-		} else {
-			migrateData.Storages = data
 		}
+		j.migrateData.Storages = data
 	}
 
-	if len(appPolicies.New) > 0 || len(appPolicies.Existing) > 0 || len(appPolicies.Delete) > 0 {
-		// bind app policies to resource
-		if data, err := policies.BuildMigrateData(appPolicies, resource.Policies); err != nil {
+	if len(j.appPolicies.New) > 0 || len(j.appPolicies.Existing) > 0 || len(j.appPolicies.Delete) > 0 {
+		data, err := j.deps.buildPolicyMigrate(j.appPolicies, j.resource.Policies)
+		if err != nil {
 			return err
-		} else {
-			migrateData.Policies = data
 		}
+		j.migrateData.Policies = data
 	}
 
-	if len(appTypes.New) > 0 || len(appTypes.Existing) > 0 || len(appTypes.Delete) > 0 {
-		// bind app policies to resource
-		if data, err := types.BuildMigrateData(appTypes, resource.Types); err != nil {
+	if len(j.appTypes.New) > 0 || len(j.appTypes.Existing) > 0 || len(j.appTypes.Delete) > 0 {
+		data, err := j.deps.buildTypeMigrate(j.appTypes, j.resource.Types)
+		if err != nil {
 			return err
-		} else {
-			migrateData.Types = data
 		}
-
+		j.migrateData.Types = data
 	}
 
 	ApplyLogger.Info("finish build migrate data")
-	if !flags.DryRun {
-		migrateErr := Migrate(config, &localState, flags.ProjectPath, &migrateData)
-		if len(migrateErr) > 0 {
-			var errMessages []string
-			for _, e := range migrateErr {
-				errMessages = append(errMessages, e.Error())
-			}
-
-			return errors.New(strings.Join(errMessages, ","))
-		}
-		ApplyLogger.Info("finish migrate resource")
-	}
-	PrintApplyChangeReport(migrateData)
-	reportPrinted = true
 	return nil
+}
+
+// runMigrations invokes the migrator unless the command is running in dry-run mode.
+func (j *applyJob) runMigrations() error {
+	if j.flags.DryRun {
+		return nil
+	}
+
+	errs := j.deps.migrate(j.config, &j.localState, j.flags.ProjectPath, &j.migrateData)
+	if len(errs) == 0 {
+		ApplyLogger.Info("finish migrate resource")
+		return nil
+	}
+
+	var errMessages []string
+	for _, e := range errs {
+		errMessages = append(errMessages, e.Error())
+	}
+
+	return errors.New(strings.Join(errMessages, ","))
+}
+
+func (j *applyJob) printReport() {
+	if j.reportPrinted {
+		return
+	}
+	j.deps.printReport(j.migrateData)
+	j.reportPrinted = true
 }
 
 func Migrate(config *raiden.Config, importState *state.LocalState, projectPath string, resource *MigrateData) (errors []error) {
@@ -433,7 +563,7 @@ func validateTableRelations(migratedTables ...objects.Table) error {
 	return nil
 }
 
-func mergeAllPolicy(et state.ExtractTableResult, es state.ExtractStorageResult, ep state.ExtractPolicyResult) (rs state.ExtractPolicyResult) {
+func mergeAllPolicy(et state.ExtractTableResult, es state.ExtractStorageResult) (rs state.ExtractPolicyResult) {
 	makeKey := func(p objects.Policy) string {
 		return fmt.Sprintf("%s.%s.%s", p.Schema, p.Table, p.Name)
 	}
@@ -486,48 +616,7 @@ func mergeAllPolicy(et state.ExtractTableResult, es state.ExtractStorageResult, 
 		appendUnique(&rs.Delete, deleteTracker, t.ExtractedPolicies.Delete...)
 	}
 
-	appendUnique(&rs.New, newTracker, ep.New...)
-	appendUnique(&rs.Existing, existingTracker, ep.Existing...)
-	appendUnique(&rs.Delete, deleteTracker, ep.Delete...)
-
 	return
-}
-
-func upsertPolicyState(localState *state.LocalState, projectPath string, policy objects.Policy) {
-	if policy.ID == 0 || policy.Name == "" {
-		return
-	}
-
-	policyStruct := utils.SnakeCaseToPascalCase(policy.Name)
-	policyPath := fmt.Sprintf("%s/%s/%s.go", projectPath, generator.PolicyDir, utils.ToSnakeCase(policy.Name))
-
-	newState := state.PolicyState{
-		Policy:       policy,
-		PolicyPath:   policyPath,
-		PolicyStruct: policyStruct,
-		LastUpdate:   time.Now(),
-	}
-
-	if index, current, found := localState.FindPolicy(policy.ID); found {
-		if newState.PolicyPath == "" {
-			newState.PolicyPath = current.PolicyPath
-		}
-		if newState.PolicyStruct == "" {
-			newState.PolicyStruct = current.PolicyStruct
-		}
-		localState.UpdatePolicy(index, newState)
-		return
-	}
-
-	localState.AddPolicy(newState)
-}
-
-func deletePolicyState(localState *state.LocalState, policy objects.Policy) {
-	if policy.ID == 0 {
-		return
-	}
-
-	localState.DeletePolicy(policy.ID)
 }
 
 func validateRoleIsExist(appPolicies state.ExtractPolicyResult, appRoles state.ExtractRoleResult, nativeRole map[string]raiden.Role) error {
@@ -652,69 +741,74 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 					}
 
 					if m.NewData.Schema == supabase.DefaultStorageSchema && m.NewData.Table == supabase.DefaultObjectTable {
-						if fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name); found {
-							tState.Policies = append(tState.Policies, m.NewData)
-							tState.LastUpdate = time.Now()
-							localState.UpdateStorage(fIndex, tState)
-							ApplyLogger.Trace("new permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
+						fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name)
+						if !found {
+							continue
 						}
+						tState.Policies = append(tState.Policies, m.NewData)
+						tState.LastUpdate = time.Now()
+						localState.UpdateStorage(fIndex, tState)
+						ApplyLogger.Trace("new permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
 					} else {
-						if fIndex, tState, found := localState.FindTable(m.NewData.TableID); found {
-							tState.Policies = append(tState.Policies, m.NewData)
-							tState.LastUpdate = time.Now()
-							ApplyLogger.Trace("new permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
-							localState.UpdateTable(fIndex, tState)
+						fIndex, tState, found := localState.FindTable(m.NewData.TableID)
+						if !found {
+							continue
 						}
+						tState.Policies = append(tState.Policies, m.NewData)
+						tState.LastUpdate = time.Now()
+						ApplyLogger.Trace("new permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
+						localState.UpdateTable(fIndex, tState)
 					}
-					upsertPolicyState(localState, projectPath, m.NewData)
 				case migrator.MigrateTypeDelete:
 					if m.OldData.Name == "" {
 						continue
 					}
 
 					if m.OldData.Schema == supabase.DefaultStorageSchema && m.OldData.Table == supabase.DefaultObjectTable {
-						if fIndex, tState, found := localState.FindStorageByPermissionName(m.OldData.Name); found {
+						fIndex, tState, found := localState.FindStorageByPermissionName(m.OldData.Name)
+						if !found {
+							continue
+						}
 
-							// find policy index
-							pi := -1
-							for i := range tState.Policies {
-								p := tState.Policies[i]
-								if p.ID == m.OldData.ID {
-									pi = i
-									break
-								}
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
 							}
+						}
 
-							if pi > -1 {
-								tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
-								tState.LastUpdate = time.Now()
-								localState.UpdateStorage(fIndex, tState)
-								ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Storage.Name, "permission", m.OldData.Name)
-							}
+						if pi > -1 {
+							tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+							tState.LastUpdate = time.Now()
+							localState.UpdateStorage(fIndex, tState)
+							ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Storage.Name, "permission", m.OldData.Name)
 						}
 					} else {
-						if fIndex, tState, found := localState.FindTable(m.OldData.TableID); found {
+						fIndex, tState, found := localState.FindTable(m.OldData.TableID)
+						if !found {
+							continue
+						}
 
-							// find policy index
-							pi := -1
-							for i := range tState.Policies {
-								p := tState.Policies[i]
-								if p.ID == m.OldData.ID {
-									pi = i
-									break
-								}
-							}
-
-							if pi > -1 {
-								tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
-								tState.LastUpdate = time.Now()
-								localState.UpdateTable(fIndex, tState)
-								ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.OldData.Name)
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
 							}
 						}
-					}
 
-					deletePolicyState(localState, m.OldData)
+						if pi > -1 {
+							tState.Policies = append(tState.Policies[:pi], tState.Policies[pi+1:]...)
+							tState.LastUpdate = time.Now()
+							localState.UpdateTable(fIndex, tState)
+							ApplyLogger.Trace("remove permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.OldData.Name)
+						}
+					}
 
 				case migrator.MigrateTypeUpdate:
 					if m.NewData.Name == "" {
@@ -722,47 +816,53 @@ func UpdateLocalStateFromApply(projectPath string, localState *state.LocalState,
 					}
 					if m.NewData.Schema == supabase.DefaultStorageSchema && m.NewData.Table == supabase.DefaultObjectTable {
 						fIndex, tState, found := localState.FindStorageByPermissionName(m.NewData.Name)
-						if found {
-
-							// find policy index
-							pi := -1
-							for i := range tState.Policies {
-								p := tState.Policies[i]
-								if p.ID == m.OldData.ID {
-									pi = i
-									break
-								}
-							}
-							if pi > -1 {
-								tState.Policies[pi] = m.NewData
-								tState.LastUpdate = time.Now()
-								ApplyLogger.Debug("update permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
-							}
-							localState.UpdateStorage(fIndex, tState)
+						if !found {
+							continue
 						}
+
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
+							}
+						}
+						if pi > -1 {
+							tState.Policies[pi] = m.NewData
+							tState.LastUpdate = time.Now()
+							ApplyLogger.Debug("update permission", supabase.RlsTypeStorage, tState.Storage.Name, "permission", m.NewData.Name)
+						}
+						localState.UpdateStorage(fIndex, tState)
 					} else {
 						fIndex, tState, found := localState.FindTable(m.NewData.TableID)
-						if found {
+						if !found {
+							continue
+						}
 
-							// find policy index
-							pi := -1
-							for i := range tState.Policies {
-								p := tState.Policies[i]
-								if p.ID == m.OldData.ID {
-									pi = i
-									break
-								}
-							}
-							if pi > -1 {
-								tState.Policies[pi] = m.NewData
-								tState.LastUpdate = time.Now()
-								localState.UpdateTable(fIndex, tState)
-								ApplyLogger.Trace("update permission", supabase.RlsTypeModel, tState.Table.Name, "permission", m.NewData.Name)
+						// find policy index
+						pi := -1
+						for i := range tState.Policies {
+							p := tState.Policies[i]
+							if p.ID == m.OldData.ID {
+								pi = i
+								break
 							}
 						}
+						if pi > -1 {
+							tState.Policies[pi] = m.NewData
+							tState.LastUpdate = time.Now()
+							localState.UpdateTable(fIndex, tState)
+							ApplyLogger.Warn("new permission",
+								supabase.RlsTypeModel, tState.Table.Name,
+								"permission", m.NewData.Name,
+								"definition", m.NewData.Definition,
+								"check", m.NewData.Check,
+								"command", m.NewData.Command,
+							)
+						}
 					}
-
-					upsertPolicyState(localState, projectPath, m.NewData)
 
 				}
 			case *rpc.MigrateItem:

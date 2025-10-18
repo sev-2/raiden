@@ -46,57 +46,79 @@ func colNameFromPtr(model any, fieldPtr any) string {
 	}
 
 	mv := reflect.ValueOf(model)
-	switch mv.Kind() {
-	case reflect.Ptr:
+	for mv.Kind() == reflect.Pointer {
 		if mv.IsNil() {
-			// create zero value for metadata purposes
 			mv = reflect.New(mv.Type().Elem())
 		}
 		mv = mv.Elem()
-	case reflect.Struct:
-		// make addressable copy so we can inspect metadata
-		addr := reflect.New(mv.Type())
-		addr.Elem().Set(mv)
-		mv = addr.Elem()
-	default:
-		panic(fmt.Sprintf("builder: model must be struct or pointer to struct (got %T)", model))
 	}
 
 	if mv.Kind() != reflect.Struct {
 		panic(fmt.Sprintf("builder: model must resolve to struct (got %T)", model))
 	}
 
+	addr := reflect.New(mv.Type())
+	addr.Elem().Set(mv)
+	mv = addr.Elem()
+
 	fp := reflect.ValueOf(fieldPtr)
-	if fp.Kind() != reflect.Ptr || fp.IsNil() {
-		panic("builder: fieldPtr must be a pointer to a struct field (e.g., &m.Title)")
+	if !fp.IsValid() {
+		panic("builder: fieldPtr must not be nil")
 	}
-	target := fp.Pointer()
 
 	mt := mv.Type()
-	bestMatch, fallbackMatch := resolveColumnFromStruct(mv, mt, target)
-	if bestMatch != nil && bestMatch.score > 0 {
-		return bestMatch.column
+
+	if fp.Kind() == reflect.Pointer && !fp.IsNil() {
+		target := fp.Pointer()
+		bestMatch, fallbackMatch := resolveColumnFromStruct(mv, mt, target)
+		if bestMatch != nil && bestMatch.score > 0 {
+			return bestMatch.column
+		}
+
+		// Attempt to resolve by matching the field type when address comparison fails
+		fieldType := fp.Type().Elem()
+		if column, ok := lookupColumnByType(mt, fieldType); ok {
+			return column
+		}
+
+		if fallbackMatch != nil && fallbackMatch.column != "" {
+			return fallbackMatch.column
+		}
+
+		panic("builder: could not match fieldPtr to any addressable struct field")
 	}
 
-	// Fallback: attempt to resolve by matching field type
-	fieldType := fp.Type().Elem()
+	// Allow resolving by value or nil pointer (e.g., model.Owner where Owner is *uuid.UUID and nil)
+	fieldType := fp.Type()
+	if fp.Kind() == reflect.Pointer && fp.IsNil() {
+		// keep fieldType as the pointer type, matching the struct field declaration
+		if column, ok := lookupColumnByType(mt, fieldType); ok {
+			return column
+		}
+		panic("builder: fieldPtr must be a pointer to a struct field (e.g., &m.Title)")
+	}
+
+	if column, ok := lookupColumnByType(mt, fieldType); ok {
+		return column
+	}
+
+	panic("builder: fieldPtr must be a pointer to a struct field (e.g., &m.Title)")
+}
+
+func lookupColumnByType(t reflect.Type, fieldType reflect.Type) (string, bool) {
 	var candidates []reflect.StructField
-	for i := 0; i < mt.NumField(); i++ {
-		sf := mt.Field(i)
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
 		if sf.Type == fieldType {
 			candidates = append(candidates, sf)
 		}
 	}
 
 	if len(candidates) == 1 {
-		return columnNameFromStructField(candidates[0])
+		return columnNameFromStructField(candidates[0]), true
 	}
 
-	if fallbackMatch != nil && fallbackMatch.column != "" {
-		return fallbackMatch.column
-	}
-
-	panic("builder: could not match fieldPtr to any addressable struct field")
+	return "", false
 }
 
 type fieldMatch struct {

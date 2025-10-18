@@ -11,10 +11,10 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/jinzhu/inflection"
 	"github.com/sev-2/raiden"
+	"github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/postgres"
 	"github.com/sev-2/raiden/pkg/state"
-	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -30,16 +30,18 @@ type (
 	}
 
 	GenerateModelData struct {
-		Columns    []GenerateModelColumn
-		Imports    []string
-		Package    string
-		Relations  []state.Relation
-		RlsTag     string
-		RlsEnable  bool
-		RlsForced  bool
-		StructName string
-		Schema     string
-		TableName  string
+		Columns          []GenerateModelColumn
+		Imports          []string
+		Package          string
+		Relations        []state.Relation
+		RlsEnable        bool
+		RlsForced        bool
+		StructName       string
+		Schema           string
+		TableName        string
+		Receiver         string
+		HasConfigureAcl  bool
+		ConfigureAclBody string
 	}
 
 	GenerateModelInput struct {
@@ -57,7 +59,7 @@ const (
 
 import (
 {{- range .Imports}}
-	"{{.}}"
+	{{.}}
 {{- end}}
 )
 {{- end }}
@@ -73,7 +75,7 @@ type {{ .StructName }} struct {
 	Metadata string ` + "`json:\"-\" schema:\"{{ .Schema}}\" tableName:\"{{ .TableName }}\" rlsEnable:\"{{ .RlsEnable }}\" rlsForced:\"{{ .RlsForced }}\"`" + `
 
 	// Access control
-	Acl string ` + "`json:\"-\" {{ .RlsTag }}`" + `
+	Acl raiden.Acl
 
 {{- if gt (len .Relations) 0 }}
 
@@ -83,10 +85,21 @@ type {{ .StructName }} struct {
 	{{ .Table | ToGoIdentifier }} {{ .Type }} ` + "`{{ .Tag }}`" + `
 {{- end }}
 }
+
+{{- if .HasConfigureAcl }}
+
+func ({{ .Receiver }} *{{ .StructName }}) ConfigureAcl() {
+{{ .ConfigureAclBody }}
+}
+{{- end }}
 `
 )
 
-func GenerateModels(basePath string, projectName string, tables []*GenerateModelInput, mapDataType map[string]objects.Type, generateFn GenerateFn) (err error) {
+func GenerateModels(
+	basePath string, projectName string, tables []*GenerateModelInput,
+	mapDataType map[string]objects.Type, roleMap map[string]string, nativeRoleMap map[string]raiden.Role,
+	generateFn GenerateFn,
+) (err error) {
 	folderPath := filepath.Join(basePath, ModelDir)
 	ModelLogger.Trace("create models folder if not exist", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -97,7 +110,7 @@ func GenerateModels(basePath string, projectName string, tables []*GenerateModel
 
 	for i := range tables {
 		t := tables[i]
-		if err := GenerateModel(folderPath, projectName, t, mapDataType, generateFn); err != nil {
+		if err := GenerateModel(folderPath, projectName, t, mapDataType, roleMap, nativeRoleMap, generateFn); err != nil {
 			return err
 		}
 	}
@@ -105,7 +118,10 @@ func GenerateModels(basePath string, projectName string, tables []*GenerateModel
 	return nil
 }
 
-func GenerateModel(folderPath string, projectName string, input *GenerateModelInput, mapDataType map[string]objects.Type, generateFn GenerateFn) error {
+func GenerateModel(folderPath string, projectName string, input *GenerateModelInput,
+	mapDataType map[string]objects.Type, roleMap map[string]string, nativeRoleMap map[string]raiden.Role,
+	generateFn GenerateFn,
+) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
@@ -114,7 +130,6 @@ func GenerateModel(folderPath string, projectName string, input *GenerateModelIn
 
 	// map column data
 	columns, importsPath := MapTableAttributes(projectName, input.Table, mapDataType, input.ValidationTags)
-	rlsTag := BuildRlsTag(input.Policies, input.Table.Name, supabase.RlsTypeModel)
 	raidenPkgDbPath := "github.com/sev-2/raiden/pkg/db"
 	importsPath = append(importsPath, raidenPkgDbPath)
 
@@ -124,18 +139,43 @@ func GenerateModel(folderPath string, projectName string, input *GenerateModelIn
 	// build relation field
 	relations := BuildRelationFields(input.Table, input.Relations)
 
+	structName := utils.SnakeCaseToPascalCase(input.Table.Name)
+	receiverName := strings.ToLower(string(structName[0]))
+	moduleName := utils.ToGoModuleName(projectName)
+	rolesImportPath := fmt.Sprintf("%s/internal/roles", moduleName)
+
+	aclInfo, err := buildAclInfo(structName, receiverName, input.Table, input.Policies, roleMap, nativeRoleMap, nil)
+	if err != nil {
+		return err
+	}
+
+	importsPath = append(importsPath, "github.com/sev-2/raiden")
+	if aclInfo.UseBuilder {
+		importsPath = append(importsPath, `st "github.com/sev-2/raiden/pkg/builder"`)
+	}
+	if aclInfo.UseRoles {
+		importsPath = append(importsPath, fmt.Sprintf("roles %q", rolesImportPath))
+	}
+	if aclInfo.UseNativeRoles {
+		importsPath = append(importsPath, `native_role "github.com/sev-2/raiden/pkg/postgres/roles"`)
+	}
+
+	importsPath = normalizeImports(importsPath)
+
 	// set data
 	data := GenerateModelData{
-		Package:    "models",
-		Imports:    importsPath,
-		StructName: utils.SnakeCaseToPascalCase(input.Table.Name),
-		Columns:    columns,
-		Schema:     input.Table.Schema,
-		TableName:  input.Table.Name,
-		RlsTag:     rlsTag,
-		RlsEnable:  input.Table.RLSEnabled,
-		RlsForced:  input.Table.RLSForced,
-		Relations:  relations,
+		Package:          "models",
+		Imports:          importsPath,
+		StructName:       structName,
+		Columns:          columns,
+		Schema:           input.Table.Schema,
+		TableName:        input.Table.Name,
+		RlsEnable:        input.Table.RLSEnabled,
+		RlsForced:        input.Table.RLSForced,
+		Relations:        relations,
+		Receiver:         receiverName,
+		HasConfigureAcl:  aclInfo.HasConfigure,
+		ConfigureAclBody: aclInfo.Body,
 	}
 
 	// setup generate input param
@@ -232,6 +272,79 @@ func MapTableAttributes(projectName string, table objects.Table, mapDataType map
 	sort.Strings(importsPath)
 
 	return
+}
+
+func resolvePolicyColumns(modelName, storageName string, tableMap map[string]objects.Table) (string, []objects.Column) {
+	if modelName != "" {
+		if table, ok := tableMap[modelName]; ok {
+			return "p.model", table.Columns
+		}
+	}
+	if storageName != "" {
+		if table, ok := tableMap[storageName]; ok {
+			return "p.storage", table.Columns
+		}
+	}
+	return "", nil
+}
+
+func generateClauseCode(sql string, qualifier builder.ClauseQualifier, receiver string, columns []objects.Column) string {
+	const alias = "st"
+	trimmed := strings.TrimSpace(sql)
+	if strings.EqualFold(trimmed, "TRUE") {
+		return fmt.Sprintf("%s.True", alias)
+	}
+	if strings.EqualFold(trimmed, "FALSE") {
+		return fmt.Sprintf("%s.False", alias)
+	}
+
+	_, clauseCode, ok := builder.UnmarshalClause(sql, qualifier)
+	if !ok {
+		normalized := strings.TrimSpace(builder.NormalizeClauseSQL(sql, qualifier))
+		if strings.EqualFold(normalized, "TRUE") {
+			return fmt.Sprintf("%s.True", alias)
+		}
+		if strings.EqualFold(normalized, "FALSE") {
+			return fmt.Sprintf("%s.False", alias)
+		}
+		return fmt.Sprintf("%s.Clause(%q)", alias, normalized)
+	}
+
+	clauseCode = strings.ReplaceAll(clauseCode, "b.", alias+".")
+	clauseCode = normalizeAliasBooleanClause(clauseCode, alias)
+	if receiver != "" && len(columns) > 0 {
+		return injectColumnReferences(clauseCode, alias, receiver, columns)
+	}
+	return clauseCode
+}
+
+func injectColumnReferences(code, alias, receiver string, columns []objects.Column) string {
+	if len(columns) == 0 {
+		return code
+	}
+	result := code
+	for _, col := range columns {
+		quoted := fmt.Sprintf("\"%s\"", col.Name)
+		if !strings.Contains(result, quoted) {
+			continue
+		}
+		fieldName := utils.SnakeCaseToPascalCase(col.Name)
+		replacement := fmt.Sprintf("%s.ColOf(%s, %s.%s)", alias, receiver, receiver, fieldName)
+		result = strings.ReplaceAll(result, quoted, replacement)
+	}
+	return result
+}
+
+func normalizeAliasBooleanClause(code, alias string) string {
+	trueLiteral := fmt.Sprintf("%s.Clause(\"TRUE\")", alias)
+	if code == trueLiteral {
+		return fmt.Sprintf("%s.True", alias)
+	}
+	falseLiteral := fmt.Sprintf("%s.Clause(\"FALSE\")", alias)
+	if code == falseLiteral {
+		return fmt.Sprintf("%s.False", alias)
+	}
+	return code
 }
 
 func buildColumnTag(c objects.Column, mapPk map[string]bool, userDefinedType *objects.Type, validationTags state.ModelValidationTag) string {

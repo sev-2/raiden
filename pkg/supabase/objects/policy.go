@@ -1,6 +1,10 @@
 package objects
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/sev-2/raiden/pkg/supabase/constants"
+)
 
 type PolicyCommand string
 type Policy struct {
@@ -48,7 +52,7 @@ func (p *Policies) FilterByBucket(bucket Bucket) Policies {
 	}
 
 	for _, v := range *p {
-		if v.Schema != "storage" {
+		if v.Schema != constants.DefaultStorageSchema {
 			continue
 		}
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )

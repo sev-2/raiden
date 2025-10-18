@@ -63,7 +63,6 @@ func main() {
 			bootstrap.RegisterModels()
 			bootstrap.RegisterTypes()
 			bootstrap.RegisterRpc()
-			bootstrap.RegisterPolicies()
 			{{if eq .Mode "bff"}}
 			bootstrap.RegisterRoles()
 			bootstrap.RegisterStorages()
@@ -81,7 +80,6 @@ func main() {
 	cmd.Flags().BoolVarP(&f.RolesOnly, "roles-only", "r", false, "apply roles only")
 	cmd.Flags().BoolVarP(&f.ModelsOnly, "models-only", "m", false, "apply models only")
 	cmd.Flags().BoolVarP(&f.StoragesOnly, "storages-only", "", false, "apply storages only")
-	cmd.Flags().BoolVar(&f.PoliciesOnly, "policies-only", false, "apply policies only")
 	cmd.Flags().StringVarP(&f.AllowedSchema, "schema", "s", "", "set allowed schema to apply, use coma separator for multiple schema")
 	cmd.Flags().BoolVar(&f.DryRun, "dry-run", false, "run apply in simulate mode without actual running apply change")
 

@@ -220,6 +220,8 @@ func TestApply(t *testing.T) {
 	})
 	assert.NoError(t, err2)
 
+	resource.RegisteredModels = nil
+	defer func() { resource.RegisteredModels = nil }()
 	resource.RegisterModels(MockNewTable{})
 	resource.RegisterModels(MockOtherTable{})
 	resource.RegisterRole(MockNewRole{})
@@ -368,46 +370,6 @@ func TestApply_AllowedTable(t *testing.T) {
 
 	errReset := state.Save(&state.State{})
 	assert.NoError(t, errReset)
-}
-
-func TestApply_RoleValidationError(t *testing.T) {
-	flags := &resource.Flags{
-		AllowedSchema: "public",
-	}
-	config := loadConfig()
-
-	resource.RegisterModels(MockPolicyTable{})
-
-	policy := objects.Policy{
-		ID:    10,
-		Name:  "policy_table_select",
-		Table: "policy_table",
-		Roles: []string{"missing_role"},
-	}
-
-	local := &state.LocalState{
-		State: state.State{
-			Tables: []state.TableState{
-				{
-					Table: objects.Table{
-						ID:     11,
-						Name:   "policy_table",
-						Schema: "public",
-					},
-					Policies: []objects.Policy{policy},
-				},
-			},
-		},
-	}
-
-	assert.NoError(t, state.Save(&local.State))
-	defer func() {
-		assert.NoError(t, state.Save(&state.State{}))
-	}()
-
-	err := resource.Apply(flags, config)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "missing_role")
 }
 
 func TestMigrate(t *testing.T) {
@@ -784,86 +746,6 @@ func TestUpdateLocalStateFromApply(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("timeout waiting for UpdateLocalStateFromApply to complete")
 	}
-}
-
-func TestUpdateLocalStateFromApply_UpsertPolicyState(t *testing.T) {
-	projectPath := "/path/to/project"
-	localState := &state.LocalState{}
-	stateChan := make(chan any)
-	done := resource.UpdateLocalStateFromApply(projectPath, localState, stateChan)
-
-	go func() {
-		stateChan <- &policies.MigrateItem{
-			Type: migrator.MigrateTypeCreate,
-			NewData: objects.Policy{
-				ID:     1,
-				Name:   "policy_a",
-				Schema: "public",
-				Table:  "tests",
-			},
-		}
-		stateChan <- &policies.MigrateItem{
-			Type: migrator.MigrateTypeUpdate,
-			OldData: objects.Policy{
-				ID:     1,
-				Name:   "policy_a",
-				Schema: "public",
-				Table:  "tests",
-			},
-			NewData: objects.Policy{
-				ID:     1,
-				Name:   "policy_a_updated",
-				Schema: "public",
-				Table:  "tests",
-			},
-		}
-		close(stateChan)
-	}()
-
-	select {
-	case err := <-done:
-		assert.NoError(t, err)
-	case <-time.After(1 * time.Second):
-		t.Fatal("timeout waiting for UpdateLocalStateFromApply to complete")
-	}
-
-	assert.Len(t, localState.State.Policies, 1)
-	assert.Equal(t, "policy_a_updated", localState.State.Policies[0].Policy.Name)
-}
-
-func TestUpdateLocalStateFromApply_DeletePolicyState(t *testing.T) {
-	projectPath := "/path/to/project"
-	localState := &state.LocalState{
-		State: state.State{
-			Policies: []state.PolicyState{
-				{Policy: objects.Policy{ID: 10, Name: "policy_b", Schema: "public", Table: "tests"}},
-			},
-		},
-	}
-	stateChan := make(chan any)
-	done := resource.UpdateLocalStateFromApply(projectPath, localState, stateChan)
-
-	go func() {
-		stateChan <- &policies.MigrateItem{
-			Type: migrator.MigrateTypeDelete,
-			OldData: objects.Policy{
-				ID:     10,
-				Name:   "policy_b",
-				Schema: "public",
-				Table:  "tests",
-			},
-		}
-		close(stateChan)
-	}()
-
-	select {
-	case err := <-done:
-		assert.NoError(t, err)
-	case <-time.After(1 * time.Second):
-		t.Fatal("timeout waiting for UpdateLocalStateFromApply to complete")
-	}
-
-	assert.Len(t, localState.State.Policies, 0)
 }
 
 func TestPrintApplyChangeReport(t *testing.T) {

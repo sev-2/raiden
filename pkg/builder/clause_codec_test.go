@@ -36,7 +36,7 @@ func TestUnmarshalClause_SimpleEquality(t *testing.T) {
 	if clause.String() != b.Eq("owner_id", b.AuthUID()).String() {
 		t.Fatalf("unexpected clause value: %q", clause)
 	}
-	if code != `b.Eq("owner_id", b.AuthUID())` {
+	if code != `st.Eq("owner_id", st.AuthUID())` {
 		t.Fatalf("unexpected builder code: %q", code)
 	}
 }
@@ -51,7 +51,7 @@ func TestUnmarshalClause_StringLiteral(t *testing.T) {
 	if clause.String() != expected.String() {
 		t.Fatalf("unexpected clause: %q", clause)
 	}
-	if code != `b.Eq("role", b.String("anon"))` {
+	if code != `st.Eq("role", st.String("anon"))` {
 		t.Fatalf("unexpected builder code: %q", code)
 	}
 }
@@ -67,7 +67,7 @@ func TestUnmarshalClause_AndCombination(t *testing.T) {
 	if clause.String() != expected.String() {
 		t.Fatalf("unexpected clause: %q", clause)
 	}
-	if code != `b.And(b.Eq("owner_id", b.AuthUID()), b.Eq("role", b.String("admin")))` {
+	if code != `st.And(st.Eq("owner_id", st.AuthUID()), st.Eq("role", st.String("admin")))` {
 		t.Fatalf("unexpected builder code: %q", code)
 	}
 }

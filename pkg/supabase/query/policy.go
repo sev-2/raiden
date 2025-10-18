@@ -11,11 +11,11 @@ import (
 func BuildCreatePolicyQuery(policy objects.Policy) string {
 	name := fmt.Sprintf("%q", strings.ToLower(policy.Name))
 
-	action := strings.ToUpper(policy.Action)
+	action := strings.ToUpper(strings.TrimSpace(policy.Action))
 	if action == "" {
 		action = "PERMISSIVE"
 	}
-	command := strings.ToUpper(string(policy.Command))
+	command := strings.ToUpper(strings.TrimSpace(string(policy.Command)))
 	if command == "" {
 		command = string(objects.PolicyCommandAll)
 	}
@@ -25,29 +25,38 @@ func BuildCreatePolicyQuery(policy objects.Policy) string {
 	tableFQNText := fmt.Sprintf("%s.%s", policy.Schema, policy.Table)
 
 	definitionClause := ""
-	if command != string(objects.PolicyCommandInsert) && policy.Definition != "" {
-		definitionClause = "USING (" + policy.Definition + ")"
+	definition := strings.TrimSpace(policy.Definition)
+	if command != string(objects.PolicyCommandInsert) && definition != "" {
+		definitionClause = "USING (" + definition + ")"
 	}
 	checkClause := ""
-	if policy.Check != nil && *policy.Check != "" {
-		checkClause = "WITH CHECK (" + *policy.Check + ")"
+	checkValue := ""
+	if policy.Check != nil {
+		checkValue = strings.TrimSpace(*policy.Check)
+	}
+	checkAllowed := command != string(objects.PolicyCommandSelect) && command != string(objects.PolicyCommandDelete)
+	if checkAllowed && checkValue != "" {
+		checkClause = "WITH CHECK (" + checkValue + ")"
 	} else if command == string(objects.PolicyCommandInsert) {
 		checkClause = "WITH CHECK (true)"
 	}
 
 	roleList := ""
 	grantAccessTables := []string{}
+	privileges := privilegesForCommand(command)
 	for i, role := range policy.Roles {
 		if i > 0 {
 			roleList += ", "
 		}
 		roleList += pq.QuoteIdentifier(role)
 
-		grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
+		for _, privilege := range privileges {
+			grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
 			IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
 				GRANT %s ON %s TO %s;
 			END IF;
-		`, role, tableFQNText, command, command, tableFQN, pq.QuoteIdentifier(role)))
+		`, role, tableFQNText, privilege, privilege, tableFQN, pq.QuoteIdentifier(role)))
+		}
 	}
 
 	if roleList == "" {
@@ -80,7 +89,7 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 	tableIdent := pq.QuoteIdentifier(policy.Table)
 	tableFQN := fmt.Sprintf("%s.%s", schemaIdent, tableIdent)
 	tableFQNText := fmt.Sprintf("%s.%s", policy.Schema, policy.Table)
-	command := strings.ToUpper(string(policy.Command))
+	command := strings.ToUpper(strings.TrimSpace(string(policy.Command)))
 	if command == "" {
 		command = string(objects.PolicyCommandAll)
 	}
@@ -116,11 +125,13 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 			}
 
 			for _, role := range policy.Roles {
-				grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
+				for _, privilege := range privilegesForCommand(command) {
+					grantAccessTables = append(grantAccessTables, fmt.Sprintf(`
 				IF NOT HAS_TABLE_PRIVILEGE('%s', '%s', '%s') THEN
 					GRANT %s ON %s TO %s;
 				END IF;
-			`, role, tableFQNText, command, command, tableFQN, pq.QuoteIdentifier(role)))
+			`, role, tableFQNText, privilege, privilege, tableFQN, pq.QuoteIdentifier(role)))
+				}
 			}
 		}
 	}
@@ -130,12 +141,15 @@ func BuildUpdatePolicyQuery(policy objects.Policy, updatePolicyParams objects.Up
 
 func BuildDeletePolicyQuery(policy objects.Policy) string {
 	revokeAccessTables := []string{}
+	privileges := privilegesForCommand(strings.ToUpper(strings.TrimSpace(string(policy.Command))))
 	for _, role := range policy.Roles {
-		revokeAccessTables = append(revokeAccessTables, fmt.Sprintf(`
+		for _, privilege := range privileges {
+			revokeAccessTables = append(revokeAccessTables, fmt.Sprintf(`
 			IF HAS_TABLE_PRIVILEGE('%s', '%s.%s', '%s') THEN
 				REVOKE %s ON %s.%s FROM %s;
 			END IF;
-		`, role, policy.Schema, policy.Table, policy.Command, policy.Command, policy.Schema, policy.Table, role))
+		`, role, policy.Schema, policy.Table, privilege, privilege, policy.Schema, policy.Table, role))
+		}
 	}
 
 	revokeAccessQuery := fmt.Sprintf(`
@@ -148,4 +162,18 @@ func BuildDeletePolicyQuery(policy objects.Policy) string {
 	`, policy.Name, policy.Schema, policy.Table, strings.Join(revokeAccessTables, "\n"))
 
 	return revokeAccessQuery
+}
+
+func privilegesForCommand(command string) []string {
+	switch command {
+	case string(objects.PolicyCommandAll):
+		return []string{
+			string(objects.PolicyCommandSelect),
+			string(objects.PolicyCommandInsert),
+			string(objects.PolicyCommandUpdate),
+			string(objects.PolicyCommandDelete),
+		}
+	default:
+		return []string{command}
+	}
 }

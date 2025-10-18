@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/sev-2/raiden"
+
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 )

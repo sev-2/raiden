@@ -1,22 +1,35 @@
 package raiden
 
 import (
-	"errors"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/sev-2/raiden/pkg/builder"
+	"github.com/sev-2/raiden/pkg/supabase/constants"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
 
 type (
 	Acl struct {
+		// TODO : decommission
 		Roles []string
 		Check *string
 		Using string
+
+		// New Handle Acl
+		Schema   string
+		Table    string
+		isEnable bool
+		isForced bool
+
+		mapRule map[string]*rule
+
+		once sync.Once
 	}
 
+	// TODO : decommission
 	AclTag struct {
 		Read  Acl
 		Write Acl
@@ -66,167 +79,240 @@ func UnmarshalAclTag(tag string) AclTag {
 	return aclTag
 }
 
-// -----------------------------------------
-// Policy Resources
-// -----------------------------------------
-
-type PolicyCommand string
+type Command string
 
 const (
-	PolicyCommandAll    PolicyCommand = "ALL"
-	PolicyCommandSelect PolicyCommand = "SELECT"
-	PolicyCommandInsert PolicyCommand = "INSERT"
-	PolicyCommandUpdate PolicyCommand = "UPDATE"
-	PolicyCommandDelete PolicyCommand = "DELETE"
+	CommandAll    Command = "ALL"
+	CommandSelect Command = "SELECT"
+	CommandInsert Command = "INSERT"
+	CommandUpdate Command = "UPDATE"
+	CommandDelete Command = "DELETE"
 )
 
-func (m PolicyCommand) ToSupabaseCommand() objects.PolicyCommand {
+func (m Command) ToSupabaseCommand() objects.PolicyCommand {
 	switch m {
-	case PolicyCommandSelect:
+	case CommandSelect:
 		return objects.PolicyCommandSelect
-	case PolicyCommandInsert:
+	case CommandInsert:
 		return objects.PolicyCommandInsert
-	case PolicyCommandUpdate:
+	case CommandUpdate:
 		return objects.PolicyCommandUpdate
-	case PolicyCommandDelete:
+	case CommandDelete:
 		return objects.PolicyCommandDelete
-	case PolicyCommandAll:
+	case CommandAll:
 		return objects.PolicyCommandAll
 	}
 
 	return ""
 }
 
-type PolicyMode int
+type AclMode int
 
 const (
-	ModePermissive PolicyMode = iota // default
-	ModeRestrictive
+	AclModePermissive AclMode = iota // default
+	AclModeRestrictive
 )
 
-func (m PolicyMode) ActionString() string {
-	if m == ModeRestrictive {
+func (m AclMode) ActionString() string {
+	if m == AclModeRestrictive {
 		return "RESTRICTIVE"
 	}
 	return "PERMISSIVE"
 }
 
-type PolicyResourceType string
+func (a *Acl) Enable() *Acl {
+	a.isEnable = true
+	return a
+}
 
-const (
-	PolicyResourceTypeModel   PolicyCommand = "TABLE"
-	PolicyResourceTypeStorage PolicyCommand = "STORAGE"
-)
+func (a *Acl) Forced() *Acl {
+	a.isForced = true
+	return a
+}
 
-type (
-	Policy interface {
-		Name() string
-		Model() any
-		Storage() Bucket
-		Roles() []Role
-		Command() PolicyCommand
-		Mode() PolicyMode
-		Definition() builder.Clause
-		Check() builder.Clause
+func (a *Acl) IsEnable() bool {
+	return a.isEnable
+}
+
+func (a *Acl) IsForced() bool {
+	return a.isForced
+}
+
+func (a *Acl) Define(rr ...*rule) *Acl {
+	if a.mapRule == nil {
+		a.mapRule = make(map[string]*rule, 0)
 	}
 
-	PolicyBase struct {
+	for _, r := range rr {
+		a.mapRule[r.name] = r
 	}
-)
-
-var (
-	DefaultPolicySchema = "public"
-)
-
-func (p PolicyBase) Name() string {
-	return ""
+	return a
 }
 
-func (p PolicyBase) Model() any {
-	return nil
-}
-func (p PolicyBase) Storage() Bucket {
-	return nil
-}
-func (p PolicyBase) Roles() []Role {
-	return []Role{}
-}
-func (p PolicyBase) Command() PolicyCommand {
-	return ""
-}
-func (p PolicyBase) Mode() PolicyMode {
-	return ModePermissive
-}
-func (p PolicyBase) Definition() builder.Clause {
-	return ""
-}
-func (p PolicyBase) Check() builder.Clause {
-	return ""
+func (a *Acl) InitOnce(fn func()) { a.once.Do(fn) }
+
+func (a *Acl) BuildPolicies(schema, table string) (policies objects.Policies, err error) {
+	a.Schema = schema
+	a.Table = table
+
+	// build rule
+	for _, r := range a.mapRule {
+		if p, err := r.Build(a.Schema, a.Table); err != nil {
+			return policies, err
+		} else {
+			policies = append(policies, *p)
+		}
+	}
+
+	return policies, nil
 }
 
-func BuildPolicy(p Policy) (*objects.Policy, error) {
+func (a *Acl) BuildStoragePolicies(bucketName string) (objects.Policies, error) {
+	bucketName = strings.TrimSpace(bucketName)
+	if err := utils.EmptyOrError(bucketName, "bucket name required to set"); err != nil {
+		return nil, err
+	}
+
+	a.Schema = constants.DefaultStorageSchema
+	a.Table = constants.DefaultObjectTable
+
+	policies := make(objects.Policies, 0, len(a.mapRule))
+	for _, r := range a.mapRule {
+		policy, err := r.buildWithClauses(a.Schema, a.Table,
+			builder.StorageUsingClause(bucketName, r.using),
+			builder.StorageCheckClause(bucketName, r.check),
+		)
+		if err != nil {
+			return nil, err
+		}
+		policies = append(policies, *policy)
+	}
+
+	return policies, nil
+}
+
+func Rule(name string) *rule {
+	return &rule{
+		name: name,
+	}
+}
+
+type rule struct {
+	name    string
+	command Command
+	roles   []string
+	using   builder.Clause
+	check   builder.Clause
+	mode    AclMode
+}
+
+func (r *rule) For(roles ...string) *rule {
+	r.roles = append(r.roles, roles...)
+	return r
+}
+
+func (r *rule) To(command Command) *rule {
+	r.command = command
+	return r
+}
+
+func (r *rule) Using(clause builder.Clause) *rule {
+	r.using = clause
+	return r
+}
+
+func (r *rule) Check(clause builder.Clause) *rule {
+	r.check = clause
+	return r
+}
+
+func (r *rule) WithPermissive() *rule {
+	r.mode = AclModePermissive
+	return r
+}
+
+func (r *rule) WithRestrictive() *rule {
+	r.mode = AclModeRestrictive
+	return r
+}
+
+func (r *rule) Build(schema string, table string) (*objects.Policy, error) {
+	return r.buildWithClauses(schema, table, r.using, r.check)
+}
+
+func (r *rule) buildWithClauses(schema string, table string, usingClause, checkClause builder.Clause) (*objects.Policy, error) {
 	// Validate Required Value
-	if err := utils.EmptyOrError(p.Name(), "name required to set"); err != nil {
+	if err := utils.EmptyOrError(r.name, "rule name required to set"); err != nil {
 		return nil, err
 	}
 
-	if p.Model() == nil && p.Storage() == nil {
-		return nil, errors.New("policy must define resoruce, implement Model() or Storage() function")
-	}
-
-	if err := utils.EmptyOrError(p.Command(), "command is rquired to set"); err != nil {
+	if err := utils.EmptyOrError(table, "table name required to set"); err != nil {
 		return nil, err
 	}
 
-	// TABLE and SCHEMA
-	var schema, table string
+	// Set default value
+	schema = utils.EmptyOrDefault(schema, "public")
+	mode := utils.EmptyOrDefault(r.mode, AclModePermissive)
 
-	if p.Model() != nil {
-		schema, table = builder.TableFromModel(p.Model())
-		schema = utils.EmptyOrDefault(schema, DefaultPolicySchema)
-		if err := utils.EmptyOrError(table, "invalid model, table is not recognize"); err != nil {
-			return nil, err
-		}
-	}
+	usingRaw := strings.TrimSpace(usingClause.String())
+	checkRaw := strings.TrimSpace(checkClause.String())
 
-	if p.Storage() != nil {
-		schema, table = "storage", p.Storage().Name()
-		if err := utils.EmptyOrError(table, "invalid storage, bucket is not recognize"); err != nil {
-			return nil, err
-		}
-	}
-
-	// USING (definition)
-	def := strings.TrimSpace(p.Definition().String())
-
-	// WITH CHECK (optional)
-	var checkPtr *string
-	if c := strings.TrimSpace(p.Check().String()); c != "" {
-		checkPtr = &c
-	}
-
-	// MODE
-	mode := utils.EmptyOrDefault(p.Mode(), ModePermissive)
-
-	// Roles
-	roles := utils.EmptyOrDefault(p.Roles(), []Role{})
-	rolesArr := []string{}
-	if len(roles) > 0 {
-		for _, r := range roles {
-			if r != nil {
-				rolesArr = append(rolesArr, r.Name())
-			}
-		}
-	}
+	definition, checkPtr := r.prepareClauses(usingRaw, checkRaw)
 
 	return &objects.Policy{
 		Schema:     schema,
 		Table:      table,
-		Name:       p.Name(),
+		Name:       r.name,
 		Action:     mode.ActionString(), // "PERMISSIVE"/"RESTRICTIVE"
-		Roles:      rolesArr,
-		Command:    p.Command().ToSupabaseCommand(),
-		Definition: def,
+		Roles:      r.roles,
+		Command:    r.command.ToSupabaseCommand(),
+		Definition: definition,
 		Check:      checkPtr,
 	}, nil
+}
+
+func (r *rule) prepareClauses(usingRaw, checkRaw string) (definition string, checkPtr *string) {
+	switch r.command {
+	case CommandSelect:
+		definition = ensureClause(usingRaw, true)
+		return definition, nil
+	case CommandInsert:
+		definition = ""
+		return definition, ensureCheck(checkRaw, true)
+	case CommandDelete:
+		merged := strings.TrimSpace(usingRaw)
+		if merged == "" {
+			merged = checkRaw
+		}
+		definition = ensureClause(merged, true)
+		return definition, nil
+	case CommandUpdate:
+		definition = ensureClause(usingRaw, true)
+		return definition, ensureCheck(checkRaw, true)
+	case CommandAll:
+		definition = ensureClause(usingRaw, true)
+		return definition, ensureCheck(checkRaw, true)
+	default:
+		definition = ensureClause(usingRaw, true)
+		return definition, ensureCheck(checkRaw, false)
+	}
+}
+
+func ensureClause(value string, requireFallback bool) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" && requireFallback {
+		return "TRUE"
+	}
+	return trimmed
+}
+
+func ensureCheck(value string, defaultTrue bool) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		if !defaultTrue {
+			return nil
+		}
+		trimmed = "TRUE"
+	}
+	return &trimmed
 }

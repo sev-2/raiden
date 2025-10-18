@@ -481,3 +481,31 @@ func InS(col string, values ...string) Clause { return InStrings(col, values...)
 
 // Deprecated: use CurrentSettingAs.
 func CurrentSettingCast(key, cast string) Exp { return CurrentSettingAs(key, cast) }
+
+// Full JWT jsonb
+func jwt() Exp { return Cast(CurrentSetting("request.jwt.claims"), "jsonb") }
+
+// token has single role match OR role in roles[]
+func RoleIs(role string) Clause {
+	rs := String(role).String()
+	return Or(
+		Clause(jwt().String()+" ->> 'role' = "+rs),
+		Clause(jwt().String()+" -> 'roles' ? "+rs),
+	)
+}
+func RolesAny(roles ...string) Clause {
+	arr := ArrayStrings(roles...).String() // ARRAY['a','b']
+	return Or(
+		Clause(jwt().String()+" ->> 'role' = ANY("+arr+")"),
+		Clause(jwt().String()+" -> 'roles' ?| "+arr),
+	)
+}
+
+// multi-tenant: org_id match from claim (string)
+func InOrg(col string) Clause {
+	// If your token stores org_id as top-level string claim:
+	return Eq(col, Claim("org_id")) // see below
+}
+
+// simple string claim (text)
+func Claim(key string) Exp { return CurrentSetting(key) }

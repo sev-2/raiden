@@ -21,7 +21,6 @@ type Flags struct {
 	RolesOnly          bool
 	ModelsOnly         bool
 	StoragesOnly       bool
-	PoliciesOnly       bool
 	AllowedSchema      string
 	DebugMode          bool
 	TraceMode          bool
@@ -34,7 +33,7 @@ type Flags struct {
 
 // LoadAll is function to check is all resource need to import or apply
 func (f *Flags) All() bool {
-	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.StoragesOnly && !f.PoliciesOnly
+	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.StoragesOnly
 }
 
 func (f *Flags) BindLog(cmd *cobra.Command) {
@@ -116,13 +115,6 @@ func filterTableBySchema(input []objects.Table, allowedSchema ...string) (output
 	}
 
 	return
-}
-
-// ----- Handle register policy -----
-var registeredPolicies []raiden.Policy
-
-func RegisterPolicies(list ...raiden.Policy) {
-	registeredPolicies = append(registeredPolicies, list...)
 }
 
 // ----- Filter allowed table ------
@@ -224,14 +216,14 @@ func filterIsNativeRole(mapNativeRole map[string]raiden.Role, supabaseRole []obj
 func extractAppResource(f *Flags, latestState *state.State) (
 	extractedTable state.ExtractTableResult, extractedRole state.ExtractRoleResult,
 	extractedRpc state.ExtractRpcResult, extractedStorage state.ExtractStorageResult,
-	extractedType state.ExtractTypeResult, extractedPolicy state.ExtractPolicyResult,
+	extractedType state.ExtractTypeResult,
 	err error,
 ) {
 	if latestState == nil {
 		return
 	}
 
-	if f.StoragesOnly || f.ModelsOnly || f.PoliciesOnly {
+	if f.StoragesOnly || f.ModelsOnly {
 		ImportLogger.Debug("Start extract role")
 		extractedRole, err = state.ExtractRole(latestState.Roles, registeredRoles, false)
 		if err != nil {
@@ -273,15 +265,6 @@ func extractAppResource(f *Flags, latestState *state.State) (
 			return
 		}
 		ImportLogger.Debug("Finish extract rpc")
-	}
-
-	if f.All() || f.PoliciesOnly {
-		ImportLogger.Debug("Start extract policy")
-		extractedPolicy, err = state.ExtractPolicy(latestState.Policies, registeredPolicies)
-		if err != nil {
-			return
-		}
-		ImportLogger.Debug("Finish extract policy")
 	}
 
 	if f.All() || f.StoragesOnly {

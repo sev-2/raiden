@@ -9,9 +9,11 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase/constants"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/admin"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/local/meta"
@@ -21,8 +23,8 @@ import (
 var SupabaseLogger = logger.HcLog().Named("supabase")
 var StorageLogger = logger.HcLog().Named("supabase.storage")
 
-var DefaultStorageSchema = "storage"
-var DefaultObjectTable = "objects"
+var DefaultStorageSchema = constants.DefaultStorageSchema
+var DefaultObjectTable = constants.DefaultObjectTable
 
 var (
 	DefaultApiUrl         = "https://api.supabase.com"

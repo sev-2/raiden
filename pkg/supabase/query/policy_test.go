@@ -42,6 +42,25 @@ func TestBuildCreatePolicyQuerySelectKeepsUsing(t *testing.T) {
 	assert.Contains(t, query, "USING ("+policy.Definition+")")
 }
 
+func TestBuildCreatePolicyQueryDeleteMovesCheckToUsing(t *testing.T) {
+	definition := "\"owner\" = auth.uid()"
+	policy := objects.Policy{
+		Name:       "delete_course",
+		Schema:     "public",
+		Table:      "course",
+		Action:     "RESTRICTIVE",
+		Roles:      []string{"faculty_administrator"},
+		Command:    objects.PolicyCommandDelete,
+		Definition: definition,
+	}
+
+	query := BuildCreatePolicyQuery(policy)
+
+	assert.Contains(t, query, "FOR DELETE")
+	assert.Contains(t, query, "USING ("+definition+")")
+	assert.NotContains(t, query, "WITH CHECK")
+}
+
 func TestBuildUpdatePolicyQueryInsertSkipsUsing(t *testing.T) {
 	policy := objects.Policy{
 		Schema:     "public",
@@ -74,6 +93,23 @@ func TestBuildCreatePolicyQueryDefaults(t *testing.T) {
 
 	assert.Contains(t, query, "TO PUBLIC")
 	assert.NotContains(t, query, "GRANT SELECT ON \"public\".\"course\" TO")
+}
+
+func TestBuildCreatePolicyQueryAllGrantsEachPrivilege(t *testing.T) {
+	policy := objects.Policy{
+		Name:    "manage_course",
+		Schema:  "public",
+		Table:   "course",
+		Roles:   []string{"super_admin"},
+		Command: objects.PolicyCommandAll,
+	}
+
+	query := BuildCreatePolicyQuery(policy)
+
+	assert.Contains(t, query, "GRANT SELECT ON \"public\".\"course\" TO \"super_admin\"")
+	assert.Contains(t, query, "GRANT INSERT ON \"public\".\"course\" TO \"super_admin\"")
+	assert.Contains(t, query, "GRANT UPDATE ON \"public\".\"course\" TO \"super_admin\"")
+	assert.Contains(t, query, "GRANT DELETE ON \"public\".\"course\" TO \"super_admin\"")
 }
 
 func TestBuildUpdatePolicyQueryQuotesRoles(t *testing.T) {

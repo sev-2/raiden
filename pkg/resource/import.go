@@ -11,7 +11,6 @@ import (
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/generator"
 	"github.com/sev-2/raiden/pkg/logger"
-	"github.com/sev-2/raiden/pkg/resource/policies"
 	"github.com/sev-2/raiden/pkg/resource/roles"
 	"github.com/sev-2/raiden/pkg/resource/rpc"
 	"github.com/sev-2/raiden/pkg/resource/storages"
@@ -24,6 +23,65 @@ import (
 
 var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 
+type importDeps struct {
+	loadNativeRoles func() (map[string]raiden.Role, error)
+	loadRemote      func(*Flags, *raiden.Config) (*Resource, error)
+	loadState       func() (*state.State, error)
+	extractApp      func(*Flags, *state.State) (state.ExtractTableResult, state.ExtractRoleResult, state.ExtractRpcResult, state.ExtractStorageResult, state.ExtractTypeResult, error)
+	compareTypes    func([]objects.Type, []objects.Type) error
+	compareTables   func([]objects.Table, []objects.Table) error
+	compareRoles    func([]objects.Role, []objects.Role) error
+	compareRpc      func([]objects.Function, []objects.Function) error
+	compareStorages func([]objects.Bucket, []objects.Bucket) error
+	updateStateOnly func(*state.LocalState, *Resource, map[string]state.ModelValidationTag) error
+	generate        func(*raiden.Config, *state.LocalState, string, *Resource, map[string]state.ModelValidationTag, bool) error
+	printReport     func(ImportReport, bool)
+}
+
+var defaultImportDeps = importDeps{
+	loadNativeRoles: loadMapNativeRole,
+	loadRemote:      Load,
+	loadState:       state.Load,
+	extractApp:      extractAppResource,
+	compareTypes: func(remote []objects.Type, existing []objects.Type) error {
+		return types.Compare(remote, existing)
+	},
+	compareTables: func(remote []objects.Table, existing []objects.Table) error {
+		return tables.Compare(tables.CompareModeImport, remote, existing)
+	},
+	compareRoles:    roles.Compare,
+	compareRpc:      rpc.Compare,
+	compareStorages: storages.Compare,
+	updateStateOnly: updateStateOnly,
+	generate:        generateImportResource,
+	printReport:     PrintImportReport,
+}
+
+// importJob keeps the shared state and dependencies needed to process an import.
+// The methods on this struct execute individual phases so tests can stub them easily.
+
+type importJob struct {
+	flags                  *Flags
+	config                 *raiden.Config
+	deps                   importDeps
+	mapNativeRole          map[string]raiden.Role
+	resource               *Resource
+	localState             *state.State
+	importState            state.LocalState
+	appTables              state.ExtractTableResult
+	appRoles               state.ExtractRoleResult
+	appRpcFunctions        state.ExtractRpcResult
+	appStorage             state.ExtractStorageResult
+	appTypes               state.ExtractTypeResult
+	nativeStateRoles       []state.RoleState
+	dryRunErrors           []string
+	mapModelValidationTags map[string]state.ModelValidationTag
+	report                 ImportReport
+	reportComputed         bool
+	reportPrinted          bool
+	skipReport             bool
+}
+
 // List of import resource
 // [x] import table, relation, column specification and acl
 // [x] import role
@@ -31,262 +89,351 @@ var ImportLogger hclog.Logger = logger.HcLog().Named("import")
 // [x] import storage
 // [x] import policy
 func Import(flags *Flags, config *raiden.Config) (err error) {
-	var (
-		report         ImportReport
-		reportComputed bool
-		reportPrinted  bool
-		skipReport     bool
-	)
+	return runImport(flags, config, defaultImportDeps)
+}
+
+// runImport wires the provided dependencies into an importJob and executes the workflow.
+func runImport(flags *Flags, config *raiden.Config, deps importDeps) (err error) {
+	job := &importJob{
+		flags:                  flags,
+		config:                 config,
+		deps:                   deps,
+		dryRunErrors:           []string{},
+		mapModelValidationTags: make(map[string]state.ModelValidationTag),
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("import panic: %v", r)
 		}
-		if err == nil && reportComputed && !reportPrinted && !skipReport {
-			PrintImportReport(report, flags.DryRun)
-			reportPrinted = true
+		if err == nil && job.reportComputed && !job.reportPrinted && !job.skipReport {
+			job.printReport(flags.DryRun)
 		}
 	}()
 
-	if flags.DryRun {
+	if err = job.run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (j *importJob) run() error {
+	if j.flags.DryRun {
 		ImportLogger.Info("running import in dry run mode")
 	}
 
-	// load map native role
+	if err := j.loadNativeRoles(); err != nil {
+		return err
+	}
+
+	if err := j.loadRemoteResource(); err != nil {
+		return err
+	}
+
+	j.prepareRemoteResource()
+
+	if err := j.loadLocalState(); err != nil {
+		return err
+	}
+
+	if err := j.extractAppResources(); err != nil {
+		return err
+	}
+
+	j.collectValidationTags()
+
+	if err := j.performComparisons(); err != nil {
+		return err
+	}
+
+	j.computeReport()
+
+	return j.handleOutput()
+}
+
+func (j *importJob) loadNativeRoles() error {
 	ImportLogger.Info("load native role")
-	mapNativeRole, err := loadMapNativeRole()
+	mapNativeRole, err := j.deps.loadNativeRoles()
 	if err != nil {
 		return err
 	}
+	j.mapNativeRole = mapNativeRole
+	return nil
+}
 
-	// load supabase resource
+func (j *importJob) loadRemoteResource() error {
 	ImportLogger.Info("load resource from database")
-	spResource, err := Load(flags, config)
+	resource, err := j.deps.loadRemote(j.flags, j.config)
 	if err != nil {
 		return err
 	}
 
-	spResource.Tables = tables.AttachIndexAndAction(spResource.Tables, spResource.Indexes, spResource.RelationActions)
-	spResource.Roles = roles.AttachInherithRole(mapNativeRole, spResource.Roles, spResource.RoleMemberships)
+	resource.Tables = tables.AttachIndexAndAction(resource.Tables, resource.Indexes, resource.RelationActions)
+	resource.Roles = roles.AttachInherithRole(j.mapNativeRole, resource.Roles, resource.RoleMemberships)
+	j.resource = resource
+	return nil
+}
 
-	// create import state
+func (j *importJob) prepareRemoteResource() {
 	ImportLogger.Debug("get native roles")
-	nativeStateRoles := filterIsNativeRole(mapNativeRole, spResource.Roles)
+	j.nativeStateRoles = filterIsNativeRole(j.mapNativeRole, j.resource.Roles)
 
-	// filter table for with allowed schema
-	ImportLogger.Debug("start filter table and function by allowed schema", "allowed-schema", flags.AllowedSchema)
+	ImportLogger.Debug("start filter table and function by allowed schema", "allowed-schema", j.flags.AllowedSchema)
 	ImportLogger.Trace("filter table by schema")
 
-	spResource.Tables = filterTableBySchema(spResource.Tables, strings.Split(flags.AllowedSchema, ",")...)
+	j.resource.Tables = filterTableBySchema(j.resource.Tables, strings.Split(j.flags.AllowedSchema, ",")...)
 
-	if config.Mode == raiden.BffMode {
-		if config.AllowedTables != "*" {
-			allowedTable := strings.Split(config.AllowedTables, ",")
-			spResource.Tables = filterAllowedTables(spResource.Tables, strings.Split(flags.AllowedSchema, ","), allowedTable...)
-		}
+	if j.config.Mode == raiden.BffMode && j.config.AllowedTables != "*" {
+		allowedTable := strings.Split(j.config.AllowedTables, ",")
+		j.resource.Tables = filterAllowedTables(j.resource.Tables, strings.Split(j.flags.AllowedSchema, ","), allowedTable...)
 	}
 
 	ImportLogger.Trace("filter function by schema")
-	spResource.Functions = filterFunctionBySchema(spResource.Functions, strings.Split(flags.AllowedSchema, ",")...)
+	j.resource.Functions = filterFunctionBySchema(j.resource.Functions, strings.Split(j.flags.AllowedSchema, ",")...)
 	ImportLogger.Debug("finish filter table and function by allowed schema")
 
 	ImportLogger.Trace("remove native role for supabase list role")
-	spResource.Roles = filterUserRole(spResource.Roles, mapNativeRole)
+	j.resource.Roles = filterUserRole(j.resource.Roles, j.mapNativeRole)
+}
 
-	// load app resource
+func (j *importJob) loadLocalState() error {
 	ImportLogger.Info("load resource from local state")
-	localState, err := state.Load()
+	localState, err := j.deps.loadState()
 	if err != nil {
 		return err
 	}
+	j.localState = localState
+	return nil
+}
 
+func (j *importJob) extractAppResources() error {
 	ImportLogger.Info("extract data from local state")
-	appTables, appRoles, appRpcFunctions, appStorage, appType, appPolicies, err := extractAppResource(flags, localState)
+	appTables, appRoles, appRpcFunctions, appStorage, appType, err := j.deps.extractApp(j.flags, j.localState)
 	if err != nil {
 		return err
 	}
 
-	importState := state.LocalState{
+	j.appTables = appTables
+	j.appRoles = appRoles
+	j.appRpcFunctions = appRpcFunctions
+	j.appStorage = appStorage
+	j.appTypes = appType
+
+	j.importState = state.LocalState{
 		State: state.State{
-			Roles: nativeStateRoles,
+			Roles: j.nativeStateRoles,
 		},
 	}
 
-	// dry run import errors
-	dryRunError := []string{}
-	mapModelValidationTags := make(map[string]state.ModelValidationTag)
-
-	if flags.ForceImport {
+	if j.flags.ForceImport {
 		ImportLogger.Warn("force import enabled: skipping diff checks and overwriting local state")
 	}
 
-	if flags.All() || flags.ModelsOnly {
-		for i := range appTables.New {
-			nt := appTables.New[i]
-			if nt.ValidationTags != nil {
-				mapModelValidationTags[nt.Table.Name] = nt.ValidationTags
-			}
-		}
+	return nil
+}
 
-		for i := range appTables.Existing {
-			et := appTables.Existing[i]
-			if et.ValidationTags != nil {
-				mapModelValidationTags[et.Table.Name] = et.ValidationTags
-			}
+// collectValidationTags records existing model validation tags so regeneration preserves them.
+func (j *importJob) collectValidationTags() {
+	if !(j.flags.All() || j.flags.ModelsOnly) {
+		return
+	}
+
+	for i := range j.appTables.New {
+		nt := j.appTables.New[i]
+		if nt.ValidationTags != nil {
+			j.mapModelValidationTags[nt.Table.Name] = nt.ValidationTags
 		}
 	}
 
-	// compare resource
-	if !flags.ForceImport && (flags.All() || flags.ModelsOnly) && len(appType.Existing) > 0 {
-		if !flags.DryRun {
-			ImportLogger.Debug("start compare types")
-		}
-		if err := types.Compare(spResource.Types, appType.Existing); err != nil {
-			if flags.DryRun {
-				dryRunError = append(dryRunError, err.Error())
-			} else {
-				return err
-			}
-		}
-		if !flags.DryRun {
-			ImportLogger.Debug("finish compare types")
+	for i := range j.appTables.Existing {
+		et := j.appTables.Existing[i]
+		if et.ValidationTags != nil {
+			j.mapModelValidationTags[et.Table.Name] = et.ValidationTags
 		}
 	}
+}
 
-	if flags.ForceImport {
+// performComparisons runs diff checks against the remote Supabase state unless forced import is requested.
+func (j *importJob) performComparisons() error {
+	if j.flags.ForceImport {
 		ImportLogger.Info("skip diff comparison and overwrite local state")
-	} else {
-		ImportLogger.Info("compare supabase resource and local resource")
-	}
-	if !flags.ForceImport && (flags.All() || flags.ModelsOnly) && len(appTables.Existing) > 0 {
-		if !flags.DryRun {
-			ImportLogger.Debug("start compare table")
-		}
-
-		compareTables := make([]objects.Table, 0, len(appTables.Existing))
-		for i := range appTables.Existing {
-			et := appTables.Existing[i]
-			compareTables = append(compareTables, et.Table)
-		}
-
-		if err := tables.Compare(tables.CompareModeImport, spResource.Tables, compareTables); err != nil {
-			if flags.DryRun {
-				dryRunError = append(dryRunError, err.Error())
-			} else {
-				return err
-			}
-		}
-		if !flags.DryRun {
-			ImportLogger.Debug("finish compare table")
-		}
+		return nil
 	}
 
-	if !flags.ForceImport && (flags.All() || flags.RolesOnly) && len(appRoles.Existing) > 0 {
-		if !flags.DryRun {
-			ImportLogger.Debug("start compare role")
-		}
-		if err := roles.Compare(spResource.Roles, appRoles.Existing); err != nil {
-			if flags.DryRun {
-				dryRunError = append(dryRunError, err.Error())
-			} else {
-				return err
-			}
-		}
-		if !flags.DryRun {
-			ImportLogger.Debug("finish compare role")
-		}
+	ImportLogger.Info("compare supabase resource and local resource")
+
+	if err := j.compareTypes(); err != nil {
+		return err
 	}
-
-	if !flags.ForceImport && (flags.All() || flags.RpcOnly) && len(appRpcFunctions.Existing) > 0 {
-		if !flags.DryRun {
-			ImportLogger.Debug("start compare rpc")
-		}
-		if err := rpc.Compare(spResource.Functions, appRpcFunctions.Existing); err != nil {
-			if flags.DryRun {
-				dryRunError = append(dryRunError, err.Error())
-			} else {
-				return err
-			}
-		}
-		if !flags.DryRun {
-			ImportLogger.Debug("finish compare rpc")
-		}
+	if err := j.compareTables(); err != nil {
+		return err
 	}
-
-	if !flags.ForceImport && (flags.All() || flags.StoragesOnly) && len(appStorage.Existing) > 0 {
-		if !flags.DryRun {
-			ImportLogger.Debug("start compare storage")
-		}
-
-		// compare table
-		var compareStorages []objects.Bucket
-		for i := range appStorage.Existing {
-			es := appStorage.Existing[i]
-			compareStorages = append(compareStorages, es.Storage)
-		}
-
-		if err := storages.Compare(spResource.Storages, compareStorages); err != nil {
-			if flags.DryRun {
-				dryRunError = append(dryRunError, err.Error())
-			} else {
-				return err
-			}
-		}
-		if !flags.DryRun {
-			ImportLogger.Debug("finish compare storage")
-		}
+	if err := j.compareRoles(); err != nil {
+		return err
 	}
-
-	if !flags.ForceImport && (flags.All() || flags.PoliciesOnly) && len(appPolicies.Existing) > 0 {
-		if !flags.DryRun {
-			ImportLogger.Debug("start compare policies")
-		}
-		if err := policies.Compare(spResource.Policies, appPolicies.Existing); err != nil {
-			if flags.DryRun {
-				dryRunError = append(dryRunError, err.Error())
-			} else {
-				return err
-			}
-		}
-		if !flags.DryRun {
-			ImportLogger.Debug("finish compare policies")
-		}
+	if err := j.compareRpc(); err != nil {
+		return err
 	}
-
-	// import report
-	report = ImportReport{
-		Role:     roles.GetNewCountData(spResource.Roles, appRoles),
-		Table:    tables.GetNewCountData(spResource.Tables, appTables),
-		Storage:  storages.GetNewCountData(spResource.Storages, appStorage),
-		Rpc:      rpc.GetNewCountData(spResource.Functions, appRpcFunctions),
-		Types:    types.GetNewCountData(spResource.Types, appType),
-		Policies: policies.GetNewCountData(spResource.Policies, appPolicies),
+	if err := j.compareStorages(); err != nil {
+		return err
 	}
-	reportComputed = true
+	return nil
+}
 
-	if !flags.DryRun {
-		if flags.UpdateStateOnly {
-			return updateStateOnly(&importState, spResource, mapModelValidationTags)
-		} else {
-			// generate resource
-			if err := generateImportResource(config, &importState, flags.ProjectPath, spResource, mapModelValidationTags, flags.GenerateController); err != nil {
-				return err
-			}
-			PrintImportReport(report, false)
-			reportPrinted = true
-		}
-
-	} else {
-		if len(dryRunError) > 0 {
-			errMessage := strings.Join(dryRunError, "\n")
-			ImportLogger.Error("got error", "err-msg", errMessage)
-			skipReport = true
+func (j *importJob) compareTypes() error {
+	if !(j.flags.All() || j.flags.ModelsOnly) || len(j.appTypes.Existing) == 0 {
+		return nil
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("start compare types")
+	}
+	if err := j.deps.compareTypes(j.resource.Types, j.appTypes.Existing); err != nil {
+		if j.flags.DryRun {
+			j.dryRunErrors = append(j.dryRunErrors, err.Error())
 			return nil
 		}
-		PrintImportReport(report, true)
-		reportPrinted = true
+		return err
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("finish compare types")
+	}
+	return nil
+}
+
+func (j *importJob) compareTables() error {
+	if !(j.flags.All() || j.flags.ModelsOnly) || len(j.appTables.Existing) == 0 {
+		return nil
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("start compare table")
+	}
+	compareTables := make([]objects.Table, 0, len(j.appTables.Existing))
+	for i := range j.appTables.Existing {
+		compareTables = append(compareTables, j.appTables.Existing[i].Table)
+	}
+
+	if err := j.deps.compareTables(j.resource.Tables, compareTables); err != nil {
+		if j.flags.DryRun {
+			j.dryRunErrors = append(j.dryRunErrors, err.Error())
+			return nil
+		}
+		return err
+	}
+
+	if !j.flags.DryRun {
+		ImportLogger.Debug("finish compare table")
 	}
 
 	return nil
+}
+
+func (j *importJob) compareRoles() error {
+	if !(j.flags.All() || j.flags.RolesOnly) || len(j.appRoles.Existing) == 0 {
+		return nil
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("start compare role")
+	}
+	if err := j.deps.compareRoles(j.resource.Roles, j.appRoles.Existing); err != nil {
+		if j.flags.DryRun {
+			j.dryRunErrors = append(j.dryRunErrors, err.Error())
+			return nil
+		}
+		return err
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("finish compare role")
+	}
+	return nil
+}
+
+func (j *importJob) compareRpc() error {
+	if !(j.flags.All() || j.flags.RpcOnly) || len(j.appRpcFunctions.Existing) == 0 {
+		return nil
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("start compare rpc")
+	}
+	if err := j.deps.compareRpc(j.resource.Functions, j.appRpcFunctions.Existing); err != nil {
+		if j.flags.DryRun {
+			j.dryRunErrors = append(j.dryRunErrors, err.Error())
+			return nil
+		}
+		return err
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("finish compare rpc")
+	}
+	return nil
+}
+
+func (j *importJob) compareStorages() error {
+	if !(j.flags.All() || j.flags.StoragesOnly) || len(j.appStorage.Existing) == 0 {
+		return nil
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("start compare storage")
+	}
+	compareStorages := make([]objects.Bucket, 0, len(j.appStorage.Existing))
+	for i := range j.appStorage.Existing {
+		compareStorages = append(compareStorages, j.appStorage.Existing[i].Storage)
+	}
+
+	if err := j.deps.compareStorages(j.resource.Storages, compareStorages); err != nil {
+		if j.flags.DryRun {
+			j.dryRunErrors = append(j.dryRunErrors, err.Error())
+			return nil
+		}
+		return err
+	}
+	if !j.flags.DryRun {
+		ImportLogger.Debug("finish compare storage")
+	}
+	return nil
+}
+
+func (j *importJob) computeReport() {
+	j.report = ImportReport{
+		Role:    roles.GetNewCountData(j.resource.Roles, j.appRoles),
+		Table:   tables.GetNewCountData(j.resource.Tables, j.appTables),
+		Storage: storages.GetNewCountData(j.resource.Storages, j.appStorage),
+		Rpc:     rpc.GetNewCountData(j.resource.Functions, j.appRpcFunctions),
+		Types:   types.GetNewCountData(j.resource.Types, j.appTypes),
+	}
+	j.reportComputed = true
+}
+
+// handleOutput decides whether to mutate local files or just display the report based on flags.
+func (j *importJob) handleOutput() error {
+	if !j.flags.DryRun {
+		if j.flags.UpdateStateOnly {
+			return j.deps.updateStateOnly(&j.importState, j.resource, j.mapModelValidationTags)
+		}
+
+		if err := j.deps.generate(j.config, &j.importState, j.flags.ProjectPath, j.resource, j.mapModelValidationTags, j.flags.GenerateController); err != nil {
+			return err
+		}
+		j.printReport(false)
+		return nil
+	}
+
+	if len(j.dryRunErrors) > 0 {
+		errMessage := strings.Join(j.dryRunErrors, "\n")
+		ImportLogger.Error("got error", "err-msg", errMessage)
+		j.skipReport = true
+		return nil
+	}
+
+	j.printReport(true)
+	return nil
+}
+
+func (j *importJob) printReport(dryRun bool) {
+	if j.reportPrinted {
+		return
+	}
+	j.deps.printReport(j.report, dryRun)
+	j.reportPrinted = true
 }
 
 // ----- Generate import data -----
@@ -297,6 +444,17 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 
 	wg, errChan, stateChan := sync.WaitGroup{}, make(chan error), make(chan any)
 	doneListen := UpdateLocalStateFromImport(importState, stateChan)
+	roleMap := make(map[string]string)
+	nativeRoleMap := make(map[string]raiden.Role)
+
+	if len(resource.Tables) > 0 || len(resource.Storages) > 0 {
+		if len(resource.Roles) > 0 {
+			for _, i := range resource.Roles {
+				roleMap[i.Name] = i.Name
+			}
+		}
+		nativeRoleMap, _ = loadMapNativeRole()
+	}
 
 	wg.Add(1)
 	go func() {
@@ -337,7 +495,7 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 				mapDataType[dataType.Name] = dataType
 			}
 
-			if err := generator.GenerateModels(projectPath, config.ProjectName, tableInputs, mapDataType, captureFunc); err != nil {
+			if err := generator.GenerateModels(projectPath, config.ProjectName, tableInputs, mapDataType, roleMap, nativeRoleMap, captureFunc); err != nil {
 				errChan <- err
 			}
 
@@ -387,7 +545,6 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 		if len(resource.Storages) > 0 {
 			ImportLogger.Info("start generate storages")
 			storageInput := storages.BuildGenerateStorageInput(resource.Storages, resource.Policies)
-
 			captureFunc := ImportDecorateFunc(storageInput, func(item *generator.GenerateStorageInput, input generator.GenerateInput) bool {
 				if i, ok := input.BindData.(generator.GenerateStoragesData); ok {
 					if utils.ToSnakeCase(i.Name) == utils.ToSnakeCase(item.Bucket.Name) {
@@ -396,53 +553,10 @@ func generateImportResource(config *raiden.Config, importState *state.LocalState
 				}
 				return false
 			}, stateChan)
-			if errGenStorage := generator.GenerateStorages(projectPath, storageInput, captureFunc); errGenStorage != nil {
+			if errGenStorage := generator.GenerateStorages(projectPath, config.ProjectName, storageInput, roleMap, nativeRoleMap, captureFunc); errGenStorage != nil {
 				errChan <- errGenStorage
 			}
 			ImportLogger.Info("finish generate storages")
-		}
-
-		// generate all policies from cloud / pg-meta
-		if len(resource.Policies) > 0 {
-			ImportLogger.Info("start generate policies")
-			captureFunc := ImportDecorateFunc(resource.Policies, func(item objects.Policy, input generator.GenerateInput) bool {
-				if i, ok := input.BindData.(generator.GeneratePolicyData); ok {
-					if i.Name == item.Name {
-						return true
-					}
-				}
-				return false
-			}, stateChan)
-
-			tableMap, storageMap, roleMap := make(map[string]objects.Table), make(map[string]string), make(map[string]string)
-			if len(resource.Tables) > 0 {
-				for _, i := range resource.Tables {
-					tableMap[i.Name] = i
-				}
-			}
-
-			if len(resource.Storages) > 0 {
-				for _, i := range resource.Storages {
-					storageMap[i.Name] = i.Name
-				}
-			}
-
-			if len(resource.Roles) > 0 {
-				for _, i := range resource.Roles {
-					roleMap[i.Name] = i.Name
-				}
-			}
-
-			nativeRoleMap, _ := loadMapNativeRole()
-
-			if err := generator.GeneratePolicies(
-				projectPath, config.ProjectName, resource.Policies,
-				tableMap, storageMap, roleMap, nativeRoleMap,
-				captureFunc,
-			); err != nil {
-				errChan <- err
-			}
-			ImportLogger.Info("finish generate policies")
 		}
 	}()
 
@@ -515,16 +629,6 @@ func updateStateOnly(importState *state.LocalState, resource *Resource, mapModel
 		}
 	}
 
-	if len(resource.Policies) > 0 {
-		for i := range resource.Policies {
-			p := resource.Policies[i]
-			importState.AddPolicy(state.PolicyState{
-				Policy:       p,
-				PolicyStruct: utils.SnakeCaseToPascalCase(p.Name),
-				LastUpdate:   time.Now(),
-			})
-		}
-	}
 	return importState.Persist()
 }
 
@@ -618,14 +722,6 @@ func UpdateLocalStateFromImport(localState *state.LocalState, stateChan chan any
 						LastUpdate: time.Now(),
 					}
 					localState.AddType(typeState)
-				case objects.Policy:
-					policyState := state.PolicyState{
-						Policy:       parseItem,
-						PolicyPath:   genInput.OutputPath,
-						PolicyStruct: utils.SnakeCaseToPascalCase(parseItem.Name),
-						LastUpdate:   time.Now(),
-					}
-					localState.AddPolicy(policyState)
 				}
 			}
 		}

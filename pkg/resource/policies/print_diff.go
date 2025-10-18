@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/fatih/color"
+	"github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -45,6 +46,8 @@ func PrintDiff(diffData CompareDiffResult) {
 	printScope := color.New(color.FgHiBlack).PrintfFunc()
 
 	changes := make([]string, 0)
+	sourceNorm := normalizePolicyForReport(diffData.SourceResource)
+	targetNorm := normalizePolicyForReport(diffData.TargetResource)
 
 	for _, v := range diffData.DiffItems.ChangeItems {
 		switch v {
@@ -52,13 +55,13 @@ func PrintDiff(diffData CompareDiffResult) {
 			changeMsg := fmt.Sprintf("- name: %s >>> %s", diffData.TargetResource.Name, diffData.SourceResource.Name)
 			changes = append(changes, changeMsg)
 		case objects.UpdatePolicyDefinition:
-			oldDef := utils.ConvertAllToString(diffData.TargetResource.Definition)
-			if len(oldDef) == 0 {
+			oldDef := targetNorm.Definition
+			if oldDef == "" {
 				oldDef = "unset"
 			}
 
-			newDef := utils.ConvertAllToString(diffData.SourceResource.Definition)
-			if len(newDef) == 0 {
+			newDef := sourceNorm.Definition
+			if newDef == "" {
 				newDef = "unset"
 			}
 
@@ -69,13 +72,13 @@ func PrintDiff(diffData CompareDiffResult) {
 			changeMsg := fmt.Sprintf("- definition: %s >>> %s", oldDef, newDef)
 			changes = append(changes, changeMsg)
 		case objects.UpdatePolicyCheck:
-			oldCheck := utils.ConvertAllToString(diffData.TargetResource.Check)
-			if len(oldCheck) == 0 {
+			oldCheck := targetNorm.Check
+			if oldCheck == "" {
 				oldCheck = "unset"
 			}
 
-			newCheck := utils.ConvertAllToString(diffData.SourceResource.Check)
-			if len(newCheck) == 0 {
+			newCheck := sourceNorm.Check
+			if newCheck == "" {
 				newCheck = "unset"
 			}
 
@@ -187,6 +190,21 @@ func GenerateDiffChangeMessage(newData []string, updateData []string, deleteData
 	}
 
 	return buff.String(), nil
+}
+
+type normalizedPolicy struct {
+	Definition string
+	Check      string
+}
+
+func normalizePolicyForReport(policy objects.Policy) normalizedPolicy {
+	qualifier := builder.ClauseQualifier{Schema: policy.Schema, Table: policy.Table}
+	norm := normalizedPolicy{}
+	norm.Definition = builder.NormalizeClauseSQL(strings.TrimSpace(policy.Definition), qualifier)
+	if policy.Check != nil {
+		norm.Check = builder.NormalizeClauseSQL(strings.TrimSpace(*policy.Check), qualifier)
+	}
+	return norm
 }
 
 const DiffChangeUpdateTemplate = `  - Update Policy {{ .Name }}

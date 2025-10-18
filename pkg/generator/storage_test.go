@@ -39,7 +39,7 @@ func TestGenerateStorages(t *testing.T) {
 		},
 	}
 
-	err2 := generator.GenerateStorages(dir, storages, generator.GenerateFn(generator.Generate))
+	err2 := generator.GenerateStorages(dir, "test-project", storages, nil, nil, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/storages/test_bucket.go")
 }

@@ -31,8 +31,4 @@ func TestGenerateApplyMainFunction(t *testing.T) {
 	assert.NoError(t, err1)
 	applyFile := dir + "/cmd/apply/main.go"
 	assert.FileExists(t, applyFile)
-
-	content, readErr := os.ReadFile(applyFile)
-	assert.NoError(t, readErr)
-	assert.Contains(t, string(content), "policies-only")
 }

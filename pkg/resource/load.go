@@ -137,25 +137,6 @@ func loadBffResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, outC
 		LoadLogger.Debug("get Bucket from server")
 		loadStorages(wg, cfg, outChan)
 	}
-
-	if flags.All() || flags.PoliciesOnly {
-		LoadLogger.Debug("get Role and Role Membership from server")
-		loadRolesAndMembership(wg, cfg, outChan, supabase.DefaultIncludedSchema)
-
-		LoadLogger.Debug("get Types from server")
-		loadTypes(wg, cfg, outChan, []string{raiden.DefaultTypeSchema})
-
-		LoadLogger.Debug("get Table, Index, and Relation Actions from server")
-		loadTableResources(wg, cfg, outChan, supabase.DefaultIncludedSchema)
-
-		LoadLogger.Debug("get Bucket from server")
-		loadStorages(wg, cfg, outChan)
-
-		LoadLogger.Debug("get Policy from server")
-		wg.Add(1)
-		go loadPoliciesWithCleanup(wg, cfg, outChan)
-	}
-
 }
 
 func loadServiceResources(wg *sync.WaitGroup, flags *Flags, cfg *raiden.Config, outChan chan any) {

@@ -231,6 +231,60 @@ func TestCompareItem_NormalizesPolicyClauses(t *testing.T) {
 	assert.Empty(t, diffWithCasts.DiffItems.ChangeItems)
 }
 
+func TestCompareItem_IgnoresBucketClauseFormatting(t *testing.T) {
+	source := objects.Policy{
+		Name:       "StorageRead",
+		Schema:     "storage",
+		Table:      "objects",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandSelect,
+		Definition: "((bucket_id = 'local_storage') AND true)",
+	}
+
+	formatted := objects.Policy{
+		Name:       "StorageRead",
+		Schema:     "storage",
+		Table:      "objects",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandSelect,
+		Definition: `("bucket_id" = 'local_storage') AND (TRUE)`,
+	}
+
+	diff := policies.CompareItem(source, formatted)
+	assert.False(t, diff.IsConflict)
+	assert.NotContains(t, diff.DiffItems.ChangeItems, objects.UpdatePolicyDefinition)
+}
+
+func TestCompareItem_NormalizesBooleanLiterals(t *testing.T) {
+	source := objects.Policy{
+		Name:       "BoolPolicy",
+		Schema:     "public",
+		Table:      "tbl",
+		Action:     "PERMISSIVE",
+		Command:    objects.PolicyCommandUpdate,
+		Definition: "TRUE",
+		Check:      stringPtr("TRUE"),
+	}
+
+	target := source
+	target.Definition = "true"
+	target.Check = stringPtr("true")
+
+	diff := policies.CompareItem(source, target)
+	assert.False(t, diff.IsConflict)
+	assert.NotContains(t, diff.DiffItems.ChangeItems, objects.UpdatePolicyDefinition)
+	assert.NotContains(t, diff.DiffItems.ChangeItems, objects.UpdatePolicyCheck)
+
+	target.Definition = "false"
+	target.Check = stringPtr("false")
+	diffFalse := policies.CompareItem(source, target)
+	assert.True(t, diffFalse.IsConflict)
+	assert.Contains(t, diffFalse.DiffItems.ChangeItems, objects.UpdatePolicyDefinition)
+	assert.Contains(t, diffFalse.DiffItems.ChangeItems, objects.UpdatePolicyCheck)
+}
+
+func stringPtr(v string) *string { return &v }
+
 func TestCompareList_DuplicateNameDifferentSchema(t *testing.T) {
 	check := "check"
 	sourcePolicies := []objects.Policy{

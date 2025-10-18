@@ -29,7 +29,7 @@ func MarshalClause(c Clause) string {
 func UnmarshalClause(sql string, qualifiers ...ClauseQualifier) (Clause, string, bool) {
 	normalized := NormalizeClauseSQL(sql, qualifiers...)
 	if strings.TrimSpace(normalized) == "" {
-		return Clause(""), "b.Clause(\"\")", true
+		return Clause(""), "st.Clause(\"\")", true
 	}
 	clause, code, ok := parseClause(normalized)
 	return clause, code, ok
@@ -58,7 +58,7 @@ func normalizeClause(expr string, qualifiers ...ClauseQualifier) string {
 func parseClause(expr string) (Clause, string, bool) {
 	expr = strings.TrimSpace(expr)
 	if expr == "" {
-		return Clause(""), "b.Clause(\"\")", true
+		return Clause(""), "st.Clause(\"\")", true
 	}
 	if enclosedByOuterParentheses(expr) {
 		return parseClause(strings.TrimSpace(expr[1 : len(expr)-1]))
@@ -77,7 +77,7 @@ func parseClause(expr string) (Clause, string, bool) {
 		if len(clauses) == 1 {
 			return clauses[0], codes[0], true
 		}
-		return Or(clauses...), "b.Or(" + strings.Join(codes, ", ") + ")", true
+		return Or(clauses...), "st.Or(" + strings.Join(codes, ", ") + ")", true
 	}
 	if parts := splitByLogical(expr, "AND"); parts != nil {
 		clauses := make([]Clause, 0, len(parts))
@@ -93,7 +93,7 @@ func parseClause(expr string) (Clause, string, bool) {
 		if len(clauses) == 1 {
 			return clauses[0], codes[0], true
 		}
-		return And(clauses...), "b.And(" + strings.Join(codes, ", ") + ")", true
+		return And(clauses...), "st.And(" + strings.Join(codes, ", ") + ")", true
 	}
 	upper := strings.ToUpper(expr)
 	if strings.HasPrefix(upper, "NOT ") {
@@ -102,12 +102,12 @@ func parseClause(expr string) (Clause, string, bool) {
 		if !ok {
 			return "", "", false
 		}
-		return Not(cl), "b.Not(" + code + ")", true
+		return Not(cl), "st.Not(" + code + ")", true
 	}
 	if left, right, ok := splitComparison(expr, "="); ok {
 		return buildEqualityClause(left, right)
 	}
-	return Clause(expr), fmt.Sprintf("b.Clause(%q)", expr), false
+	return Clause(expr), fmt.Sprintf("st.Clause(%q)", expr), false
 }
 
 func buildEqualityClause(left, right string) (Clause, string, bool) {
@@ -122,19 +122,19 @@ func buildEqualityClause(left, right string) (Clause, string, bool) {
 		if !ok {
 			return Clause(""), "", false
 		}
-		return Eq(left, rhsExp), fmt.Sprintf("b.Eq(%q, %s)", left, rhsCode), true
+		return Eq(left, rhsExp), fmt.Sprintf("st.Eq(%q, %s)", left, rhsCode), true
 	case !leftIsColumn && rightIsColumn:
 		lhsExp, lhsCode, ok := operandToBuilderExp(left, true)
 		if !ok {
 			return Clause(""), "", false
 		}
-		return Eq(right, lhsExp), fmt.Sprintf("b.Eq(%q, %s)", right, lhsCode), true
+		return Eq(right, lhsExp), fmt.Sprintf("st.Eq(%q, %s)", right, lhsCode), true
 	case leftIsColumn && rightIsColumn:
 		rhsExp, rhsCode, ok := operandToBuilderExp(right, true)
 		if !ok {
 			return Clause(""), "", false
 		}
-		return Eq(left, rhsExp), fmt.Sprintf("b.Eq(%q, %s)", left, rhsCode), true
+		return Eq(left, rhsExp), fmt.Sprintf("st.Eq(%q, %s)", left, rhsCode), true
 	default:
 		return Clause(""), "", false
 	}
@@ -147,42 +147,42 @@ func operandToBuilderExp(operand string, allowIdentifier bool) (Exp, string, boo
 	}
 	if strings.HasPrefix(op, "'") && strings.HasSuffix(op, "'") {
 		value := strings.ReplaceAll(op[1:len(op)-1], "''", "'")
-		return String(value), fmt.Sprintf("b.String(%q)", value), true
+		return String(value), fmt.Sprintf("st.String(%q)", value), true
 	}
 	upper := strings.ToUpper(op)
 	if upper == "TRUE" {
-		return Bool(true), "b.Bool(true)", true
+		return Bool(true), "st.Bool(true)", true
 	}
 	if upper == "FALSE" {
-		return Bool(false), "b.Bool(false)", true
+		return Bool(false), "st.Bool(false)", true
 	}
 	if i, err := strconv.ParseInt(op, 10, 64); err == nil {
-		return Int64(i), fmt.Sprintf("b.Int64(%d)", i), true
+		return Int64(i), fmt.Sprintf("st.Int64(%d)", i), true
 	}
 	if allowIdentifier && isColumnReference(op) {
-		return Ident(op), fmt.Sprintf("b.Ident(%q)", op), true
+		return Ident(op), fmt.Sprintf("st.Ident(%q)", op), true
 	}
 	switch strings.ToLower(op) {
 	case "auth.uid()":
-		return AuthUID(), "b.AuthUID()", true
+		return AuthUID(), "st.AuthUID()", true
 	case "now()":
-		return Now(), "b.Now()", true
+		return Now(), "st.Now()", true
 	}
 	if strings.Contains(op, "(") {
 		name, args := parseFunctionCall(op)
 		switch name {
 		case "auth.uid":
-			return AuthUID(), "b.AuthUID()", true
+			return AuthUID(), "st.AuthUID()", true
 		case "current_setting":
 			if len(args) == 1 && args[0].kind == argString {
-				return CurrentSetting(args[0].value), fmt.Sprintf("b.CurrentSetting(%q)", args[0].value), true
+				return CurrentSetting(args[0].value), fmt.Sprintf("st.CurrentSetting(%q)", args[0].value), true
 			}
 			if len(args) == 2 && args[0].kind == argString && args[1].kind == argIdentifier {
-				return CurrentSettingAs(args[0].value, args[1].value), fmt.Sprintf("b.CurrentSettingAs(%q, %q)", args[0].value, args[1].value), true
+				return CurrentSettingAs(args[0].value, args[1].value), fmt.Sprintf("st.CurrentSettingAs(%q, %q)", args[0].value, args[1].value), true
 			}
 		}
 	}
-	return Raw(op), fmt.Sprintf("b.Raw(%q)", op), true
+	return Raw(op), fmt.Sprintf("st.Raw(%q)", op), true
 }
 
 func removeQualifiers(expr string, qualifiers ...ClauseQualifier) string {
