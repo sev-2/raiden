@@ -30,6 +30,14 @@ type mockEdgeRole struct {
 	raiden.RoleBase
 }
 
+type mockNativeRole struct {
+	raiden.RoleBase
+}
+
+func (r *mockNativeRole) Name() string {
+	return "native_role"
+}
+
 func (r *MockRole) Name() string {
 	return "test_role"
 }
@@ -107,13 +115,15 @@ func TestExtractRole(t *testing.T) {
 
 	appRoles := []raiden.Role{
 		&MockRole{},
+		&mockNativeRole{},
 	}
 
 	result, err := state.ExtractRole(roleStates, appRoles, true)
 	assert.NoError(t, err)
-	assert.Len(t, result.Existing, 0)
+	assert.Len(t, result.Existing, 1)
 	assert.Len(t, result.New, 1)
-	assert.Len(t, result.Delete, 2)
+	assert.Len(t, result.Delete, 1)
+	assert.Equal(t, "native_role", result.Existing[0].Name)
 
 	result, err = state.ExtractRole(roleStates, appRoles, false)
 	assert.NoError(t, err)

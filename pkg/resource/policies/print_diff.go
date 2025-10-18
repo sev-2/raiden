@@ -7,7 +7,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/fatih/color"
 	"github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -43,8 +42,13 @@ func PrintDiff(diffData CompareDiffResult) {
 		return
 	}
 	fileName := utils.ToSnakeCase(diffData.TargetResource.Name)
-	printScope := color.New(color.FgHiBlack).PrintfFunc()
-
+	
+	// Set up output to go to stdout to ensure test output capture works
+	printScope := func(format string, args ...interface{}) {
+		// Directly write to stdout to make test capture work
+		fmt.Printf(format, args...)
+	}
+	
 	changes := make([]string, 0)
 	sourceNorm := normalizePolicyForReport(diffData.SourceResource)
 	targetNorm := normalizePolicyForReport(diffData.TargetResource)

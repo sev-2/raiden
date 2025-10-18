@@ -8,7 +8,6 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/postgres"
-	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -474,91 +473,6 @@ func bindTableMetadata(field *reflect.StructField, table *objects.Table) {
 	} else {
 		table.RLSForced = false
 	}
-}
-
-func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []objects.Policy) {
-	acl := raiden.UnmarshalAclTag(string(field.Tag))
-	tableType := strings.ToLower(string(supabase.RlsTypeModel))
-
-	defaultCheck, defaultDefinition := "true", "true"
-	if len(acl.Read.Roles) > 0 {
-		readPolicyName := supabase.GetPolicyName(objects.PolicyCommandSelect, tableType, ei.Table.Name)
-		policy := objects.Policy{
-			Name:       readPolicyName,
-			Schema:     ei.Table.Schema,
-			Table:      ei.Table.Name,
-			Action:     "PERMISSIVE",
-			Command:    objects.PolicyCommandSelect,
-			Roles:      acl.Read.Roles,
-			Definition: acl.Read.Using,
-		}
-		if policy.Definition == "" {
-			policy.Definition = defaultDefinition
-		} else if policy.Definition != defaultDefinition {
-			policy.Definition = fmt.Sprintf("(%s)", policy.Definition)
-		}
-
-		policies = append(policies, policy)
-	}
-
-	if len(acl.Write.Roles) > 0 {
-		createPolicy := objects.Policy{
-			Name:    supabase.GetPolicyName(objects.PolicyCommandInsert, tableType, ei.Table.Name),
-			Schema:  ei.Table.Schema,
-			Table:   ei.Table.Name,
-			Action:  "PERMISSIVE",
-			Command: objects.PolicyCommandInsert,
-			Roles:   acl.Write.Roles,
-			Check:   acl.Write.Check,
-		}
-		if createPolicy.Check == nil || (createPolicy.Check != nil && *createPolicy.Check == "") {
-			createPolicy.Check = &defaultCheck
-		} else if createPolicy.Check != nil && *createPolicy.Check != "" && *createPolicy.Check != defaultCheck {
-			check := fmt.Sprintf("(%s)", *createPolicy.Check)
-			createPolicy.Check = &check
-		}
-
-		updatePolicy := objects.Policy{
-			Name:       supabase.GetPolicyName(objects.PolicyCommandUpdate, tableType, ei.Table.Name),
-			Schema:     ei.Table.Schema,
-			Table:      ei.Table.Name,
-			Action:     "PERMISSIVE",
-			Command:    objects.PolicyCommandUpdate,
-			Roles:      acl.Write.Roles,
-			Definition: acl.Write.Using,
-			Check:      acl.Write.Check,
-		}
-		if updatePolicy.Check == nil || (updatePolicy.Check != nil && *updatePolicy.Check == "") {
-			updatePolicy.Check = &defaultCheck
-		} else if updatePolicy.Check != nil && *updatePolicy.Check != "" && *updatePolicy.Check != defaultCheck {
-			check := fmt.Sprintf("(%s)", *updatePolicy.Check)
-			updatePolicy.Check = &check
-		}
-
-		if updatePolicy.Definition == "" {
-			updatePolicy.Definition = "true"
-		} else if updatePolicy.Definition != defaultDefinition {
-			updatePolicy.Definition = fmt.Sprintf("(%s)", updatePolicy.Definition)
-		}
-
-		deletePolicy := objects.Policy{
-			Name:       supabase.GetPolicyName(objects.PolicyCommandDelete, tableType, ei.Table.Name),
-			Schema:     ei.Table.Schema,
-			Table:      ei.Table.Name,
-			Action:     "PERMISSIVE",
-			Command:    objects.PolicyCommandDelete,
-			Roles:      acl.Write.Roles,
-			Definition: acl.Write.Using,
-		}
-		if deletePolicy.Definition == "" {
-			deletePolicy.Definition = "true"
-		} else if deletePolicy.Definition != defaultDefinition {
-			deletePolicy.Definition = fmt.Sprintf("(%s)", deletePolicy.Definition)
-		}
-		policies = append(policies, createPolicy, updatePolicy, deletePolicy)
-	}
-
-	return
 }
 
 func buildTableRelation(tableName, fieldName, schema string, mapRelations map[string]objects.TablesRelationship, joinTag string) (relation objects.TablesRelationship) {
