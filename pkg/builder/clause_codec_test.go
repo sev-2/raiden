@@ -58,7 +58,7 @@ func TestEnclosedByOuterParentheses(t *testing.T) {
 // Test collapseWhitespace function (testing internal function through coverage)
 func TestCollapseWhitespace(t *testing.T) {
 	// Similar to above - test through public API
-	result := builder.NormalizeClauseSQL("col   =   'value'") 
+	result := builder.NormalizeClauseSQL("col   =   'value'")
 	assert.Contains(t, result, "col")
 	assert.Contains(t, result, "value")
 }
@@ -92,7 +92,7 @@ func TestOperandToBuilderExp(t *testing.T) {
 }
 
 // Test canonicalizeSimpleEquality
-func TestCanonicalizeSimpleEquality(t *testing.T) { 
+func TestCanonicalizeSimpleEquality(t *testing.T) {
 	result := builder.NormalizeClauseSQL("b = 'value' AND a = 'other'")
 	assert.Contains(t, result, "=")
 }

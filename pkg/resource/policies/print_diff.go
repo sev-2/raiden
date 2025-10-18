@@ -42,13 +42,13 @@ func PrintDiff(diffData CompareDiffResult) {
 		return
 	}
 	fileName := utils.ToSnakeCase(diffData.TargetResource.Name)
-	
+
 	// Set up output to go to stdout to ensure test output capture works
 	printScope := func(format string, args ...interface{}) {
 		// Directly write to stdout to make test capture work
 		fmt.Printf(format, args...)
 	}
-	
+
 	changes := make([]string, 0)
 	sourceNorm := normalizePolicyForReport(diffData.SourceResource)
 	targetNorm := normalizePolicyForReport(diffData.TargetResource)

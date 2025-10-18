@@ -73,14 +73,14 @@ func TestCleanupAclExpression(t *testing.T) {
 }
 
 func TestGetNewCountData(t *testing.T) {
-    supabasePolicies := []objects.Policy{{Name: "p1"}, {Name: "p2"}, {Name: "p3"}}
-    local := state.ExtractPolicyResult{
-        Delete: []objects.Policy{{Name: "p1"}, {Name: "p3"}},
-    }
+	supabasePolicies := []objects.Policy{{Name: "p1"}, {Name: "p2"}, {Name: "p3"}}
+	local := state.ExtractPolicyResult{
+		Delete: []objects.Policy{{Name: "p1"}, {Name: "p3"}},
+	}
 
-    count := policies.GetNewCountData(supabasePolicies, local)
-    assert.Equal(t, 2, count)
+	count := policies.GetNewCountData(supabasePolicies, local)
+	assert.Equal(t, 2, count)
 
-    count = policies.GetNewCountData(nil, state.ExtractPolicyResult{})
-    assert.Equal(t, 0, count)
+	count = policies.GetNewCountData(nil, state.ExtractPolicyResult{})
+	assert.Equal(t, 0, count)
 }
