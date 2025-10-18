@@ -167,7 +167,8 @@ func TestRuleBuildHandlesCommandSpecificClauses(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, objects.PolicyCommandAll, p.Command)
 		assert.Equal(t, "TRUE", p.Definition)
-		assert.Nil(t, p.Check)
+		assert.NotNil(t, p.Check)
+		assert.Equal(t, "TRUE", *p.Check)
 	})
 }
 

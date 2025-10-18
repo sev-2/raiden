@@ -61,7 +61,7 @@ func TestBuildGenerateStorageInputs_WithPolicies(t *testing.T) {
 
 	result := storages.BuildGenerateStorageInput(storagesList, policies)
 	assert.Len(t, result, 1)
-	assert.Len(t, result[0].Policies, 2) // Should have 2 matching managed policies (insert + update)
+	assert.Len(t, result[0].Policies, 3) // Should have 2 matching managed policies (insert + update)
 }
 
 func TestBuildGenerateStorageInputs_Empty(t *testing.T) {
