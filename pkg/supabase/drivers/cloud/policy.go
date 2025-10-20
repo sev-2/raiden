@@ -57,6 +57,27 @@ func CreatePolicy(cfg *raiden.Config, policy objects.Policy) (objects.Policy, er
 
 func UpdatePolicy(cfg *raiden.Config, policy objects.Policy, updatePolicyParams objects.UpdatePolicyParam) error {
 	CloudLogger.Trace("start update policy", "name", policy.Name)
+	if policyRequiresRecreate(updatePolicyParams.ChangeItems) {
+		oldPolicy := objects.Policy{
+			Name:    updatePolicyParams.Name,
+			Schema:  updatePolicyParams.OldSchema,
+			Table:   updatePolicyParams.OldTable,
+			Action:  updatePolicyParams.OldAction,
+			Command: updatePolicyParams.OldCommand,
+			Roles:   updatePolicyParams.OldRoles,
+		}
+
+		if err := DeletePolicy(cfg, oldPolicy); err != nil {
+			return err
+		}
+
+		_, err := CreatePolicy(cfg, policy)
+		if err != nil {
+			return err
+		}
+		CloudLogger.Trace("finish update policy", "name", policy.Name)
+		return nil
+	}
 	sql := query.BuildUpdatePolicyQuery(policy, updatePolicyParams)
 	// Execute SQL Query
 	_, err := ExecuteQuery[any](cfg.SupabaseApiUrl, cfg.ProjectId, sql, DefaultAuthInterceptor(cfg.AccessToken), nil)
@@ -65,6 +86,16 @@ func UpdatePolicy(cfg *raiden.Config, policy objects.Policy, updatePolicyParams 
 	}
 	CloudLogger.Trace("finish update policy", "name", policy.Name)
 	return nil
+}
+
+func policyRequiresRecreate(changeItems []objects.UpdatePolicyType) bool {
+	for _, item := range changeItems {
+		switch item {
+		case objects.UpdatePolicySchema, objects.UpdatePolicyTable, objects.UpdatePolicyAction, objects.UpdatePolicyCommand:
+			return true
+		}
+	}
+	return false
 }
 
 func DeletePolicy(cfg *raiden.Config, policy objects.Policy) error {

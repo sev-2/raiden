@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
+
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/sev-2/raiden/pkg/logger"
+	"github.com/sev-2/raiden/pkg/supabase/constants"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/cloud/admin"
 	"github.com/sev-2/raiden/pkg/supabase/drivers/local/meta"
@@ -22,8 +23,8 @@ import (
 var SupabaseLogger = logger.HcLog().Named("supabase")
 var StorageLogger = logger.HcLog().Named("supabase.storage")
 
-var DefaultStorageSchema = "storage"
-var DefaultObjectTable = "objects"
+var DefaultStorageSchema = constants.DefaultStorageSchema
+var DefaultObjectTable = constants.DefaultObjectTable
 
 var (
 	DefaultApiUrl         = "https://api.supabase.com"
@@ -160,6 +161,19 @@ func GetRoles(cfg *raiden.Config) ([]objects.Role, error) {
 	SupabaseLogger.Debug("Get all roles from supabase pg-meta")
 	return decorateActionWithDataErr("fetch", "role", func() ([]objects.Role, error) {
 		return meta.GetRoles(cfg)
+	})
+}
+
+func GetRoleMemberships(cfg *raiden.Config, includedSchema []string) ([]objects.RoleMembership, error) {
+	if cfg.DeploymentTarget == raiden.DeploymentTargetCloud {
+		SupabaseLogger.Debug("Get role memberships from supabase cloud", "project-id", cfg.ProjectId)
+		return decorateActionWithDataErr("fetch", "role membership", func() ([]objects.RoleMembership, error) {
+			return cloud.GetRoleMemberships(cfg, includedSchema)
+		})
+	}
+	SupabaseLogger.Debug("Get role memberships from supabase pg-meta")
+	return decorateActionWithDataErr("fetch", "role membership", func() ([]objects.RoleMembership, error) {
+		return meta.GetRoleMemberships(cfg, includedSchema)
 	})
 }
 
@@ -366,7 +380,9 @@ func AdminUpdateUserData(cfg *raiden.Config, userId string, data objects.User) (
 		})
 	}
 	SupabaseLogger.Debug("Update user data in self hosted", "user-id", userId)
-	return objects.User{}, errors.New("update user data in self hosted in not implemented, stay update :)")
+	return decorateActionWithDataErr("update", "user", func() (objects.User, error) {
+		return data, meta.UpdateUserData(cfg, userId, data)
+	})
 }
 
 func GetBuckets(cfg *raiden.Config) (buckets []objects.Bucket, err error) {

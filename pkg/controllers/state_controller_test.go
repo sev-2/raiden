@@ -45,6 +45,9 @@ func TestStateController_Post(t *testing.T) {
 		SendJsonFn: func(data any) error {
 			return nil
 		},
+		SendErrorWithCodeFn: func(statusCode int, err error) error {
+			return nil
+		},
 	}
 
 	mock := &mock.MockSupabase{Cfg: config}
@@ -83,6 +86,22 @@ func TestStateController_Post(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err3)
+
+	err4 := mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{
+		{
+			ParentID:    18136,
+			ParentRole:  "student",
+			InheritID:   18138,
+			InheritRole: "admin",
+		},
+		{
+			ParentID:    18137,
+			ParentRole:  "instructor",
+			InheritID:   18138,
+			InheritRole: "admin",
+		},
+	})
+	assert.NoError(t, err4)
 
 	c := controllers.StateReadyController{
 		Result: controllers.StateReadyResponse{},

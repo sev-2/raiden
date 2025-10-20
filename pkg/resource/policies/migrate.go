@@ -18,13 +18,13 @@ var ActionFunc = MigrateActionFunc{
 	DeleteFunc: supabase.DeletePolicy,
 }
 
-func BuildMigrateData(extractedLocalData state.ExtractedPolicies, supabaseData []objects.Policy) (migrateData []MigrateItem, err error) {
+func BuildMigrateData(extractedLocalData state.ExtractPolicyResult, supabaseData []objects.Policy) (migrateData []MigrateItem, err error) {
 	Logger.Info("start build policy migrate data")
 	// compare and bind existing table to migrate data
-	mapSpPolicies := make(map[string]bool)
+	mapSpPolicies := make(map[string]objects.Policy)
 	for i := range supabaseData {
 		t := supabaseData[i]
-		mapSpPolicies[t.Name] = true
+		mapSpPolicies[policyKey(t)] = t
 	}
 
 	Logger.Debug("filter extracted data for update new local policy data")
@@ -32,7 +32,7 @@ func BuildMigrateData(extractedLocalData state.ExtractedPolicies, supabaseData [
 	var comparePolicies []objects.Policy
 	for i := range extractedLocalData.Existing {
 		p := extractedLocalData.Existing[i]
-		if _, isExist := mapSpPolicies[p.Name]; isExist {
+		if _, isExist := mapSpPolicies[policyKey(p)]; isExist {
 			comparePolicies = append(comparePolicies, p)
 		} else {
 			removeExistingIndex = append(removeExistingIndex, i)
@@ -46,7 +46,7 @@ func BuildMigrateData(extractedLocalData state.ExtractedPolicies, supabaseData [
 	var removeNewIndex []int
 	for i := range extractedLocalData.New {
 		p := extractedLocalData.New[i]
-		if _, isExist := mapSpPolicies[p.Name]; isExist {
+		if _, isExist := mapSpPolicies[policyKey(p)]; isExist {
 			comparePolicies = append(comparePolicies, p)
 			extractedLocalData.Existing = append(extractedLocalData.Existing, p)
 			removeNewIndex = append(removeNewIndex, i)
@@ -112,6 +112,7 @@ func BuildMigrateItem(supabaseData, localData []objects.Policy) (migrateData []M
 		migrateData = append(migrateData, MigrateItem{
 			Type:           migrateType,
 			NewData:        r.SourceResource,
+			OldData:        r.TargetResource,
 			MigrationItems: r.DiffItems,
 		})
 	}

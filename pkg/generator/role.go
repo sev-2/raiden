@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/hashicorp/go-hclog"
@@ -29,6 +30,7 @@ type GenerateRoleData struct {
 	CanCreateRole          bool
 	CanLogin               bool
 	ValidUntil             string
+	InheritRoles           string
 }
 
 const (
@@ -59,8 +61,14 @@ func (r *{{ .Name | ToGoIdentifier }}) ConnectionLimit() int {
 {{- end }}
 {{- if not .InheritRole }}
 
-func (r *{{ .Name | ToGoIdentifier }}) InheritRole() bool {
+func (r *{{ .Name | ToGoIdentifier }}) IsInheritRole() bool {
 	return {{ .InheritRole }}
+}
+{{- end }}
+{{- if ne .InheritRoles "" }}
+
+func (r *{{ .Name | ToGoIdentifier }}) InheritRoles() []raiden.Role {
+	return []raiden.Role{ {{ .InheritRoles }} }
 }
 {{- end }}
 {{- if .IsReplicationRole }}
@@ -110,7 +118,6 @@ func (r *{{ .Name | ToGoIdentifier }}) ValidUntil() *objects.SupabaseTime {
 	return objects.NewSupabaseTime(t)
 }
 {{- end }}
-
 `
 )
 
@@ -156,6 +163,14 @@ func GenerateRole(folderPath string, role objects.Role, generateFn GenerateFn) e
 		validUntil = role.ValidUntil.Format(raiden.DefaultRoleValidUntilLayout)
 	}
 
+	// set inherit roles
+	var inheritRoles []string
+	if role.InheritRole && len(role.InheritRoles) > 0 {
+		for _, r := range role.InheritRoles {
+			inheritRoles = append(inheritRoles, fmt.Sprintf("&%s{}", utils.SnakeCaseToPascalCase(r.Name)))
+		}
+	}
+
 	// execute the template and write to the file
 	data := GenerateRoleData{
 		Package:                "roles",
@@ -164,6 +179,7 @@ func GenerateRole(folderPath string, role objects.Role, generateFn GenerateFn) e
 		ConnectionLimit:        role.ConnectionLimit,
 		DefaultLimitConnection: raiden.DefaultRoleConnectionLimit,
 		InheritRole:            role.InheritRole,
+		InheritRoles:           strings.Join(inheritRoles, ","),
 		IsReplicationRole:      role.IsReplicationRole,
 		IsSuperuser:            role.IsSuperuser,
 		CanBypassRls:           role.CanBypassRLS,

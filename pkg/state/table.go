@@ -8,7 +8,6 @@ import (
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/postgres"
-	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
@@ -18,7 +17,7 @@ type ModelValidationTag map[string]string
 type ExtractTableItem struct {
 	Table             objects.Table
 	ValidationTags    ModelValidationTag
-	ExtractedPolicies ExtractedPolicies
+	ExtractedPolicies ExtractPolicyResult
 }
 
 type ExtractTableItems []ExtractTableItem
@@ -27,6 +26,21 @@ type ExtractTableResult struct {
 	Existing ExtractTableItems
 	New      ExtractTableItems
 	Delete   ExtractTableItems
+}
+
+type tableBuilder struct {
+	modelType          reflect.Type
+	mapDataType        map[string]objects.Type
+	hasState           bool
+	item               ExtractTableItem
+	columns            []objects.Column
+	relations          []objects.TablesRelationship
+	primaryKeys        []objects.PrimaryKey
+	existingColumns    map[string]objects.Column
+	existingRelations  map[string]objects.TablesRelationship
+	existingPrimaryKey map[string]objects.PrimaryKey
+	existingPolicies   map[string]objects.Policy
+	acl                *raiden.Acl
 }
 
 func ExtractTable(tableStates []TableState, appTable []any, mapDataType map[string]objects.Type) (result ExtractTableResult, err error) {
@@ -63,7 +77,7 @@ func ExtractTable(tableStates []TableState, appTable []any, mapDataType map[stri
 
 		result.Delete = append(result.Delete, ExtractTableItem{
 			Table: v.Table,
-			ExtractedPolicies: ExtractedPolicies{
+			ExtractedPolicies: ExtractPolicyResult{
 				Delete: deletedPolicy,
 			},
 		})
@@ -73,294 +87,338 @@ func ExtractTable(tableStates []TableState, appTable []any, mapDataType map[stri
 }
 
 func buildTableFromModel(model any, mapDataType map[string]objects.Type) (ei ExtractTableItem) {
-	modelType := reflect.TypeOf(model)
-	if modelType.Kind() == reflect.Ptr {
-		modelType = modelType.Elem()
-	}
-
-	ei.Table.Name = raiden.GetTableName(model)
-	ei.ValidationTags = make(ModelValidationTag)
-
-	// add metadata
-	metadataField, isExist := modelType.FieldByName("Metadata")
-	if isExist {
-		bindTableMetadata(&metadataField, &ei.Table)
-	} else {
-		ei.Table.Schema = "public"
-		ei.Table.RLSEnabled = true
-		ei.Table.RLSForced = false
-	}
-
-	for i := 0; i < modelType.NumField(); i++ {
-		field := modelType.Field(i)
-		switch field.Name {
-		case "Metadata", "Acl":
-			continue
-		default:
-			if column := field.Tag.Get("column"); len(column) > 0 {
-				ct := raiden.UnmarshalColumnTag(column)
-
-				c := objects.Column{
-					Table:    ei.Table.Name,
-					Schema:   ei.Table.Schema,
-					IsUnique: false,
-				}
-
-				bindColumn(&field, &ct, &c)
-
-				if c.DataType == string(postgres.TextType) {
-					_, exist := mapDataType[ct.Type]
-					if exist {
-						c.DataType = string(postgres.UserDefined)
-						c.Format = ct.Type
-					}
-				}
-
-				ei.Table.Columns = append(ei.Table.Columns, c)
-
-				if ct.PrimaryKey {
-					ei.Table.PrimaryKeys = append(ei.Table.PrimaryKeys, objects.PrimaryKey{
-						Name:      c.Name,
-						TableName: c.Table,
-						Schema:    c.Schema,
-					})
-
-					// set is unique to false if is primary key
-					c.IsUnique = false
-				}
-
-				if vTag := field.Tag.Get("validate"); len(vTag) > 0 {
-					ei.ValidationTags[c.Name] = vTag
-				}
-			}
-
-			if join := field.Tag.Get("join"); len(join) > 0 {
-				jt := raiden.UnmarshalJoinTag(join)
-				if jt.JoinType == raiden.RelationTypeHasOne {
-					rel := objects.TablesRelationship{}
-					rel.SourceTableName = ei.Table.Name
-					rel.SourceColumnName = jt.ForeignKey
-					rel.SourceSchema = ei.Table.Schema
-					rel.TargetTableName = utils.ToSnakeCase(field.Name)
-					rel.TargetTableSchema = ei.Table.Schema
-					rel.TargetColumnName = jt.PrimaryKey
-
-					// check action field
-					onUpdate := field.Tag.Get("onUpdate")
-					onDelete := field.Tag.Get("onDelete")
-					if len(onUpdate) > 0 || len(onDelete) > 0 {
-						if len(onUpdate) == 0 {
-							onUpdate = string(objects.RelationActionDefault)
-						} else {
-							v, ok := objects.RelationActionMapCode[objects.RelationActionLabel(onUpdate)]
-							if ok {
-								onUpdate = string(v)
-							}
-						}
-
-						if len(onDelete) == 0 {
-							onDelete = string(objects.RelationActionDefault)
-						} else {
-							v, ok := objects.RelationActionMapCode[objects.RelationActionLabel(onDelete)]
-							if ok {
-								onDelete = string(v)
-							}
-						}
-
-						rel.Action = &objects.TablesRelationshipAction{
-							ConstraintName: fmt.Sprintf("%s_%s_fkey", rel.SourceTableName, rel.SourceColumnName),
-							UpdateAction:   onUpdate,
-							DeletionAction: onDelete,
-							SourceSchema:   rel.SourceSchema,
-							SourceTable:    rel.SourceTableName,
-							SourceColumns:  fmt.Sprintf("{%s}", rel.SourceColumnName),
-
-							TargetSchema:  rel.TargetTableSchema,
-							TargetTable:   rel.SourceTableName,
-							TargetColumns: fmt.Sprintf("{%s}", rel.TargetColumnName),
-						}
-					}
-
-					ei.Table.Relationships = append(ei.Table.Relationships, rel)
-				}
-			}
-		}
-	}
-
-	// add metadata
-	aclField, isExist := modelType.FieldByName("Acl")
-	if isExist {
-		ei.ExtractedPolicies.New = getPolicies(&aclField, &ei)
-	}
-
-	return
+	b := newTableBuilder(model, mapDataType, nil)
+	b.processFields()
+	b.collectModelRelations()
+	b.applyPolicies()
+	return b.finish()
 }
 
 func buildTableFromState(model any, mapDataType map[string]objects.Type, state TableState) (ei ExtractTableItem) {
+	b := newTableBuilder(model, mapDataType, &state)
+	b.processFields()
+	b.collectStateRelations()
+	b.applyPolicies()
+	return b.finish()
+}
+
+func newTableBuilder(model any, mapDataType map[string]objects.Type, state *TableState) *tableBuilder {
 	modelType := reflect.TypeOf(model)
-	if modelType.Kind() == reflect.Ptr {
+	if modelType.Kind() == reflect.Pointer {
 		modelType = modelType.Elem()
 	}
 
-	// Get the reflect.Type of the struct
-	ei.Table = state.Table
-	ei.Table.Name = raiden.GetTableName(model)
-	ei.ValidationTags = make(ModelValidationTag)
-
-	// map column for make check if column exist and reuse default
-	mapColumn := make(map[string]objects.Column)
-	for i := range ei.Table.Columns {
-		c := ei.Table.Columns[i]
-		mapColumn[c.Name] = c
+	b := &tableBuilder{
+		modelType:          modelType,
+		mapDataType:        mapDataType,
+		item:               ExtractTableItem{ValidationTags: make(ModelValidationTag)},
+		existingColumns:    make(map[string]objects.Column),
+		existingRelations:  make(map[string]objects.TablesRelationship),
+		existingPrimaryKey: make(map[string]objects.PrimaryKey),
+		existingPolicies:   make(map[string]objects.Policy),
 	}
 
-	// map relation for make check if relation exist and reuse default
-	mapRelation := make(map[string]objects.TablesRelationship)
-	for i := range ei.Table.Relationships {
-		r := ei.Table.Relationships[i]
-		mapRelation[r.ConstraintName] = r
+	b.item.Table.Name = raiden.GetTableName(model)
+
+	if state != nil {
+		b.hasState = true
+		b.item.Table = state.Table
+		b.item.Table.Name = raiden.GetTableName(model)
+		for _, c := range state.Table.Columns {
+			b.existingColumns[c.Name] = c
+		}
+		for _, r := range state.Table.Relationships {
+			b.existingRelations[r.ConstraintName] = r
+		}
+		for _, pk := range state.Table.PrimaryKeys {
+			b.existingPrimaryKey[pk.Name] = pk
+		}
+		for _, p := range state.Policies {
+			b.existingPolicies[p.Name] = p
+		}
 	}
 
-	// map relation for make check if relation exist and reuse default
-	mapPrimaryKey := make(map[string]objects.PrimaryKey)
-	for i := range ei.Table.PrimaryKeys {
-		pk := ei.Table.PrimaryKeys[i]
-		mapPrimaryKey[pk.Name] = pk
+	b.applyMetadata()
+	b.columns = make([]objects.Column, 0)
+	b.relations = make([]objects.TablesRelationship, 0)
+	b.primaryKeys = make([]objects.PrimaryKey, 0)
+
+	// colleact and assign Acl
+	b.acl = getAcl(model)
+
+	return b
+}
+
+func (b *tableBuilder) applyMetadata() {
+	if metadataField, ok := b.modelType.FieldByName("Metadata"); ok {
+		bindTableMetadata(&metadataField, &b.item.Table)
+		return
 	}
 
-	mapPolicies := make(map[string]objects.Policy)
-	for ip := range state.Policies {
-		p := state.Policies[ip]
-		mapPolicies[p.Name] = p
+	if b.item.Table.Schema == "" {
+		b.item.Table.Schema = "public"
 	}
-
-	var columns []objects.Column
-	var relations []objects.TablesRelationship
-	var primaryKeys []objects.PrimaryKey
-
-	// update metadata
-	metadataField, isExist := modelType.FieldByName("Metadata")
-	if isExist {
-		bindTableMetadata(&metadataField, &ei.Table)
-	} else {
-		ei.Table.Schema = "public"
-		ei.Table.RLSEnabled = true
-		ei.Table.RLSForced = false
+	if !b.item.Table.RLSEnabled && !b.hasState {
+		b.item.Table.RLSEnabled = true
 	}
+	if !b.item.Table.RLSForced && !b.hasState {
+		b.item.Table.RLSForced = false
+	}
+}
 
-	// Iterate over the fields of the struct
-	for i := 0; i < modelType.NumField(); i++ {
-		field := modelType.Field(i)
-
-		switch field.Name {
-		case "Metadata", "Acl":
+func (b *tableBuilder) processFields() {
+	for i := 0; i < b.modelType.NumField(); i++ {
+		field := b.modelType.Field(i)
+		if b.shouldSkip(field.Name) {
 			continue
-		default:
-			// example tag "name:id;type:bigint;primaryKey;autoIncrement;nullable:false"
-			if columnTag := field.Tag.Get("column"); len(columnTag) > 0 {
-				var c objects.Column
-				c.IsUnique = false
+		}
+		b.collectColumn(field)
+	}
+}
 
-				ct := raiden.UnmarshalColumnTag(columnTag)
-				if found, exist := mapColumn[ct.Name]; exist {
-					c = found
-				}
+func (b *tableBuilder) collectColumn(field reflect.StructField) {
+	columnTag := field.Tag.Get("column")
+	if columnTag == "" {
+		return
+	}
 
-				c.Table = ei.Table.Name
-				c.Schema = ei.Table.Schema
+	ct := raiden.UnmarshalColumnTag(columnTag)
+	column := objects.Column{
+		Table:  b.item.Table.Name,
+		Schema: b.item.Table.Schema,
+	}
+	if existing, ok := b.existingColumns[ct.Name]; ok {
+		column = existing
+	}
 
-				bindColumn(&field, &ct, &c)
+	bindColumn(&field, &ct, &column)
+	column.Table = b.item.Table.Name
+	column.Schema = b.item.Table.Schema
 
-				if c.DataType == string(postgres.TextType) {
-					_, exist := mapDataType[ct.Type]
-					if exist {
-						c.DataType = string(postgres.UserDefined)
-						c.Format = ct.Type
-					}
-				}
-
-				if ct.PrimaryKey {
-					if pk, exist := mapPrimaryKey[c.Name]; exist {
-						pk.Schema = c.Schema
-						pk.TableName = ei.Table.Name
-						primaryKeys = append(primaryKeys, pk)
-					} else {
-						primaryKeys = append(primaryKeys, objects.PrimaryKey{
-							Name:      c.Name,
-							Schema:    ei.Table.Schema,
-							TableID:   ei.Table.ID,
-							TableName: ei.Table.Name,
-						})
-					}
-				}
-
-				if vTag := field.Tag.Get("validate"); len(vTag) > 0 {
-					ei.ValidationTags[c.Name] = vTag
-				}
-
-				columns = append(columns, c)
-			}
-
-			if joinTag := field.Tag.Get("join"); len(joinTag) > 0 {
-				tableName := findTypeName(field.Type, reflect.Struct, 4)
-				if tableName != "" {
-					if r := buildTableRelation(ei.Table.Name, tableName, ei.Table.Schema, mapRelation, joinTag); r.ConstraintName != "" {
-						if onUpdate := field.Tag.Get("onUpdate"); onUpdate != "" {
-							if r.Action == nil {
-								r.Action = &objects.TablesRelationshipAction{}
-							}
-
-							r.Action.UpdateAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(strings.ToLower(onUpdate))])
-						}
-
-						if onDelete := field.Tag.Get("onDelete"); onDelete != "" {
-							if r.Action == nil {
-								r.Action = &objects.TablesRelationshipAction{}
-							}
-
-							r.Action.DeletionAction = string(objects.RelationActionMapCode[objects.RelationActionLabel(strings.ToLower(onDelete))])
-						}
-
-						relations = append(relations, r)
-					}
-				}
-
-			}
+	if column.DataType == string(postgres.TextType) {
+		if _, exist := b.mapDataType[ct.Type]; exist {
+			column.DataType = string(postgres.UserDefined)
+			column.Format = ct.Type
 		}
 	}
 
-	// add acl
-	aclField, isExist := modelType.FieldByName("Acl")
-	if isExist {
-		policies := getPolicies(&aclField, &ei)
-		for ip := range policies {
-			p := policies[ip]
+	if ct.PrimaryKey {
+		column.IsUnique = false
+		b.appendPrimaryKey(column)
+	}
 
-			sp, exist := mapPolicies[p.Name]
-			if !exist {
-				ei.ExtractedPolicies.New = append(ei.ExtractedPolicies.New, p)
-				continue
-			}
+	if vTag := field.Tag.Get("validate"); len(vTag) > 0 {
+		b.item.ValidationTags[column.Name] = vTag
+	}
 
-			sp.Roles = p.Roles
-			sp.Check = p.Check
-			sp.Definition = p.Definition
-			ei.ExtractedPolicies.Existing = append(ei.ExtractedPolicies.Existing, sp)
-			delete(mapPolicies, p.Name)
+	b.columns = append(b.columns, column)
+}
+
+func (b *tableBuilder) collectModelRelations() {
+	for i := 0; i < b.modelType.NumField(); i++ {
+		field := b.modelType.Field(i)
+		if b.shouldSkip(field.Name) {
+			continue
+		}
+		if join := field.Tag.Get("join"); join != "" {
+			b.addModelRelation(field, join)
+		}
+	}
+}
+
+func (b *tableBuilder) collectStateRelations() {
+	for i := 0; i < b.modelType.NumField(); i++ {
+		field := b.modelType.Field(i)
+		if b.shouldSkip(field.Name) {
+			continue
+		}
+		if join := field.Tag.Get("join"); join != "" {
+			b.addStateRelation(field, join)
+		}
+	}
+}
+
+func (b *tableBuilder) applyPolicies() {
+	// TODO : remove after check and test
+	// aclField, ok := b.modelType.FieldByName("Acl")
+	// if !ok {
+	// 	return
+	// }
+
+	// policies := getPolicies(&aclField, &b.item)
+	// if len(policies) == 0 {
+	// 	return
+	// }
+
+	if b.acl == nil {
+		return
+	}
+
+	if b.item.Table.RLSEnabled != b.acl.IsEnable() {
+		b.item.Table.RLSEnabled = b.acl.IsEnable()
+	}
+
+	if b.item.Table.RLSForced != b.acl.IsForced() {
+		b.item.Table.RLSForced = b.acl.IsForced()
+	}
+
+	policies, err := b.acl.BuildPolicies(b.item.Table.Schema, b.item.Table.Name)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	for _, p := range policies {
+		if existing, ok := b.existingPolicies[p.Name]; ok {
+			existing.Roles = p.Roles
+			existing.Check = p.Check
+			existing.Definition = p.Definition
+			b.item.ExtractedPolicies.Existing = append(b.item.ExtractedPolicies.Existing, existing)
+			delete(b.existingPolicies, p.Name)
+			continue
+		}
+		b.item.ExtractedPolicies.New = append(b.item.ExtractedPolicies.New, p)
+	}
+
+}
+
+func (b *tableBuilder) finish() ExtractTableItem {
+	b.item.Table.Columns = b.columns
+	b.item.Table.Relationships = b.relations
+	b.item.Table.PrimaryKeys = b.primaryKeys
+
+	if len(b.existingPolicies) > 0 {
+		for _, p := range b.existingPolicies {
+			b.item.ExtractedPolicies.Delete = append(b.item.ExtractedPolicies.Delete, p)
 		}
 	}
 
-	if len(mapPolicies) > 0 {
-		for _, v := range mapPolicies {
-			ei.ExtractedPolicies.Delete = append(ei.ExtractedPolicies.Delete, v)
-		}
+	return b.item
+}
+
+func (b *tableBuilder) addModelRelation(field reflect.StructField, join string) {
+	jt := raiden.UnmarshalJoinTag(join)
+	if jt.JoinType != raiden.RelationTypeHasOne {
+		return
 	}
 
-	ei.Table.Columns = columns
-	ei.Table.Relationships = relations
-	ei.Table.PrimaryKeys = primaryKeys
+	relation := objects.TablesRelationship{
+		SourceTableName:   b.item.Table.Name,
+		SourceSchema:      b.item.Table.Schema,
+		TargetTableName:   utils.ToSnakeCase(field.Name),
+		TargetTableSchema: b.item.Table.Schema,
+	}
 
-	return ei
+	if jt.ForeignKey != "" {
+		relation.SourceColumnName = jt.ForeignKey
+	} else {
+		relation.SourceColumnName = fmt.Sprintf("%s_id", utils.ToSnakeCase(b.item.Table.Name))
+	}
+
+	if jt.PrimaryKey != "" {
+		relation.TargetColumnName = jt.PrimaryKey
+	} else {
+		relation.TargetColumnName = "id"
+	}
+
+	b.applyRelationActions(&relation, field)
+	if relation.Action != nil && relation.Action.ConstraintName == "" {
+		relation.Action.ConstraintName = fmt.Sprintf("%s_%s_fkey", relation.SourceTableName, relation.SourceColumnName)
+	}
+
+	b.relations = append(b.relations, relation)
+}
+
+func (b *tableBuilder) addStateRelation(field reflect.StructField, join string) {
+	tableName := findTypeName(field.Type, reflect.Struct, 4)
+	if tableName == "" {
+		return
+	}
+
+	relation := buildTableRelation(b.item.Table.Name, tableName, b.item.Table.Schema, b.existingRelations, join)
+	if relation.ConstraintName == "" {
+		return
+	}
+
+	b.applyRelationActions(&relation, field)
+	b.relations = append(b.relations, relation)
+}
+
+func (b *tableBuilder) applyRelationActions(relation *objects.TablesRelationship, field reflect.StructField) {
+	onUpdate := strings.ToLower(field.Tag.Get("onUpdate"))
+	onDelete := strings.ToLower(field.Tag.Get("onDelete"))
+	if onUpdate == "" && onDelete == "" {
+		return
+	}
+
+	if relation.Action == nil {
+		relation.Action = &objects.TablesRelationshipAction{}
+	}
+
+	if onUpdate == "" {
+		relation.Action.UpdateAction = string(objects.RelationActionDefault)
+	} else if v, ok := objects.RelationActionMapCode[objects.RelationActionLabel(onUpdate)]; ok {
+		relation.Action.UpdateAction = string(v)
+	} else {
+		relation.Action.UpdateAction = string(objects.RelationActionDefault)
+	}
+
+	if onDelete == "" {
+		relation.Action.DeletionAction = string(objects.RelationActionDefault)
+	} else if v, ok := objects.RelationActionMapCode[objects.RelationActionLabel(onDelete)]; ok {
+		relation.Action.DeletionAction = string(v)
+	} else {
+		relation.Action.DeletionAction = string(objects.RelationActionDefault)
+	}
+
+	if relation.Action.ConstraintName == "" {
+		relation.Action.ConstraintName = fmt.Sprintf("%s_%s_fkey", relation.SourceTableName, relation.SourceColumnName)
+	}
+
+	if relation.Action.SourceSchema == "" {
+		relation.Action.SourceSchema = relation.SourceSchema
+	}
+	if relation.Action.SourceTable == "" {
+		relation.Action.SourceTable = relation.SourceTableName
+	}
+	if relation.Action.SourceColumns == "" {
+		relation.Action.SourceColumns = fmt.Sprintf("{%s}", relation.SourceColumnName)
+	}
+	if relation.Action.TargetSchema == "" {
+		relation.Action.TargetSchema = relation.TargetTableSchema
+	}
+	if relation.Action.TargetTable == "" {
+		relation.Action.TargetTable = relation.SourceTableName
+	}
+	if relation.Action.TargetColumns == "" {
+		relation.Action.TargetColumns = fmt.Sprintf("{%s}", relation.TargetColumnName)
+	}
+}
+
+func (b *tableBuilder) appendPrimaryKey(column objects.Column) {
+	if column.Name == "" {
+		return
+	}
+
+	if existing, ok := b.existingPrimaryKey[column.Name]; ok {
+		existing.Schema = column.Schema
+		existing.TableName = b.item.Table.Name
+		b.primaryKeys = append(b.primaryKeys, existing)
+		return
+	}
+
+	pk := objects.PrimaryKey{
+		Name:      column.Name,
+		Schema:    column.Schema,
+		TableName: b.item.Table.Name,
+	}
+	if b.item.Table.ID != 0 {
+		pk.TableID = b.item.Table.ID
+	}
+	b.primaryKeys = append(b.primaryKeys, pk)
+}
+
+func (b *tableBuilder) shouldSkip(fieldName string) bool {
+	return fieldName == "Metadata" || fieldName == "Acl"
 }
 
 func bindColumn(field *reflect.StructField, ct *raiden.ColumnTag, c *objects.Column) {
@@ -370,7 +428,8 @@ func bindColumn(field *reflect.StructField, ct *raiden.ColumnTag, c *objects.Col
 	if ct.Name != "" {
 		c.Name = ct.Name
 	} else {
-		ct.Name = utils.ToSnakeCase(field.Name)
+		c.Name = utils.ToSnakeCase(field.Name)
+		ct.Name = c.Name
 	}
 
 	if ct.Type != "" {
@@ -414,91 +473,6 @@ func bindTableMetadata(field *reflect.StructField, table *objects.Table) {
 	} else {
 		table.RLSForced = false
 	}
-}
-
-func getPolicies(field *reflect.StructField, ei *ExtractTableItem) (policies []objects.Policy) {
-	acl := raiden.UnmarshalAclTag(string(field.Tag))
-	tableType := strings.ToLower(string(supabase.RlsTypeModel))
-
-	defaultCheck, defaultDefinition := "true", "true"
-	if len(acl.Read.Roles) > 0 {
-		readPolicyName := supabase.GetPolicyName(objects.PolicyCommandSelect, tableType, ei.Table.Name)
-		policy := objects.Policy{
-			Name:       readPolicyName,
-			Schema:     ei.Table.Schema,
-			Table:      ei.Table.Name,
-			Action:     "PERMISSIVE",
-			Command:    objects.PolicyCommandSelect,
-			Roles:      acl.Read.Roles,
-			Definition: acl.Read.Using,
-		}
-		if policy.Definition == "" {
-			policy.Definition = defaultDefinition
-		} else if policy.Definition != defaultDefinition {
-			policy.Definition = fmt.Sprintf("(%s)", policy.Definition)
-		}
-
-		policies = append(policies, policy)
-	}
-
-	if len(acl.Write.Roles) > 0 {
-		createPolicy := objects.Policy{
-			Name:    supabase.GetPolicyName(objects.PolicyCommandInsert, tableType, ei.Table.Name),
-			Schema:  ei.Table.Schema,
-			Table:   ei.Table.Name,
-			Action:  "PERMISSIVE",
-			Command: objects.PolicyCommandInsert,
-			Roles:   acl.Write.Roles,
-			Check:   acl.Write.Check,
-		}
-		if createPolicy.Check == nil || (createPolicy.Check != nil && *createPolicy.Check == "") {
-			createPolicy.Check = &defaultCheck
-		} else if createPolicy.Check != nil && *createPolicy.Check != "" && *createPolicy.Check != defaultCheck {
-			check := fmt.Sprintf("(%s)", *createPolicy.Check)
-			createPolicy.Check = &check
-		}
-
-		updatePolicy := objects.Policy{
-			Name:       supabase.GetPolicyName(objects.PolicyCommandUpdate, tableType, ei.Table.Name),
-			Schema:     ei.Table.Schema,
-			Table:      ei.Table.Name,
-			Action:     "PERMISSIVE",
-			Command:    objects.PolicyCommandUpdate,
-			Roles:      acl.Write.Roles,
-			Definition: acl.Write.Using,
-			Check:      acl.Write.Check,
-		}
-		if updatePolicy.Check == nil || (updatePolicy.Check != nil && *updatePolicy.Check == "") {
-			updatePolicy.Check = &defaultCheck
-		} else if updatePolicy.Check != nil && *updatePolicy.Check != "" && *updatePolicy.Check != defaultCheck {
-			check := fmt.Sprintf("(%s)", *updatePolicy.Check)
-			updatePolicy.Check = &check
-		}
-
-		if updatePolicy.Definition == "" {
-			updatePolicy.Definition = "true"
-		} else if updatePolicy.Definition != defaultDefinition {
-			updatePolicy.Definition = fmt.Sprintf("(%s)", updatePolicy.Definition)
-		}
-
-		deletePolicy := objects.Policy{
-			Name:       supabase.GetPolicyName(objects.PolicyCommandDelete, tableType, ei.Table.Name),
-			Schema:     ei.Table.Schema,
-			Table:      ei.Table.Name,
-			Action:     "PERMISSIVE",
-			Command:    objects.PolicyCommandDelete,
-			Roles:      acl.Write.Roles,
-			Definition: acl.Write.Using,
-		}
-		if deletePolicy.Definition == "" {
-			deletePolicy.Definition = "true"
-		} else if deletePolicy.Definition != defaultDefinition {
-			deletePolicy.Definition = fmt.Sprintf("(%s)", deletePolicy.Definition)
-		}
-		policies = append(policies, createPolicy, updatePolicy, deletePolicy)
-	}
-
-	return
 }
 
 func buildTableRelation(tableName, fieldName, schema string, mapRelations map[string]objects.TablesRelationship, joinTag string) (relation objects.TablesRelationship) {
@@ -553,6 +527,79 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 	relation.TargetColumnName = primaryKey
 
 	return
+}
+
+// get Acl
+func getAcl(model any) *raiden.Acl {
+	v := reflect.ValueOf(model)
+	if !v.IsValid() {
+		return nil
+	}
+
+	// ensure pointer to struct
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Pointer {
+		if v.CanAddr() {
+			v = v.Addr()
+		} else {
+			p := reflect.New(v.Type())
+			p.Elem().Set(v)
+			v = p
+		}
+	}
+	if v.IsNil() {
+		return nil
+	}
+	elem := v.Elem()
+	if elem.Kind() != reflect.Struct {
+		return nil
+	}
+
+	f := elem.FieldByName("Acl")
+	if f.IsValid() {
+		// model has: Acl raiden.Acl   (value)  or  Acl *raiden.Acl   (pointer)
+		switch f.Kind() {
+		case reflect.Struct:
+			if f.CanAddr() {
+				if a, ok := f.Addr().Interface().(*raiden.Acl); ok {
+					callConfigureOnce(v, a)
+					return a
+				}
+			}
+		case reflect.Pointer:
+			if f.IsNil() {
+				// allocate if nil so ConfigureAcl can mutate it
+				p := reflect.New(f.Type().Elem())
+				if initializer, ok := p.Interface().(*raiden.Acl); ok && initializer != nil {
+					initializer.Define() // ensure internal map gets initialised via guard
+				}
+				f.Set(p)
+			}
+			current := f.Interface()
+			if a, ok := current.(*raiden.Acl); ok && a != nil {
+				callConfigureOnce(v, a)
+				// Configuration might have swapped the pointer; read the field again
+				if updated, ok := f.Interface().(*raiden.Acl); ok && updated != nil {
+					return updated
+				}
+				return a
+			}
+		}
+	}
+
+	return nil
+}
+
+func callConfigureOnce(modelVal reflect.Value, a *raiden.Acl) {
+	if a == nil {
+		return
+	}
+	// If model has ConfigureAcl(), run it exactly once for this ACL instance
+	if m := modelVal.MethodByName("ConfigureAcl"); m.IsValid() && m.Type().NumIn() == 0 && m.Type().NumOut() == 0 {
+		a.InitOnce(func() { m.Call(nil) })
+	}
 }
 
 // get relation table name, base on struct type that defined in relation field

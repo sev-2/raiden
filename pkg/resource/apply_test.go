@@ -47,8 +47,17 @@ type MockNewTable struct {
 	OtherTable *MockOtherTable `json:"other_table,omitempty" join:"joinType:hasOne;primaryKey:id;foreignKey:table_id"`
 }
 
+type MockPolicyTable struct {
+	raiden.ModelBase
+
+	ID int64 `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement"`
+
+	Metadata string `json:"-" schema:"public" tableName:"policy_table" rlsEnable:"true" rlsForced:"false"`
+	Acl      string `json:"-" read:"missing_role" write:""`
+}
+
 type MockNewRole struct {
-	raiden.Role
+	raiden.RoleBase
 }
 
 func (m MockNewRole) Name() string {
@@ -67,7 +76,7 @@ func (m MockNewRole) CanCreateRole() bool {
 	return true
 }
 
-func (m MockNewRole) InheritRole() bool {
+func (m MockNewRole) IsInheritRole() bool {
 	return true
 }
 
@@ -81,6 +90,10 @@ func (m MockNewRole) ValidUntil() *objects.SupabaseTime {
 
 func (m MockNewRole) CanBypassRls() bool {
 	return true
+}
+
+func (m MockNewRole) InheritRoles() []raiden.Role {
+	return nil
 }
 
 func loadConfig() *raiden.Config {
@@ -175,9 +188,40 @@ func TestApply(t *testing.T) {
 	})
 	assert.NoError(t, err0)
 
+	errMembership := mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{})
+	assert.NoError(t, errMembership)
+
 	err1 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{})
 	assert.NoError(t, err1)
 
+	err2 := mock.MockGetTablesWithExpectedResponse(200, []objects.Table{
+		{
+			Name:   "test_table",
+			Schema: "public",
+			Columns: []objects.Column{
+				{
+					ID:     "1",
+					Schema: "public",
+					Name:   "id",
+				},
+			},
+		},
+		{
+			Name:   "other_table",
+			Schema: "public",
+			Columns: []objects.Column{
+				{
+					ID:     "1",
+					Schema: "public",
+					Name:   "id",
+				},
+			},
+		},
+	})
+	assert.NoError(t, err2)
+
+	resource.RegisteredModels = nil
+	defer func() { resource.RegisteredModels = nil }()
 	resource.RegisterModels(MockNewTable{})
 	resource.RegisterModels(MockOtherTable{})
 	resource.RegisterRole(MockNewRole{})
@@ -268,6 +312,9 @@ func TestApply_AllowedTable(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err0)
+
+	errMembership := mock.MockGetRoleMembershipsWithExpectedResponse(200, []objects.RoleMembership{})
+	assert.NoError(t, errMembership)
 
 	err1 := mock.MockGetBucketsWithExpectedResponse(200, []objects.Bucket{})
 	assert.NoError(t, err1)
@@ -471,6 +518,13 @@ func TestMigrate(t *testing.T) {
 				NewData: objects.Role{
 					Name:     "test_role",
 					CanLogin: true,
+				},
+				MigrationItems: objects.UpdateRoleParam{
+					OldData: objects.Role{
+						Name:     "test_role",
+						CanLogin: false,
+					},
+					ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleCanLogin},
 				},
 			},
 			{
@@ -698,8 +752,216 @@ func TestPrintApplyChangeReport(t *testing.T) {
 	migrateData := resource.MigrateData{
 		Tables: []tables.MigrateItem{
 			{Type: migrator.MigrateTypeCreate, NewData: objects.Table{Name: "test_table"}},
+			{Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Table{Name: "old_table"},
+				NewData: objects.Table{Name: "new_table"}},
+			{Type: migrator.MigrateTypeDelete, OldData: objects.Table{Name: "delete_table"}},
+		},
+		Roles: []roles.MigrateItem{
+			{Type: migrator.MigrateTypeCreate, NewData: objects.Role{Name: "test_role"}},
+			{Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Role{Name: "old_role"},
+				NewData: objects.Role{Name: "new_role"}},
+			{Type: migrator.MigrateTypeDelete, OldData: objects.Role{Name: "delete_role"}},
+		},
+		Rpc: []rpc.MigrateItem{
+			{Type: migrator.MigrateTypeCreate, NewData: objects.Function{Name: "test_function"}},
+			{Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Function{Name: "old_function"},
+				NewData: objects.Function{Name: "new_function"}},
+			{Type: migrator.MigrateTypeDelete, OldData: objects.Function{Name: "delete_function"}},
+		},
+		Policies: []policies.MigrateItem{
+			{Type: migrator.MigrateTypeCreate, NewData: objects.Policy{Name: "test_policy", Schema: "public", Table: "test_table"}},
+			{Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Policy{Name: "old_policy", Schema: "public", Table: "old_table"},
+				NewData: objects.Policy{Name: "new_policy", Schema: "public", Table: "new_table"}},
+			{Type: migrator.MigrateTypeDelete, OldData: objects.Policy{Name: "delete_policy", Schema: "public", Table: "delete_table"}},
+		},
+		Storages: []storages.MigrateItem{
+			{Type: migrator.MigrateTypeCreate, NewData: objects.Bucket{Name: "test_storage"}},
+			{Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Bucket{Name: "old_storage"},
+				NewData: objects.Bucket{Name: "new_storage"}},
+			{Type: migrator.MigrateTypeDelete, OldData: objects.Bucket{Name: "delete_storage"}},
+		},
+		Types: []types.MigrateItem{
+			{Type: migrator.MigrateTypeCreate, NewData: objects.Type{Name: "test_type", Format: "enum", Schema: "public"}},
+			{Type: migrator.MigrateTypeUpdate,
+				OldData: objects.Type{Name: "old_type", Format: "enum", Schema: "public"},
+				NewData: objects.Type{Name: "new_type", Format: "enum", Schema: "public"}},
+			{Type: migrator.MigrateTypeDelete, OldData: objects.Type{Name: "delete_type", Format: "enum", Schema: "public"}},
 		},
 	}
 
 	resource.PrintApplyChangeReport(migrateData)
+}
+
+func TestApply_WithVariousPolicyCombinations(t *testing.T) {
+	flags := &resource.Flags{
+		DryRun:        true,
+		AllowedSchema: "public",
+	}
+	config := loadConfig()
+
+	// Test case 1: New policies only
+	localState1 := &state.LocalState{
+		State: state.State{
+			Tables: []state.TableState{
+				{
+					Table: objects.Table{
+						Name:   "policy_table_new",
+						Schema: "public",
+					},
+					Policies: []objects.Policy{
+						{
+							Name:   "new_select_policy",
+							Schema: "public",
+							Table:  "policy_table_new",
+							Action: "SELECT",
+							Roles:  []string{"anon"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := state.Save(&localState1.State)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, state.Save(&state.State{}))
+	}()
+
+	// Register model that has policies
+	resource.RegisterModels(MockPolicyTable{})
+
+	err = resource.Apply(flags, config)
+	assert.Error(t, err)
+
+	// Test case 2: Existing policies with updates and deletes
+	localState2 := &state.LocalState{
+		State: state.State{
+			Tables: []state.TableState{
+				{
+					Table: objects.Table{
+						ID:     1,
+						Name:   "policy_table_existing",
+						Schema: "public",
+					},
+					Policies: []objects.Policy{
+						{
+							ID:     1,
+							Name:   "existing_select_policy",
+							Schema: "public",
+							Table:  "policy_table_existing",
+							Action: "SELECT",
+							Roles:  []string{"anon"},
+						},
+						{
+							ID:     2,
+							Name:   "delete_policy",
+							Schema: "public",
+							Table:  "policy_table_existing",
+							Action: "INSERT",
+							Roles:  []string{"anon"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err = state.Save(&localState2.State)
+	assert.NoError(t, err)
+
+	err = resource.Apply(flags, config)
+	assert.Error(t, err)
+
+	// Test case 3: Storage policies
+	localState3 := &state.LocalState{
+		State: state.State{
+			Storage: []state.StorageState{
+				{
+					Storage: objects.Bucket{
+						ID:   "test-bucket-id",
+						Name: "test_bucket",
+					},
+					Policies: []objects.Policy{
+						{
+							Name:   "storage_select_policy",
+							Schema: "storage",
+							Table:  "objects",
+							Action: "SELECT",
+							Roles:  []string{"anon"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err = state.Save(&localState3.State)
+	assert.NoError(t, err)
+
+	err = resource.Apply(flags, config)
+	assert.Error(t, err)
+
+	// Test case 4: Storage with existing policies
+	localState4 := &state.LocalState{
+		State: state.State{
+			Storage: []state.StorageState{
+				{
+					Storage: objects.Bucket{
+						ID:   "test-bucket-id-existing",
+						Name: "test_bucket_existing",
+					},
+					Policies: []objects.Policy{
+						{
+							ID:     1,
+							Name:   "existing_storage_select_policy",
+							Schema: "storage",
+							Table:  "objects",
+							Action: "SELECT",
+							Roles:  []string{"anon"},
+						},
+						{
+							ID:     2,
+							Name:   "delete_storage_policy",
+							Schema: "storage",
+							Table:  "objects",
+							Action: "INSERT",
+							Roles:  []string{"anon"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err = state.Save(&localState4.State)
+	assert.NoError(t, err)
+
+	err = resource.Apply(flags, config)
+	assert.Error(t, err)
+
+	// Test case 5: Delete storage policies
+	localState5 := &state.LocalState{
+		State: state.State{
+			Storage: []state.StorageState{
+				{
+					Storage: objects.Bucket{
+						ID:   "test-bucket-id-delete",
+						Name: "test_bucket_delete",
+					},
+				},
+			},
+		},
+	}
+
+	err = state.Save(&localState5.State)
+	assert.NoError(t, err)
+
+	err = resource.Apply(flags, config)
+	assert.Error(t, err)
 }

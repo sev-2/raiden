@@ -14,7 +14,9 @@ type (
 		ConnectionLimit() int
 
 		// default true
-		InheritRole() bool
+		IsInheritRole() bool
+
+		InheritRoles() []Role
 
 		// Disable for now, because need super user role for set it
 		// // default false
@@ -52,8 +54,12 @@ func (r *RoleBase) ConnectionLimit() int {
 	return DefaultRoleConnectionLimit
 }
 
-func (r *RoleBase) InheritRole() bool {
+func (r *RoleBase) IsInheritRole() bool {
 	return true
+}
+
+func (r *RoleBase) InheritRoles() []Role {
+	return []Role{}
 }
 
 func (r *RoleBase) CanBypassRls() bool {

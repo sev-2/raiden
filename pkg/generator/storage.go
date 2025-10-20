@@ -5,8 +5,10 @@ import (
 	"html/template"
 	"path/filepath"
 	"reflect"
+	"strings"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/supabase"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -24,11 +26,13 @@ type GenerateStoragesData struct {
 	Package           string
 	Name              string
 	StructName        string
+	Receiver          string
 	Public            bool
 	FileSizeLimit     int
 	AvifAutoDetection bool
 	AllowedMimeTypes  string
-	ObjectAcl         string
+	HasConfigureAcl   bool
+	ConfigureAclBody  string
 }
 
 const (
@@ -47,33 +51,45 @@ type {{ .StructName | ToGoIdentifier }} struct {
 	raiden.BucketBase
 
 	// Access control
-	Acl string ` + "`json:\"-\" {{ .ObjectAcl }}`" + `
+	Acl raiden.Acl
 }
 
-func (r *{{ .StructName | ToGoIdentifier }}) Name() string {
+func ({{ .Receiver }} *{{ .StructName | ToGoIdentifier }}) Name() string {
 	return "{{ .Name }}"
 }
 
 {{- if .Public }}
-func (r *{{ .StructName | ToGoIdentifier }}) Public() bool {
+func ({{ .Receiver }} *{{ .StructName | ToGoIdentifier }}) Public() bool {
 	return {{ .Public }}
 }
 {{- end }}
 {{- if ne .FileSizeLimit 0}}
 
-func (r *{{ .StructName | ToGoIdentifier }}) FileSizeLimit() int {
+func ({{ .Receiver }} *{{ .StructName | ToGoIdentifier }}) FileSizeLimit() int {
 	return {{ .FileSizeLimit }} // bytes
 }
 {{- end }}
 {{- if ne .AllowedMimeTypes "" }}
-func (r *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
+func ({{ .Receiver }} *{{ .StructName | ToGoIdentifier }}) AllowedMimeTypes() []string {
 	return {{ .AllowedMimeTypes }}
+}
+{{- end }}
+{{- if .AvifAutoDetection }}
+
+func ({{ .Receiver }} *{{ .StructName | ToGoIdentifier }}) AvifAutoDetection() bool {
+	return {{ .AvifAutoDetection }}
+}
+{{- end }}
+{{- if .HasConfigureAcl }}
+
+func ({{ .Receiver }} *{{ .StructName | ToGoIdentifier }}) ConfigureAcl() {
+{{ .ConfigureAclBody }}
 }
 {{- end }}
 `
 )
 
-func GenerateStorages(basePath string, storages []*GenerateStorageInput, generateFn GenerateFn) (err error) {
+func GenerateStorages(basePath string, projectName string, storages []*GenerateStorageInput, roleMap map[string]string, nativeRoleMap map[string]raiden.Role, generateFn GenerateFn) (err error) {
 	folderPath := filepath.Join(basePath, StorageDir)
 	StorageLogger.Trace("create storages folder", "path", folderPath)
 	if exist := utils.IsFolderExists(folderPath); !exist {
@@ -83,7 +99,7 @@ func GenerateStorages(basePath string, storages []*GenerateStorageInput, generat
 	}
 
 	for _, v := range storages {
-		if err := GenerateStorage(folderPath, v, generateFn); err != nil {
+		if err := GenerateStorage(folderPath, projectName, v, roleMap, nativeRoleMap, generateFn); err != nil {
 			return err
 		}
 	}
@@ -91,7 +107,7 @@ func GenerateStorages(basePath string, storages []*GenerateStorageInput, generat
 	return nil
 }
 
-func GenerateStorage(folderPath string, storage *GenerateStorageInput, generateFn GenerateFn) error {
+func GenerateStorage(folderPath string, projectName string, storage *GenerateStorageInput, roleMap map[string]string, nativeRoleMap map[string]raiden.Role, generateFn GenerateFn) error {
 	// define binding func
 	funcMaps := []template.FuncMap{
 		{"ToGoIdentifier": utils.SnakeCaseToPascalCase},
@@ -100,20 +116,13 @@ func GenerateStorage(folderPath string, storage *GenerateStorageInput, generateF
 	// define file path
 	filePath := filepath.Join(folderPath, fmt.Sprintf("%s.%s", utils.ToSnakeCase(storage.Bucket.Name), "go"))
 
-	// set imports path
-	var imports []string
-	raidenPath := fmt.Sprintf("%q", "github.com/sev-2/raiden")
-	imports = append(imports, raidenPath)
-
-	// build rls tag
 	var objectPolicies objects.Policies
 	for i := range storage.Policies {
 		p := storage.Policies[i]
-		if p.Table == "objects" {
+		if p.Table == supabase.DefaultObjectTable {
 			objectPolicies = append(objectPolicies, p)
 		}
 	}
-	objectRlsTag := BuildRlsTag(objectPolicies, storage.Bucket.Name, supabase.RlsTypeStorage)
 
 	var fileSizeLimit = 0
 	if storage.Bucket.FileSizeLimit != nil {
@@ -125,18 +134,44 @@ func GenerateStorage(folderPath string, storage *GenerateStorageInput, generateF
 		allowedMimeTypes = GenerateArrayDeclaration(reflect.ValueOf(storage.Bucket.AllowedMimeTypes), false)
 	}
 
-	structName := utils.ToSnakeCase(storage.Bucket.Name)
+	structName := utils.SnakeCaseToPascalCase(storage.Bucket.Name)
+	if structName == "" {
+		structName = "Storage"
+	}
+	receiver := strings.ToLower(string(structName[0]))
+
+	aclInfo, err := buildStorageAclInfo(structName, receiver, storage.Bucket, objectPolicies, roleMap, nativeRoleMap)
+	if err != nil {
+		return err
+	}
+
+	imports := []string{fmt.Sprintf("%q", "github.com/sev-2/raiden")}
+	if aclInfo.UseBuilder {
+		imports = append(imports, `st "github.com/sev-2/raiden/pkg/builder"`)
+	}
+	moduleName := utils.ToGoModuleName(projectName)
+	rolesImportPath := fmt.Sprintf("%s/internal/roles", moduleName)
+	if aclInfo.UseRoles {
+		imports = append(imports, fmt.Sprintf("roles %q", rolesImportPath))
+	}
+	if aclInfo.UseNativeRoles {
+		imports = append(imports, `native_role "github.com/sev-2/raiden/pkg/postgres/roles"`)
+	}
+	imports = normalizeImports(imports)
 
 	// execute the template and write to the file
 	data := GenerateStoragesData{
-		Package:          "storages",
-		Imports:          imports,
-		Name:             storage.Bucket.Name,
-		StructName:       structName,
-		Public:           storage.Bucket.Public,
-		FileSizeLimit:    fileSizeLimit,
-		AllowedMimeTypes: allowedMimeTypes,
-		ObjectAcl:        objectRlsTag,
+		Package:           "storages",
+		Imports:           imports,
+		Name:              storage.Bucket.Name,
+		StructName:        structName,
+		Receiver:          receiver,
+		Public:            storage.Bucket.Public,
+		FileSizeLimit:     fileSizeLimit,
+		AvifAutoDetection: storage.Bucket.AvifAutoDetection,
+		AllowedMimeTypes:  allowedMimeTypes,
+		HasConfigureAcl:   aclInfo.HasConfigure,
+		ConfigureAclBody:  aclInfo.Body,
 	}
 
 	// set input
@@ -150,4 +185,14 @@ func GenerateStorage(folderPath string, storage *GenerateStorageInput, generateF
 
 	StorageLogger.Debug("generate storages", "path", input.OutputPath)
 	return generateFn(input, nil)
+}
+
+func buildStorageAclInfo(structName, receiver string, bucket objects.Bucket, policies objects.Policies, roleMap map[string]string, nativeRoleMap map[string]raiden.Role) (aclInfo, error) {
+	table := objects.Table{
+		Schema:     supabase.DefaultStorageSchema,
+		Name:       supabase.DefaultObjectTable,
+		RLSEnabled: true,
+		RLSForced:  false,
+	}
+	return buildAclInfo(structName, receiver, table, policies, roleMap, nativeRoleMap, &aclBuildOptions{StorageBucketName: bucket.Name})
 }

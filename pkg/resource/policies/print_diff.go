@@ -2,13 +2,118 @@ package policies
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"strings"
 	"text/template"
 
+	"github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/resource/migrator"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/sev-2/raiden/pkg/utils"
 )
+
+// ----- print diff section -----
+func PrintDiffResult(diffResult []CompareDiffResult) error {
+	if len(diffResult) == 0 {
+		return nil
+	}
+
+	isConflict := false
+	for i := range diffResult {
+		d := diffResult[i]
+		if d.IsConflict {
+			PrintDiff(d)
+			if !isConflict {
+				isConflict = true
+			}
+		}
+	}
+
+	if isConflict {
+		return errors.New("canceled import process, you have conflict in policy. please fix it first")
+	}
+
+	return nil
+}
+
+func PrintDiff(diffData CompareDiffResult) {
+	if len(diffData.DiffItems.ChangeItems) == 0 {
+		return
+	}
+	fileName := utils.ToSnakeCase(diffData.TargetResource.Name)
+
+	// Set up output to go to stdout to ensure test output capture works
+	printScope := func(format string, args ...interface{}) {
+		// Directly write to stdout to make test capture work
+		fmt.Printf(format, args...)
+	}
+
+	changes := make([]string, 0)
+	sourceNorm := normalizePolicyForReport(diffData.SourceResource)
+	targetNorm := normalizePolicyForReport(diffData.TargetResource)
+
+	for _, v := range diffData.DiffItems.ChangeItems {
+		switch v {
+		case objects.UpdatePolicyName:
+			changeMsg := fmt.Sprintf("- name: %s >>> %s", diffData.TargetResource.Name, diffData.SourceResource.Name)
+			changes = append(changes, changeMsg)
+		case objects.UpdatePolicyDefinition:
+			oldDef := targetNorm.Definition
+			if oldDef == "" {
+				oldDef = "unset"
+			}
+
+			newDef := sourceNorm.Definition
+			if newDef == "" {
+				newDef = "unset"
+			}
+
+			if oldDef == newDef {
+				continue
+			}
+
+			changeMsg := fmt.Sprintf("- definition: %s >>> %s", oldDef, newDef)
+			changes = append(changes, changeMsg)
+		case objects.UpdatePolicyCheck:
+			oldCheck := targetNorm.Check
+			if oldCheck == "" {
+				oldCheck = "unset"
+			}
+
+			newCheck := sourceNorm.Check
+			if newCheck == "" {
+				newCheck = "unset"
+			}
+
+			if oldCheck == newCheck {
+				continue
+			}
+
+			changeMsg := fmt.Sprintf("- check: %s >>> %s", oldCheck, newCheck)
+			changes = append(changes, changeMsg)
+		case objects.UpdatePolicyRoles:
+			// Convert roles to string representation for comparison
+			oldRoles := strings.Join(diffData.TargetResource.Roles, ", ")
+			newRoles := strings.Join(diffData.SourceResource.Roles, ", ")
+
+			if oldRoles == newRoles {
+				continue
+			}
+
+			changeMsg := fmt.Sprintf("- roles: [%s] >>> [%s]", oldRoles, newRoles)
+			changes = append(changes, changeMsg)
+		}
+	}
+
+	if len(changes) == 0 {
+		return
+	}
+
+	printScope("*** Found diff in %s/%s.go ***\n", "/internal/policies", fileName)
+	fmt.Println(strings.Join(changes, "\n"))
+	printScope("*** End found diff ***\n")
+}
 
 func GetDiffChangeMessage(items []MigrateItem) string {
 	newData := []string{}
@@ -91,6 +196,21 @@ func GenerateDiffChangeMessage(newData []string, updateData []string, deleteData
 	return buff.String(), nil
 }
 
+type normalizedPolicy struct {
+	Definition string
+	Check      string
+}
+
+func normalizePolicyForReport(policy objects.Policy) normalizedPolicy {
+	qualifier := builder.ClauseQualifier{Schema: policy.Schema, Table: policy.Table}
+	norm := normalizedPolicy{}
+	norm.Definition = builder.NormalizeClauseSQL(strings.TrimSpace(policy.Definition), qualifier)
+	if policy.Check != nil {
+		norm.Check = builder.NormalizeClauseSQL(strings.TrimSpace(*policy.Check), qualifier)
+	}
+	return norm
+}
+
 const DiffChangeUpdateTemplate = `  - Update Policy {{ .Name }}
   {{- if gt (len .ChangeItems) 0}}
       Change Configuration
@@ -141,7 +261,35 @@ func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, err
 
 			changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "check", oldCheck, newCheck))
 		case objects.UpdatePolicyRoles:
+			oldRoles := strings.Join(item.OldData.Roles, ",")
+			if len(oldRoles) == 0 {
+				oldRoles = "unset"
+			}
 
+			newRoles := strings.Join(item.NewData.Roles, ",")
+			if len(newRoles) == 0 {
+				newRoles = "unset"
+			}
+
+			if oldRoles != newRoles {
+				changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "roles", oldRoles, newRoles))
+			}
+		case objects.UpdatePolicySchema:
+			if !strings.EqualFold(item.OldData.Schema, item.NewData.Schema) {
+				changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "schema", item.OldData.Schema, item.NewData.Schema))
+			}
+		case objects.UpdatePolicyTable:
+			if !strings.EqualFold(item.OldData.Table, item.NewData.Table) {
+				changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "table", item.OldData.Table, item.NewData.Table))
+			}
+		case objects.UpdatePolicyAction:
+			if !strings.EqualFold(item.OldData.Action, item.NewData.Action) {
+				changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "action", item.OldData.Action, item.NewData.Action))
+			}
+		case objects.UpdatePolicyCommand:
+			if !strings.EqualFold(string(item.OldData.Command), string(item.NewData.Command)) {
+				changeMsgArr = append(changeMsgArr, fmt.Sprintf("- %s : %s >>> %s", "command", item.OldData.Command, item.NewData.Command))
+			}
 		}
 	}
 

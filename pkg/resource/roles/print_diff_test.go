@@ -72,6 +72,10 @@ func TestPrintDiff(t *testing.T) {
 			objects.UpdateRoleIsSuperUser,
 			objects.UpdateRoleValidUntil,
 		},
+		ChangeInheritItems: []objects.UpdateRoleInheritItem{
+			{Role: objects.Role{Name: "student"}, Type: objects.UpdateRoleInheritGrant},
+			{Role: objects.Role{Name: "instructor"}, Type: objects.UpdateRoleInheritRevoke},
+		},
 	}
 
 	successDiffData := roles.CompareDiffResult{
@@ -106,6 +110,82 @@ func TestPrintDiff(t *testing.T) {
 	}
 
 	roles.PrintDiff(successDiffData)
+}
+
+func TestPrintDiff_VariousBranches(t *testing.T) {
+	createDiff := roles.CompareDiffResult{
+		SourceResource: objects.Role{ConnectionLimit: 4},
+		TargetResource: objects.Role{ConnectionLimit: 0},
+		DiffItems:      objects.UpdateRoleParam{ChangeItems: []objects.UpdateRoleType{objects.UpdateConnectionLimit}},
+	}
+	roles.PrintDiff(createDiff)
+
+	deleteDiff := roles.CompareDiffResult{
+		SourceResource: objects.Role{ConnectionLimit: 0},
+		TargetResource: objects.Role{ConnectionLimit: 6},
+		DiffItems:      objects.UpdateRoleParam{ChangeItems: []objects.UpdateRoleType{objects.UpdateConnectionLimit}},
+	}
+	roles.PrintDiff(deleteDiff)
+
+	updateDiff := roles.CompareDiffResult{
+		SourceResource: objects.Role{ConnectionLimit: 3},
+		TargetResource: objects.Role{ConnectionLimit: 5},
+		DiffItems:      objects.UpdateRoleParam{ChangeItems: []objects.UpdateRoleType{objects.UpdateConnectionLimit}},
+	}
+	roles.PrintDiff(updateDiff)
+
+	now := time.Now()
+	validCreate := roles.CompareDiffResult{
+		SourceResource: objects.Role{ValidUntil: objects.NewSupabaseTime(now.Add(24 * time.Hour))},
+		TargetResource: objects.Role{ValidUntil: nil},
+		DiffItems:      objects.UpdateRoleParam{ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleValidUntil}},
+	}
+	roles.PrintDiff(validCreate)
+
+	validDelete := roles.CompareDiffResult{
+		SourceResource: objects.Role{ValidUntil: nil},
+		TargetResource: objects.Role{ValidUntil: objects.NewSupabaseTime(now.Add(48 * time.Hour))},
+		DiffItems:      objects.UpdateRoleParam{ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleValidUntil}},
+	}
+	roles.PrintDiff(validDelete)
+
+	validUpdate := roles.CompareDiffResult{
+		SourceResource: objects.Role{ValidUntil: objects.NewSupabaseTime(now.Add(24 * time.Hour))},
+		TargetResource: objects.Role{ValidUntil: objects.NewSupabaseTime(now.Add(72 * time.Hour))},
+		DiffItems:      objects.UpdateRoleParam{ChangeItems: []objects.UpdateRoleType{objects.UpdateRoleValidUntil}},
+	}
+	roles.PrintDiff(validUpdate)
+
+	inheritDiff := roles.CompareDiffResult{
+		SourceResource: objects.Role{
+			Name:          "source_role",
+			InheritRole:   true,
+			CanCreateDB:   true,
+			CanCreateRole: true,
+			CanLogin:      true,
+			CanBypassRLS:  true,
+		},
+		TargetResource: objects.Role{Name: "target_role"},
+		DiffItems: objects.UpdateRoleParam{
+			ChangeItems: []objects.UpdateRoleType{
+				objects.UpdateRoleInheritRole,
+				objects.UpdateRoleCanCreateDb,
+				objects.UpdateRoleCanCreateRole,
+				objects.UpdateRoleCanLogin,
+				objects.UpdateRoleCanBypassRls,
+			},
+			ChangeInheritItems: []objects.UpdateRoleInheritItem{
+				{Role: objects.Role{Name: "add_role"}, Type: objects.UpdateRoleInheritGrant},
+				{Role: objects.Role{Name: "remove_role"}, Type: objects.UpdateRoleInheritRevoke},
+			},
+		},
+	}
+	roles.PrintDiff(inheritDiff)
+}
+
+func TestGenerateDiffMessage_UnsupportedType(t *testing.T) {
+	_, err := roles.GenerateDiffMessage("role", roles.DiffTypeCreate, objects.UpdateRoleConfig, "", "")
+	assert.Error(t, err)
 }
 
 // TestGetDiffChangeMessage tests the GetDiffChangeMessage role
@@ -158,6 +238,9 @@ func TestGetDiffChangeMessage(t *testing.T) {
 					objects.UpdateRoleIsSuperUser,
 					objects.UpdateRoleValidUntil,
 				},
+				ChangeInheritItems: []objects.UpdateRoleInheritItem{
+					{Role: objects.Role{Name: "student"}, Type: objects.UpdateRoleInheritGrant},
+				},
 			},
 		},
 		{
@@ -170,6 +253,8 @@ func TestGetDiffChangeMessage(t *testing.T) {
 	assert.Contains(t, diffMessage, "New Role")
 	assert.Contains(t, diffMessage, "Update Role")
 	assert.Contains(t, diffMessage, "Delete Role")
+	assert.Contains(t, diffMessage, "Inherited Roles")
+	assert.Contains(t, diffMessage, "add inherited role")
 }
 
 // TestGenerateDiffMessage tests the GenerateDiffMessage role

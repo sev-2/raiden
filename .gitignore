@@ -1,3 +1,7 @@
+.gocache
+.gomodcache
+.cache/
+
 build/
 examples/
 deployments/
@@ -6,7 +10,13 @@ deployments/
 coverage.out
 tmp.out
 profile.out
+pkg/generator/test_*.txt
 
 *sa.json
 
 app.yaml
+
+AGENTS.md
+
+QWEN.md
+.qwen
