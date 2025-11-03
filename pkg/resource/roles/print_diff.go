@@ -48,7 +48,7 @@ func PrintDiffResult(diffResult []CompareDiffResult) error {
 }
 
 func PrintDiff(diffData CompareDiffResult) {
-	if len(diffData.DiffItems.ChangeItems) == 0 {
+	if len(diffData.DiffItems.ChangeItems) == 0 && len(diffData.DiffItems.ChangeInheritItems) == 0 {
 		return
 	}
 	fileName := utils.ToSnakeCase(diffData.TargetResource.Name)
@@ -56,6 +56,10 @@ func PrintDiff(diffData CompareDiffResult) {
 	printScope := color.New(color.FgHiBlack).PrintfFunc()
 
 	changes := make([]string, 0)
+	roleName := diffData.SourceResource.Name
+	if roleName == "" {
+		roleName = diffData.TargetResource.Name
+	}
 	for _, v := range diffData.DiffItems.ChangeItems {
 		switch v {
 		case objects.UpdateConnectionLimit:
@@ -218,6 +222,34 @@ func PrintDiff(diffData CompareDiffResult) {
 		}
 	}
 
+	if len(diffData.DiffItems.ChangeInheritItems) > 0 {
+		for i := range diffData.DiffItems.ChangeInheritItems {
+			item := diffData.DiffItems.ChangeInheritItems[i]
+			if item.Role.Name == "" {
+				continue
+			}
+
+			var (
+				diffType DiffType
+				action   string
+			)
+
+			switch item.Type {
+			case objects.UpdateRoleInheritGrant:
+				diffType = DiffTypeCreate
+				action = "add inherited role"
+			case objects.UpdateRoleInheritRevoke:
+				diffType = DiffTypeDelete
+				action = "remove inherited role"
+			default:
+				continue
+			}
+
+			symbol := getDiffSymbol(diffType)
+			changes = append(changes, fmt.Sprintf("%s %s %s for %s\n", symbol, action, item.Role.Name, roleName))
+		}
+	}
+
 	printScope("*** Found diff in %s/%s.go ***\n", "/internal/roles", fileName)
 	fmt.Println(strings.Join(changes, ""))
 	printScope("*** End found diff ***\n")
@@ -327,7 +359,7 @@ func GenerateDiffMessage(name string, diffType DiffType, updateType objects.Upda
 	case objects.UpdateRoleIsSuperUser:
 		tmplStr = buildDiffTemplate("IsSuperuser() bool", "", "")
 	case objects.UpdateRoleInheritRole:
-		tmplStr = buildDiffTemplate("InheritRole()", "", "")
+		tmplStr = buildDiffTemplate("IsInheritRole() bool", "", "")
 	case objects.UpdateRoleCanCreateDb:
 		tmplStr = buildDiffTemplate("CanCreateDB() bool", "", "")
 	case objects.UpdateRoleCanCreateRole:
@@ -430,6 +462,12 @@ const DiffChangeUpdateTemplate = `  - Update Role {{ .Name }}
       {{.}}
       {{- end }}
   {{- end -}}
+  {{- if gt (len .ChangeInheritItems) 0}}
+      Inherited Roles
+      {{- range .ChangeInheritItems}}
+      {{.}}
+      {{- end }}
+  {{- end -}}
   `
 
 func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, error) {
@@ -472,9 +510,25 @@ func GenerateDiffChangeUpdateMessage(name string, item MigrateItem) (string, err
 		}
 	}
 
+	changeInheritArr := []string{}
+	for i := range diffItems.ChangeInheritItems {
+		item := diffItems.ChangeInheritItems[i]
+		if item.Role.Name == "" {
+			continue
+		}
+
+		switch item.Type {
+		case objects.UpdateRoleInheritGrant:
+			changeInheritArr = append(changeInheritArr, fmt.Sprintf("- add inherited role : %s", item.Role.Name))
+		case objects.UpdateRoleInheritRevoke:
+			changeInheritArr = append(changeInheritArr, fmt.Sprintf("- remove inherited role : %s", item.Role.Name))
+		}
+	}
+
 	param := map[string]any{
-		"Name":        name,
-		"ChangeItems": changeMsgArr,
+		"Name":               name,
+		"ChangeItems":        changeMsgArr,
+		"ChangeInheritItems": changeInheritArr,
 	}
 
 	tmplInstance := template.New("generate diff change update")

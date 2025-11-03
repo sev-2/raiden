@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lib/pq"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
-	"github.com/sev-2/raiden/pkg/supabase/query/sql"
 )
 
 type TypeAction string
@@ -20,18 +20,22 @@ func BuildCreateTypeQuery(dataType *objects.Type) string {
 	if dataType == nil {
 		return ""
 	}
+	schemaIdent := pq.QuoteIdentifier(dataType.Schema)
+	nameIdent := pq.QuoteIdentifier(dataType.Name)
 	enums := []string{}
 	for _, e := range dataType.Enums {
-		enums = append(enums, sql.Literal(e))
+		enums = append(enums, pq.QuoteLiteral(e))
 	}
-	return fmt.Sprintf(`CREATE TYPE %s.%s AS ENUM (%s);`, dataType.Schema, dataType.Name, strings.Join(enums, ","))
+	return fmt.Sprintf(`CREATE TYPE IF NOT EXISTS %s.%s AS ENUM (%s);`, schemaIdent, nameIdent, strings.Join(enums, ","))
 }
 
 func BuildDeleteTypeQuery(dataType *objects.Type) string {
 	if dataType == nil {
 		return ""
 	}
-	return fmt.Sprintf(`DROP TYPE IF EXISTS %s.%s CASCADE;`, dataType.Schema, dataType.Name)
+	schemaIdent := pq.QuoteIdentifier(dataType.Schema)
+	nameIdent := pq.QuoteIdentifier(dataType.Name)
+	return fmt.Sprintf(`DROP TYPE IF EXISTS %s.%s CASCADE;`, schemaIdent, nameIdent)
 }
 
 func BuildTypeQuery(action TypeAction, dataType *objects.Type) (string, error) {

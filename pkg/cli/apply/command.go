@@ -26,6 +26,7 @@ type Flags struct {
 	RolesOnly     bool
 	ModelsOnly    bool
 	StoragesOnly  bool
+	PoliciesOnly  bool
 	AllowedSchema string
 	DryRun        bool
 }
@@ -40,7 +41,7 @@ func (f *Flags) Bind(cmd *cobra.Command) {
 }
 
 func (f *Flags) LoadAll() bool {
-	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly
+	return !f.RpcOnly && !f.RolesOnly && !f.ModelsOnly && !f.StoragesOnly && !f.PoliciesOnly
 }
 
 func PreRun(projectPath string) error {
@@ -71,6 +72,10 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 		if flags.StoragesOnly {
 			generatedResources = append(generatedResources, "storages")
 		}
+
+		if flags.PoliciesOnly {
+			generatedResources = append(generatedResources, "policies")
+		}
 	}
 
 	ApplyLogger.Info("prepare apply", "resource", strings.Join(generatedResources, ","))
@@ -80,7 +85,7 @@ func Run(logFlags *cli.LogFlags, flags *Flags, projectPath string) error {
 	mainFilePath := filepath.Join(projectPath, mainFile)
 
 	// set output
-	output := GetBuildFilePath(projectPath, runtime.GOOS, "import")
+	output := GetBuildFilePath(projectPath, runtime.GOOS, "apply")
 
 	if utils.IsFileExists(output) {
 		if err := utils.DeleteFile(output); err != nil {

@@ -60,7 +60,7 @@ func TestGenerateModels(t *testing.T) {
 		},
 	}
 
-	err2 := generator.GenerateModels(dir, "test-project", tables, nil, generator.GenerateFn(generator.Generate))
+	err2 := generator.GenerateModels(dir, "test-project", tables, nil, nil, nil, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/models/test_table.go")
 }
@@ -97,7 +97,7 @@ func TestGenerateModels_WithCustomType(t *testing.T) {
 			Name:   "test_status",
 			Format: "test_status",
 		},
-	}, generator.GenerateFn(generator.Generate))
+	}, nil, nil, generator.GenerateFn(generator.Generate))
 	assert.NoError(t, err2)
 	assert.FileExists(t, dir+"/internal/models/test_table.go")
 }

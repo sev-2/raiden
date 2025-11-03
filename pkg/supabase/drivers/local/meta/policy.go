@@ -58,13 +58,34 @@ func CreatePolicy(cfg *raiden.Config, policy objects.Policy) (objects.Policy, er
 
 func UpdatePolicy(cfg *raiden.Config, policy objects.Policy, updatePolicyParams objects.UpdatePolicyParam) error {
 	MetaLogger.Trace("start update policy", "name", policy.Name)
+	if policyRequiresRecreate(updatePolicyParams.ChangeItems) {
+		oldPolicy := objects.Policy{
+			Name:    updatePolicyParams.Name,
+			Schema:  updatePolicyParams.OldSchema,
+			Table:   updatePolicyParams.OldTable,
+			Action:  updatePolicyParams.OldAction,
+			Command: updatePolicyParams.OldCommand,
+			Roles:   updatePolicyParams.OldRoles,
+		}
+
+		if err := DeletePolicy(cfg, oldPolicy); err != nil {
+			return err
+		}
+
+		_, err := CreatePolicy(cfg, policy)
+		if err != nil {
+			return err
+		}
+		MetaLogger.Trace("finish update policy", "name", policy.Name)
+		return nil
+	}
 	sql := query.BuildUpdatePolicyQuery(policy, updatePolicyParams)
 	// Execute SQL Query
 	_, err := ExecuteQuery[any](getBaseUrl(cfg), sql, nil, DefaultInterceptor(cfg), nil)
 	if err != nil {
 		return fmt.Errorf("update policy %s error : %s", policy.Name, err)
 	}
-	MetaLogger.Trace("finish create policy", "name", policy.Name)
+	MetaLogger.Trace("finish update policy", "name", policy.Name)
 	return nil
 }
 
@@ -77,6 +98,16 @@ func DeletePolicy(cfg *raiden.Config, policy objects.Policy) error {
 	if err != nil {
 		return fmt.Errorf("delete role %s error : %s", policy.Name, err)
 	}
-	MetaLogger.Trace("finish create policy", "name", policy.Name)
+	MetaLogger.Trace("finish delete policy", "name", policy.Name)
 	return nil
+}
+
+func policyRequiresRecreate(changeItems []objects.UpdatePolicyType) bool {
+	for _, item := range changeItems {
+		switch item {
+		case objects.UpdatePolicySchema, objects.UpdatePolicyTable, objects.UpdatePolicyAction, objects.UpdatePolicyCommand:
+			return true
+		}
+	}
+	return false
 }

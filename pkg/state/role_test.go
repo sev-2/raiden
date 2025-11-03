@@ -14,6 +14,30 @@ type MockRole struct {
 	raiden.RoleBase
 }
 
+type MockChildRole struct {
+	raiden.RoleBase
+}
+
+type mockUnnamedRole struct {
+	raiden.RoleBase
+}
+
+type mockExplicitRole struct {
+	raiden.RoleBase
+}
+
+type mockEdgeRole struct {
+	raiden.RoleBase
+}
+
+type mockNativeRole struct {
+	raiden.RoleBase
+}
+
+func (r *mockNativeRole) Name() string {
+	return "native_role"
+}
+
 func (r *MockRole) Name() string {
 	return "test_role"
 }
@@ -22,8 +46,12 @@ func (r *MockRole) ConnectionLimit() int {
 	return 10
 }
 
-func (r *MockRole) InheritRole() bool {
+func (r *MockRole) IsInheritRole() bool {
 	return true
+}
+
+func (r *MockRole) InheritRoles() []raiden.Role {
+	return []raiden.Role{&MockChildRole{}}
 }
 
 func (r *MockRole) IsReplicationRole() bool {
@@ -50,6 +78,35 @@ func (r *MockRole) ValidUntil() *objects.SupabaseTime {
 	return objects.NewSupabaseTime(time.Now())
 }
 
+func (r *MockChildRole) Name() string {
+	return "child_role"
+}
+
+func (r *mockUnnamedRole) Name() string {
+	return ""
+}
+
+func (r *mockExplicitRole) Name() string {
+	return "explicit_role"
+}
+
+func (r *mockEdgeRole) Name() string {
+	return "edge_role"
+}
+
+func (r *mockEdgeRole) IsInheritRole() bool {
+	return true
+}
+
+func (r *mockEdgeRole) InheritRoles() []raiden.Role {
+	return []raiden.Role{
+		nil,
+		&mockUnnamedRole{},
+		&mockUnnamedRole{},
+		&mockExplicitRole{},
+	}
+}
+
 func TestExtractRole(t *testing.T) {
 	roleStates := []state.RoleState{
 		{Role: objects.Role{Name: "existing_role"}, IsNative: false},
@@ -58,13 +115,15 @@ func TestExtractRole(t *testing.T) {
 
 	appRoles := []raiden.Role{
 		&MockRole{},
+		&mockNativeRole{},
 	}
 
 	result, err := state.ExtractRole(roleStates, appRoles, true)
 	assert.NoError(t, err)
-	assert.Len(t, result.Existing, 0)
+	assert.Len(t, result.Existing, 1)
 	assert.Len(t, result.New, 1)
-	assert.Len(t, result.Delete, 2)
+	assert.Len(t, result.Delete, 1)
+	assert.Equal(t, "native_role", result.Existing[0].Name)
 
 	result, err = state.ExtractRole(roleStates, appRoles, false)
 	assert.NoError(t, err)
@@ -86,6 +145,9 @@ func TestBindToSupabaseRole(t *testing.T) {
 	assert.True(t, r.CanLogin)
 	assert.True(t, r.InheritRole)
 	assert.NotNil(t, r.ValidUntil)
+	if assert.Len(t, r.InheritRoles, 1) {
+		assert.Equal(t, "child_role", r.InheritRoles[0].Name)
+	}
 }
 
 func TestBuildRoleFromState(t *testing.T) {
@@ -113,6 +175,21 @@ func TestBuildRoleFromState(t *testing.T) {
 	assert.True(t, r.CanLogin)
 	assert.True(t, r.InheritRole)
 	assert.NotNil(t, r.ValidUntil)
+}
+
+func TestBindToSupabaseRole_InheritRoleEdgeCases(t *testing.T) {
+	role := mockEdgeRole{}
+	var res objects.Role
+
+	state.BindToSupabaseRole(&res, &role)
+
+	assert.Equal(t, "edge_role", res.Name)
+	assert.True(t, res.InheritRole)
+	if assert.Len(t, res.InheritRoles, 2) {
+		names := []string{res.InheritRoles[0].Name, res.InheritRoles[1].Name}
+		assert.Equal(t, "mock_unnamed_role", names[0])
+		assert.Equal(t, "explicit_role", names[1])
+	}
 }
 
 func TestExtractRoleResult_ToDeleteFlatMap(t *testing.T) {

@@ -2,6 +2,7 @@ package roles
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
@@ -117,6 +118,60 @@ func CompareItem(source, target objects.Role) (diffResult CompareDiffResult) {
 		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleInheritRole)
 	}
 
+	newInheritMap := make(map[string]objects.Role)
+	for i := range source.InheritRoles {
+		rolePtr := source.InheritRoles[i]
+		if rolePtr == nil {
+			continue
+		}
+
+		name := strings.TrimSpace(rolePtr.Name)
+		if name == "" {
+			continue
+		}
+
+		key := strings.ToLower(name)
+		if _, exist := newInheritMap[key]; exist {
+			continue
+		}
+
+		newInheritMap[key] = objects.Role{Name: name}
+	}
+
+	oldInheritMap := make(map[string]objects.Role)
+	for i := range target.InheritRoles {
+		rolePtr := target.InheritRoles[i]
+		if rolePtr == nil {
+			continue
+		}
+
+		name := strings.TrimSpace(rolePtr.Name)
+		if name == "" {
+			continue
+		}
+
+		key := strings.ToLower(name)
+		if _, exist := oldInheritMap[key]; exist {
+			continue
+		}
+
+		oldInheritMap[key] = objects.Role{Name: name}
+	}
+
+	for name, role := range newInheritMap {
+		if _, exist := oldInheritMap[name]; exist {
+			continue
+		}
+		updateItem.ChangeInheritItems = append(updateItem.ChangeInheritItems, objects.UpdateRoleInheritItem{Role: role, Type: objects.UpdateRoleInheritGrant})
+	}
+
+	for name, role := range oldInheritMap {
+		if _, exist := newInheritMap[name]; exist {
+			continue
+		}
+		updateItem.ChangeInheritItems = append(updateItem.ChangeInheritItems, objects.UpdateRoleInheritItem{Role: role, Type: objects.UpdateRoleInheritRevoke})
+	}
+
 	// Unsupported now, because need superuser role
 	// if source.IsReplicationRole != target.IsReplicationRole {
 	// 	updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateRoleIsReplication)
@@ -137,7 +192,7 @@ func CompareItem(source, target objects.Role) (diffResult CompareDiffResult) {
 		}
 	}
 
-	diffResult.IsConflict = len(updateItem.ChangeItems) > 0
+	diffResult.IsConflict = len(updateItem.ChangeItems) > 0 || len(updateItem.ChangeInheritItems) > 0
 	diffResult.DiffItems = updateItem
 
 	return

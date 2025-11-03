@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/sev-2/raiden"
+	st "github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/state"
 	"github.com/sev-2/raiden/pkg/supabase/objects"
 	"github.com/stretchr/testify/assert"
@@ -11,20 +12,29 @@ import (
 
 // Mock types
 type MockBucket struct {
+	raiden.BucketBase
 	name              string
 	public            bool
 	allowedMimeTypes  []string
 	avifAutoDetection bool
 	fileSizeLimit     int
-
-	Acl string `json:"-" read:"authenticated,sc" write:"authenticated,sc" readUsing:"true" writeCheck:"true" writeUsing:"true"`
+	Acl               raiden.Acl
 }
 
-func (m MockBucket) Name() string               { return m.name }
-func (m MockBucket) Public() bool               { return m.public }
-func (m MockBucket) AllowedMimeTypes() []string { return m.allowedMimeTypes }
-func (m MockBucket) AvifAutoDetection() bool    { return m.avifAutoDetection }
-func (m MockBucket) FileSizeLimit() int         { return m.fileSizeLimit }
+func (m *MockBucket) Name() string               { return m.name }
+func (m *MockBucket) Public() bool               { return m.public }
+func (m *MockBucket) AllowedMimeTypes() []string { return m.allowedMimeTypes }
+func (m *MockBucket) AvifAutoDetection() bool    { return m.avifAutoDetection }
+func (m *MockBucket) FileSizeLimit() int         { return m.fileSizeLimit }
+
+func (m *MockBucket) ConfigureAcl() {
+	m.Acl.Enable()
+	m.Acl.Define(
+		raiden.Rule("read_bucket").For("authenticated").To(raiden.CommandSelect).
+			Using(st.True).
+			WithPermissive(),
+	)
+}
 
 func TestExtractStorage(t *testing.T) {
 	storageStates := []state.StorageState{
@@ -37,8 +47,8 @@ func TestExtractStorage(t *testing.T) {
 	}
 
 	appStorages := []raiden.Bucket{
-		MockBucket{name: "storage1"},
-		MockBucket{name: "storage3"},
+		&MockBucket{name: "storage1"},
+		&MockBucket{name: "storage3"},
 	}
 
 	result, err := state.ExtractStorage(storageStates, appStorages)
@@ -49,7 +59,7 @@ func TestExtractStorage(t *testing.T) {
 }
 
 func TestBindToSupabaseStorage(t *testing.T) {
-	mockStorage := MockBucket{
+	mockStorage := &MockBucket{
 		name:              "storage1",
 		public:            true,
 		allowedMimeTypes:  []string{"image/png", "image/jpeg"},
@@ -69,13 +79,13 @@ func TestBindToSupabaseStorage(t *testing.T) {
 }
 
 func TestBuildStorageFromApp(t *testing.T) {
-	mockStorage := MockBucket{name: "storage1"}
+	mockStorage := &MockBucket{name: "storage1"}
 	result := state.BuildStorageFromApp(mockStorage)
 	assert.Equal(t, "storage1", result.Storage.Name)
 }
 
 func TestBuildStorageFromState(t *testing.T) {
-	mockStorage := MockBucket{name: "storage1"}
+	mockStorage := &MockBucket{name: "storage1"}
 	storageState := state.StorageState{
 		Storage: objects.Bucket{
 			Name: "storage1",

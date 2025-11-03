@@ -50,6 +50,14 @@ type (
 		LastUpdate time.Time
 	}
 
+	// TODO :
+	// PolicyState struct {
+	// 	Policy       objects.Policy
+	// 	PolicyPath   string
+	// 	PolicyStruct string
+	// 	LastUpdate   time.Time
+	// }
+
 	StorageState struct {
 		Storage       objects.Bucket
 		StoragePath   string
@@ -85,12 +93,6 @@ type (
 		State      State
 		NeedUpdate bool
 		Mutex      sync.RWMutex
-	}
-
-	ExtractedPolicies struct {
-		Existing []objects.Policy
-		New      []objects.Policy
-		Delete   []objects.Policy
 	}
 
 	TypeState struct {
@@ -528,7 +530,7 @@ func Load() (*State, error) {
 	defer file.Close()
 
 	state := &State{}
-	gob.Register(map[string]interface{}{})
+	gob.Register(map[string]any{})
 	decoder := gob.NewDecoder(file)
 	if err := decoder.Decode(state); err != nil {
 		return nil, err
