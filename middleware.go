@@ -336,8 +336,16 @@ func isValidHeaders(requestHeaders string, allowedHeaders []string) bool {
 		return true
 	}
 
-	headers := strings.Split(requestHeaders, ", ")
-	for _, header := range headers {
+	if strings.TrimSpace(requestHeaders) == "" {
+		return true
+	}
+
+	for _, raw := range strings.Split(requestHeaders, ",") {
+		header := strings.ToLower(strings.TrimSpace(raw))
+		if header == "" {
+			continue
+		}
+
 		if !contains(allowedHeaders, header) {
 			return false
 		}
