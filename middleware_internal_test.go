@@ -119,6 +119,27 @@ func TestIsValidHeaders(t *testing.T) {
 			expected:       true,
 			description:    "Should handle all empty entries gracefully",
 		},
+		{
+			name:           "Duplicate headers - same header repeated",
+			requestHeaders: "content-type,content-type",
+			allowedHeaders: []string{"content-type", "authorization"},
+			expected:       true,
+			description:    "Should allow duplicate headers if all are in allowed list",
+		},
+		{
+			name:           "Duplicate headers with mixed case",
+			requestHeaders: "content-type,Content-Type,CONTENT-TYPE",
+			allowedHeaders: []string{"content-type", "authorization"},
+			expected:       true,
+			description:    "Should handle duplicate headers with case variations",
+		},
+		{
+			name:           "Duplicate headers with one invalid",
+			requestHeaders: "content-type,content-type,x-custom-header",
+			allowedHeaders: []string{"content-type", "authorization"},
+			expected:       false,
+			description:    "Should reject if any header (even among duplicates) is not allowed",
+		},
 	}
 
 	for _, tt := range tests {
