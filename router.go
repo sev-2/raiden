@@ -284,6 +284,7 @@ func (r *router) registerRestHandler(route *Route) {
 		group.PUT(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPut, r.lib))
 		group.PATCH(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPatch, r.lib))
 		group.DELETE(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodDelete, r.lib))
+		group.HEAD(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodHead, r.lib))
 	}
 }
 

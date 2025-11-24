@@ -286,6 +286,24 @@ func TestRouter_BuildHandler(t *testing.T) {
 	assert.NotNil(t, registeredRoutes)
 }
 
+func TestRouter_RestRouteRegistersHead(t *testing.T) {
+	conf := loadConfig()
+	router := raiden.NewRouter(conf)
+
+	restRoute := raiden.Route{
+		Type:       raiden.RouteTypeRest,
+		Path:       "/rest/v1/rest_head_check",
+		Controller: &RestController{},
+		Model:      &SomeModel{},
+	}
+
+	router.Register([]*raiden.Route{&restRoute})
+	router.BuildHandler()
+
+	registeredRoutes := router.GetRegisteredRoutes()
+	assert.Contains(t, registeredRoutes[fasthttp.MethodHead], "/rest/v1/rest_head_check")
+}
+
 func TestRouter_NewRouteFromCustomController(t *testing.T) {
 	methods := []string{fasthttp.MethodGet}
 	r := raiden.NewRouteFromController(&HelloWorldController{}, methods)
