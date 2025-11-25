@@ -289,6 +289,16 @@ func (rc RestController) Get(ctx Context) error {
 
 // Head implements Controller.
 func (rc RestController) Head(ctx Context) error {
+	if rc.Controller != nil {
+		if err := rc.Controller.Head(ctx); err != nil {
+			var er *ErrorResponse
+			if errors.As(err, &er) && er.StatusCode == fasthttp.StatusNotImplemented {
+				return RestProxy(ctx, rc.TableName)
+			}
+			return err
+		}
+		return nil
+	}
 	return RestProxy(ctx, rc.TableName)
 }
 

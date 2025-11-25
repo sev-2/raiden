@@ -49,6 +49,15 @@ type DataController struct {
 	Result  map[string]any
 }
 
+type CustomHeadController struct {
+	raiden.ControllerBase
+}
+
+func (c *CustomHeadController) Head(ctx raiden.Context) error {
+	ctx.RequestContext().Response.SetStatusCode(fasthttp.StatusAccepted)
+	return nil
+}
+
 func (h *DataController) BeforeGet(ctx raiden.Context) error {
 	ctx.Set("message", "from before get middleware")
 	return nil
@@ -292,6 +301,29 @@ func TestRestController_HeadUsesRestProxy(t *testing.T) {
 	assert.Equal(t, fasthttp.StatusNoContent, ctx.Response.StatusCode())
 	assert.Equal(t, fasthttp.MethodHead, receivedMethod)
 	assert.Equal(t, "http://supabase.local/rest/v1/test_table?select=*", receivedPath)
+}
+
+func TestRestController_HeadPrefersControllerImplementation(t *testing.T) {
+	calledProxy := false
+	restore := raiden.SetRestProxyDoTimeout(func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
+		calledProxy = true
+		return nil
+	})
+	defer restore()
+
+	controllerImpl := &CustomHeadController{}
+	cfg := &raiden.Config{SupabasePublicUrl: "http://supabase.local"}
+	ctx := raiden.NewCtx(cfg, nil, nil)
+	ctx.RequestCtx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/rest/v1/test_table")
+	ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+
+	controller := raiden.RestController{Controller: controllerImpl, TableName: "test_table"}
+
+	err := controller.Head(&ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, fasthttp.StatusAccepted, ctx.Response.StatusCode())
+	assert.False(t, calledProxy)
 }
 
 func TestRestController_HeadReturnsProxyError(t *testing.T) {
