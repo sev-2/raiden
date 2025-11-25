@@ -295,6 +295,7 @@ func (r *router) registerStorageHandler(route *Route) {
 		if len(r.middlewares) > 0 {
 			chain = r.buildAppMiddleware(chain)
 		}
+
 		path := route.Path
 		for _, prefix := range []string{"/storage/v1/object", "/storage/v1"} {
 			for strings.HasPrefix(path, prefix) {
@@ -304,6 +305,7 @@ func (r *router) registerStorageHandler(route *Route) {
 		if path != "" && !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
+
 		group.GET(path+"/{path:*}", chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodGet, r.lib))
 		group.POST(path+"/{path:*}", chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPost, r.lib))
 		group.PUT(path+"/{path:*}", chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPut, r.lib))

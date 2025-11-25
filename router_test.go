@@ -354,6 +354,11 @@ func TestRouter_RegisterStorageHandler_TrimsPrefixes(t *testing.T) {
 			routePath:   "/storage/v1/object/public",
 			expectedGet: "/storage/v1/object/public/{path:*}",
 		},
+		{
+			name:        "relative bucket path",
+			routePath:   "public",
+			expectedGet: "/storage/v1/object/public/{path:*}",
+		},
 	}
 
 	for _, tc := range testCases {
