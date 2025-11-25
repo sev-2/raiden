@@ -288,9 +288,8 @@ func (rc RestController) Get(ctx Context) error {
 }
 
 // Head implements Controller.
-// Subtle: this method shadows the method (Controller).Head of RestController.Controller.
 func (rc RestController) Head(ctx Context) error {
-	return rc.Controller.Head(ctx)
+	return RestProxy(ctx, rc.TableName)
 }
 
 // Options implements Controller.
@@ -761,6 +760,14 @@ func (c *HealthController) Get(ctx Context) error {
 
 // RestHandler
 var restProxyLogger = logger.HcLog().Named("raiden.controller.rest-proxy")
+var restProxyDoTimeout = fasthttp.DoTimeout
+
+// SetRestProxyDoTimeout overrides the default request executor; returns a restore function.
+func SetRestProxyDoTimeout(fn func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error) func() {
+	prev := restProxyDoTimeout
+	restProxyDoTimeout = fn
+	return func() { restProxyDoTimeout = prev }
+}
 
 func RestProxy(appCtx Context, TableName string) error {
 	// Create a new request object
@@ -782,7 +789,7 @@ func RestProxy(appCtx Context, TableName string) error {
 	defer fasthttp.ReleaseResponse(resp)
 
 	restProxyLogger.Debug("forward request", "method", string(req.Header.Method()), "uri", string(req.URI().FullURI()), "header", string(req.Header.RawHeaders()), "body", string(appCtx.RequestContext().Request.Body()))
-	if err := fasthttp.DoTimeout(req, resp, 30*time.Second); err != nil {
+	if err := restProxyDoTimeout(req, resp, 30*time.Second); err != nil {
 		return err
 	}
 
