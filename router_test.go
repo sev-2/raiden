@@ -333,6 +333,49 @@ func TestRouter_NewRouteFromStorageController(t *testing.T) {
 	assert.Equal(t, methods[1], r.Methods[1])
 }
 
+func TestRouter_RegisterStorageHandler_TrimsPrefixes(t *testing.T) {
+	testCases := []struct {
+		name        string
+		routePath   string
+		expectedGet string
+	}{
+		{
+			name:        "bucket path",
+			routePath:   "/assets",
+			expectedGet: "/storage/v1/object/assets/{path:*}",
+		},
+		{
+			name:        "prefixed storage path",
+			routePath:   "/storage/v1/public",
+			expectedGet: "/storage/v1/object/public/{path:*}",
+		},
+		{
+			name:        "full storage object path",
+			routePath:   "/storage/v1/object/public",
+			expectedGet: "/storage/v1/object/public/{path:*}",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := loadConfig()
+			router := raiden.NewRouter(conf)
+			storageRoute := raiden.Route{
+				Type:       raiden.RouteTypeStorage,
+				Path:       tc.routePath,
+				Controller: &StorageController{},
+				Storage:    &SomeBucket{},
+			}
+
+			router.Register([]*raiden.Route{&storageRoute})
+			router.BuildHandler()
+
+			registered := router.GetRegisteredRoutes()
+			assert.Contains(t, registered[fasthttp.MethodGet], tc.expectedGet)
+		})
+	}
+}
+
 func TestRoute_BuildAppMiddleware(t *testing.T) {
 	conf := loadConfig()
 	conf.TraceEnable = true
