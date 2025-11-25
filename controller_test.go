@@ -294,6 +294,23 @@ func TestRestController_HeadUsesRestProxy(t *testing.T) {
 	assert.Equal(t, "http://supabase.local/rest/v1/test_table?select=*", receivedPath)
 }
 
+func TestRestController_HeadReturnsProxyError(t *testing.T) {
+	restore := raiden.SetRestProxyDoTimeout(func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
+		return errors.New("proxy failed")
+	})
+	defer restore()
+
+	cfg := &raiden.Config{SupabasePublicUrl: "http://supabase.local"}
+	ctx := raiden.NewCtx(cfg, nil, nil)
+	ctx.RequestCtx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/rest/v1/test_table")
+	ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+
+	controller := raiden.RestController{Controller: &raiden.ControllerBase{}, TableName: "test_table"}
+	err := controller.Head(&ctx)
+	assert.EqualError(t, err, "proxy failed")
+}
+
 // Test StorageController methods
 func TestStorageController(t *testing.T) {
 	ctx := newMockCtx()
