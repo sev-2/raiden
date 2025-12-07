@@ -128,7 +128,12 @@ func GenerateType(folderPath string, t objects.Type, generateFn GenerateFn) erro
 	if len(t.Enums) > 0 {
 		enums := []string{}
 		for _, e := range t.Enums {
-			variableName := fmt.Sprintf("%s%s", utils.SnakeCaseToPascalCase(t.Name), utils.SnakeCaseToPascalCase(e))
+			variableName := fmt.Sprintf("%s%s",
+				utils.SnakeCaseToPascalCase(t.Name),
+				utils.SnakeCaseToPascalCase(
+					utils.ToSnakeCase(e),
+				),
+			)
 			enums = append(enums, variableName)
 			data.EnumArr = append(data.EnumArr, GenerateTypeDataEnum{
 				Key: variableName, Value: e,
