@@ -57,9 +57,11 @@ func colNameFromPtr(model any, fieldPtr any) string {
 		panic(fmt.Sprintf("builder: model must resolve to struct (got %T)", model))
 	}
 
-	addr := reflect.New(mv.Type())
-	addr.Elem().Set(mv)
-	mv = addr.Elem()
+	if !mv.CanAddr() {
+		addr := reflect.New(mv.Type())
+		addr.Elem().Set(mv)
+		mv = addr.Elem()
+	}
 
 	fp := reflect.ValueOf(fieldPtr)
 	if !fp.IsValid() {
@@ -90,6 +92,7 @@ func colNameFromPtr(model any, fieldPtr any) string {
 
 	// Allow resolving by value or nil pointer (e.g., model.Owner where Owner is *uuid.UUID and nil)
 	fieldType := fp.Type()
+
 	if fp.Kind() == reflect.Pointer && fp.IsNil() {
 		// keep fieldType as the pointer type, matching the struct field declaration
 		if column, ok := lookupColumnByType(mt, fieldType); ok {
@@ -106,16 +109,22 @@ func colNameFromPtr(model any, fieldPtr any) string {
 }
 
 func lookupColumnByType(t reflect.Type, fieldType reflect.Type) (string, bool) {
-	var candidates []reflect.StructField
+	var best *fieldMatch
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
-		if sf.Type == fieldType {
-			candidates = append(candidates, sf)
+		if sf.Type != fieldType {
+			continue
+		}
+
+		score := fieldMatchScore(sf)
+		candidate := &fieldMatch{column: columnNameFromStructField(sf), score: score}
+		if best == nil || candidate.score > best.score {
+			best = candidate
 		}
 	}
 
-	if len(candidates) == 1 {
-		return columnNameFromStructField(candidates[0]), true
+	if best != nil {
+		return best.column, true
 	}
 
 	return "", false

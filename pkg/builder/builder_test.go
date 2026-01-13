@@ -3,6 +3,7 @@ package builder_test
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	builder "github.com/sev-2/raiden/pkg/builder"
 	"github.com/sev-2/raiden/pkg/db"
 	"github.com/stretchr/testify/assert"
@@ -10,13 +11,24 @@ import (
 )
 
 type sampleModel struct {
-	Field string `json:"field"`
+	Field  string    `json:"field"`
+	Id     uuid.UUID `json:"id,omitempty" column:"name:id;type:uuid;primaryKey;nullable:false;default:gen_random_uuid()"`
+	UserId uuid.UUID `json:"user_id,omitempty" column:"name:user_id;type:uuid;nullable:false"`
+}
+
+func (s *sampleModel) GetIdColName() string {
+	return builder.ColOf(s, s.Id)
 }
 
 func TestColOfReturnsColumnName(t *testing.T) {
 	m := sampleModel{}
 	col := builder.ColOf(&m, &m.Field)
 	require.Equal(t, "field", col)
+}
+
+func TestColOfUuuidReturnsColumnName(t *testing.T) {
+	m := sampleModel{}
+	require.Equal(t, "id", m.GetIdColName())
 }
 
 func TestColOfPanicsWhenModelNotStructPointer(t *testing.T) {
