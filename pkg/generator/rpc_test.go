@@ -133,6 +133,119 @@ func TestExtractRpcTable(t *testing.T) {
 	assert.Equal(t, 1, len(scouter.Relation))
 }
 
+func TestExtractRpcTable_Complex(t *testing.T) {
+	definition := `
+	DECLARE
+		v_user_id UUID;
+		v_failed_attempts INTEGER;
+		v_banned_until TIMESTAMPTZ;
+		v_max_attempts INTEGER := 3;
+		v_lockout_duration INTERVAL := '15 minutes';
+	BEGIN
+		-- Extract user_id from event
+		v_user_id := (event->>'user_id')::UUID;
+
+		-- Get current lockout status
+		SELECT failed_attempts, banned_until
+		INTO v_failed_attempts, v_banned_until
+		FROM public.password_failed_verification_attempts
+		WHERE user_id = v_user_id;
+
+		-- Check if account is currently locked
+		IF v_banned_until IS NOT NULL AND NOW() < v_banned_until THEN
+			-- Account is locked, calculate remaining time
+			DECLARE
+				remaining_seconds INTEGER;
+				remaining_minutes INTEGER;
+			BEGIN
+				remaining_seconds := EXTRACT(EPOCH FROM (v_banned_until - NOW()))::INTEGER;
+				remaining_minutes := CEIL(remaining_seconds / 60.0)::INTEGER;
+				
+				RETURN jsonb_build_object(
+					'decision', 'reject',
+					'message', format('Account is locked. Please try again in %s minute(s).', remaining_minutes),
+					'should_logout_user', false
+				);
+			END;
+		END IF;
+
+		-- If password is valid, reset failed attempts
+		IF (event->>'valid')::BOOLEAN IS TRUE THEN
+			-- Reset failed attempts on successful login
+			DELETE FROM public.password_failed_verification_attempts
+			WHERE user_id = v_user_id;
+			
+			RETURN jsonb_build_object('decision', 'continue');
+		END IF;
+
+		-- Password is invalid, increment failed attempts
+		v_failed_attempts := COALESCE(v_failed_attempts, 0) + 1;
+
+		-- Check if max attempts exceeded
+		IF v_failed_attempts >= v_max_attempts THEN
+			-- Lock the account
+			v_banned_until := NOW() + v_lockout_duration;
+			
+			INSERT INTO public.password_failed_verification_attempts (
+				user_id,
+				failed_attempts,
+				last_failed_at,
+				banned_until,
+				updated_at
+			) VALUES (
+				v_user_id,
+				v_failed_attempts,
+				NOW(),
+				v_banned_until,
+				NOW()
+			)
+			ON CONFLICT (user_id) DO UPDATE SET
+				failed_attempts = v_failed_attempts,
+				last_failed_at = NOW(),
+				banned_until = v_banned_until,
+				updated_at = NOW();
+
+			RETURN jsonb_build_object(
+				'decision', 'reject',
+				'message', format('Too many failed attempts. Account locked for %s minutes.', 
+					EXTRACT(EPOCH FROM v_lockout_duration) / 60),
+				'should_logout_user', false
+			);
+		ELSE
+			-- Record failed attempt but don't lock yet
+			INSERT INTO public.password_failed_verification_attempts (
+				user_id,
+				failed_attempts,
+				last_failed_at,
+				updated_at
+			) VALUES (
+				v_user_id,
+				v_failed_attempts,
+				NOW(),
+				NOW()
+			)
+			ON CONFLICT (user_id) DO UPDATE SET
+				failed_attempts = v_failed_attempts,
+				last_failed_at = NOW(),
+				updated_at = NOW();
+
+			-- Let Supabase Auth return the default "Invalid credentials" error
+			RETURN jsonb_build_object('decision', 'continue');
+		END IF;
+	END;
+	`
+
+	_, mapTable, err := generator.ExtractRpcTable(definition)
+	assert.NoError(t, err)
+
+	assert.Len(t, mapTable, 1)
+	failedAttemptsTable, isExist := mapTable["password_failed_verification_attempts"]
+	assert.True(t, isExist)
+	assert.Equal(t, "password_failed_verification_attempts", failedAttemptsTable.Name)
+	assert.Equal(t, "", failedAttemptsTable.Alias)
+	assert.Len(t, failedAttemptsTable.Relation, 0)
+}
+
 func TestExtractRpcSingleTable(t *testing.T) {
 	definition := `
 	begin

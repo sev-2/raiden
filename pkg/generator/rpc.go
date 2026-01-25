@@ -429,19 +429,35 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 	// value false if command start with select or with
 	var readMode = true
 
+	var waitingExtractFrom bool
+	var skipNextFromIdentifier bool
 	for _, f := range dFields {
 		f = strings.TrimRight(f, ";")
 		k := strings.ToUpper(f)
 
+		if strings.HasPrefix(k, "EXTRACT") {
+			waitingExtractFrom = true
+		}
+
 		switch k {
-		case postgres.Create, postgres.Update, postgres.Delete, postgres.Alter, postgres.With:
+		case postgres.Create, postgres.Update, postgres.Delete, postgres.Insert, postgres.Alter, postgres.With:
 			readMode = false
 		case postgres.Select:
 			readMode = true
 		}
 
+		if waitingExtractFrom && k == postgres.From {
+			skipNextFromIdentifier = true
+			waitingExtractFrom = false
+		}
+
 		switch lastField {
 		case postgres.From:
+			if skipNextFromIdentifier {
+				skipNextFromIdentifier = false
+				lastField = k
+				continue
+			}
 			// stop condition
 			if postgres.IsReservedKeyword(k) {
 				mapResult[foundTable.Name] = foundTable
