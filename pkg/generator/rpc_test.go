@@ -45,6 +45,29 @@ func TestRpcExtractParam(t *testing.T) {
 	assert.Equal(t, raiden.RpcParamDataTypeVarcharAlias, param[1].Type)
 }
 
+func TestRpcExtractParam_ArrOfUUID(t *testing.T) {
+	fn := objects.Function{
+		Args: []objects.FunctionArg{
+			{
+				Mode:       "in",
+				Name:       "p_roadmap_ids",
+				TypeId:     1043,
+				HasDefault: true,
+			},
+		},
+		ArgumentTypes: "p_roadmap_ids uuid[] DEFAULT NULL::uuid[]",
+	}
+
+	param, usePrefix, err := generator.ExtractRpcParam(&fn)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(param))
+	assert.Equal(t, false, usePrefix)
+
+	assert.Equal(t, "p_roadmap_ids", param[0].Name)
+	assert.Equal(t, raiden.RpcParamDataTypeArrayOfUuid, param[0].Type)
+}
+
 func TestExtractRpcData(t *testing.T) {
 	fn := objects.Function{
 		Schema:   "public",
