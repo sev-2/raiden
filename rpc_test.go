@@ -279,6 +279,7 @@ func TestRpcParamToGoType(t *testing.T) {
 		{raiden.RpcParamDataTypeJSONB, "map[string]interface{}"},
 		{raiden.RpcParamDataTypeDate, "postgres.Date"},
 		{raiden.RpcParamDataTypePoint, "postgres.Point"},
+		{raiden.RpcParamDataTypeArrayOfUuid, "[]uuid.UUID"},
 		{raiden.RpcParamDataTypeArrayOfInteger, "[]int64"},
 		{raiden.RpcParamDataTypeArrayOfBigInt, "[]int64"},
 		{raiden.RpcParamDataTypeArrayOfReal, "[]float32"},
@@ -319,6 +320,7 @@ func TestGetValidRpcParamType(t *testing.T) {
 		{"text[]", false, raiden.RpcParamDataTypeArrayOfText, false},
 		{"varchar[]", false, raiden.RpcParamDataTypeArrayOfVarchar, false},
 		{"varchar[]", true, raiden.RpcParamDataTypeArrayOfVarcharAlias, false},
+		{"uuid[]", false, raiden.RpcParamDataTypeArrayOfUuid, false},
 	}
 
 	for _, tt := range tests {

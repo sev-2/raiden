@@ -650,7 +650,9 @@ func (r *ExtractRpcDataResult) GetParams(mapImports map[string]bool) (columns []
 			Tag:   fmt.Sprintf("json:%q column:%q", p.Name, rpcTag),
 		}
 
-		splitType := strings.Split(c.Type, ".")
+		typeDecl := c.Type
+		cleanType := strings.TrimLeft(typeDecl, "[]")
+		splitType := strings.Split(cleanType, ".")
 		if len(splitType) > 1 {
 			importPackage := splitType[0]
 			var importPackageName string
@@ -740,8 +742,18 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 				Tag:   fmt.Sprintf("json:%q column:%q", cName, rpcTag),
 			}
 
-			splitType := strings.Split(c.Type, ".")
+			typeDecl := c.Type
+			cleanType := strings.TrimLeft(typeDecl, "[]")
+			splitType := strings.Split(cleanType, ".")
+
 			if len(splitType) > 1 {
+				cleanType := strings.TrimLeft(typeDecl, "[]")
+				splitType := strings.Split(cleanType, ".")
+				if len(splitType) <= 1 {
+					returnColumns = append(returnColumns, c)
+					continue
+				}
+
 				importPackage := splitType[0]
 				var importPackageName string
 				switch importPackage {

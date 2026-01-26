@@ -44,6 +44,7 @@ const (
 	RpcParamDataTypeUuid                RpcParamDataType = "UUID"
 	RpcParamDataTypeDate                RpcParamDataType = "DATE"
 	RpcParamDataTypePoint               RpcParamDataType = "POINT"
+	RpcParamDataTypeArrayOfUuid         RpcParamDataType = "UUID[]"
 	RpcParamDataTypeArrayOfInteger      RpcParamDataType = "INTEGER[]"
 	RpcParamDataTypeArrayOfNumeric      RpcParamDataType = "NUMERIC[]"
 	RpcParamDataTypeArrayOfBigInt       RpcParamDataType = "BIGINT[]"
@@ -108,6 +109,8 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 		return "map[string]interface{}"
 	case RpcParamDataTypeUuid:
 		return "uuid.UUID"
+	case RpcParamDataTypeArrayOfUuid:
+		return "[]uuid.UUID"
 	case RpcParamDataTypeDate:
 		return "postgres.Date"
 	case RpcParamDataTypePoint:
@@ -184,6 +187,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 			return RpcParamDataTypeArrayOfVarcharAlias, nil
 		}
 		return RpcParamDataTypeArrayOfVarchar, nil
+	case RpcParamDataTypeArrayOfUuid:
+		return RpcParamDataTypeArrayOfUuid, nil
 	case RpcParamDataTypePoint:
 		return RpcParamDataTypePoint, nil
 	default:
