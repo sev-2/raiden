@@ -651,14 +651,9 @@ func (r *ExtractRpcDataResult) GetParams(mapImports map[string]bool) (columns []
 		}
 
 		typeDecl := c.Type
-		if strings.Contains(typeDecl, ".") {
-			cleanType := strings.TrimLeft(typeDecl, "[]")
-			splitType := strings.Split(cleanType, ".")
-			if len(splitType) <= 1 {
-				columns = append(columns, c)
-				continue
-			}
-
+		cleanType := strings.TrimLeft(typeDecl, "[]")
+		splitType := strings.Split(cleanType, ".")
+		if len(splitType) > 1 {
 			importPackage := splitType[0]
 			var importPackageName string
 			switch importPackage {
@@ -748,7 +743,10 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 			}
 
 			typeDecl := c.Type
-			if strings.Contains(typeDecl, ".") {
+			cleanType := strings.TrimLeft(typeDecl, "[]")
+			splitType := strings.Split(cleanType, ".")
+
+			if len(splitType) > 1 {
 				cleanType := strings.TrimLeft(typeDecl, "[]")
 				splitType := strings.Split(cleanType, ".")
 				if len(splitType) <= 1 {
