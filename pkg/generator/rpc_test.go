@@ -1154,16 +1154,16 @@ func TestExtractRpcTable_WithParenthesesInON(t *testing.T) {
 	assert.Contains(t, mapTable1, "table1", "table1 should be extracted")
 	assert.Contains(t, mapTable1, "table2", "table2 should be extracted - saved when encountering parenthesis")
 	// Note: table4 is the last table so it won't be in the result (existing parser behavior)
-	
+
 	// Verify aliases are registered - this proves mapTableOrAlias[foundTable.Alias] was set
 	table1 := mapTable1["table1"]
 	assert.NotNil(t, table1, "table1 should be in mapResult")
 	assert.Equal(t, "t1", table1.Alias, "alias should be saved")
-	
+
 	table2 := mapTable1["table2"]
 	assert.NotNil(t, table2, "table2 should be in mapResult")
 	assert.Equal(t, "t2", table2.Alias, "alias should be saved")
-	
+
 	// Verify the tables can be referenced by alias - proves mapTableOrAlias was populated correctly
 	// by checking that references using the alias don't cause "table X is not exist" errors
 	definition1b := `
@@ -1187,18 +1187,18 @@ func TestExtractRpcTable_WithParenthesesInON(t *testing.T) {
 	assert.Contains(t, mapTable2, "user_profiles", "user_profiles should be extracted")
 	assert.Contains(t, mapTable2, "master_orgs", "master_orgs should be extracted - saved when encountering parenthesis")
 	// Note: master_jobs is the last table so it won't be in the result
-	
+
 	// Verify mapResult entries have proper structure
 	userProfiles := mapTable2["user_profiles"]
 	assert.NotNil(t, userProfiles)
 	assert.Equal(t, "user_profiles", userProfiles.Name, "mapResult[foundTable.Name] should contain the table")
 	assert.Equal(t, "up", userProfiles.Alias, "foundTable.Alias should be set")
-	
+
 	masterOrgs := mapTable2["master_orgs"]
 	assert.NotNil(t, masterOrgs)
 	assert.Equal(t, "master_orgs", masterOrgs.Name)
 	assert.Equal(t, "mo", masterOrgs.Alias)
-	
+
 	// Test case 3: Consecutive JOINs after complex CASE - tests saving on new JOIN keyword
 	// This tests the code at line 489: if foundTable.Name != ""
 	definition3 := `
@@ -1213,17 +1213,17 @@ func TestExtractRpcTable_WithParenthesesInON(t *testing.T) {
 	assert.Contains(t, mapTable3, "table_b", "table_b should be extracted - saved when encountering parenthesis")
 	assert.Contains(t, mapTable3, "table_c", "table_c should be extracted - saved when encountering new LEFT JOIN")
 	// Note: table_d is the last table so it won't be in the result
-	
+
 	// Verify foundTable was reset to new RpcScannedTable{} after saving
 	// by checking that each table has the correct individual properties
 	tableA := mapTable3["table_a"]
 	tableB := mapTable3["table_b"]
 	tableC := mapTable3["table_c"]
-	
+
 	assert.Equal(t, "ta", tableA.Alias)
 	assert.Equal(t, "tb", tableB.Alias)
 	assert.Equal(t, "tc", tableC.Alias)
-	
+
 	// Each table should be a distinct object (proves foundTable was reset)
 	assert.NotEqual(t, tableA, tableB, "tables should be different objects")
 	assert.NotEqual(t, tableB, tableC, "tables should be different objects")
@@ -1237,42 +1237,42 @@ func TestExtractRpcTable_SaveTableOnNewJOIN(t *testing.T) {
 	// - mapTableOrAlias[foundTable.Name] = foundTable.Name
 	// - if foundTable.Alias != "" { mapTableOrAlias[foundTable.Alias] = foundTable.Name }
 	// - foundTable = &RpcScannedTable{}
-	
+
 	definition := `
 		FROM orders o
 		LEFT JOIN customers c ON c.id = o.customer_id
 		RIGHT JOIN products p ON p.id = o.product_id
 		INNER JOIN categories cat ON cat.id = p.category_id
 	`
-	
+
 	_, mapTable, err := generator.ExtractRpcTable(definition)
 	assert.NoError(t, err)
-	
+
 	// Tables should be extracted (except the last one which is current parser limitation)
 	assert.Contains(t, mapTable, "orders")
 	assert.Contains(t, mapTable, "customers")
 	assert.Contains(t, mapTable, "products")
 	// Note: categories is the last table so it won't be in the result (existing parser behavior)
-	
+
 	// Verify mapResult[foundTable.Name] was set correctly
 	orders := mapTable["orders"]
 	assert.NotNil(t, orders, "mapResult['orders'] should be set")
 	assert.Equal(t, "orders", orders.Name, "table name should be correct")
-	
+
 	customers := mapTable["customers"]
 	assert.NotNil(t, customers, "mapResult['customers'] should be set")
 	assert.Equal(t, "customers", customers.Name)
-	
+
 	products := mapTable["products"]
 	assert.NotNil(t, products, "mapResult['products'] should be set")
 	assert.Equal(t, "products", products.Name)
-	
+
 	// Verify foundTable.Alias was saved and can be used to reference tables
 	// This proves: mapTableOrAlias[foundTable.Alias] = foundTable.Name was executed
 	assert.Equal(t, "o", orders.Alias, "orders alias should be 'o'")
 	assert.Equal(t, "c", customers.Alias, "customers alias should be 'c'")
 	assert.Equal(t, "p", products.Alias, "products alias should be 'p'")
-	
+
 	// Test that aliases can be used to reference tables (proves mapTableOrAlias works)
 	definitionWithAliasRef := `
 		FROM orders o
@@ -1281,7 +1281,7 @@ func TestExtractRpcTable_SaveTableOnNewJOIN(t *testing.T) {
 	`
 	_, _, err = generator.ExtractRpcTable(definitionWithAliasRef)
 	assert.NoError(t, err, "Should not error when referencing tables by alias")
-	
+
 	// Verify each table is a distinct object (proves foundTable = &RpcScannedTable{} reset works)
 	assert.NotEqual(t, orders, customers, "orders and customers should be different objects")
 	assert.NotEqual(t, customers, products, "customers and products should be different objects")
@@ -1301,18 +1301,18 @@ func TestExtractRpcTable_ComplexCASEWithMultipleParens(t *testing.T) {
 		)
 		LEFT JOIN managers m ON m.employee_id = e.id
 	`
-	
+
 	_, mapTable, err := generator.ExtractRpcTable(definition)
 	assert.NoError(t, err)
-	
+
 	assert.Contains(t, mapTable, "employees")
 	assert.Contains(t, mapTable, "departments", "departments should be extracted - saved when encountering parenthesis in ON clause")
 	// Note: managers is the last table so it won't be in the result (existing parser behavior)
-	
+
 	// Verify that the table before CASE was saved correctly
 	assert.Equal(t, "e", mapTable["employees"].Alias)
 	assert.Equal(t, "d", mapTable["departments"].Alias)
-	
+
 	// Verify that references to saved tables work (no "table X is not exist" error)
 	// The fact that we didn't get an error means the fix is working
 }
@@ -1321,35 +1321,35 @@ func TestExtractRpcTable_LeftOuterSeparateTokens(t *testing.T) {
 	// This test specifically targets line 489: case postgres.Left, postgres.Right, postgres.Inner, postgres.Outer
 	// When lastField is "LEFT" and we encounter "OUTER", it should save any pending table
 	// In SQL "LEFT OUTER JOIN", the tokens are ["LEFT", "OUTER", "JOIN"]
-	
+
 	definition := `
 		SELECT *
 		FROM employees e
 		LEFT OUTER JOIN departments d ON d.id = e.dept_id
 		LEFT OUTER JOIN managers m ON m.dept_id = d.id
 	`
-	
+
 	_, mapTable, err := generator.ExtractRpcTable(definition)
 	assert.NoError(t, err)
-	
+
 	assert.Contains(t, mapTable, "employees")
 	assert.Contains(t, mapTable, "departments", "departments should be extracted")
 	// managers is the last table so it won't be in the result
-	
+
 	// Test with RIGHT OUTER JOIN as well
 	definition2 := `
 		FROM orders o
 		RIGHT OUTER JOIN products p ON p.id = o.product_id
 		INNER JOIN categories c ON c.id = p.category_id
 	`
-	
+
 	_, mapTable2, err := generator.ExtractRpcTable(definition2)
 	assert.NoError(t, err)
-	
+
 	assert.Contains(t, mapTable2, "orders")
 	assert.Contains(t, mapTable2, "products")
 	// categories is the last table so it won't be in the result
-	
+
 	// Test edge case: what if we have consecutive LEFT/RIGHT keywords?
 	// This might happen in malformed SQL or edge cases
 	definition3 := `
@@ -1363,7 +1363,7 @@ func TestExtractRpcTable_LeftOuterSeparateTokens(t *testing.T) {
 	} else {
 		t.Logf("Got error (expected for malformed SQL): %v", err)
 	}
-	
+
 	// Try another edge case: table name that looks like a JOIN keyword
 	// If we have schema.inner or column named "left", etc.
 	definition4 := `
@@ -1384,26 +1384,26 @@ func TestExtractRpcTable_EdgeCaseJOINWithTableBeforeKeyword(t *testing.T) {
 	// When we see the second "LEFT", lastField will transition from "LEFT JOIN" to default case (setting lastField="LEFT")
 	// Then when we see "OUTER", lastField="LEFT" and foundTable still has table1/t1
 	// This should trigger the save at line 489
-	
+
 	definition := `
 		FROM base b
 		LEFT JOIN table1 t1 LEFT OUTER JOIN table2 t2 ON t2.ref = t1.id
 	`
-	
+
 	_, mapTable, err := generator.ExtractRpcTable(definition)
-	
+
 	// Log results regardless of error
 	t.Logf("Result: %+v", mapTable)
 	t.Logf("Error: %v", err)
-	
+
 	// The code at line 489-495 should save table1 when we encounter "OUTER" after "LEFT"
 	// If it doesn't, we'll get "table t1 is not exist" error
 	// If it does, table1 should be in the map
-	
+
 	if err == nil {
 		assert.Contains(t, mapTable, "base", "base should be extracted")
 		assert.Contains(t, mapTable, "table1", "table1 should be extracted (saved by code at line 489-495)")
-		
+
 		// Verify the table was saved correctly
 		table1 := mapTable["table1"]
 		assert.NotNil(t, table1)

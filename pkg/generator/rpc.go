@@ -503,7 +503,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				lastField = k
 				continue
 			}
-			
+
 			// If we encounter a JOIN keyword (LEFT/RIGHT/INNER/OUTER), save current table first
 			if k == postgres.Left || k == postgres.Right || k == postgres.Inner || k == postgres.Outer {
 				if foundTable.Name != "" {
