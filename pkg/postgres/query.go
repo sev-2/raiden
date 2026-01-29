@@ -43,6 +43,7 @@ const (
 	Except    = "EXCEPT"
 	Asc       = "ASC"
 	Desc      = "DESC"
+	Is        = "IS"
 	IsNull    = "IS NULL"
 	IsNotNull = "IS NOT NULL"
 	End       = "END"
@@ -93,6 +94,7 @@ var ReservedKeywords = map[string]struct{}{
 	Except:    {},
 	Asc:       {},
 	Desc:      {},
+	Is:        {},
 	IsNull:    {},
 	IsNotNull: {},
 	End:       {},

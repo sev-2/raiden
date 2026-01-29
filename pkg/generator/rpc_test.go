@@ -269,6 +269,174 @@ func TestExtractRpcTable_Complex(t *testing.T) {
 	assert.Len(t, failedAttemptsTable.Relation, 0)
 }
 
+func TestExtractRpcTable_InClause(t *testing.T) {
+	definition := `
+		DECLARE
+		v_offset INT;
+		BEGIN
+		IF p_program_id IS NULL THEN
+			RAISE EXCEPTION 'p_program_id is required';
+		END IF;
+
+		v_offset := COALESCE(p_page, 0) * COALESCE(p_page_size, 10);
+
+		RETURN QUERY
+		WITH org_filtered_users AS (
+			SELECT DISTINCT ua.user_id
+			FROM user_attributes ua
+			WHERE ua.attribute_category = 'employee'
+			AND ua.attribute_key = 'organization'
+			AND (p_organization_id IS NULL OR ua.attribute_value = p_organization_id::TEXT)
+		),
+		dept_filtered_users AS (
+			SELECT DISTINCT ua.user_id
+			FROM user_attributes ua
+			WHERE ua.attribute_category = 'employee'
+			AND ua.attribute_key = 'department'
+			AND (p_department_id IS NULL OR ua.attribute_value = p_department_id::TEXT)
+		),
+		section_filtered_users AS (
+			SELECT DISTINCT ua.user_id
+			FROM user_attributes ua
+			WHERE ua.attribute_category = 'employee'
+			AND ua.attribute_key = 'section'
+			AND (p_section_id IS NULL OR ua.attribute_value = p_section_id::TEXT)
+		),
+		job_filtered_users AS (
+			SELECT DISTINCT ua.user_id
+			FROM user_attributes ua
+			WHERE ua.attribute_category = 'employee'
+			AND ua.attribute_key = 'job_position'
+			AND (
+				p_job_position_ids IS NULL
+				OR array_length(p_job_position_ids, 1) IS NULL
+				OR (
+				ua.attribute_value ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+				AND ua.attribute_value::UUID = ANY(p_job_position_ids)
+				)
+			)
+		),
+		grade_filtered_users AS (
+			SELECT DISTINCT ua.user_id
+			FROM user_attributes ua
+			WHERE ua.attribute_category = 'employee'
+			AND ua.attribute_key = 'job_level'
+			AND (
+				p_grade_ids IS NULL
+				OR array_length(p_grade_ids, 1) IS NULL
+				OR (
+				ua.attribute_value ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+				AND ua.attribute_value::UUID = ANY(p_grade_ids)
+				)
+			)
+		),
+		filtered_user_ids AS (
+			SELECT ofu.user_id
+			FROM org_filtered_users ofu
+			INNER JOIN dept_filtered_users dfu ON dfu.user_id = ofu.user_id
+			INNER JOIN section_filtered_users sfu ON sfu.user_id = ofu.user_id
+			INNER JOIN job_filtered_users jfu ON jfu.user_id = ofu.user_id
+			INNER JOIN grade_filtered_users gfu ON gfu.user_id = ofu.user_id
+			WHERE (
+			p_excluded_user_ids IS NULL
+			OR array_length(p_excluded_user_ids, 1) IS NULL
+			OR ofu.user_id != ALL(p_excluded_user_ids)
+			)
+		),
+		user_profiles_with_attrs AS (
+			SELECT 
+			up.id,
+			up.user_id,
+			up.name,
+			up.email,
+			up.nrp,
+			MAX(CASE WHEN ua.attribute_key = 'organization' THEN ua.attribute_value END) AS org_id,
+			MAX(CASE WHEN ua.attribute_key = 'department' THEN ua.attribute_value END) AS dept_id,
+			MAX(CASE WHEN ua.attribute_key = 'job_position' THEN ua.attribute_value END) AS job_id,
+			MAX(CASE WHEN ua.attribute_key = 'job_level' THEN ua.attribute_value END) AS grade_id
+			FROM user_profile up
+			INNER JOIN filtered_user_ids fui ON up.user_id = fui.user_id
+			LEFT JOIN user_attributes ua ON up.user_id = ua.user_id 
+			AND ua.attribute_category = 'employee'
+			AND ua.attribute_key IN ('organization', 'department', 'job_position', 'job_level')
+			WHERE (
+			p_search IS NULL
+			OR char_length(p_search) < 3
+			OR up.name ILIKE CONCAT('%', p_search, '%')
+			OR up.nrp ILIKE CONCAT('%', p_search, '%')
+			)
+			GROUP BY up.id, up.user_id, up.name, up.email, up.nrp
+		),
+		enriched_profiles AS (
+			SELECT 
+			upa.id,
+			upa.user_id,
+			upa.name,
+			upa.email,
+			upa.nrp,
+			COALESCE(mo.name, upa.org_id) AS organization,
+			COALESCE(mou.name, upa.dept_id) AS department,
+			COALESCE(mj.name, upa.job_id) AS job_position,
+			CASE 
+				WHEN mg.name IS NOT NULL THEN CONCAT(mg.name, ' (', COALESCE(mg.label, ''), ')')
+				ELSE upa.grade_id
+			END AS grade
+			FROM user_profiles_with_attrs upa
+			LEFT JOIN master_organizations mo 
+			ON upa.org_id IS NOT NULL
+			AND upa.org_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+			AND mo.id = upa.org_id::UUID
+			LEFT JOIN master_organization_units mou 
+			ON upa.dept_id IS NOT NULL 
+			AND upa.dept_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+			AND mou.id = upa.dept_id::UUID
+			LEFT JOIN master_job_positions mjp 
+			ON upa.job_id IS NOT NULL 
+			AND upa.job_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+			AND mjp.id = upa.job_id::UUID
+			LEFT JOIN master_jobs mj ON mjp.job_id = mj.id
+			LEFT JOIN master_job_position_grades mjpg 
+			ON upa.grade_id IS NOT NULL 
+			AND upa.grade_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+			AND mjpg.id = upa.grade_id::UUID
+			LEFT JOIN master_grades mg ON mjpg.grade_id = mg.id
+		),
+		counted_profiles AS (
+			SELECT ep.*, COUNT(*) OVER() AS total_count
+			FROM enriched_profiles ep
+		)
+		SELECT 
+			cp.id,
+			cp.user_id,
+			cp.name,
+			cp.email,
+			cp.nrp,
+			cp.organization,
+			cp.department,
+			cp.job_position,
+			cp.grade,
+			cp.total_count
+		FROM counted_profiles cp
+		ORDER BY cp.name ASC NULLS LAST
+		OFFSET v_offset
+		LIMIT p_page_size;
+		END;
+
+	`
+
+	_, mapTable, err := generator.ExtractRpcTable(definition)
+	assert.NoError(t, err)
+
+	// Should extract the main tables from the query
+	assert.Greater(t, len(mapTable), 0, "Should extract at least one table")
+
+	// Verify user_attributes table is extracted (it uses IN clause with attribute_key)
+	userAttrsTable, isExist := mapTable["user_attributes"]
+	assert.True(t, isExist, "user_attributes table should be extracted")
+	assert.NotNil(t, userAttrsTable)
+	assert.Equal(t, "user_attributes", userAttrsTable.Name)
+}
+
 func TestExtractRpcSingleTable(t *testing.T) {
 	definition := `
 	begin
