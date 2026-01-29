@@ -46,6 +46,10 @@ const (
 	Is        = "IS"
 	IsNull    = "IS NULL"
 	IsNotNull = "IS NOT NULL"
+	Case      = "CASE"
+	When      = "WHEN"
+	Then      = "THEN"
+	Else      = "ELSE"
 	End       = "END"
 	With      = "WITH"
 )
@@ -97,6 +101,10 @@ var ReservedKeywords = map[string]struct{}{
 	Is:        {},
 	IsNull:    {},
 	IsNotNull: {},
+	Case:      {},
+	When:      {},
+	Then:      {},
+	Else:      {},
 	End:       {},
 	With:      {},
 }
