@@ -1,0 +1,72 @@
+package rpc
+
+import (
+	"github.com/google/uuid"
+	"github.com/sev-2/raiden"
+	"testproject/internal/models"
+)
+
+type GetEligibleParticipantsParams struct {
+	PProgramId uuid.UUID `json:"p_program_id" column:"name:p_program_id;type:uuid"`
+	POrganizationId *uuid.UUID `json:"p_organization_id" column:"name:p_organization_id;type:uuid;default:NULL"`
+	PDepartmentId *uuid.UUID `json:"p_department_id" column:"name:p_department_id;type:uuid;default:NULL"`
+	PSectionId *uuid.UUID `json:"p_section_id" column:"name:p_section_id;type:uuid;default:NULL"`
+	PJobPositionIds []*uuid.UUID `json:"p_job_position_ids" column:"name:p_job_position_ids;type:uuid[];default:NULL"`
+	PGradeIds []*uuid.UUID `json:"p_grade_ids" column:"name:p_grade_ids;type:uuid[];default:NULL"`
+	PSearch *string `json:"p_search" column:"name:p_search;type:text;default:NULL"`
+	PExcludedUserIds []*uuid.UUID `json:"p_excluded_user_ids" column:"name:p_excluded_user_ids;type:uuid[];default:NULL"`
+	PPage *int64 `json:"p_page" column:"name:p_page;type:integer;default:0"`
+	PPageSize *int64 `json:"p_page_size" column:"name:p_page_size;type:integer;default:10"`
+}
+type GetEligibleParticipantsItem struct {
+	Id uuid.UUID `json:"id" column:"name:id;type:uuid"`
+	UserId uuid.UUID `json:"user_id" column:"name:user_id;type:uuid"`
+	Name string `json:"name" column:"name:name;type:text"`
+	Email string `json:"email" column:"name:email;type:text"`
+	Nrp string `json:"nrp" column:"name:nrp;type:text"`
+	Organization string `json:"organization" column:"name:organization;type:text"`
+	Department string `json:"department" column:"name:department;type:text"`
+	JobPosition string `json:"job_position" column:"name:job_position;type:text"`
+	Grade string `json:"grade" column:"name:grade;type:text"`
+	TotalCount int64 `json:"total_count" column:"name:total_count;type:bigint"`
+}
+
+type GetEligibleParticipantsResult []GetEligibleParticipantsItem
+
+type GetEligibleParticipants struct {
+	raiden.RpcBase
+	Params   *GetEligibleParticipantsParams `json:"-"`
+	Return   GetEligibleParticipantsResult `json:"-"`
+}
+
+func (r *GetEligibleParticipants) GetName() string {
+	return "get_eligible_participants"
+}
+
+func (r *GetEligibleParticipants) GetLanguage() string {
+	return "plpgsql"
+}
+
+func  (r *GetEligibleParticipants) UseParamPrefix() bool {
+	return false
+}
+
+func (r *GetEligibleParticipants) GetSecurity() raiden.RpcSecurityType {
+	return raiden.RpcSecurityTypeDefiner
+}
+
+func (r *GetEligibleParticipants) GetBehavior() raiden.RpcBehaviorType {
+	return raiden.RpcBehaviorStable
+}
+
+func (r *GetEligibleParticipants) GetReturnType() raiden.RpcReturnDataType {
+	return raiden.RpcReturnDataTypeTable
+}
+
+func (r *GetEligibleParticipants) BindModels() {
+	r.BindModel(models.CountedProfiles{}, "cp").BindModel(models.DeptFilteredUsers{}, "dfu").BindModel(models.EnrichedProfiles{}, "ep").BindModel(models.FilteredUserIds{}, "fui").BindModel(models.GradeFilteredUsers{}, "gfu").BindModel(models.JobFilteredUsers{}, "jfu").BindModel(models.MasterGrades{}, "mg").BindModel(models.MasterJobPositionGrades{}, "mjpg").BindModel(models.MasterJobPositions{}, "mjp").BindModel(models.MasterJobs{}, "mj").BindModel(models.MasterOrganizationUnits{}, "mou").BindModel(models.MasterOrganizations{}, "mo").BindModel(models.OrgFilteredUsers{}, "ofu").BindModel(models.SectionFilteredUsers{}, "sfu").BindModel(models.Unnest(PGradeIds){}, "u").BindModel(models.Unnest(PJobPositionIds){}, "un").BindModel(models.UserAttributes{}, "ua").BindModel(models.UserProfile{}, "up").BindModel(models.UserProfilesWithAttrs{}, "upa")
+}
+
+func (r *GetEligibleParticipants) GetRawDefinition() string {
+	return `DECLARE v_offset INT; BEGIN IF :p_program_id IS NULL THEN RAISE EXCEPTION ':p_program_id is required'; END IF; v_offset := COALESCE(:p_page, 0) * COALESCE(:p_page_size, 10); RETURN QUERY WITH :ofu AS ( SELECT DISTINCT ua.user_id FROM :ua ua WHERE ua.attribute_category = 'employee' AND ua.attribute_key = 'organization' AND (:p_organization_id IS NULL OR ua.attribute_value = :p_organization_id::TEXT) ), :dfu AS ( SELECT DISTINCT ua.user_id FROM :ua ua WHERE ua.attribute_category = 'employee' AND ua.attribute_key = 'department' AND (:p_department_id IS NULL OR ua.attribute_value = :p_department_id::TEXT) ), :sfu AS ( SELECT DISTINCT ua.user_id FROM :ua ua WHERE ua.attribute_category = 'employee' AND ua.attribute_key = 'section' AND (:p_section_id IS NULL OR ua.attribute_value = :p_section_id::TEXT) ), :jfu AS ( SELECT DISTINCT ua.user_id FROM :ua ua WHERE ua.attribute_category = 'employee' AND ua.attribute_key = 'job_position' AND ( :p_job_position_ids IS NULL OR array_length(:p_job_position_ids, 1) IS NULL OR ua.attribute_value = ANY(ARRAY(SELECT uuid::text FROM unnest(:p_job_position_ids) AS uuid)) ) ), :gfu AS ( SELECT DISTINCT ua.user_id FROM :ua ua WHERE ua.attribute_category = 'employee' AND ua.attribute_key = 'job_level' AND ( :p_grade_ids IS NULL OR array_length(:p_grade_ids, 1) IS NULL OR ua.attribute_value = ANY(ARRAY(SELECT uuid::text FROM unnest(:p_grade_ids) AS uuid)) ) ), :fui AS ( SELECT ofu.user_id FROM :ofu ofu INNER JOIN :dfu dfu ON dfu.user_id = ofu.user_id INNER JOIN :sfu sfu ON sfu.user_id = ofu.user_id INNER JOIN :jfu jfu ON jfu.user_id = ofu.user_id INNER JOIN :gfu gfu ON gfu.user_id = ofu.user_id WHERE ( :p_excluded_user_ids IS NULL OR array_length(:p_excluded_user_ids, 1) IS NULL OR ofu.user_id != ALL(:p_excluded_user_ids) ) ), :upa AS ( SELECT up.id, up.user_id, up.name, up.email, up.nrp, MAX(CASE WHEN ua.attribute_key = 'organization' THEN ua.attribute_value END) AS org_id, MAX(CASE WHEN ua.attribute_key = 'department' THEN ua.attribute_value END) AS dept_id, MAX(CASE WHEN ua.attribute_key = 'job_position' THEN ua.attribute_value END) AS job_id, MAX(CASE WHEN ua.attribute_key = 'job_level' THEN ua.attribute_value END) AS grade_id FROM :up up INNER JOIN :fui fui ON up.user_id = fui.user_id LEFT JOIN :ua ua ON up.user_id = ua.user_id AND ua.attribute_category = 'employee' AND ua.attribute_key IN ('organization', 'department', 'job_position', 'job_level') WHERE ( :p_search IS NULL OR char_length(:p_search) < 3 OR up.name ILIKE CONCAT('%', :p_search, '%') OR up.nrp ILIKE CONCAT('%', :p_search, '%') ) GROUP BY up.id, up.user_id, up.name, up.email, up.nrp ), :ep AS ( SELECT upa.id, upa.user_id, upa.name, upa.email, upa.nrp, COALESCE(mo.name, upa.org_id) AS organization, COALESCE(mou.name, upa.dept_id) AS department, COALESCE(mj.name, upa.job_id) AS job_position, CASE WHEN mg.name IS NOT NULL THEN CONCAT(mg.name, ' (', COALESCE(mg.label, ''), ')') ELSE upa.grade_id END AS grade FROM :upa upa LEFT JOIN :mo mo ON mo.id = ( CASE WHEN upa.org_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN upa.org_id::UUID ELSE NULL END ) LEFT JOIN :mou mou ON mou.id = ( CASE WHEN upa.dept_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN upa.dept_id::UUID ELSE NULL END ) LEFT JOIN :mjp mjp ON mjp.id = ( CASE WHEN upa.job_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN upa.job_id::UUID ELSE NULL END ) LEFT JOIN :mj mj ON mjp.job_id = mj.id LEFT JOIN :mjpg mjpg ON mjpg.id = ( CASE WHEN upa.grade_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN upa.grade_id::UUID ELSE NULL END ) LEFT JOIN :mg mg ON mjpg.grade_id = mg.id ), :cp AS ( SELECT ep.*, COUNT(*) OVER() AS total_count FROM :ep ep ) SELECT cp.id, cp.user_id, cp.name::text, cp.email::text, cp.nrp::text, cp.organization::text, cp.department::text, cp.job_position::text, cp.grade::text, cp.total_count FROM :cp cp ORDER BY cp.name ASC NULLS LAST OFFSET v_offset LIMIT :p_page_size; END;`
+}

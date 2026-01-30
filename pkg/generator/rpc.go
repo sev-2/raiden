@@ -609,13 +609,23 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 
 func RpcNormalizeTableAliases(mapTables map[string]*RpcScannedTable) error {
 	mapAlias := make(map[string]bool)
-	for _, v := range mapTables {
+
+	// Sort map keys to ensure deterministic alias assignment
+	keys := make([]string, 0, len(mapTables))
+	for k := range mapTables {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		v := mapTables[k]
 		if v.Alias != "" && v.Name != "" {
 			mapAlias[v.Alias] = true
 		}
 	}
 
-	for _, v := range mapTables {
+	for _, k := range keys {
+		v := mapTables[k]
 		if (v.Alias != "" && v.Name != "") || v.Name == "" {
 			continue
 		}
@@ -681,14 +691,29 @@ func (r *ExtractRpcDataResult) GetParams(mapImports map[string]bool) (columns []
 			return
 		}
 
+		// Determine if the type should be a pointer based on having a default value
+		goType := raiden.RpcParamToGoType(p.Type)
+		hasDefault := p.Default != nil
+
+		// Make it a pointer type if it has any default value
+		if hasDefault {
+			// For array types, make the element type a pointer
+			if strings.HasPrefix(goType, "[]") {
+				goType = "[]" + "*" + strings.TrimPrefix(goType, "[]")
+			} else {
+				goType = "*" + goType
+			}
+		}
+
 		c := RpcColumn{
 			Field: utils.SnakeCaseToPascalCase(p.Name),
-			Type:  raiden.RpcParamToGoType(p.Type),
+			Type:  goType,
 			Tag:   fmt.Sprintf("json:%q column:%q", p.Name, rpcTag),
 		}
 
 		typeDecl := c.Type
 		cleanType := strings.TrimLeft(typeDecl, "[]")
+		cleanType = strings.TrimLeft(cleanType, "*")
 		splitType := strings.Split(cleanType, ".")
 		if len(splitType) > 1 {
 			importPackage := splitType[0]
@@ -717,8 +742,16 @@ func (r *ExtractRpcDataResult) GetModelDecl() (modelDecl string) {
 		return
 	}
 
+	// Sort map keys to ensure deterministic output
+	keys := make([]string, 0, len(r.MapScannedTable))
+	for k := range r.MapScannedTable {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	var bindModelDeclArr []string
-	for _, v := range r.MapScannedTable {
+	for _, k := range keys {
+		v := r.MapScannedTable[k]
 		bindModelDeclArr = append(bindModelDeclArr, fmt.Sprintf("BindModel(models.%s{}, %q)", utils.SnakeCaseToPascalCase(v.Name), v.Alias))
 	}
 	return "r." + strings.Join(bindModelDeclArr, ".")
