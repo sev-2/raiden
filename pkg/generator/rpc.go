@@ -485,12 +485,35 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				foundTable.Alias = f
 			}
 		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right:
+			// Save any pending table before starting a new JOIN
+			if foundTable.Name != "" {
+				mapResult[foundTable.Name] = foundTable
+				mapTableOrAlias[foundTable.Name] = foundTable.Name
+				if foundTable.Alias != "" {
+					mapTableOrAlias[foundTable.Alias] = foundTable.Name
+				}
+				foundTable = &RpcScannedTable{}
+			}
 			if k == postgres.Join {
 				lastField += " " + postgres.Join
 				continue
 			}
 		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin:
 			if k == postgres.On || postgres.IsReservedSymbol(f) || k[0] == '(' || k[0] == ')' {
+				lastField = k
+				continue
+			}
+
+			// If we encounter a JOIN keyword (LEFT/RIGHT/INNER/OUTER), save current table first
+			if k == postgres.Left || k == postgres.Right || k == postgres.Inner || k == postgres.Outer {
+				if foundTable.Name != "" {
+					mapResult[foundTable.Name] = foundTable
+					mapTableOrAlias[foundTable.Name] = foundTable.Name
+					if foundTable.Alias != "" {
+						mapTableOrAlias[foundTable.Alias] = foundTable.Name
+					}
+					foundTable = &RpcScannedTable{}
+				}
 				lastField = k
 				continue
 			}
@@ -506,7 +529,21 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				foundTable.Alias = f
 			}
 		case postgres.On:
-			if !readMode || k[0] == '(' || k[0] == ')' {
+			if k[0] == '(' || k[0] == ')' {
+				// When encountering parentheses in ON clause, save current table first
+				if foundTable.Name != "" {
+					mapResult[foundTable.Name] = foundTable
+					mapTableOrAlias[foundTable.Name] = foundTable.Name
+					if foundTable.Alias != "" {
+						mapTableOrAlias[foundTable.Alias] = foundTable.Name
+					}
+					foundTable = &RpcScannedTable{}
+				}
+				lastField = k
+				continue
+			}
+
+			if !readMode {
 				lastField = k
 				continue
 			}
