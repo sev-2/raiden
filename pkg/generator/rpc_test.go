@@ -1062,9 +1062,9 @@ func TestGetParams_WithImports(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, columns, 2)
 
-	// Check that imports were added for time and uuid packages
-	// Timestamp maps to time.Time and Uuid maps to uuid.UUID, both trigger imports
-	assert.True(t, importsMap[`"time"`])
+	// Check that imports were added for postgres and uuid packages
+	// Timestamp maps to postgres.DateTime and Uuid maps to uuid.UUID, both trigger imports
+	assert.True(t, importsMap[`"github.com/sev-2/raiden/pkg/postgres"`])
 	assert.True(t, importsMap[`"github.com/google/uuid"`])
 }
 
@@ -1700,7 +1700,7 @@ func TestGetParams_Comprehensive(t *testing.T) {
 				},
 				{
 					Name: "timestamp_field",
-					Type: raiden.RpcParamDataTypeTimestamp, // Maps to time.Time, has dot
+					Type: raiden.RpcParamDataTypeTimestamp, // Maps to postgres.DateTime, has dot
 				},
 				{
 					Name: "uuid_field",
@@ -1719,7 +1719,7 @@ func TestGetParams_Comprehensive(t *testing.T) {
 	assert.Len(t, columns, 3)
 
 	// Verify imports were added for types with dots
-	assert.True(t, importsMap[`"time"`])
+	assert.True(t, importsMap[`"github.com/sev-2/raiden/pkg/postgres"`])
 	assert.True(t, importsMap[`"github.com/google/uuid"`])
 	// String type doesn't have dots, so no special import processing for it
 }

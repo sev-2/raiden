@@ -105,7 +105,7 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 	case RpcParamDataTypeBytea:
 		return "[]byte"
 	case RpcParamDataTypeTimestamp, RpcParamDataTypeTimestampTZ, RpcParamDataTypeTimestampAlias, RpcParamDataTypeTimestampTZAlias:
-		return "time.Time"
+		return "postgres.DateTime"
 	case RpcParamDataTypeJSON, RpcParamDataTypeJSONB:
 		return "map[string]interface{}"
 	case RpcParamDataTypeUuid:
@@ -212,7 +212,7 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 	case RpcReturnDataTypeBytea:
 		return "[]byte"
 	case RpcReturnDataTypeTimestamp, RpcReturnDataTypeTimestampTZ:
-		return "time.Time"
+		return "postgres.DateTime"
 	case RpcReturnDataTypeJSON, RpcReturnDataTypeJSONB:
 		return "map[string]interface{}"
 	case RpcReturnDataTypeDate:
