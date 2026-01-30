@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/mock"
 	"github.com/stretchr/testify/assert"
@@ -665,4 +666,129 @@ func TestExecuteRpc_IncludesNonNilOptionalParameters(t *testing.T) {
 	assert.True(t, ok)
 	assert.Len(t, result, 1)
 	assert.Equal(t, int64(2), result[0].Id)
+}
+
+// Test RPC with UUID parameters
+type GetUserByIdParams struct {
+	UserId           uuid.UUID  `json:"user_id" column:"name:user_id;type:uuid"`
+	OptionalOrgId    uuid.UUID  `json:"optional_org_id" column:"name:optional_org_id;type:uuid;default:NULL"`
+	OptionalPtrOrgId *uuid.UUID `json:"optional_ptr_org_id" column:"name:optional_ptr_org_id;type:uuid;default:NULL"`
+}
+
+type GetUserByIdItem struct {
+	Id   uuid.UUID `json:"id" column:"name:id;type:uuid"`
+	Name string    `json:"name" column:"name:name;type:text"`
+}
+
+type GetUserByIdResult []GetUserByIdItem
+
+type GetUserById struct {
+	raiden.RpcBase
+	Params *GetUserByIdParams  `json:"-"`
+	Return GetUserByIdResult   `json:"-"`
+}
+
+func (r *GetUserById) GetName() string {
+	return "get_user_by_id"
+}
+
+func (r *GetUserById) GetLanguange() string {
+	return "plpgsql"
+}
+
+func (r *GetUserById) GetSchema() string {
+	return "public"
+}
+
+func (r *GetUserById) GetReturnType() raiden.RpcReturnDataType {
+	return raiden.RpcReturnDataTypeTable
+}
+
+func TestExecuteRpc_SkipsZeroUUID(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:  raiden.DeploymentTargetCloud,
+				SupabasePublicUrl: "http://supabase.test.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+	}
+
+	mockSb := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mockSb.Activate()
+	defer mockSb.Deactivate()
+
+	testUserId := uuid.New()
+	expectedResult := GetUserByIdResult{
+		{Id: testUserId, Name: "John"},
+	}
+
+	err := mockSb.MockExecuteRpcWithExpectedResponse(200, "get_user_by_id", expectedResult)
+	assert.NoError(t, err)
+
+	// Test with zero UUID values that have defaults - they should be skipped
+	rpc := &GetUserById{
+		Params: &GetUserByIdParams{
+			UserId:           testUserId,  // Required, non-zero
+			OptionalOrgId:    uuid.Nil,    // Zero UUID with default - should be skipped
+			OptionalPtrOrgId: nil,         // Nil pointer with default - should be skipped
+		},
+	}
+
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+
+	result, ok := res.(GetUserByIdResult)
+	assert.True(t, ok)
+	assert.Len(t, result, 1)
+	assert.Equal(t, testUserId, result[0].Id)
+}
+
+func TestExecuteRpc_IncludesNonZeroUUID(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:  raiden.DeploymentTargetCloud,
+				SupabasePublicUrl: "http://supabase.test.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+	}
+
+	mockSb := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mockSb.Activate()
+	defer mockSb.Deactivate()
+
+	testUserId := uuid.New()
+	testOrgId := uuid.New()
+	expectedResult := GetUserByIdResult{
+		{Id: testUserId, Name: "Jane"},
+	}
+
+	err := mockSb.MockExecuteRpcWithExpectedResponse(200, "get_user_by_id", expectedResult)
+	assert.NoError(t, err)
+
+	// Test with non-zero UUID values - they should be included
+	rpc := &GetUserById{
+		Params: &GetUserByIdParams{
+			UserId:           testUserId, // Required
+			OptionalOrgId:    testOrgId,  // Non-zero UUID - should be included
+			OptionalPtrOrgId: &testOrgId, // Non-nil pointer - should be included
+		},
+	}
+
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+
+	result, ok := res.(GetUserByIdResult)
+	assert.True(t, ok)
+	assert.Len(t, result, 1)
+	assert.Equal(t, testUserId, result[0].Id)
 }
