@@ -1,0 +1,36 @@
+package rpc
+
+import (
+	"github.com/sev-2/raiden"
+)
+
+type SayHelloParams struct {
+	Name string `json:"name" column:"name:name;type:text"`
+}
+type SayHelloResult string
+
+type SayHello struct {
+	raiden.RpcBase
+	Params   *SayHelloParams `json:"-"`
+	Return   SayHelloResult `json:"-"`
+}
+
+func (r *SayHello) GetName() string {
+	return "say_hello"
+}
+
+func (r *SayHello) GetLanguage() string {
+	return "sql"
+}
+
+func  (r *SayHello) UseParamPrefix() bool {
+	return false
+}
+
+func (r *SayHello) GetReturnType() raiden.RpcReturnDataType {
+	return raiden.RpcReturnDataTypeText
+}
+
+func (r *SayHello) GetRawDefinition() string {
+	return `select :name as greeting;`
+}
