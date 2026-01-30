@@ -609,14 +609,14 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 
 func RpcNormalizeTableAliases(mapTables map[string]*RpcScannedTable) error {
 	mapAlias := make(map[string]bool)
-	
+
 	// Sort map keys to ensure deterministic alias assignment
 	keys := make([]string, 0, len(mapTables))
 	for k := range mapTables {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	
+
 	for _, k := range keys {
 		v := mapTables[k]
 		if v.Alias != "" && v.Name != "" {
@@ -694,7 +694,7 @@ func (r *ExtractRpcDataResult) GetParams(mapImports map[string]bool) (columns []
 		// Determine if the type should be a pointer based on having a default value
 		goType := raiden.RpcParamToGoType(p.Type)
 		hasDefault := p.Default != nil
-		
+
 		// Make it a pointer type if it has any default value
 		if hasDefault {
 			// For array types, make the element type a pointer

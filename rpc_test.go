@@ -652,9 +652,9 @@ func TestExecuteRpc_IncludesNonNilOptionalParameters(t *testing.T) {
 	rpc := &GetUsersWithFilters{
 		Params: &GetUsersWithFiltersParams{
 			RequiredName: "test_user",
-			OptionalAge:  &age,                 // Should be included
-			OptionalCity: &city,                // Should be included
-			OptionalIds:  []int64{1, 2, 3},     // Should be included
+			OptionalAge:  &age,             // Should be included
+			OptionalCity: &city,            // Should be included
+			OptionalIds:  []int64{1, 2, 3}, // Should be included
 		},
 	}
 
@@ -684,8 +684,8 @@ type GetUserByIdResult []GetUserByIdItem
 
 type GetUserById struct {
 	raiden.RpcBase
-	Params *GetUserByIdParams  `json:"-"`
-	Return GetUserByIdResult   `json:"-"`
+	Params *GetUserByIdParams `json:"-"`
+	Return GetUserByIdResult  `json:"-"`
 }
 
 func (r *GetUserById) GetName() string {
@@ -732,9 +732,9 @@ func TestExecuteRpc_SkipsZeroUUID(t *testing.T) {
 	// Test with zero UUID values that have defaults - they should be skipped
 	rpc := &GetUserById{
 		Params: &GetUserByIdParams{
-			UserId:           testUserId,  // Required, non-zero
-			OptionalOrgId:    uuid.Nil,    // Zero UUID with default - should be skipped
-			OptionalPtrOrgId: nil,         // Nil pointer with default - should be skipped
+			UserId:           testUserId, // Required, non-zero
+			OptionalOrgId:    uuid.Nil,   // Zero UUID with default - should be skipped
+			OptionalPtrOrgId: nil,        // Nil pointer with default - should be skipped
 		},
 	}
 
