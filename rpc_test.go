@@ -538,3 +538,131 @@ func TestOrderedMap_MarshalJSONOrder(t *testing.T) {
 		lastIndex = index
 	}
 }
+
+// Test RPC with optional parameters (pointer types)
+type GetUsersWithFiltersParams struct {
+	RequiredName string  `json:"required_name" column:"name:required_name;type:text"`
+	OptionalAge  *int64  `json:"optional_age" column:"name:optional_age;type:integer;default:0"`
+	OptionalCity *string `json:"optional_city" column:"name:optional_city;type:text;default:NULL"`
+	OptionalIds  []int64 `json:"optional_ids" column:"name:optional_ids;type:integer[];default:NULL"`
+}
+
+type GetUsersWithFiltersItem struct {
+	Id   int64  `json:"id" column:"name:id;type:integer"`
+	Name string `json:"name" column:"name:name;type:text"`
+}
+
+type GetUsersWithFiltersResult []GetUsersWithFiltersItem
+
+type GetUsersWithFilters struct {
+	raiden.RpcBase
+	Params *GetUsersWithFiltersParams `json:"-"`
+	Return GetUsersWithFiltersResult  `json:"-"`
+}
+
+func (r *GetUsersWithFilters) GetName() string {
+	return "get_users_with_filters"
+}
+
+func (r *GetUsersWithFilters) GetLanguange() string {
+	return "plpgsql"
+}
+
+func (r *GetUsersWithFilters) GetSchema() string {
+	return "public"
+}
+
+func (r *GetUsersWithFilters) GetReturnType() raiden.RpcReturnDataType {
+	return raiden.RpcReturnDataTypeTable
+}
+
+func TestExecuteRpc_SkipsNilParameters(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:  raiden.DeploymentTargetCloud,
+				SupabasePublicUrl: "http://supabase.test.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+	}
+
+	mockSb := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mockSb.Activate()
+	defer mockSb.Deactivate()
+
+	// Mock the expected response
+	expectedResult := GetUsersWithFiltersResult{
+		{Id: 1, Name: "John"},
+	}
+
+	err := mockSb.MockExecuteRpcWithExpectedResponse(200, "get_users_with_filters", expectedResult)
+	assert.NoError(t, err)
+
+	// Test with only required parameter (all optional params are nil)
+	rpc := &GetUsersWithFilters{
+		Params: &GetUsersWithFiltersParams{
+			RequiredName: "test_user",
+			OptionalAge:  nil, // Should be skipped
+			OptionalCity: nil, // Should be skipped
+			OptionalIds:  nil, // Should be skipped
+		},
+	}
+
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+
+	result, ok := res.(GetUsersWithFiltersResult)
+	assert.True(t, ok)
+	assert.Len(t, result, 1)
+	assert.Equal(t, int64(1), result[0].Id)
+}
+
+func TestExecuteRpc_IncludesNonNilOptionalParameters(t *testing.T) {
+	mockCtx := &mock.MockContext{
+		ConfigFn: func() *raiden.Config {
+			return &raiden.Config{
+				DeploymentTarget:  raiden.DeploymentTargetCloud,
+				SupabasePublicUrl: "http://supabase.test.com",
+			}
+		},
+		RequestContextFn: func() *fasthttp.RequestCtx {
+			return &fasthttp.RequestCtx{}
+		},
+	}
+
+	mockSb := mock.MockSupabase{Cfg: mockCtx.Config()}
+	mockSb.Activate()
+	defer mockSb.Deactivate()
+
+	expectedResult := GetUsersWithFiltersResult{
+		{Id: 2, Name: "Jane"},
+	}
+
+	err := mockSb.MockExecuteRpcWithExpectedResponse(200, "get_users_with_filters", expectedResult)
+	assert.NoError(t, err)
+
+	// Test with optional parameters set
+	age := int64(30)
+	city := "NYC"
+	rpc := &GetUsersWithFilters{
+		Params: &GetUsersWithFiltersParams{
+			RequiredName: "test_user",
+			OptionalAge:  &age,                 // Should be included
+			OptionalCity: &city,                // Should be included
+			OptionalIds:  []int64{1, 2, 3},     // Should be included
+		},
+	}
+
+	res, err := raiden.ExecuteRpc(mockCtx, rpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+
+	result, ok := res.(GetUsersWithFiltersResult)
+	assert.True(t, ok)
+	assert.Len(t, result, 1)
+	assert.Equal(t, int64(2), result[0].Id)
+}

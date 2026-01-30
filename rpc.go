@@ -993,6 +993,14 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 		if paramValue.IsValid() {
 			fieldType, fieldValue := paramsType.Field(i), paramValue.Field(i)
 
+			// Skip nil pointer values and zero values for slices
+			if fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+				continue
+			}
+			if fieldValue.Kind() == reflect.Slice && fieldValue.IsNil() {
+				continue
+			}
+
 			key := ""
 			columnTagStr := fieldType.Tag.Get("column")
 			if len(columnTagStr) >= 0 {
