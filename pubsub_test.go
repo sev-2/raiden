@@ -3,13 +3,16 @@ package raiden_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/mock"
-	googlepubsub "github.com/sev-2/raiden/pkg/pubsub/google"
+	google "github.com/sev-2/raiden/pkg/pubsub/google"
+	supabasepubsub "github.com/sev-2/raiden/pkg/pubsub/supabase"
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -81,7 +84,7 @@ func TestGooglePubSubProvider_Publish(t *testing.T) {
 	mockClient := &mock.MockPubSubClient{
 		Topics: map[string]*mock.MockTopic{
 			"test-topic": {
-				PublishFn: func(ctx context.Context, msg *pubsub.Message) googlepubsub.PublishResult {
+				PublishFn: func(ctx context.Context, msg *pubsub.Message) google.PublishResult {
 					return &mock.MockPublishResult{Result: "mock-server-id", Err: nil}
 				},
 			},
@@ -90,8 +93,8 @@ func TestGooglePubSubProvider_Publish(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Provider: &googlepubsub.Provider{
-			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
 			Client: mockClient,
 		},
 	}
@@ -106,7 +109,7 @@ func TestGooglePubSubProvider_PublishWithSpan(t *testing.T) {
 	mockClient := &mock.MockPubSubClient{
 		Topics: map[string]*mock.MockTopic{
 			"test-topic": {
-				PublishFn: func(ctx context.Context, msg *pubsub.Message) googlepubsub.PublishResult {
+				PublishFn: func(ctx context.Context, msg *pubsub.Message) google.PublishResult {
 					return &mock.MockPublishResult{Result: "mock-server-id", Err: nil}
 				},
 			},
@@ -115,8 +118,8 @@ func TestGooglePubSubProvider_PublishWithSpan(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Provider: &googlepubsub.Provider{
-			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
 			Client: mockClient,
 		},
 	}
@@ -172,8 +175,8 @@ func TestGooglePubSubProvider_StartListen(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Provider: &googlepubsub.Provider{
-			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
 			Client: mockClient,
 		},
 	}
@@ -215,8 +218,8 @@ func TestGooglePubSubProvider_StartListenErr(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Provider: &googlepubsub.Provider{
-			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
 			Client: mockClient,
 		},
 	}
@@ -252,8 +255,8 @@ func TestGooglePubSubProvider_StartListenErrCancel(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Provider: &googlepubsub.Provider{
-			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
 			Client: mockClient,
 		},
 	}
@@ -299,8 +302,8 @@ func TestGooglePubSubProvider_StartListenWithTrace(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Provider: &googlepubsub.Provider{
-			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
 			Client: mockClient,
 			Tracer: &mock.MockTracer{},
 		},
@@ -325,8 +328,8 @@ func TestGooglePubSubProvider_StopLister(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Provider: &googlepubsub.Provider{
-			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
 			Client: mockClient,
 		},
 	}
@@ -474,6 +477,264 @@ func TestSupabaseRealtimeProvider_HandlerRegistration(t *testing.T) {
 	assert.Equal(t, 1, mgr.GetHandlerCount())
 	assert.Equal(t, raiden.PubSubProviderSupabase, mgr.Handlers()[0].Provider())
 	assert.Equal(t, raiden.RealtimeChannelBroadcast, mgr.Handlers()[0].ChannelType())
+}
+
+// ----- SubscriberBase Default Tests -----
+
+func TestSubscriberBase_AllDefaults(t *testing.T) {
+	base := &raiden.SubscriberBase{}
+	assert.Equal(t, raiden.PubSubProviderUnknown, base.Provider())
+	assert.Equal(t, "", base.PushEndpoint())
+	assert.Equal(t, "", base.Topic())
+	assert.Equal(t, true, base.AutoAck())
+	assert.Equal(t, "unknown", base.Name())
+	assert.Equal(t, raiden.SubscriptionTypePull, base.SubscriptionType())
+	assert.Equal(t, "", base.Subscription())
+	assert.Equal(t, raiden.RealtimeChannelType(""), base.ChannelType())
+	assert.Equal(t, "public", base.Schema())
+	assert.Equal(t, "", base.Table())
+	assert.Equal(t, "*", base.EventFilter())
+	assert.Error(t, base.Consume(nil, raiden.SubscriberMessage{}))
+}
+
+// ----- PubSubManager.Serve missing branch tests -----
+
+func TestPubSubManager_Serve_NotPush(t *testing.T) {
+	mgr := &raiden.PubSubManager{}
+	mgr.SetConfig(loadConfig())
+	mgr.SetProvider(raiden.PubSubProviderGoogle, &mock.MockProvider{})
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:             "test",
+		ProviderValue:         raiden.PubSubProviderGoogle,
+		SubscriptionTypeValue: raiden.SubscriptionTypePull,
+	}
+
+	_, err := mgr.Serve(handler)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not push subscription")
+}
+
+func TestPubSubManager_Serve_UnknownProvider(t *testing.T) {
+	mgr := &raiden.PubSubManager{}
+	mgr.SetConfig(loadConfig())
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:             "test",
+		ProviderValue:         raiden.PubSubProviderType("nonexistent"),
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+	}
+
+	_, err := mgr.Serve(handler)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported pubsub provider")
+}
+
+// ----- Legacy Adapter Full Coverage -----
+
+func TestWrapLegacySubscriber_AllMethods(t *testing.T) {
+	legacy := &legacyHandler{}
+	wrapped := raiden.WrapLegacySubscriber(legacy)
+
+	assert.Equal(t, true, wrapped.AutoAck())
+	assert.Equal(t, raiden.RealtimeChannelType(""), wrapped.ChannelType())
+	assert.Equal(t, "*", wrapped.EventFilter())
+	assert.Equal(t, "legacy-test", wrapped.Name())
+	assert.Equal(t, raiden.PubSubProviderGoogle, wrapped.Provider())
+	assert.Equal(t, "", wrapped.PushEndpoint())
+	assert.Equal(t, "public", wrapped.Schema())
+	assert.Equal(t, "legacy-sub", wrapped.Subscription())
+	assert.Equal(t, raiden.SubscriptionTypePull, wrapped.SubscriptionType())
+	assert.Equal(t, "", wrapped.Table())
+	assert.Equal(t, "", wrapped.Topic())
+}
+
+// ----- SupabaseRealtimeProvider Adapter Direct Tests -----
+
+func TestSupabaseRealtimeProvider_CreateSubscription(t *testing.T) {
+	adapter := &raiden.SupabaseRealtimeProvider{
+		Config:   loadConfig(),
+		Provider: &supabasepubsub.Provider{},
+	}
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:  "test-sub",
+		TopicValue: "test-topic",
+	}
+
+	err := adapter.CreateSubscription(handler)
+	assert.NoError(t, err)
+}
+
+func TestSupabaseRealtimeProvider_StopListen(t *testing.T) {
+	adapter := &raiden.SupabaseRealtimeProvider{
+		Config:   loadConfig(),
+		Provider: &supabasepubsub.Provider{},
+	}
+
+	err := adapter.StopListen()
+	assert.NoError(t, err)
+}
+
+func TestSupabaseRealtimeProvider_StartListen(t *testing.T) {
+	adapter := &raiden.SupabaseRealtimeProvider{
+		Config: loadConfig(),
+		Provider: &supabasepubsub.Provider{
+			Config: &supabasepubsub.ProviderConfig{
+				SupabasePublicUrl: "https://test.supabase.co",
+				AnonKey:           "test-key",
+				ProjectId:         "test-project",
+			},
+			Dialer: &mockDialer{err: fmt.Errorf("dial failed")},
+		},
+	}
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:             "test-handler",
+		TopicValue:            "test-room",
+		ChannelTypeValue:      raiden.RealtimeChannelBroadcast,
+		SchemaValue:           "public",
+		TableValue:            "",
+		EventFilterValue:      "*",
+		SubscriptionTypeValue: raiden.SubscriptionTypePull,
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+			return nil
+		},
+	}
+
+	// StartListen will fail at connect because dialer returns error
+	err := adapter.StartListen([]raiden.SubscriberHandler{handler})
+	assert.Error(t, err)
+}
+
+// Mock Dialer for Supabase adapter tests
+type mockDialer struct {
+	conn supabasepubsub.WebSocketConn
+	err  error
+}
+
+func (m *mockDialer) Dial(url string) (supabasepubsub.WebSocketConn, error) {
+	return m.conn, m.err
+}
+
+// ----- Google Provider Adapter Tests -----
+
+func TestGooglePubSubProvider_CreateSubscription_NotPush(t *testing.T) {
+	provider := &raiden.GooglePubSubProvider{
+		Config: &raiden.Config{GoogleProjectId: "test-project"},
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project"},
+		},
+	}
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:             "test",
+		SubscriptionTypeValue: raiden.SubscriptionTypePull,
+	}
+
+	err := provider.CreateSubscription(handler)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not push subscription")
+}
+
+func TestGooglePubSubProvider_Serve(t *testing.T) {
+	mockClient := &mock.MockPubSubClient{
+		CreateSubscriptionFn: func(ctx context.Context, id string, cfg pubsub.SubscriptionConfig) (google.Subscription, error) {
+			return &mock.MockSubscription{Id: id}, nil
+		},
+		Topics: map[string]*mock.MockTopic{
+			"test-topic": {
+				PublishFn: func(ctx context.Context, msg *pubsub.Message) google.PublishResult {
+					return &mock.MockPublishResult{Result: "ok", Err: nil}
+				},
+			},
+		},
+	}
+
+	config := &raiden.Config{GoogleProjectId: "test-project", ServerDns: "http://localhost"}
+	provider := &raiden.GooglePubSubProvider{
+		Config: config,
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project"},
+			Client: mockClient,
+		},
+	}
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:             "test-handler",
+		TopicValue:            "test-topic",
+		SubscriptionValue:     "test-sub",
+		PushEndpointValue:     "/webhook",
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+			return nil
+		},
+	}
+
+	httpHandler, err := provider.Serve(config, handler)
+	assert.NoError(t, err)
+	assert.NotNil(t, httpHandler)
+
+	// Test with valid JSON body
+	reqCtx := &fasthttp.RequestCtx{}
+	reqCtx.Request.SetBodyString(`{"message":{"data":"dGVzdA==","message_id":"123","publish_time":"2026-01-01"},"subscription":"projects/test-project/subscriptions/test-sub"}`)
+	httpHandler(reqCtx)
+	assert.Equal(t, fasthttp.StatusOK, reqCtx.Response.StatusCode())
+
+	// Test with invalid JSON body
+	reqCtx2 := &fasthttp.RequestCtx{}
+	reqCtx2.Request.SetBodyString(`not json`)
+	httpHandler(reqCtx2)
+	assert.Contains(t, string(reqCtx2.Response.Body()), "invalid json data")
+
+	// Test with wrong subscription
+	reqCtx3 := &fasthttp.RequestCtx{}
+	reqCtx3.Request.SetBodyString(`{"message":{"data":"test"},"subscription":"wrong-sub"}`)
+	httpHandler(reqCtx3)
+	assert.Equal(t, fasthttp.StatusUnprocessableEntity, reqCtx3.Response.StatusCode())
+}
+
+func TestGooglePubSubProvider_Serve_ConsumeError(t *testing.T) {
+	mockClient := &mock.MockPubSubClient{
+		CreateSubscriptionFn: func(ctx context.Context, id string, cfg pubsub.SubscriptionConfig) (google.Subscription, error) {
+			return &mock.MockSubscription{Id: id}, nil
+		},
+		Topics: map[string]*mock.MockTopic{
+			"test-topic": {
+				PublishFn: func(ctx context.Context, msg *pubsub.Message) google.PublishResult {
+					return &mock.MockPublishResult{Result: "ok", Err: nil}
+				},
+			},
+		},
+	}
+
+	config := &raiden.Config{GoogleProjectId: "test-project", ServerDns: "http://localhost"}
+	provider := &raiden.GooglePubSubProvider{
+		Config: config,
+		Provider: &google.Provider{
+			Config: &google.ProviderConfig{GoogleProjectId: "test-project"},
+			Client: mockClient,
+		},
+	}
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:             "test-handler",
+		TopicValue:            "test-topic",
+		SubscriptionValue:     "test-sub",
+		PushEndpointValue:     "/webhook",
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+			return errors.New("consume failed")
+		},
+	}
+
+	httpHandler, err := provider.Serve(config, handler)
+	assert.NoError(t, err)
+
+	reqCtx := &fasthttp.RequestCtx{}
+	reqCtx.Request.SetBodyString(`{"message":{"data":"test","message_id":"1","publish_time":"t"},"subscription":"projects/test-project/subscriptions/test-sub"}`)
+	httpHandler(reqCtx)
+	assert.Equal(t, fasthttp.StatusInternalServerError, reqCtx.Response.StatusCode())
 }
 
 func TestSupabaseRealtimeProvider_PublishViaMock(t *testing.T) {
