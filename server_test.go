@@ -1,7 +1,6 @@
 package raiden_test
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/pubsub"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-hclog"
@@ -63,13 +61,8 @@ func (s *TestSubscriber) Subscripbtion() string {
 	return "test.new-sub"
 }
 
-func (s *TestSubscriber) Consume(ctx raiden.SubscriberContext, message any) error {
-	msg, valid := message.(*pubsub.Message)
-	if !valid {
-		return errors.New("invalid google pubsub message")
-	}
-
-	raiden.Info("test new listener executed", "data", string(msg.Data))
+func (s *TestSubscriber) Consume(ctx raiden.SubscriberContext, message raiden.SubscriberMessage) error {
+	raiden.Info("test new listener executed", "data", string(message.Data))
 	return nil
 }
 
