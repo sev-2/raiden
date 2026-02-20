@@ -73,7 +73,7 @@ type MockSubscriberHandler struct {
 	AutoAckValue          bool
 	ProviderValue         raiden.PubSubProviderType
 	SubscriptionTypeValue raiden.SubscriptionType
-	ConsumeFunc           func(ctx raiden.SubscriberContext, msg any) error
+	ConsumeFunc           func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error
 }
 
 func (m *MockSubscriberHandler) Provider() raiden.PubSubProviderType {
@@ -104,6 +104,6 @@ func (m *MockSubscriberHandler) AutoAck() bool {
 	return m.AutoAckValue
 }
 
-func (m *MockSubscriberHandler) Consume(ctx raiden.SubscriberContext, msg any) error {
+func (m *MockSubscriberHandler) Consume(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
 	return m.ConsumeFunc(ctx, msg)
 }

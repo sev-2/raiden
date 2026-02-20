@@ -8,7 +8,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/mock"
-	"github.com/sev-2/raiden/pkg/pubsub/google"
+	googlepubsub "github.com/sev-2/raiden/pkg/pubsub/google"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -53,7 +53,7 @@ func TestNewGooglePubsub(t *testing.T) {
 	assert.Equal(t, true, handler.AutoAck())
 	assert.Equal(t, "unknown", handler.Name())
 	assert.Equal(t, "", handler.Subscription())
-	assert.Error(t, handler.Consume(nil, nil))
+	assert.Error(t, handler.Consume(nil, raiden.SubscriberMessage{}))
 
 	// assert register
 	pubsub.Register(handler)
@@ -81,7 +81,7 @@ func TestGooglePubSubProvider_Publish(t *testing.T) {
 	mockClient := &mock.MockPubSubClient{
 		Topics: map[string]*mock.MockTopic{
 			"test-topic": {
-				PublishFn: func(ctx context.Context, msg *pubsub.Message) google.PublishResult {
+				PublishFn: func(ctx context.Context, msg *pubsub.Message) googlepubsub.PublishResult {
 					return &mock.MockPublishResult{Result: "mock-server-id", Err: nil}
 				},
 			},
@@ -90,7 +90,10 @@ func TestGooglePubSubProvider_Publish(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Client: mockClient,
+		Provider: &googlepubsub.Provider{
+			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+			Client: mockClient,
+		},
 	}
 
 	err := provider.Publish(context.Background(), "test-topic", []byte("test message"))
@@ -103,7 +106,7 @@ func TestGooglePubSubProvider_PublishWithSpan(t *testing.T) {
 	mockClient := &mock.MockPubSubClient{
 		Topics: map[string]*mock.MockTopic{
 			"test-topic": {
-				PublishFn: func(ctx context.Context, msg *pubsub.Message) google.PublishResult {
+				PublishFn: func(ctx context.Context, msg *pubsub.Message) googlepubsub.PublishResult {
 					return &mock.MockPublishResult{Result: "mock-server-id", Err: nil}
 				},
 			},
@@ -112,7 +115,10 @@ func TestGooglePubSubProvider_PublishWithSpan(t *testing.T) {
 
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Client: mockClient,
+		Provider: &googlepubsub.Provider{
+			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+			Client: mockClient,
+		},
 	}
 
 	ctx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
@@ -128,11 +134,9 @@ func TestGooglePubSubProvider_PublishWithSpan(t *testing.T) {
 }
 
 func TestGooglePubSubProvider_StartListen(t *testing.T) {
-	// Mock PubSub client and subscription behavior
 	mockSub := &mock.MockSubscription{
 		Id: "test-subscription",
 		ReceiveFn: func(ctx context.Context, f func(ctx context.Context, msg *pubsub.Message)) error {
-			// Simulate a message being received
 			msg := &pubsub.Message{
 				Data: []byte("test message"),
 				Attributes: map[string]string{
@@ -151,41 +155,40 @@ func TestGooglePubSubProvider_StartListen(t *testing.T) {
 		},
 	}
 
-	// Mock SubscriberHandler behavior
 	handlerCalled := false
 	mockHandler := &mock.MockSubscriberHandler{
 		TopicValue:   "test-topic",
 		NameValue:    "test-handler",
 		AutoAckValue: true,
-		ConsumeFunc: func(ctx raiden.SubscriberContext, msg any) error {
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
 			handlerCalled = true
+			assert.NotNil(t, msg.Data)
+			assert.NotNil(t, msg.Raw)
 			return nil
 		},
 		SubscriptionTypeValue: raiden.SubscriptionTypePush,
 		SubscriptionValue:     "test-topic",
 	}
 
-	// Create provider
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Client: mockClient,
-		Tracer: nil, // You can add a mock tracer here if needed
+		Provider: &googlepubsub.Provider{
+			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+			Client: mockClient,
+		},
 	}
 
-	// Start listening
 	err := provider.StartListen([]raiden.SubscriberHandler{mockHandler})
 	if err != nil {
 		t.Fatalf("StartListen failed: %v", err)
 	}
 
-	// Verify the handler was called
 	if !handlerCalled {
 		t.Error("Handler was not called")
 	}
 }
 
 func TestGooglePubSubProvider_StartListenErr(t *testing.T) {
-	// Mock PubSub client and subscription behavior
 	mockSub := &mock.MockSubscription{
 		Id: "test-subscription",
 		ReceiveFn: func(ctx context.Context, f func(ctx context.Context, msg *pubsub.Message)) error {
@@ -199,32 +202,30 @@ func TestGooglePubSubProvider_StartListenErr(t *testing.T) {
 		},
 	}
 
-	// Mock SubscriberHandler behavior
 	mockHandler := &mock.MockSubscriberHandler{
 		TopicValue:   "test-topic",
 		NameValue:    "test-handler",
 		AutoAckValue: true,
-		ConsumeFunc: func(ctx raiden.SubscriberContext, msg any) error {
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
 			return nil
 		},
 		SubscriptionTypeValue: raiden.SubscriptionTypePush,
 		SubscriptionValue:     "test-topic",
 	}
 
-	// Create provider
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Client: mockClient,
-		Tracer: nil, // You can add a mock tracer here if needed
+		Provider: &googlepubsub.Provider{
+			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+			Client: mockClient,
+		},
 	}
 
-	// Start listening
 	err := provider.StartListen([]raiden.SubscriberHandler{mockHandler})
 	assert.Error(t, err)
 }
 
 func TestGooglePubSubProvider_StartListenErrCancel(t *testing.T) {
-	// Mock PubSub client and subscription behavior
 	mockSub := &mock.MockSubscription{
 		Id: "test-subscription",
 		ReceiveFn: func(ctx context.Context, f func(ctx context.Context, msg *pubsub.Message)) error {
@@ -238,36 +239,33 @@ func TestGooglePubSubProvider_StartListenErrCancel(t *testing.T) {
 		},
 	}
 
-	// Mock SubscriberHandler behavior
 	mockHandler := &mock.MockSubscriberHandler{
 		TopicValue:   "test-topic",
 		NameValue:    "test-handler",
 		AutoAckValue: true,
-		ConsumeFunc: func(ctx raiden.SubscriberContext, msg any) error {
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
 			return nil
 		},
 		SubscriptionTypeValue: raiden.SubscriptionTypePush,
 		SubscriptionValue:     "test-topic",
 	}
 
-	// Create provider
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Client: mockClient,
-		Tracer: nil, // You can add a mock tracer here if needed
+		Provider: &googlepubsub.Provider{
+			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+			Client: mockClient,
+		},
 	}
 
-	// Start listening
 	err := provider.StartListen([]raiden.SubscriberHandler{mockHandler})
 	assert.Nil(t, err)
 }
 
 func TestGooglePubSubProvider_StartListenWithTrace(t *testing.T) {
-	// Mock PubSub client and subscription behavior
 	mockSub := &mock.MockSubscription{
 		Id: "test-subscription",
 		ReceiveFn: func(ctx context.Context, f func(ctx context.Context, msg *pubsub.Message)) error {
-			// Simulate a message being received
 			msg := &pubsub.Message{
 				Data: []byte("test message"),
 				Attributes: map[string]string{
@@ -286,13 +284,12 @@ func TestGooglePubSubProvider_StartListenWithTrace(t *testing.T) {
 		},
 	}
 
-	// Mock SubscriberHandler behavior
 	handlerCalled := false
 	mockHandler := &mock.MockSubscriberHandler{
 		TopicValue:   "test-topic",
 		NameValue:    "test-handler",
 		AutoAckValue: true,
-		ConsumeFunc: func(ctx raiden.SubscriberContext, msg any) error {
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
 			handlerCalled = true
 			return nil
 		},
@@ -300,20 +297,20 @@ func TestGooglePubSubProvider_StartListenWithTrace(t *testing.T) {
 		SubscriptionValue:     "test-topic",
 	}
 
-	// Create provider
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Client: mockClient,
-		Tracer: &mock.MockTracer{}, // You can add a mock tracer here if needed
+		Provider: &googlepubsub.Provider{
+			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+			Client: mockClient,
+			Tracer: &mock.MockTracer{},
+		},
 	}
 
-	// Start listening
 	err := provider.StartListen([]raiden.SubscriberHandler{mockHandler})
 	if err != nil {
 		t.Fatalf("StartListen failed: %v", err)
 	}
 
-	// Verify the handler was called
 	if !handlerCalled {
 		t.Error("Handler was not called")
 	}
@@ -326,14 +323,78 @@ func TestGooglePubSubProvider_StopLister(t *testing.T) {
 		},
 	}
 
-	// Create provider
 	provider := &raiden.GooglePubSubProvider{
 		Config: &raiden.Config{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
-		Client: mockClient,
-		Tracer: nil, // You can add a mock tracer here if needed
+		Provider: &googlepubsub.Provider{
+			Config: &googlepubsub.ProviderConfig{GoogleProjectId: "test-project", GoogleSaPath: "test-path"},
+			Client: mockClient,
+		},
 	}
 
-	// Start listening
 	err := provider.StopListen()
 	assert.NoError(t, err)
+}
+
+// ----- Legacy Backward Compatibility Tests -----
+
+// legacyHandler implements the old Consume(ctx, message any) pattern.
+type legacyHandler struct {
+	raiden.SubscriberBase
+	consumed any
+}
+
+func (h *legacyHandler) Name() string                        { return "legacy-test" }
+func (h *legacyHandler) Provider() raiden.PubSubProviderType { return raiden.PubSubProviderGoogle }
+func (h *legacyHandler) Subscription() string                { return "legacy-sub" }
+func (h *legacyHandler) Consume(ctx raiden.SubscriberContext, message any) error {
+	h.consumed = message
+	return nil
+}
+
+func TestWrapLegacySubscriber(t *testing.T) {
+	legacy := &legacyHandler{}
+	wrapped := raiden.WrapLegacySubscriber(legacy)
+
+	assert.Equal(t, "legacy-test", wrapped.Name())
+	assert.Equal(t, raiden.PubSubProviderGoogle, wrapped.Provider())
+	assert.Equal(t, "legacy-sub", wrapped.Subscription())
+
+	msg := raiden.SubscriberMessage{
+		Data:       []byte("hello"),
+		Attributes: map[string]string{"key": "val"},
+		Raw:        "original-raw",
+	}
+
+	err := wrapped.Consume(nil, msg)
+	assert.NoError(t, err)
+	// Legacy consumer should receive the Raw value
+	assert.Equal(t, "original-raw", legacy.consumed)
+}
+
+func TestWrapLegacySubscriber_NilRaw(t *testing.T) {
+	legacy := &legacyHandler{}
+	wrapped := raiden.WrapLegacySubscriber(legacy)
+
+	msg := raiden.SubscriberMessage{
+		Data: []byte("data-only"),
+	}
+
+	err := wrapped.Consume(nil, msg)
+	assert.NoError(t, err)
+	// When Raw is nil, legacy consumer should receive the full SubscriberMessage
+	assert.Equal(t, msg, legacy.consumed)
+}
+
+func TestPushSubscriptionMessageAlias(t *testing.T) {
+	// Verify the deprecated type alias still works
+	var msg raiden.PushSubscriptionMessage
+	msg.Data = "test-data"
+	msg.MessageId = "msg-123"
+	msg.PublishTime = "2026-01-01T00:00:00Z"
+	assert.Equal(t, "test-data", msg.Data)
+
+	var data raiden.PushSubscriptionData
+	data.Message = msg
+	data.Subscription = "projects/test/subscriptions/sub"
+	assert.Equal(t, "projects/test/subscriptions/sub", data.Subscription)
 }
