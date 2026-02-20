@@ -9,10 +9,13 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/fasthttp/websocket"
 	"github.com/oklog/run"
 	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/sev-2/raiden/pkg/logger"
 	googlepubsub "github.com/sev-2/raiden/pkg/pubsub/google"
+	supabasepubsub "github.com/sev-2/raiden/pkg/pubsub/supabase"
+	"github.com/sev-2/raiden/pkg/supabase/constants"
 	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -23,8 +26,9 @@ var PubSubLogger = logger.HcLog().Named("raiden.pubsub")
 type PubSubProviderType string
 
 const (
-	PubSubProviderGoogle  PubSubProviderType = "google"
-	PubSubProviderUnknown PubSubProviderType = "unknown"
+	PubSubProviderGoogle   PubSubProviderType = "google"
+	PubSubProviderSupabase PubSubProviderType = "supabase"
+	PubSubProviderUnknown  PubSubProviderType = "unknown"
 )
 
 type SubscriptionType string
@@ -35,6 +39,14 @@ const (
 )
 
 const SubscriptionPrefixEndpoint = "pubsub-endpoint"
+
+type RealtimeChannelType string
+
+const (
+	RealtimeChannelBroadcast       RealtimeChannelType = "broadcast"
+	RealtimeChannelPresence        RealtimeChannelType = "presence"
+	RealtimeChannelPostgresChanges RealtimeChannelType = "postgres_changes"
+)
 
 // SubscriberMessage is a provider-agnostic message wrapper.
 type SubscriberMessage struct {
@@ -99,10 +111,14 @@ type SubscriberHandler interface {
 	AutoAck() bool
 	Name() string
 	Consume(ctx SubscriberContext, message SubscriberMessage) error
+	ChannelType() RealtimeChannelType
+	EventFilter() string
 	Provider() PubSubProviderType
 	PushEndpoint() string
+	Schema() string
 	Subscription() string
 	SubscriptionType() SubscriptionType
+	Table() string
 	Topic() string
 }
 
@@ -110,6 +126,14 @@ type SubscriberBase struct{}
 
 func (s *SubscriberBase) AutoAck() bool {
 	return true
+}
+
+func (s *SubscriberBase) ChannelType() RealtimeChannelType {
+	return ""
+}
+
+func (s *SubscriberBase) EventFilter() string {
+	return constants.RealtimeEventAll
 }
 
 func (s *SubscriberBase) Name() string {
@@ -120,11 +144,19 @@ func (s *SubscriberBase) Provider() PubSubProviderType {
 	return PubSubProviderUnknown
 }
 
+func (s *SubscriberBase) Schema() string {
+	return "public"
+}
+
 func (s *SubscriberBase) Subscription() string {
 	return ""
 }
 
 func (s *SubscriberBase) PushEndpoint() string {
+	return ""
+}
+
+func (s *SubscriberBase) Table() string {
 	return ""
 }
 
@@ -155,6 +187,7 @@ func NewPubsub(config *Config, tracer trace.Tracer) PubSub {
 		providers: make(map[PubSubProviderType]PubSubProvider),
 	}
 	mgr.providers[PubSubProviderGoogle] = newGoogleProviderAdapter(config, tracer)
+	mgr.providers[PubSubProviderSupabase] = newSupabaseProviderAdapter(config)
 	return mgr
 }
 
@@ -336,13 +369,13 @@ func (a *GooglePubSubProvider) Serve(config *Config, handler SubscriberHandler) 
 
 		var data googlePushData
 		if err := json.Unmarshal(ctx.Request.Body(), &data); err != nil {
-			ctx.WriteString("{\"message\":\"invalid json data\"}")
+			_, _ = ctx.WriteString("{\"message\":\"invalid json data\"}")
 			return
 		}
 
 		if data.Subscription != subscriptionSignature {
 			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
-			ctx.WriteString("{\"message\":\"subscription validation failed: received unexpected subscription name\"}")
+			_, _ = ctx.WriteString("{\"message\":\"subscription validation failed: received unexpected subscription name\"}")
 			return
 		}
 
@@ -363,10 +396,10 @@ func (a *GooglePubSubProvider) Serve(config *Config, handler SubscriberHandler) 
 
 		resByte, err := json.Marshal(response)
 		if err != nil {
-			ctx.WriteString("{\"message\":\"internal server error\"}")
+			_, _ = ctx.WriteString("{\"message\":\"internal server error\"}")
 			return
 		}
-		ctx.Write(resByte)
+		_, _ = ctx.Write(resByte)
 	}, nil
 }
 
@@ -395,6 +428,94 @@ func (a *GooglePubSubProvider) StartListen(handlers []SubscriberHandler) error {
 
 func (a *GooglePubSubProvider) StopListen() error {
 	return a.Provider.StopListen()
+}
+
+// ----- Supabase Realtime Provider Adapter -----
+// SupabaseRealtimeProvider adapts supabase.Provider to the PubSubProvider interface.
+type SupabaseRealtimeProvider struct {
+	Config   *Config
+	Provider *supabasepubsub.Provider
+}
+
+func newSupabaseProviderAdapter(config *Config) *SupabaseRealtimeProvider {
+	var providerConfig *supabasepubsub.ProviderConfig
+	if config != nil {
+		providerConfig = &supabasepubsub.ProviderConfig{
+			SupabasePublicUrl: config.SupabasePublicUrl,
+			SupabaseApiUrl:    config.SupabaseApiUrl,
+			AnonKey:           config.AnonKey,
+			ServiceKey:        config.ServiceKey,
+			ProjectId:         config.ProjectId,
+		}
+	}
+
+	return &SupabaseRealtimeProvider{
+		Config: config,
+		Provider: &supabasepubsub.Provider{
+			Config: providerConfig,
+			Dialer: &DefaultWebSocketDialer{},
+		},
+	}
+}
+
+func (a *SupabaseRealtimeProvider) Publish(ctx context.Context, topic string, message []byte) error {
+	return a.Provider.Publish(ctx, topic, message)
+}
+
+func (a *SupabaseRealtimeProvider) CreateSubscription(handler SubscriberHandler) error {
+	return a.Provider.CreateSubscription(handler.Name(), handler.Topic())
+}
+
+// Serve returns an error for Supabase Realtime — it uses WebSocket, not HTTP push.
+func (a *SupabaseRealtimeProvider) Serve(config *Config, handler SubscriberHandler) (fasthttp.RequestHandler, error) {
+	return nil, fmt.Errorf("supabase realtime does not support HTTP push endpoints; use pull/websocket mode")
+}
+
+func (a *SupabaseRealtimeProvider) StartListen(handlers []SubscriberHandler) error {
+	listenHandlers := make([]supabasepubsub.ListenHandler, len(handlers))
+	for i, h := range handlers {
+		handler := h
+		listenHandlers[i] = supabasepubsub.ListenHandler{
+			Name:        handler.Name(),
+			Topic:       handler.Topic(),
+			ChannelType: supabasepubsub.RealtimeChannelType(handler.ChannelType()),
+			Table:       handler.Table(),
+			Schema:      handler.Schema(),
+			EventFilter: handler.EventFilter(),
+			ConsumeFn: func(ctx context.Context, event string, payload json.RawMessage) error {
+				subCtx := &subscriberContext{
+					cfg:     a.Config,
+					Context: ctx,
+				}
+				msg := SubscriberMessage{
+					Data: []byte(payload),
+					Attributes: map[string]string{
+						"channel_type": string(handler.ChannelType()),
+						"event":        event,
+						"topic":        handler.Topic(),
+					},
+					Raw: payload,
+				}
+				return handler.Consume(subCtx, msg)
+			},
+		}
+	}
+	return a.Provider.StartListen(listenHandlers)
+}
+
+func (a *SupabaseRealtimeProvider) StopListen() error {
+	return a.Provider.StopListen()
+}
+
+// DefaultWebSocketDialer wraps github.com/fasthttp/websocket for production use.
+type DefaultWebSocketDialer struct{}
+
+func (d *DefaultWebSocketDialer) Dial(wsUrl string) (supabasepubsub.WebSocketConn, error) {
+	conn, _, err := websocket.DefaultDialer.Dial(wsUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
 
 // ----- Backward Compatibility -----
@@ -435,14 +556,18 @@ func WrapLegacySubscriber(s LegacySubscriberConsumer) SubscriberHandler {
 	return &legacySubscriberAdapter{legacy: s}
 }
 
-func (a *legacySubscriberAdapter) AutoAck() bool                { return a.legacy.AutoAck() }
-func (a *legacySubscriberAdapter) Name() string                 { return a.legacy.Name() }
-func (a *legacySubscriberAdapter) Provider() PubSubProviderType { return a.legacy.Provider() }
-func (a *legacySubscriberAdapter) PushEndpoint() string         { return a.legacy.PushEndpoint() }
-func (a *legacySubscriberAdapter) Subscription() string         { return a.legacy.Subscription() }
+func (a *legacySubscriberAdapter) AutoAck() bool                    { return a.legacy.AutoAck() }
+func (a *legacySubscriberAdapter) ChannelType() RealtimeChannelType { return "" }
+func (a *legacySubscriberAdapter) EventFilter() string              { return constants.RealtimeEventAll }
+func (a *legacySubscriberAdapter) Name() string                     { return a.legacy.Name() }
+func (a *legacySubscriberAdapter) Provider() PubSubProviderType     { return a.legacy.Provider() }
+func (a *legacySubscriberAdapter) PushEndpoint() string             { return a.legacy.PushEndpoint() }
+func (a *legacySubscriberAdapter) Schema() string                   { return "public" }
+func (a *legacySubscriberAdapter) Subscription() string             { return a.legacy.Subscription() }
 func (a *legacySubscriberAdapter) SubscriptionType() SubscriptionType {
 	return a.legacy.SubscriptionType()
 }
+func (a *legacySubscriberAdapter) Table() string { return "" }
 func (a *legacySubscriberAdapter) Topic() string { return a.legacy.Topic() }
 func (a *legacySubscriberAdapter) Consume(ctx SubscriberContext, message SubscriberMessage) error {
 	// Forward Raw (original provider message) to legacy consumer.

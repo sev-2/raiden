@@ -71,6 +71,10 @@ type MockSubscriberHandler struct {
 	NameValue             string
 	PushEndpointValue     string
 	AutoAckValue          bool
+	ChannelTypeValue      raiden.RealtimeChannelType
+	EventFilterValue      string
+	SchemaValue           string
+	TableValue            string
 	ProviderValue         raiden.PubSubProviderType
 	SubscriptionTypeValue raiden.SubscriptionType
 	ConsumeFunc           func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error
@@ -102,6 +106,28 @@ func (m *MockSubscriberHandler) Name() string {
 
 func (m *MockSubscriberHandler) AutoAck() bool {
 	return m.AutoAckValue
+}
+
+func (m *MockSubscriberHandler) ChannelType() raiden.RealtimeChannelType {
+	return m.ChannelTypeValue
+}
+
+func (m *MockSubscriberHandler) EventFilter() string {
+	if m.EventFilterValue == "" {
+		return "*"
+	}
+	return m.EventFilterValue
+}
+
+func (m *MockSubscriberHandler) Schema() string {
+	if m.SchemaValue == "" {
+		return "public"
+	}
+	return m.SchemaValue
+}
+
+func (m *MockSubscriberHandler) Table() string {
+	return m.TableValue
 }
 
 func (m *MockSubscriberHandler) Consume(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {

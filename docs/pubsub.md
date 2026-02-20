@@ -1,6 +1,6 @@
 # Pub/Sub
 
-Raiden provides a provider-agnostic Pub/Sub layer for subscribing to and publishing messages. The framework ships with a Google Cloud Pub/Sub provider and is designed to support additional providers (e.g., AWS SNS/SQS, Kafka) through the `PubSubProvider` interface.
+Raiden provides a provider-agnostic Pub/Sub layer for subscribing to and publishing messages. The framework ships with a Google Cloud Pub/Sub provider and a Supabase Realtime provider, and is designed to support additional providers (e.g., AWS SNS/SQS, Kafka) through the `PubSubProvider` interface.
 
 ## Architecture
 
@@ -9,9 +9,11 @@ Raiden provides a provider-agnostic Pub/Sub layer for subscribing to and publish
 │                          PubSubManager                             │
 │                                                                    │
 │  providers: map[PubSubProviderType]PubSubProvider                  │
-│   ├── "google" ──► GooglePubSubProvider (adapter)                  │
+│   ├── "google"   ──► GooglePubSubProvider (adapter)                │
 │   │                   └── pkg/pubsub/google.Provider               │
-│   └── "custom" ──► YourCustomProvider                              │
+│   ├── "supabase" ──► SupabaseRealtimeProvider (adapter)            │
+│   │                   └── pkg/pubsub/supabase.Provider             │
+│   └── "custom"   ──► YourCustomProvider                            │
 │                                                                    │
 │  handlers: []SubscriberHandler                                     │
 │   ├── Pull subscribers  ──► Listen() ──► provider.StartListen()    │
@@ -109,8 +111,12 @@ The subscriber embeds `raiden.SubscriberBase` which provides sensible defaults:
 - `AutoAck()` returns `true`
 - `SubscriptionType()` returns `SubscriptionTypePull`
 - `PushEndpoint()` returns `""`
+- `ChannelType()` returns `""` (for Supabase Realtime channel selection)
+- `Schema()` returns `"public"` (for Postgres Changes)
+- `Table()` returns `""` (for Postgres Changes)
+- `EventFilter()` returns `"*"` (for Postgres Changes; use constants from `pkg/supabase/constants`)
 
-Override only the methods you need.
+**Important:** All subscribers MUST embed `raiden.SubscriberBase`. The code generator (`pkg/generator/subscriber_register.go`) uses AST scanning to detect structs embedding `SubscriberBase` and auto-registers them in `server.go`. Without this embed, your subscriber will not be discovered or registered.
 
 ### 2. Create a Push Subscriber
 
@@ -153,7 +159,128 @@ func (s *PaymentWebhookSubscriber) Consume(ctx raiden.SubscriberContext, message
 
 Push endpoints are registered at `/<SubscriptionPrefixEndpoint>/<push-endpoint>` (e.g., `/pubsub-endpoint/payment-webhook`).
 
-### 3. Register Subscribers
+### 3. Supabase Realtime Subscribers
+
+Supabase Realtime provides three channel types: Broadcast, Presence, and Postgres Changes.
+
+#### Broadcast Subscriber
+
+```go
+type ChatMessageSubscriber struct {
+    raiden.SubscriberBase
+}
+
+func (s *ChatMessageSubscriber) Name() string {
+    return "ChatMessage"
+}
+
+func (s *ChatMessageSubscriber) Provider() raiden.PubSubProviderType {
+    return raiden.PubSubProviderSupabase
+}
+
+func (s *ChatMessageSubscriber) Topic() string {
+    return "chat-room"
+}
+
+func (s *ChatMessageSubscriber) ChannelType() raiden.RealtimeChannelType {
+    return raiden.RealtimeChannelBroadcast
+}
+
+func (s *ChatMessageSubscriber) Consume(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+    raiden.Info("chat message received", "data", string(msg.Data))
+    return nil
+}
+```
+
+#### Postgres Changes Subscriber
+
+```go
+import "github.com/sev-2/raiden/pkg/supabase/constants"
+
+type OrderChangeSubscriber struct {
+    raiden.SubscriberBase
+}
+
+func (s *OrderChangeSubscriber) Name() string {
+    return "OrderChange"
+}
+
+func (s *OrderChangeSubscriber) Provider() raiden.PubSubProviderType {
+    return raiden.PubSubProviderSupabase
+}
+
+func (s *OrderChangeSubscriber) ChannelType() raiden.RealtimeChannelType {
+    return raiden.RealtimeChannelPostgresChanges
+}
+
+func (s *OrderChangeSubscriber) Table() string {
+    return "orders"
+}
+
+func (s *OrderChangeSubscriber) Schema() string {
+    return "public"
+}
+
+func (s *OrderChangeSubscriber) EventFilter() string {
+    return constants.RealtimeEventInsert // constants.RealtimeEventAll, RealtimeEventUpdate, RealtimeEventDelete
+}
+
+func (s *OrderChangeSubscriber) Consume(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+    raiden.Info("order change", "event", msg.Attributes["event"], "data", string(msg.Data))
+    return nil
+}
+```
+
+#### Presence Subscriber
+
+```go
+type LobbyPresenceSubscriber struct {
+    raiden.SubscriberBase
+}
+
+func (s *LobbyPresenceSubscriber) Name() string {
+    return "LobbyPresence"
+}
+
+func (s *LobbyPresenceSubscriber) Provider() raiden.PubSubProviderType {
+    return raiden.PubSubProviderSupabase
+}
+
+func (s *LobbyPresenceSubscriber) Topic() string {
+    return "lobby"
+}
+
+func (s *LobbyPresenceSubscriber) ChannelType() raiden.RealtimeChannelType {
+    return raiden.RealtimeChannelPresence
+}
+
+func (s *LobbyPresenceSubscriber) Consume(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+    raiden.Info("presence update", "event", msg.Attributes["event"])
+    return nil
+}
+```
+
+#### Supabase Realtime Message Attributes
+
+When a Supabase Realtime message is delivered, `SubscriberMessage` contains:
+- **`Data`**: JSON payload from the WebSocket message
+- **`Attributes`**: `{"channel_type": "broadcast|presence|postgres_changes", "event": "<event>", "topic": "<topic>"}`
+- **`Raw`**: Original `json.RawMessage` from the WebSocket frame
+
+#### Event Filter Constants
+
+The framework provides string constants in `pkg/supabase/constants` for use with `EventFilter()`:
+
+| Constant | Value | Description |
+|---|---|---|
+| `constants.RealtimeEventAll` | `"*"` | All events (default) |
+| `constants.RealtimeEventInsert` | `"INSERT"` | Row inserts only |
+| `constants.RealtimeEventUpdate` | `"UPDATE"` | Row updates only |
+| `constants.RealtimeEventDelete` | `"DELETE"` | Row deletes only |
+
+Each subscription accepts a single event filter. To listen for multiple specific events (e.g. INSERT + UPDATE), create separate subscribers or use `RealtimeEventAll` and filter in `Consume()`.
+
+### 4. Register Subscribers
 
 Register subscribers in your module:
 
@@ -166,7 +293,7 @@ func (m *AppModule) Subscribers() []raiden.SubscriberHandler {
 }
 ```
 
-### 4. Publish Messages
+### 5. Publish Messages
 
 Publish from any controller or handler via the context:
 
@@ -211,10 +338,14 @@ type SubscriberHandler interface {
     AutoAck() bool
     Name() string
     Consume(ctx SubscriberContext, message SubscriberMessage) error
+    ChannelType() RealtimeChannelType  // Supabase Realtime channel type
+    EventFilter() string               // Postgres Changes event filter
     Provider() PubSubProviderType
     PushEndpoint() string
+    Schema() string                    // Postgres Changes schema
     Subscription() string
     SubscriptionType() SubscriptionType
+    Table() string                     // Postgres Changes table
     Topic() string
 }
 ```
@@ -308,7 +439,7 @@ func (s *MySubscriber) Provider() raiden.PubSubProviderType {
 
 ## Configuration
 
-The following environment variables are used for Google Pub/Sub:
+### Google Pub/Sub
 
 | Variable | Description |
 |---|---|
@@ -316,25 +447,40 @@ The following environment variables are used for Google Pub/Sub:
 | `GOOGLE_SA_PATH` | Path to Google service account JSON key file |
 | `SERVER_DNS` | Server DNS used for push subscription endpoint registration |
 
+### Supabase Realtime
+
+Supabase Realtime reuses existing Raiden configuration — no additional environment variables are needed:
+
+| Variable | Description |
+|---|---|
+| `SUPABASE_PUBLIC_URL` | Supabase project URL (WebSocket URL is derived: `wss://{host}/realtime/v1/websocket`) |
+| `SUPABASE_API_URL` | Fallback if public URL not set |
+| `ANON_KEY` | Supabase anonymous key (used if service key not set) |
+| `SERVICE_KEY` | Supabase service role key (preferred for server-side auth) |
+| `PROJECT_ID` | Supabase project ID |
+
 These are loaded via `raiden.Config` and passed to providers automatically.
 
 ## Project Structure
 
 ```
 raiden/
-├── pubsub.go                      # Core interfaces, PubSubManager, Google adapter
+├── pubsub.go                      # Core interfaces, PubSubManager, Google & Supabase adapters
 ├── pubsub_test.go                 # Tests
 ├── pkg/
 │   ├── pubsub/
-│   │   └── google/
-│   │       ├── provider.go        # Self-contained Google Cloud Pub/Sub implementation
-│   │       └── wrapper.go         # Google SDK wrapper interfaces (for testing)
+│   │   ├── google/
+│   │   │   ├── provider.go        # Self-contained Google Cloud Pub/Sub implementation
+│   │   │   └── wrapper.go         # Google SDK wrapper interfaces (for testing)
+│   │   └── supabase/
+│   │       ├── provider.go        # Supabase Realtime provider (WebSocket/Phoenix channels)
+│   │       └── provider_test.go   # Provider tests
 │   └── mock/
 │       ├── provider.go            # MockProvider for testing
 │       └── pubsub.go              # Mock Pub/Sub client & handler
 ```
 
-The Google provider in `pkg/pubsub/google/` is self-contained with no imports back to the root `raiden` package, avoiding circular dependencies. The root `GooglePubSubProvider` acts as a thin adapter that translates between raiden types and the Google provider's internal types.
+The Google provider in `pkg/pubsub/google/` and Supabase provider in `pkg/pubsub/supabase/` are self-contained with no imports back to the root `raiden` package, avoiding circular dependencies. The root adapters (`GooglePubSubProvider`, `SupabaseRealtimeProvider`) translate between raiden types and provider-internal types.
 
 ## Migration Guide
 

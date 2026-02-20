@@ -4,7 +4,7 @@
 
 The Pub/Sub capability provides a provider-agnostic messaging layer for publishing and subscribing to messages. It supports multiple subscription delivery modes (pull and push) and multiple provider backends through a pluggable provider registry.
 
-**Key files:** `pubsub.go`, `pkg/pubsub/google/provider.go`, `pkg/pubsub/google/wrapper.go`, `pkg/mock/provider.go`, `pkg/mock/pubsub.go`
+**Key files:** `pubsub.go`, `pkg/pubsub/google/provider.go`, `pkg/pubsub/google/wrapper.go`, `pkg/pubsub/supabase/provider.go`, `pkg/mock/provider.go`, `pkg/mock/pubsub.go`
 
 ## Requirements
 
@@ -30,7 +30,7 @@ The system SHALL maintain a map-based registry of providers (`map[PubSubProvider
 
 #### Scenario: Default provider registration
 - **WHEN** `NewPubsub(config, tracer)` is called
-- **THEN** the Google Cloud Pub/Sub provider SHALL be registered under `PubSubProviderGoogle` ("google")
+- **THEN** the Google Cloud Pub/Sub provider SHALL be registered under `PubSubProviderGoogle` ("google") and the Supabase Realtime provider SHALL be registered under `PubSubProviderSupabase` ("supabase")
 
 #### Scenario: Custom provider registration
 - **WHEN** `SetProvider(providerType, provider)` is called with a new provider type
@@ -42,11 +42,11 @@ The system SHALL maintain a map-based registry of providers (`map[PubSubProvider
 
 ### Requirement: Subscriber Handler Interface
 
-The system SHALL define a `SubscriberHandler` interface that all subscribers MUST implement. The interface includes: `AutoAck()`, `Name()`, `Consume(ctx SubscriberContext, message SubscriberMessage) error`, `Provider()`, `PushEndpoint()`, `Subscription()`, `SubscriptionType()`, and `Topic()`.
+The system SHALL define a `SubscriberHandler` interface that all subscribers MUST implement. The interface includes: `AutoAck()`, `Name()`, `Consume(ctx SubscriberContext, message SubscriberMessage) error`, `ChannelType()`, `EventFilter()`, `Provider()`, `PushEndpoint()`, `Schema()`, `Subscription()`, `SubscriptionType()`, `Table()`, and `Topic()`.
 
 #### Scenario: Embed SubscriberBase for defaults
 - **WHEN** a subscriber struct embeds `SubscriberBase`
-- **THEN** it inherits default values: `AutoAck() = true`, `SubscriptionType() = SubscriptionTypePull`, `Provider() = PubSubProviderUnknown`, and empty strings for `Name`, `Subscription`, `PushEndpoint`, and `Topic`
+- **THEN** it inherits default values: `AutoAck() = true`, `SubscriptionType() = SubscriptionTypePull`, `Provider() = PubSubProviderUnknown`, `ChannelType() = ""`, `Schema() = "public"`, `Table() = ""`, `EventFilter() = "*"`, and empty strings for `Name`, `Subscription`, `PushEndpoint`, and `Topic`
 
 #### Scenario: Unimplemented Consume returns error
 - **WHEN** `SubscriberBase.Consume` is called without being overridden
@@ -197,3 +197,79 @@ The system SHALL integrate Pub/Sub into the server lifecycle. The server creates
 #### Scenario: Middleware injects PubSub into context
 - **WHEN** an HTTP request is processed through middleware
 - **THEN** the PubSub instance SHALL be injected into `Ctx` so controllers can call `ctx.Publish()`
+
+### Requirement: Supabase Realtime Provider
+
+The system SHALL ship with a built-in Supabase Realtime provider implemented in `pkg/pubsub/supabase/` with a root-level adapter (`SupabaseRealtimeProvider`). The Supabase provider package MUST NOT import the root `raiden` package.
+
+#### Scenario: Supabase Realtime channel types
+- **WHEN** a Supabase Realtime subscriber is registered
+- **THEN** it SHALL support three channel types: `RealtimeChannelBroadcast` ("broadcast"), `RealtimeChannelPresence` ("presence"), and `RealtimeChannelPostgresChanges` ("postgres_changes")
+
+#### Scenario: Supabase WebSocket connection
+- **WHEN** `StartListen()` is called for Supabase subscribers
+- **THEN** the provider SHALL connect via WebSocket to `wss://{host}/realtime/v1/websocket?apikey={key}&vsn=1.0.0`, deriving the URL from `SupabasePublicUrl` or `SupabaseApiUrl` config, and authenticating with `ServiceKey` (preferred) or `AnonKey`
+
+#### Scenario: Supabase channel join
+- **WHEN** a WebSocket connection is established
+- **THEN** the provider SHALL send a `phx_join` message for each subscriber's channel with appropriate config payload (broadcast settings, presence settings, or postgres_changes filter with schema/table/event)
+
+#### Scenario: Supabase heartbeat
+- **WHEN** a WebSocket connection is active
+- **THEN** the provider SHALL send heartbeat messages to the `"phoenix"` topic every 30 seconds
+
+#### Scenario: Supabase message dispatch
+- **WHEN** a message is received on the WebSocket
+- **THEN** the provider SHALL dispatch it to the matching handler's `ConsumeFn` based on the message topic, skipping system events (`phx_reply`, `phx_close`, `heartbeat`)
+
+#### Scenario: Supabase message mapping
+- **WHEN** a Supabase Realtime message is delivered to a subscriber
+- **THEN** `SubscriberMessage.Data` SHALL contain the JSON payload, `Attributes` SHALL contain `{"channel_type", "event", "topic"}`, and `Raw` SHALL hold the original `json.RawMessage`
+
+#### Scenario: Supabase Publish broadcast
+- **WHEN** `Publish(ctx, topic, message)` is called on the Supabase provider
+- **THEN** it SHALL send a broadcast event to `realtime:{topic}` over the WebSocket connection
+
+#### Scenario: Supabase Serve returns error
+- **WHEN** `Serve()` is called on the Supabase provider
+- **THEN** it SHALL return an error because Supabase Realtime uses WebSocket, not HTTP push endpoints
+
+#### Scenario: Supabase reconnection
+- **WHEN** the WebSocket connection is lost
+- **THEN** the provider SHALL attempt to reconnect with exponential backoff up to a maximum number of retries, and re-join all channels on successful reconnection
+
+#### Scenario: Supabase no circular dependency
+- **WHEN** `pkg/pubsub/supabase/` is compiled
+- **THEN** it SHALL have zero imports of the `github.com/sev-2/raiden` root package
+
+#### Scenario: Supabase config reuse
+- **WHEN** the Supabase Realtime provider is initialized
+- **THEN** it SHALL reuse existing Raiden config fields (`SupabasePublicUrl`, `SupabaseApiUrl`, `AnonKey`, `ServiceKey`, `ProjectId`) without requiring new environment variables
+
+### Requirement: Postgres Changes Filtering
+
+The system SHALL support declarative filtering for Postgres Changes subscribers via `Table()`, `Schema()`, and `EventFilter()` methods on `SubscriberHandler`. `EventFilter()` returns `string`; the framework SHALL provide string constants in `pkg/supabase/constants` (`RealtimeEventAll`, `RealtimeEventInsert`, `RealtimeEventUpdate`, `RealtimeEventDelete`) for convenience. Each subscription accepts a single event filter value; to listen for multiple specific events, create multiple subscribers.
+
+#### Scenario: Default Postgres Changes filter
+- **WHEN** a Postgres Changes subscriber does not override filter methods
+- **THEN** `Schema()` SHALL default to `"public"`, `Table()` SHALL default to `""` (all tables), and `EventFilter()` SHALL default to `"*"` (all events, using `constants.RealtimeEventAll`)
+
+#### Scenario: Filtered Postgres Changes subscription
+- **WHEN** a Postgres Changes subscriber overrides `Table()` and `EventFilter()`
+- **THEN** the channel join payload SHALL include the specified table and event filter in the `postgres_changes` config
+
+#### Scenario: Event filter constants
+- **WHEN** a subscriber sets `EventFilter()` return value
+- **THEN** it MAY use string constants from `pkg/supabase/constants`: `RealtimeEventAll` (`"*"`), `RealtimeEventInsert` (`"INSERT"`), `RealtimeEventUpdate` (`"UPDATE"`), `RealtimeEventDelete` (`"DELETE"`)
+
+### Requirement: SubscriberBase Code Generation Detection
+
+The system SHALL use `SubscriberBase` as a code generation marker. The CLI code generator (`pkg/generator/subscriber_register.go`) SHALL scan subscriber files via AST to detect structs embedding `SubscriberBase` and auto-register them in the server.
+
+#### Scenario: Subscriber detection via AST
+- **WHEN** the code generator processes files in `internal/subscribers/`
+- **THEN** it SHALL find all structs that embed `SubscriberBase` using `getStructByBaseName(path, "SubscriberBase")` and generate registration code for each
+
+#### Scenario: Adding new interface methods is non-breaking
+- **WHEN** new methods are added to `SubscriberHandler` interface with defaults in `SubscriberBase`
+- **THEN** existing subscribers SHALL continue to compile because they embed `SubscriberBase` which provides the defaults

@@ -398,3 +398,98 @@ func TestPushSubscriptionMessageAlias(t *testing.T) {
 	data.Subscription = "projects/test/subscriptions/sub"
 	assert.Equal(t, "projects/test/subscriptions/sub", data.Subscription)
 }
+
+// ----- Supabase Realtime Provider Adapter Tests -----
+
+func TestNewPubsub_RegistersSupabaseProvider(t *testing.T) {
+	config := loadConfig()
+	ps := raiden.NewPubsub(config, nil)
+	mgr := ps.(*raiden.PubSubManager)
+
+	// Publish to supabase provider should not return "unsupported" error
+	// (it will fail on connection, but the provider is registered)
+	err := mgr.Publish(context.Background(), raiden.PubSubProviderSupabase, "test", []byte("hello"))
+	// Error should be about connection, not "unsupported pubsub provider"
+	assert.Error(t, err)
+	assert.NotContains(t, err.Error(), "unsupported pubsub provider")
+}
+
+func TestSupabaseRealtimeProvider_ServeReturnsError(t *testing.T) {
+	config := loadConfig()
+	ps := raiden.NewPubsub(config, nil)
+
+	handler := &mock.MockSubscriberHandler{
+		NameValue:             "test-supabase",
+		ProviderValue:         raiden.PubSubProviderSupabase,
+		SubscriptionTypeValue: raiden.SubscriptionTypePush,
+		ConsumeFunc: func(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+			return nil
+		},
+	}
+
+	_, err := ps.Serve(handler)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "does not support HTTP push")
+}
+
+func TestSupabaseRealtimeProvider_SubscriberBaseDefaults(t *testing.T) {
+	handler := &pubsubHandler{}
+
+	assert.Equal(t, raiden.RealtimeChannelType(""), handler.ChannelType())
+	assert.Equal(t, "public", handler.Schema())
+	assert.Equal(t, "", handler.Table())
+	assert.Equal(t, "*", handler.EventFilter())
+}
+
+type supabaseHandler struct {
+	raiden.SubscriberBase
+	consumeCalled bool
+	lastMsg       raiden.SubscriberMessage
+}
+
+func (s *supabaseHandler) Name() string                        { return "supabase-test" }
+func (s *supabaseHandler) Provider() raiden.PubSubProviderType { return raiden.PubSubProviderSupabase }
+func (s *supabaseHandler) Topic() string                       { return "test-room" }
+func (s *supabaseHandler) ChannelType() raiden.RealtimeChannelType {
+	return raiden.RealtimeChannelBroadcast
+}
+func (s *supabaseHandler) Consume(ctx raiden.SubscriberContext, msg raiden.SubscriberMessage) error {
+	s.consumeCalled = true
+	s.lastMsg = msg
+	return nil
+}
+
+func TestSupabaseRealtimeProvider_HandlerRegistration(t *testing.T) {
+	mgr := &raiden.PubSubManager{}
+	mgr.SetConfig(loadConfig())
+	mgr.SetProvider(raiden.PubSubProviderSupabase, &mock.MockProvider{
+		PublishFn: func(ctx context.Context, topic string, message []byte) error {
+			return nil
+		},
+	})
+
+	handler := &supabaseHandler{}
+	mgr.Register(handler)
+
+	assert.Equal(t, 1, mgr.GetHandlerCount())
+	assert.Equal(t, raiden.PubSubProviderSupabase, mgr.Handlers()[0].Provider())
+	assert.Equal(t, raiden.RealtimeChannelBroadcast, mgr.Handlers()[0].ChannelType())
+}
+
+func TestSupabaseRealtimeProvider_PublishViaMock(t *testing.T) {
+	publishCalled := false
+	mgr := &raiden.PubSubManager{}
+	mgr.SetConfig(loadConfig())
+	mgr.SetProvider(raiden.PubSubProviderSupabase, &mock.MockProvider{
+		PublishFn: func(ctx context.Context, topic string, message []byte) error {
+			publishCalled = true
+			assert.Equal(t, "test-topic", topic)
+			assert.Equal(t, []byte(`{"text":"hello"}`), message)
+			return nil
+		},
+	})
+
+	err := mgr.Publish(context.Background(), raiden.PubSubProviderSupabase, "test-topic", []byte(`{"text":"hello"}`))
+	assert.NoError(t, err)
+	assert.True(t, publishCalled)
+}
