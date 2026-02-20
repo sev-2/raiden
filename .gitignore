@@ -16,7 +16,5 @@ pkg/generator/test_*.txt
 
 app.yaml
 
-AGENTS.md
-
 QWEN.md
 .qwen
