@@ -188,6 +188,26 @@ func (j *importJob) prepareRemoteResource() {
 		j.resource.Tables = filterAllowedTables(j.resource.Tables, strings.Split(j.flags.AllowedSchema, ","), allowedTable...)
 	}
 
+	// log tables included and detect relations referencing missing tables
+	importedTableSet := make(map[string]bool)
+	for _, t := range j.resource.Tables {
+		importedTableSet[fmt.Sprintf("%s.%s", t.Schema, t.Name)] = true
+	}
+	ImportLogger.Debug("tables included for import", "count", len(j.resource.Tables))
+	for _, t := range j.resource.Tables {
+		ImportLogger.Trace("included table", "schema", t.Schema, "table", t.Name, "relations", len(t.Relationships))
+		for _, r := range t.Relationships {
+			targetKey := fmt.Sprintf("%s.%s", r.TargetTableSchema, r.TargetTableName)
+			sourceKey := fmt.Sprintf("%s.%s", r.SourceSchema, r.SourceTableName)
+			if !importedTableSet[targetKey] {
+				ImportLogger.Debug("relation target table not in import set", "table", t.Name, "relation-target", r.TargetTableName, "target-schema", r.TargetTableSchema)
+			}
+			if !importedTableSet[sourceKey] {
+				ImportLogger.Debug("relation source table not in import set", "table", t.Name, "relation-source", r.SourceTableName, "source-schema", r.SourceSchema)
+			}
+		}
+	}
+
 	ImportLogger.Trace("filter function by schema")
 	j.resource.Functions = filterFunctionBySchema(j.resource.Functions, strings.Split(j.flags.AllowedSchema, ",")...)
 	ImportLogger.Debug("finish filter table and function by allowed schema")

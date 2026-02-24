@@ -106,13 +106,17 @@ func filterTableBySchema(input []objects.Table, allowedSchema ...string) (output
 		mapSchema[s] = true
 	}
 
+	ImportLogger.Debug("filter table by schema", "total-fetched", len(input), "allowed-schemas", filterSchema)
 	for i := range input {
 		t := input[i]
 
 		if _, exist := mapSchema[t.Schema]; exist {
 			output = append(output, t)
+		} else {
+			ImportLogger.Debug("table excluded by schema filter", "table", t.Name, "schema", t.Schema)
 		}
 	}
+	ImportLogger.Debug("tables after schema filter", "total-included", len(output), "total-excluded", len(input)-len(output))
 
 	return
 }
