@@ -23,10 +23,12 @@ const (
 	Outer     = "OUTER"
 	Left      = "LEFT"
 	Right     = "RIGHT"
+	Cross     = "CROSS"
 	LeftJoin  = "LEFT JOIN"
 	RightJoin = "RIGHT JOIN"
 	InnerJoin = "INNER JOIN"
 	OuterJoin = "OUTER JOIN"
+	CrossJoin = "CROSS JOIN"
 	On        = "ON"
 	As        = "AS"
 	And       = "AND"
@@ -78,10 +80,12 @@ var ReservedKeywords = map[string]struct{}{
 	Outer:     {},
 	Left:      {},
 	Right:     {},
+	Cross:     {},
 	LeftJoin:  {},
 	RightJoin: {},
 	InnerJoin: {},
 	OuterJoin: {},
+	CrossJoin: {},
 	On:        {},
 	As:        {},
 	And:       {},

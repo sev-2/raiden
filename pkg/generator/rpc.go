@@ -484,7 +484,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 			} else {
 				foundTable.Alias = f
 			}
-		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right:
+		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right, postgres.Cross:
 			// Save any pending table before starting a new JOIN
 			if foundTable.Name != "" {
 				mapResult[foundTable.Name] = foundTable
@@ -498,14 +498,14 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				lastField += " " + postgres.Join
 				continue
 			}
-		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin:
+		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin, postgres.CrossJoin:
 			if k == postgres.On || postgres.IsReservedSymbol(f) || k[0] == '(' || k[0] == ')' {
 				lastField = k
 				continue
 			}
 
-			// If we encounter a JOIN keyword (LEFT/RIGHT/INNER/OUTER), save current table first
-			if k == postgres.Left || k == postgres.Right || k == postgres.Inner || k == postgres.Outer {
+			// If we encounter a JOIN keyword (LEFT/RIGHT/INNER/OUTER/CROSS), save current table first
+			if k == postgres.Left || k == postgres.Right || k == postgres.Inner || k == postgres.Outer || k == postgres.Cross {
 				if foundTable.Name != "" {
 					mapResult[foundTable.Name] = foundTable
 					mapTableOrAlias[foundTable.Name] = foundTable.Name
