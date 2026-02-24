@@ -63,13 +63,19 @@ func ToGoModuleName(s string) string {
 }
 
 func SnakeCaseToPascalCase(s string) string {
+	// Replace hyphens with underscores so both delimiters are handled
+	s = strings.ReplaceAll(s, "-", "_")
 	words := strings.Split(s, "_")
 	caser := cases.Title(language.Und, cases.NoLower)
 
-	for i := range words {
-		words[i] = caser.String(words[i])
+	var result []string
+	for _, w := range words {
+		if w == "" {
+			continue
+		}
+		result = append(result, caser.String(w))
 	}
-	return strings.Join(words, "")
+	return strings.Join(result, "")
 }
 
 func MatchReplacer(query string, paramKey string, replacement string) string {

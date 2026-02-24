@@ -361,6 +361,7 @@ func TestRpcReturnToGoType(t *testing.T) {
 		{raiden.RpcReturnDataTypeArrayOfText, "[]string"},
 		{raiden.RpcReturnDataTypeArrayOfVarchar, "[]string"},
 		{raiden.RpcReturnDataTypeArrayOfVarcharAlias, "[]string"},
+		{raiden.RpcReturnDataTypeUUID, "uuid.UUID"},
 	}
 
 	for _, tt := range tests {
@@ -395,6 +396,7 @@ func TestGetValidRpcReturnType(t *testing.T) {
 		{"text[]", false, raiden.RpcReturnDataTypeArrayOfText, false},
 		{"varchar[]", false, raiden.RpcReturnDataTypeArrayOfVarchar, false},
 		{"varchar[]", true, raiden.RpcReturnDataTypeArrayOfVarcharAlias, false},
+		{"uuid", false, raiden.RpcReturnDataTypeUUID, false},
 	}
 
 	for _, tt := range tests {
@@ -431,6 +433,7 @@ func TestGetValidRpcReturnNameDecl(t *testing.T) {
 		{raiden.RpcReturnDataTypeArrayOfText, false, "RpcReturnDataTypeArrayOfText", false},
 		{raiden.RpcReturnDataTypeArrayOfVarchar, false, "RpcReturnDataTypeArrayOfVarchar", false},
 		{raiden.RpcReturnDataTypeArrayOfVarcharAlias, true, "RpcReturnDataTypeArrayOfVarcharAlias", false},
+		{raiden.RpcReturnDataTypeUUID, false, "RpcReturnDataTypeUUID", false},
 		{raiden.RpcReturnDataType("unsupported"), false, "", true},
 	}
 

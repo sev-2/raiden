@@ -50,3 +50,17 @@ func TestAttachActionAndIndex(t *testing.T) {
 
 	tables.AttachIndexAndAction(tbls, indexes, actions)
 }
+
+func TestBuildGenerateModelInputs_SkipsNonImportedRelations(t *testing.T) {
+	// Table "orders" has a relation to "auth.users" which is NOT in the imported tables
+	jsonStrData := `[{"id":1001,"schema":"public","name":"orders","rls_enabled":false,"rls_forced":false,"replica_identity":"DEFAULT","bytes":8192,"size":"8 kB","live_rows_estimate":0,"dead_rows_estimate":0,"comment":null,"columns":[{"table_id":1001,"schema":"public","table":"orders","id":"1001.1","ordinal_position":1,"name":"id","default_value":null,"data_type":"bigint","format":"int8","is_identity":true,"identity_generation":"BY DEFAULT","is_generated":false,"is_nullable":false,"is_updatable":true,"is_unique":false,"enums":[],"check":null,"comment":null},{"table_id":1001,"schema":"public","table":"orders","id":"1001.2","ordinal_position":2,"name":"user_id","default_value":null,"data_type":"uuid","format":"uuid","is_identity":false,"identity_generation":null,"is_generated":false,"is_nullable":true,"is_updatable":true,"is_unique":false,"enums":[],"check":null,"comment":null}],"primary_keys":[{"schema":"public","table_name":"orders","name":"id","table_id":1001}],"relationships":[{"id":2001,"constraint_name":"orders_user_id_fkey","source_schema":"public","source_table_name":"orders","source_column_name":"user_id","target_table_schema":"auth","target_table_name":"users","target_column_name":"id"}]}]`
+
+	var sourceTables []objects.Table
+	err := json.Unmarshal([]byte(jsonStrData), &sourceTables)
+	assert.NoError(t, err)
+
+	rs := tables.BuildGenerateModelInputs(sourceTables, nil, nil)
+	assert.Len(t, rs, 1)
+	// The relation to auth.users should be skipped since auth.users is not in the import set
+	assert.Len(t, rs[0].Relations, 0)
+}

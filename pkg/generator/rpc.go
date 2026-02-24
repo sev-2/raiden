@@ -51,11 +51,12 @@ type (
 		ReturnDecl   string
 		IsReturnArr  bool
 
-		Name     string
-		Schema   string
-		Security string
-		Behavior string
-		Language string
+		Name         string
+		OriginalName string
+		Schema       string
+		Security     string
+		Behavior     string
+		Language     string
 
 		Models     string
 		Definition string
@@ -99,7 +100,7 @@ type {{ .Name }} struct {
 }
 
 func (r *{{ .Name }}) GetName() string {
-	return "{{ .Name | ToSnakeCase }}"
+	return "{{ .OriginalName }}"
 }
 
 func (r *{{ .Name }}) GetLanguage() string {
@@ -221,6 +222,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 		Package:        "rpc",
 		Imports:        importsPath,
 		Name:           utils.SnakeCaseToPascalCase(function.Name),
+		OriginalName:   function.Name,
 		Language:       strings.ToLower(result.Rpc.Language),
 		Params:         rpcParams,
 		UseParamPrefix: result.UseParamPrefix,
@@ -373,6 +375,7 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 	// loop for create rpc param and add to params variable
 	paramsUsePrefix := []string{}
 	paramsInCount := 0
+	seenFields := make(map[string]bool)
 	for i := range fn.Args {
 		fa := fn.Args[i]
 		if fa.Mode != "in" {
@@ -385,6 +388,12 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 			paramsUsePrefix = append(paramsUsePrefix, fa.Name)
 			fieldName = strings.TrimPrefix(fieldName, raiden.DefaultRpcParamPrefix)
 		}
+
+		// skip duplicate field names (e.g. in_platform_id and platform_id both resolve to platform_id)
+		if seenFields[fieldName] {
+			continue
+		}
+		seenFields[fieldName] = true
 
 		p := raiden.RpcParam{
 			Name: fieldName,
@@ -484,7 +493,7 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 			} else {
 				foundTable.Alias = f
 			}
-		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right:
+		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right, postgres.Cross:
 			// Save any pending table before starting a new JOIN
 			if foundTable.Name != "" {
 				mapResult[foundTable.Name] = foundTable
@@ -498,14 +507,14 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				lastField += " " + postgres.Join
 				continue
 			}
-		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin:
+		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin, postgres.CrossJoin:
 			if k == postgres.On || postgres.IsReservedSymbol(f) || k[0] == '(' || k[0] == ')' {
 				lastField = k
 				continue
 			}
 
-			// If we encounter a JOIN keyword (LEFT/RIGHT/INNER/OUTER), save current table first
-			if k == postgres.Left || k == postgres.Right || k == postgres.Inner || k == postgres.Outer {
+			// If we encounter a JOIN keyword (LEFT/RIGHT/INNER/OUTER/CROSS), save current table first
+			if k == postgres.Left || k == postgres.Right || k == postgres.Inner || k == postgres.Outer || k == postgres.Cross {
 				if foundTable.Name != "" {
 					mapResult[foundTable.Name] = foundTable
 					mapTableOrAlias[foundTable.Name] = foundTable.Name
@@ -848,6 +857,17 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 		isReturnArr = false
 		returnName := strings.ToUpper(string(r.OriginalReturnType))
 		returnDecl = raiden.RpcReturnToGoType(raiden.RpcReturnDataType(returnName))
+
+		// add import for return types that need external packages
+		if strings.Contains(returnDecl, ".") {
+			splitType := strings.Split(returnDecl, ".")
+			switch splitType[0] {
+			case "uuid":
+				mapImports[fmt.Sprintf("%q", "github.com/google/uuid")] = true
+			case "postgres":
+				mapImports[fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/postgres")] = true
+			}
+		}
 	}
 
 	return
