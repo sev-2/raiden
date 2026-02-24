@@ -332,7 +332,32 @@ func (j *importJob) compareTables() error {
 		compareTables = append(compareTables, j.appTables.Existing[i].Table)
 	}
 
-	if err := j.deps.compareTables(j.resource.Tables, compareTables); err != nil {
+	// Build set of locally-known tables so we can filter out remote
+	// relationships that reference tables not in the local model set
+	// (e.g., cross-schema FKs to auth.users). The generator already
+	// skips these when creating join tags, so the comparison should too.
+	localTableSet := make(map[string]bool, len(compareTables))
+	for _, t := range compareTables {
+		localTableSet[fmt.Sprintf("%s.%s", t.Schema, t.Name)] = true
+	}
+	remoteTables := make([]objects.Table, len(j.resource.Tables))
+	copy(remoteTables, j.resource.Tables)
+	for i := range remoteTables {
+		if len(remoteTables[i].Relationships) == 0 {
+			continue
+		}
+		filtered := make([]objects.TablesRelationship, 0, len(remoteTables[i].Relationships))
+		for _, r := range remoteTables[i].Relationships {
+			targetKey := fmt.Sprintf("%s.%s", r.TargetTableSchema, r.TargetTableName)
+			sourceKey := fmt.Sprintf("%s.%s", r.SourceSchema, r.SourceTableName)
+			if localTableSet[targetKey] && localTableSet[sourceKey] {
+				filtered = append(filtered, r)
+			}
+		}
+		remoteTables[i].Relationships = filtered
+	}
+
+	if err := j.deps.compareTables(remoteTables, compareTables); err != nil {
 		if j.flags.DryRun {
 			j.dryRunErrors = append(j.dryRunErrors, err.Error())
 			return nil
@@ -374,6 +399,24 @@ func (j *importJob) compareRpc() error {
 	if !j.flags.DryRun {
 		ImportLogger.Debug("start compare rpc")
 	}
+
+	// Restore state CompleteStatement for import comparison.
+	// BindRpcFunction rebuilds CompleteStatement from the Go struct template which
+	// may differ in formatting from pg_get_functiondef() (param prefix, default
+	// quoting, search_path inclusion). Using the stored state value (captured from
+	// the last import) ensures we only flag real remote changes as conflicts.
+	mapStateCS := make(map[string]string)
+	for _, rs := range j.localState.Rpc {
+		if rs.Function.CompleteStatement != "" {
+			mapStateCS[rs.Function.Name] = rs.Function.CompleteStatement
+		}
+	}
+	for i := range j.appRpcFunctions.Existing {
+		if cs, ok := mapStateCS[j.appRpcFunctions.Existing[i].Name]; ok {
+			j.appRpcFunctions.Existing[i].CompleteStatement = cs
+		}
+	}
+
 	if err := j.deps.compareRpc(j.resource.Functions, j.appRpcFunctions.Existing); err != nil {
 		if j.flags.DryRun {
 			j.dryRunErrors = append(j.dryRunErrors, err.Error())

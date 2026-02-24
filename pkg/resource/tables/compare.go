@@ -217,12 +217,17 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 
 func compareRelations(mode CompareMode, table *objects.Table, source, target []objects.TablesRelationship) (updateItems []objects.UpdateRelationItem) {
 	mapTargetRelation := make(map[string]objects.TablesRelationship)
+	// Secondary index keyed by schema.table.column for fallback matching
+	// when constraint names differ (e.g., custom FK names vs generated defaults).
+	mapTargetByCol := make(map[string]objects.TablesRelationship)
 	for i := range target {
 		c := target[i]
 		if !strings.HasPrefix(c.ConstraintName, fmt.Sprintf("%s_", c.SourceSchema)) {
 			c.ConstraintName = fmt.Sprintf("%s_%s", c.SourceSchema, c.ConstraintName)
 		}
 		mapTargetRelation[c.ConstraintName] = c
+		colKey := fmt.Sprintf("%s.%s.%s", c.SourceSchema, c.SourceTableName, c.SourceColumnName)
+		mapTargetByCol[colKey] = c
 	}
 
 	for i := range source {
@@ -238,6 +243,17 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 		}
 
 		t, exist := mapTargetRelation[sc.ConstraintName]
+		if !exist {
+			// Fallback: match by source table + column when constraint
+			// names differ (e.g., custom FK names vs generated defaults).
+			colKey := fmt.Sprintf("%s.%s.%s", sc.SourceSchema, sc.SourceTableName, sc.SourceColumnName)
+			if tc, ok := mapTargetByCol[colKey]; ok {
+				t = tc
+				exist = true
+				delete(mapTargetRelation, tc.ConstraintName)
+			}
+		}
+
 		if !exist {
 			updateItems = append(updateItems, objects.UpdateRelationItem{
 				Data: sc,
@@ -271,16 +287,21 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 				Logger.Debug("check on delete", "t-on-delete", t.Action.DeletionAction, "sc-on-delete", sc.Action.DeletionAction, "same", t.Action.DeletionAction == sc.Action.DeletionAction)
 			}
 		} else if t.Action != nil && sc.Action == nil {
-			updateItems = append(updateItems, objects.UpdateRelationItem{
-				Data: sc,
-				Type: objects.UpdateRelationActionOnUpdate,
-			})
+			if mode == CompareModeApply {
+				// Only flag missing remote action as a diff in apply mode.
+				// During import the remote may not have action data attached;
+				// treating that as a conflict produces false positives.
+				updateItems = append(updateItems, objects.UpdateRelationItem{
+					Data: sc,
+					Type: objects.UpdateRelationActionOnUpdate,
+				})
 
-			updateItems = append(updateItems, objects.UpdateRelationItem{
-				Data: sc,
-				Type: objects.UpdateRelationActionOnDelete,
-			})
-			Logger.Debug("create relation new action", "on-update", t.Action.UpdateAction, "on-delete", t.Action.DeletionAction)
+				updateItems = append(updateItems, objects.UpdateRelationItem{
+					Data: sc,
+					Type: objects.UpdateRelationActionOnDelete,
+				})
+				Logger.Debug("create relation new action", "on-update", t.Action.UpdateAction, "on-delete", t.Action.DeletionAction)
+			}
 		}
 
 		delete(mapTargetRelation, sc.ConstraintName)

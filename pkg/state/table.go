@@ -512,9 +512,16 @@ func buildTableRelation(tableName, fieldName, schema string, mapRelations map[st
 	relation.ConstraintName = getRelationConstrainName(schema, sourceTableName, foreignKey)
 	if r, ok := mapRelations[relation.ConstraintName]; ok {
 		relation = r
+	} else if r, ok := mapRelations[getRelationConstrainNameWithoutSchema(sourceTableName, foreignKey)]; ok {
+		relation = r
 	} else {
-		if r, ok := mapRelations[getRelationConstrainNameWithoutSchema(sourceTableName, foreignKey)]; ok {
-			relation = r
+		// Fallback: match by source table + column when constraint name
+		// doesn't follow the default naming pattern (e.g., custom FK names).
+		for _, r := range mapRelations {
+			if r.SourceTableName == sourceTableName && r.SourceColumnName == foreignKey {
+				relation = r
+				break
+			}
 		}
 	}
 
