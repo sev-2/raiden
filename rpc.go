@@ -80,6 +80,7 @@ const (
 	RpcReturnDataTypeTrigger             RpcReturnDataType = "TRIGGER"
 	RpcReturnDataTypeDate                RpcReturnDataType = "DATE"
 	RpcReturnDataTypePoint               RpcReturnDataType = "POINT"
+	RpcReturnDataTypeUUID                RpcReturnDataType = "UUID"
 	RpcReturnDataTypeArrayOfInteger      RpcReturnDataType = "INTEGER[]"
 	RpcReturnDataTypeArrayOfNumeric      RpcReturnDataType = "NUMERIC[]"
 	RpcReturnDataTypeArrayOfBigInt       RpcReturnDataType = "BIGINT[]"
@@ -219,6 +220,8 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 		return "postgres.Date"
 	case RpcReturnDataTypePoint:
 		return "postgres.Point"
+	case RpcReturnDataTypeUUID:
+		return "uuid.UUID"
 	case RpcReturnDataTypeArrayOfInteger, RpcReturnDataTypeArrayOfBigInt:
 		return "[]int64"
 	case RpcReturnDataTypeArrayOfReal:
@@ -297,6 +300,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeArrayOfVarchar, nil
 	case RpcReturnDataTypePoint:
 		return RpcReturnDataTypePoint, nil
+	case RpcReturnDataTypeUUID:
+		return RpcReturnDataTypeUUID, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return type  : %s", pCheckType)
 	}
@@ -364,6 +369,8 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeArrayOfVarchar", nil
 	case RpcReturnDataTypePoint:
 		return "RpcReturnDataTypePoint", nil
+	case RpcReturnDataTypeUUID:
+		return "RpcReturnDataTypeUUID", nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}

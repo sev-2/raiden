@@ -848,6 +848,17 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 		isReturnArr = false
 		returnName := strings.ToUpper(string(r.OriginalReturnType))
 		returnDecl = raiden.RpcReturnToGoType(raiden.RpcReturnDataType(returnName))
+
+		// add import for return types that need external packages
+		if strings.Contains(returnDecl, ".") {
+			splitType := strings.Split(returnDecl, ".")
+			switch splitType[0] {
+			case "uuid":
+				mapImports[fmt.Sprintf("%q", "github.com/google/uuid")] = true
+			case "postgres":
+				mapImports[fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/postgres")] = true
+			}
+		}
 	}
 
 	return
