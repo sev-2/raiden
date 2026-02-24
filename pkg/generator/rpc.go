@@ -51,11 +51,12 @@ type (
 		ReturnDecl   string
 		IsReturnArr  bool
 
-		Name     string
-		Schema   string
-		Security string
-		Behavior string
-		Language string
+		Name         string
+		OriginalName string
+		Schema       string
+		Security     string
+		Behavior     string
+		Language     string
 
 		Models     string
 		Definition string
@@ -99,7 +100,7 @@ type {{ .Name }} struct {
 }
 
 func (r *{{ .Name }}) GetName() string {
-	return "{{ .Name | ToSnakeCase }}"
+	return "{{ .OriginalName }}"
 }
 
 func (r *{{ .Name }}) GetLanguage() string {
@@ -221,6 +222,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 		Package:        "rpc",
 		Imports:        importsPath,
 		Name:           utils.SnakeCaseToPascalCase(function.Name),
+		OriginalName:   function.Name,
 		Language:       strings.ToLower(result.Rpc.Language),
 		Params:         rpcParams,
 		UseParamPrefix: result.UseParamPrefix,
@@ -373,6 +375,7 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 	// loop for create rpc param and add to params variable
 	paramsUsePrefix := []string{}
 	paramsInCount := 0
+	seenFields := make(map[string]bool)
 	for i := range fn.Args {
 		fa := fn.Args[i]
 		if fa.Mode != "in" {
@@ -385,6 +388,12 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 			paramsUsePrefix = append(paramsUsePrefix, fa.Name)
 			fieldName = strings.TrimPrefix(fieldName, raiden.DefaultRpcParamPrefix)
 		}
+
+		// skip duplicate field names (e.g. in_platform_id and platform_id both resolve to platform_id)
+		if seenFields[fieldName] {
+			continue
+		}
+		seenFields[fieldName] = true
 
 		p := raiden.RpcParam{
 			Name: fieldName,
