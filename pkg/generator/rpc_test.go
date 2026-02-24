@@ -1723,3 +1723,104 @@ func TestGetParams_Comprehensive(t *testing.T) {
 	assert.True(t, importsMap[`"github.com/google/uuid"`])
 	// String type doesn't have dots, so no special import processing for it
 }
+
+func TestGetReturn_UUIDType(t *testing.T) {
+	result := generator.ExtractRpcDataResult{
+		Rpc: raiden.RpcBase{
+			Name:       "extract_user_id",
+			ReturnType: raiden.RpcReturnDataTypeUUID,
+		},
+		OriginalReturnType: "uuid",
+		MapScannedTable:    map[string]*generator.RpcScannedTable{},
+	}
+
+	importsMap := map[string]bool{
+		`"github.com/sev-2/raiden"`: true,
+	}
+
+	returnDecl, returnColumns, isReturnArr, err := result.GetReturn(importsMap)
+	assert.NoError(t, err)
+	assert.Equal(t, "uuid.UUID", returnDecl)
+	assert.Empty(t, returnColumns)
+	assert.False(t, isReturnArr)
+	// Verify uuid import was added
+	assert.True(t, importsMap[`"github.com/google/uuid"`])
+}
+
+func TestExtractRpcFunction_DuplicateParams(t *testing.T) {
+	fn := objects.Function{
+		Schema:     "public",
+		Name:       "bm_filter_options",
+		Language:   "plpgsql",
+		Definition: `SELECT * FROM brands WHERE platform_id = platform_id`,
+		CompleteStatement: `
+		CREATE OR REPLACE FUNCTION public.bm_filter_options(in_platform_id uuid, platform_id uuid)
+		RETURNS jsonb
+		LANGUAGE plpgsql
+		AS $function$
+		SELECT * FROM brands WHERE platform_id = platform_id
+		$function$`,
+		Args: []objects.FunctionArg{
+			{Mode: "in", Name: "in_platform_id", TypeId: 2950, HasDefault: false},
+			{Mode: "in", Name: "platform_id", TypeId: 2950, HasDefault: false},
+		},
+		ArgumentTypes:          "in_platform_id uuid, platform_id uuid",
+		ReturnType:             "jsonb",
+		ReturnTypeRelationID:   0,
+		IsSetReturningFunction: false,
+		Behavior:               string(raiden.RpcBehaviorVolatile),
+		SecurityDefiner:        false,
+	}
+
+	result, err := generator.ExtractRpcFunction(&fn, []objects.Table{})
+	assert.NoError(t, err)
+
+	// Both in_platform_id and platform_id resolve to platform_id after prefix stripping
+	// Should be deduplicated to a single param
+	assert.Len(t, result.Rpc.Params, 1)
+	assert.Equal(t, "platform_id", result.Rpc.Params[0].Name)
+}
+
+func TestGenerateRpc_HyphenatedFunctionName(t *testing.T) {
+	dir, err := os.MkdirTemp("", "rpc_hyphen")
+	assert.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	rpcPath := filepath.Join(dir, "internal")
+	err = utils.CreateFolder(rpcPath)
+	assert.NoError(t, err)
+
+	fn := objects.Function{
+		Schema:     "public",
+		Name:       "get-user-card-order",
+		Language:   "plpgsql",
+		Definition: `SELECT 1`,
+		CompleteStatement: `
+		CREATE OR REPLACE FUNCTION public."get-user-card-order"()
+		RETURNS jsonb
+		LANGUAGE plpgsql
+		AS $function$
+		SELECT 1
+		$function$`,
+		Args:                   []objects.FunctionArg{},
+		ArgumentTypes:          "",
+		ReturnType:             "jsonb",
+		ReturnTypeRelationID:   0,
+		IsSetReturningFunction: false,
+		Behavior:               string(raiden.RpcBehaviorVolatile),
+		SecurityDefiner:        false,
+	}
+
+	err = generator.GenerateRpc(dir, "test_project", []objects.Function{fn}, []objects.Table{}, generator.GenerateFn(generator.Generate))
+	assert.NoError(t, err)
+
+	filePath := filepath.Join(dir, "internal", "rpc", "get_user_card_order.go")
+	assert.FileExists(t, filePath)
+
+	content, err := os.ReadFile(filePath)
+	assert.NoError(t, err)
+	// Struct name should have no hyphens
+	assert.Contains(t, string(content), "type GetUserCardOrder struct")
+	// GetName should return original function name with hyphens
+	assert.Contains(t, string(content), `return "get-user-card-order"`)
+}
