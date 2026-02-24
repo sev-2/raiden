@@ -204,7 +204,7 @@ When importing models, the system SHALL preserve existing model validation tags 
 
 ### Requirement: Comparison and Diff Checks
 
-The system SHALL compare remote (Supabase) resources against existing local resources to detect drift, unless `--force` is set. Pointer-typed fields (e.g., `*string`) SHALL be compared by dereferenced value, not by pointer address. Slice fields SHALL be compared by element values, not by slice indices. Relation action comparisons SHALL only flag a conflict when action data is available from both sides, or when running in apply mode. Relation matching SHALL fall back to `schema.table.column` lookup when constraint name lookup fails. Cross-schema FK references SHALL be filtered out before comparison when the target table is not in the local model set. RPC `CompleteStatement` comparison during import SHALL use the stored state value, not the rebuilt value from `BuildRpc()`.
+The system SHALL compare remote (Supabase) resources against existing local resources to detect drift, unless `--force` is set. Pointer-typed fields (e.g., `*string`) SHALL be compared by dereferenced value, not by pointer address. Slice fields SHALL be compared by element values, not by slice indices. Relation action comparisons SHALL only flag a conflict when action data is available from both sides, or when running in apply mode. Relation matching SHALL fall back to `schema.table.column` lookup when constraint name lookup fails. Cross-schema FK references SHALL be filtered out before comparison when the target table is not in the local model set. RPC `CompleteStatement` comparison during import SHALL use the stored state value, not the rebuilt value from `BuildRpc()`. Model relation `TargetTableName` SHALL be derived from the referenced type name, not from the struct field name, to ensure it matches the actual database table.
 
 #### Scenario: Normal comparison
 - **WHEN** `--force` is not set and existing resources are present
@@ -257,6 +257,10 @@ The system SHALL compare remote (Supabase) resources against existing local reso
 #### Scenario: No false conflict on RPC CompleteStatement formatting
 - **WHEN** an RPC function's `CompleteStatement` from `pg_get_functiondef()` differs from the `BuildRpc()` rebuilt version only in formatting (param prefix, default quoting, search_path)
 - **THEN** the import comparison SHALL use the stored state `CompleteStatement` and report no conflict
+
+#### Scenario: Correct TargetTableName for model relations
+- **WHEN** a model struct field references a type with a different name than the field (e.g., field `MasterCreatorBrand` of type `*MasterCreators`)
+- **THEN** the relation `TargetTableName` SHALL be derived from the type name (`master_creators`), not the field name (`master_creator_brand`)
 
 ### Requirement: Import Report
 
@@ -382,3 +386,38 @@ Before the core import logic runs, the system SHALL execute `generate.Run()` to 
 - **WHEN** `generate.Run()` fails before the import
 - **THEN** the system SHALL log the error and abort without proceeding to the import
 
+
+### Requirement: Apply Relation Comparison Accuracy
+
+The relation comparison in apply mode SHALL correctly handle duplicate FK constraints and cross-schema FK references without producing false-change detections.
+
+#### Scenario: Duplicate FK constraints on same column
+- **WHEN** the remote database has two FK constraints for the same source column (e.g., custom-named and default-named)
+- **AND** the local code has one FK for that column
+- **THEN** the duplicate constraint SHALL NOT be flagged as a delete
+
+#### Scenario: Cross-schema FK reference
+- **WHEN** the remote database has a FK referencing a table in a different schema (e.g., `auth.users`)
+- **AND** the local code does not represent this FK
+- **THEN** the cross-schema FK SHALL NOT be flagged as a delete
+
+#### Scenario: Index creation when both sides lack indexes
+- **WHEN** both local and remote sides have no index for a relation
+- **THEN** no index creation SHALL be proposed
+
+### Requirement: Apply Policy Comparison Accuracy
+
+The policy comparison SHALL match policies by their full identity (schema, table, and name) rather than by name alone.
+
+#### Scenario: Same-named policies on different tables
+- **WHEN** multiple tables have policies with the same name
+- **THEN** each policy SHALL be compared only with its corresponding policy on the same table
+- **AND** no false table-change diffs SHALL be reported
+
+### Requirement: Apply RPC Comparison Accuracy
+
+The RPC state extraction SHALL preserve the stored CompleteStatement from the previous import to avoid format-only differences.
+
+#### Scenario: No code changes after import
+- **WHEN** a user runs import and then apply without modifying any RPC code
+- **THEN** no RPC updates SHALL be detected

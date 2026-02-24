@@ -329,3 +329,104 @@ func TestCompareList_DuplicateNameDifferentSchema(t *testing.T) {
 	assert.Equal(t, "table_a", diffResult[0].TargetResource.Table)
 	assert.False(t, diffResult[0].IsConflict)
 }
+
+func TestCompareList_SameNameDifferentTable(t *testing.T) {
+	// Two policies with the same name but different tables in the same schema.
+	// They should NOT collide — each should match only its own table's policy.
+	check := "check"
+	sourcePolicies := []objects.Policy{
+		{
+			Name:       "admin full access",
+			Schema:     "public",
+			Table:      "products",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "def1",
+			Check:      &check,
+			Roles:      []string{"admin"},
+		},
+		{
+			Name:       "admin full access",
+			Schema:     "public",
+			Table:      "orders",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "def2",
+			Check:      &check,
+			Roles:      []string{"admin"},
+		},
+	}
+
+	targetPolicies := []objects.Policy{
+		{
+			Name:       "admin full access",
+			Schema:     "public",
+			Table:      "products",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "def1",
+			Check:      &check,
+			Roles:      []string{"admin"},
+		},
+		{
+			Name:       "admin full access",
+			Schema:     "public",
+			Table:      "orders",
+			Action:     "PERMISSIVE",
+			Command:    objects.PolicyCommandSelect,
+			Definition: "def2",
+			Check:      &check,
+			Roles:      []string{"admin"},
+		},
+	}
+
+	diffResult := policies.CompareList(sourcePolicies, targetPolicies)
+	assert.Equal(t, 2, len(diffResult))
+	// Neither should have a table mismatch conflict
+	for _, r := range diffResult {
+		assert.Equal(t, r.SourceResource.Table, r.TargetResource.Table,
+			"policy should match its own table, not a different one")
+		assert.False(t, r.IsConflict)
+	}
+}
+
+func TestCompareList_SameNameDifferentTable_WithChange(t *testing.T) {
+	// Verify that a real change is detected on the correct table, not cross-matched.
+	check := "check"
+	sourcePolicies := []objects.Policy{
+		{
+			Name: "shared policy", Schema: "public", Table: "table_x",
+			Action: "PERMISSIVE", Command: objects.PolicyCommandSelect,
+			Definition: "def", Check: &check, Roles: []string{"role1"},
+		},
+		{
+			Name: "shared policy", Schema: "public", Table: "table_y",
+			Action: "PERMISSIVE", Command: objects.PolicyCommandSelect,
+			Definition: "def", Check: &check, Roles: []string{"role1"},
+		},
+	}
+
+	targetPolicies := []objects.Policy{
+		{
+			Name: "shared policy", Schema: "public", Table: "table_x",
+			Action: "PERMISSIVE", Command: objects.PolicyCommandSelect,
+			Definition: "def", Check: &check, Roles: []string{"role1"},
+		},
+		{
+			Name: "shared policy", Schema: "public", Table: "table_y",
+			Action: "PERMISSIVE", Command: objects.PolicyCommandSelect,
+			Definition: "different_def", Check: &check, Roles: []string{"role1"},
+		},
+	}
+
+	diffResult := policies.CompareList(sourcePolicies, targetPolicies)
+	assert.Equal(t, 2, len(diffResult))
+
+	// table_x should have no conflict
+	assert.Equal(t, "table_x", diffResult[0].SourceResource.Table)
+	assert.False(t, diffResult[0].IsConflict)
+
+	// table_y should have a conflict (definition differs)
+	assert.Equal(t, "table_y", diffResult[1].SourceResource.Table)
+	assert.True(t, diffResult[1].IsConflict)
+}

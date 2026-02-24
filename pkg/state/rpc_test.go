@@ -108,6 +108,30 @@ func TestExtractRpcResult_ToDeleteFlatMap(t *testing.T) {
 	assert.Equal(t, "rpc2", mapData["rpc2"].Name)
 }
 
+func TestExtractRpc_PreservesStateCompleteStatement(t *testing.T) {
+	// When a function exists in state with a CompleteStatement from pg_get_functiondef,
+	// ExtractRpc should preserve that value instead of using the rebuilt one from BuildRpc.
+	stateCS := "create or replace function public.get_submissions(in_scouter_name varchar, in_candidate_name text) returns table(id integer) language plpgsql as $function$ begin end; $function$"
+	rpcStates := []state.RpcState{
+		{
+			Function: objects.Function{
+				Name:              "get_submissions",
+				Schema:            "public",
+				CompleteStatement: stateCS,
+			},
+		},
+	}
+
+	rpc1 := &GetSubmissions{}
+	_ = raiden.BuildRpc(rpc1)
+
+	result, err := state.ExtractRpc(rpcStates, []raiden.Rpc{rpc1})
+	assert.NoError(t, err)
+	assert.Len(t, result.Existing, 1)
+	assert.Equal(t, stateCS, result.Existing[0].CompleteStatement,
+		"should preserve state CompleteStatement, not the rebuilt one")
+}
+
 // Test declaration query with return trigger
 
 type CreateProfileParams struct{}

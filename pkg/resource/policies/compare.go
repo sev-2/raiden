@@ -27,12 +27,12 @@ func CompareList(sourcePolicies, targetPolicies []objects.Policy) (diffResult []
 	mapTargetPolicies := make(map[string]objects.Policy)
 	for i := range targetPolicies {
 		r := targetPolicies[i]
-		mapTargetPolicies[strings.ToLower(r.Name)] = r
+		mapTargetPolicies[comparePolicyKey(r)] = r
 	}
 	for i := range sourcePolicies {
 		p := sourcePolicies[i]
 
-		tp, isExist := mapTargetPolicies[strings.ToLower(p.Name)]
+		tp, isExist := mapTargetPolicies[comparePolicyKey(p)]
 		if !isExist {
 			continue
 		}
@@ -40,6 +40,19 @@ func CompareList(sourcePolicies, targetPolicies []objects.Policy) (diffResult []
 	}
 
 	return
+}
+
+// comparePolicyKey builds a unique key for matching policies. Policies with the
+// same name on different tables are distinct; keying by name alone causes
+// cross-table mismatches.
+func comparePolicyKey(p objects.Policy) string {
+	sch := strings.ToLower(p.Schema)
+	table := strings.ToLower(p.Table)
+	name := strings.ToLower(p.Name)
+	if sch == "" && table == "" {
+		return name
+	}
+	return sch + "." + table + "." + name
 }
 
 func CompareItem(source, target objects.Policy) (diffResult CompareDiffResult) {

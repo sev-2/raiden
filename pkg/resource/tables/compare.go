@@ -230,6 +230,10 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 		mapTargetByCol[colKey] = c
 	}
 
+	// Track which source columns have been matched, so duplicate target FKs
+	// for the same column are not incorrectly flagged as deletes.
+	matchedSourceCols := make(map[string]bool)
+
 	for i := range source {
 		sc := source[i]
 
@@ -262,7 +266,11 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 			continue
 		}
 
-		if t.Index == nil && sc.Index == nil && mode == CompareModeApply {
+		// Record that this source column has been matched.
+		matchedColKey := fmt.Sprintf("%s.%s.%s", sc.SourceSchema, sc.SourceTableName, sc.SourceColumnName)
+		matchedSourceCols[matchedColKey] = true
+
+		if t.Index != nil && sc.Index == nil && mode == CompareModeApply {
 			updateItems = append(updateItems, objects.UpdateRelationItem{
 				Data: sc,
 				Type: objects.UpdateRelationCreateIndex,
@@ -328,6 +336,22 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 	if len(mapTargetRelation) > 0 {
 		for _, r := range mapTargetRelation {
 			if r.SourceTableName != table.Name {
+				continue
+			}
+
+			// Skip cross-schema FKs (e.g., public.user_brands → auth.users).
+			// These are not represented in Go code because the target table
+			// is not in the imported model set.
+			if r.TargetTableSchema != r.SourceSchema {
+				continue
+			}
+
+			// Skip duplicate FKs whose column was already matched.
+			// The database may have multiple constraints for the same column
+			// (e.g., custom-named + default-named). Since Go structs can only
+			// represent one FK per column, these duplicates are expected.
+			colKey := fmt.Sprintf("%s.%s.%s", r.SourceSchema, r.SourceTableName, r.SourceColumnName)
+			if matchedSourceCols[colKey] {
 				continue
 			}
 

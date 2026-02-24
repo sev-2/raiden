@@ -51,8 +51,18 @@ func ExtractTable(tableStates []TableState, appTable []any, mapDataType map[stri
 		mapTableState[t.Table.Name] = t
 	}
 
+	processedTables := make(map[string]bool)
 	for _, t := range appTable {
 		tableName := raiden.GetTableName(t)
+
+		// Skip duplicate model registrations for the same table name.
+		// Two Go structs pointing to the same tableName would cause the
+		// second one to be incorrectly classified as "New".
+		if processedTables[tableName] {
+			continue
+		}
+		processedTables[tableName] = true
+
 		ts, isExist := mapTableState[tableName]
 
 		if !isExist {
@@ -301,10 +311,22 @@ func (b *tableBuilder) addModelRelation(field reflect.StructField, join string) 
 		return
 	}
 
+	// Derive target table name from the field's type, not the field name.
+	// The field name is a relationship alias (e.g., MasterCreatorBrand)
+	// while the type resolves to the actual table via GetTableName.
+	fieldType := field.Type
+	if fieldType.Kind() == reflect.Ptr {
+		fieldType = fieldType.Elem()
+	}
+	if fieldType.Kind() != reflect.Struct {
+		return
+	}
+	targetTableName := raiden.GetTableName(reflect.New(fieldType).Interface())
+
 	relation := objects.TablesRelationship{
 		SourceTableName:   b.item.Table.Name,
 		SourceSchema:      b.item.Table.Schema,
-		TargetTableName:   utils.ToSnakeCase(field.Name),
+		TargetTableName:   targetTableName,
 		TargetTableSchema: b.item.Table.Schema,
 	}
 

@@ -9,6 +9,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// CandidateAlias is a second struct pointing to the same table as Candidate.
+// Used to test duplicate table name registration handling.
+type CandidateAlias struct {
+	Id   int64   `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false"`
+	Name *string `json:"name,omitempty" column:"name:name;type:varchar;nullable;unique"`
+
+	// Table information — intentionally same tableName as Candidate
+	Metadata string `json:"-" schema:"public" tableName:"candidate"`
+
+	// Access control
+	Acl string `json:"-" read:"anon" write:"anon"`
+}
+
 type Submission struct {
 	Id          int64      `json:"id,omitempty" column:"name:id;type:bigint;primaryKey;autoIncrement;nullable:false"`
 	ScouterId   *int64     `json:"scouter_id,omitempty" column:"name:scouter_id;type:bigint;nullable"`
@@ -196,4 +209,40 @@ func TestToDeleteFlatMap(t *testing.T) {
 	assert.Equal(t, 2, len(mapData))
 	assert.Equal(t, "table1", mapData["table1"].Name)
 	assert.Equal(t, "table2", mapData["table2"].Name)
+}
+
+func TestExtractTable_DuplicateTableName(t *testing.T) {
+	// Two models (Candidate + CandidateAlias) point to the same tableName "candidate".
+	// The second registration should be skipped, not treated as "New".
+	tableState := []state.TableState{
+		{
+			Table: objects.Table{
+				ID:   100,
+				Name: "candidate",
+				PrimaryKeys: []objects.PrimaryKey{
+					{Name: "id", Schema: "public", TableName: "candidate"},
+				},
+				Columns: []objects.Column{{Name: "id"}, {Name: "name"}},
+			},
+		},
+	}
+	appTable := []any{&Candidate{}, &CandidateAlias{}}
+	rs, err := state.ExtractTable(tableState, appTable, nil)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(rs.Existing), "should have exactly one Existing entry")
+	assert.Equal(t, 0, len(rs.New), "duplicate should NOT create a New entry")
+	assert.Equal(t, 0, len(rs.Delete))
+	assert.Equal(t, 100, rs.Existing[0].Table.ID)
+}
+
+func TestExtractTable_DuplicateTableName_NoState(t *testing.T) {
+	// Two models with same tableName, neither in state — only one New entry expected.
+	appTable := []any{&Candidate{}, &CandidateAlias{}}
+	rs, err := state.ExtractTable(nil, appTable, nil)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(rs.Existing))
+	assert.Equal(t, 1, len(rs.New), "duplicate should NOT create a second New entry")
+	assert.Equal(t, "candidate", rs.New[0].Table.Name)
 }

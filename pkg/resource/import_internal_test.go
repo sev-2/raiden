@@ -303,3 +303,104 @@ func TestRunImport_CompareTablesError(t *testing.T) {
 	err := runImport(flags, &raiden.Config{}, deps)
 	require.Equal(t, expectedErr, err)
 }
+
+func TestRunImport_CrossSchemaRelationsFiltered(t *testing.T) {
+	flags := &Flags{AllowedSchema: "public"}
+
+	var capturedRemote []objects.Table
+	deps := importDeps{
+		loadNativeRoles: func() (map[string]raiden.Role, error) { return map[string]raiden.Role{}, nil },
+		loadRemote: func(*Flags, *raiden.Config) (*Resource, error) {
+			return &Resource{
+				Tables: []objects.Table{
+					{
+						Name: "t1", Schema: "public",
+						Relationships: []objects.TablesRelationship{
+							{ConstraintName: "fk1", SourceSchema: "public", SourceTableName: "t1", TargetTableSchema: "public", TargetTableName: "t2"},
+							{ConstraintName: "fk_cross", SourceSchema: "public", SourceTableName: "t1", TargetTableSchema: "auth", TargetTableName: "users"},
+						},
+					},
+					{Name: "t2", Schema: "public"},
+				},
+			}, nil
+		},
+		loadState: func() (*state.State, error) { return &state.State{}, nil },
+		extractApp: func(*Flags, *state.State) (state.ExtractTableResult, state.ExtractRoleResult, state.ExtractRpcResult, state.ExtractStorageResult, state.ExtractTypeResult, error) {
+			return state.ExtractTableResult{
+				Existing: state.ExtractTableItems{
+					{Table: objects.Table{Name: "t1", Schema: "public"}},
+					{Table: objects.Table{Name: "t2", Schema: "public"}},
+				},
+			}, state.ExtractRoleResult{}, state.ExtractRpcResult{}, state.ExtractStorageResult{}, state.ExtractTypeResult{}, nil
+		},
+		compareTypes: func([]objects.Type, []objects.Type) error { return nil },
+		compareTables: func(remote []objects.Table, local []objects.Table) error {
+			capturedRemote = remote
+			return nil
+		},
+		compareRoles:    func([]objects.Role, []objects.Role) error { return nil },
+		compareRpc:      func([]objects.Function, []objects.Function) error { return nil },
+		compareStorages: func([]objects.Bucket, []objects.Bucket) error { return nil },
+		updateStateOnly: func(*state.LocalState, *Resource, map[string]state.ModelValidationTag) error { return nil },
+		generate: func(*raiden.Config, *state.LocalState, string, *Resource, map[string]state.ModelValidationTag, bool) error {
+			return nil
+		},
+		printReport: func(ImportReport, bool) {},
+	}
+
+	err := runImport(flags, &raiden.Config{Mode: raiden.BffMode, AllowedTables: "*", ProjectName: "proj"}, deps)
+	require.NoError(t, err)
+
+	// The cross-schema FK (auth.users) should have been filtered out.
+	for _, tbl := range capturedRemote {
+		if tbl.Name == "t1" {
+			assert.Len(t, tbl.Relationships, 1, "should only have the intra-schema FK")
+			assert.Equal(t, "fk1", tbl.Relationships[0].ConstraintName)
+		}
+	}
+}
+
+func TestRunImport_RpcStateCompleteStatementRestored(t *testing.T) {
+	flags := &Flags{AllowedSchema: "public"}
+
+	var capturedLocal []objects.Function
+	deps := importDeps{
+		loadNativeRoles: func() (map[string]raiden.Role, error) { return map[string]raiden.Role{}, nil },
+		loadRemote: func(*Flags, *raiden.Config) (*Resource, error) {
+			return &Resource{
+				Functions: []objects.Function{{Name: "my_rpc", Schema: "public", CompleteStatement: "remote_cs"}},
+			}, nil
+		},
+		loadState: func() (*state.State, error) {
+			return &state.State{
+				Rpc: []state.RpcState{{Function: objects.Function{Name: "my_rpc", CompleteStatement: "state_cs"}}},
+			}, nil
+		},
+		extractApp: func(*Flags, *state.State) (state.ExtractTableResult, state.ExtractRoleResult, state.ExtractRpcResult, state.ExtractStorageResult, state.ExtractTypeResult, error) {
+			return state.ExtractTableResult{},
+				state.ExtractRoleResult{},
+				state.ExtractRpcResult{Existing: []objects.Function{{Name: "my_rpc", CompleteStatement: "rebuilt_cs"}}},
+				state.ExtractStorageResult{}, state.ExtractTypeResult{}, nil
+		},
+		compareTypes:  func([]objects.Type, []objects.Type) error { return nil },
+		compareTables: func([]objects.Table, []objects.Table) error { return nil },
+		compareRoles:  func([]objects.Role, []objects.Role) error { return nil },
+		compareRpc: func(remote []objects.Function, local []objects.Function) error {
+			capturedLocal = local
+			return nil
+		},
+		compareStorages: func([]objects.Bucket, []objects.Bucket) error { return nil },
+		updateStateOnly: func(*state.LocalState, *Resource, map[string]state.ModelValidationTag) error { return nil },
+		generate: func(*raiden.Config, *state.LocalState, string, *Resource, map[string]state.ModelValidationTag, bool) error {
+			return nil
+		},
+		printReport: func(ImportReport, bool) {},
+	}
+
+	err := runImport(flags, &raiden.Config{Mode: raiden.BffMode, AllowedTables: "*", ProjectName: "proj"}, deps)
+	require.NoError(t, err)
+
+	// CompleteStatement should have been restored from state, not the rebuilt value.
+	require.Len(t, capturedLocal, 1)
+	assert.Equal(t, "state_cs", capturedLocal[0].CompleteStatement)
+}
