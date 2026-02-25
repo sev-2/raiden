@@ -4,11 +4,13 @@ import (
 	"context"
 
 	"github.com/sev-2/raiden"
+	"github.com/valyala/fasthttp"
 )
 
 type MockProvider struct {
 	CreateSubscriptionFn func(handler raiden.SubscriberHandler) error
 	PublishFn            func(ctx context.Context, topic string, message []byte) error
+	ServeFn              func(config *raiden.Config, handler raiden.SubscriberHandler) (fasthttp.RequestHandler, error)
 	StartListenFn        func(handler []raiden.SubscriberHandler) error
 	StopListenFn         func() error
 }
@@ -31,4 +33,12 @@ func (m *MockProvider) StartListen(handler []raiden.SubscriberHandler) error {
 // StopListen implements raiden.PubSubProvider.
 func (m *MockProvider) StopListen() error {
 	return m.StopListenFn()
+}
+
+// Serve implements raiden.PubSubProvider.
+func (m *MockProvider) Serve(config *raiden.Config, handler raiden.SubscriberHandler) (fasthttp.RequestHandler, error) {
+	if m.ServeFn != nil {
+		return m.ServeFn(config, handler)
+	}
+	return nil, nil
 }

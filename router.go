@@ -284,6 +284,7 @@ func (r *router) registerRestHandler(route *Route) {
 		group.PUT(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPut, r.lib))
 		group.PATCH(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPatch, r.lib))
 		group.DELETE(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodDelete, r.lib))
+		group.HEAD(path, chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodHead, r.lib))
 	}
 }
 
@@ -295,7 +296,8 @@ func (r *router) registerStorageHandler(route *Route) {
 			chain = r.buildAppMiddleware(chain)
 		}
 
-		path := strings.ReplaceAll(route.Path, "/storage/v1", "/storage/v1/object")
+		path := normalizeStorageUrl(route.Path)
+
 		group.GET(path+"/{path:*}", chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodGet, r.lib))
 		group.POST(path+"/{path:*}", chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPost, r.lib))
 		group.PUT(path+"/{path:*}", chain.Then(route, r.config, r.tracer, r.jobChan, r.pubSub, fasthttp.MethodPut, r.lib))
@@ -337,6 +339,20 @@ func createRouteGroups(engine *fs_router.Router) map[RouteType]*fs_router.Group 
 	}
 }
 
+func normalizeStorageUrl(path string) string {
+	cleanPath := path
+	for _, prefix := range []string{"/storage/v1/object", "/storage/v1"} {
+		for strings.HasPrefix(cleanPath, prefix) {
+			cleanPath = strings.TrimPrefix(cleanPath, prefix)
+		}
+	}
+	if cleanPath != "" && !strings.HasPrefix(cleanPath, "/") {
+		cleanPath = "/" + cleanPath
+	}
+
+	return cleanPath
+}
+
 // The `createHandleFunc` function creates a route handler function that handles different HTTP methods
 // by calling corresponding methods on a controller object.
 func createHandleFunc(httpMethod string, router *Route) RouteHandlerFn {
@@ -362,7 +378,7 @@ func createHandleFunc(httpMethod string, router *Route) RouteHandlerFn {
 			c = StorageController{
 				Controller: router.Controller,
 				BucketName: router.Storage.Name(),
-				RoutePath:  router.Path,
+				RoutePath:  normalizeStorageUrl(router.Path),
 			}
 		}
 

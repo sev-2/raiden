@@ -53,8 +53,12 @@ func CompareItem(source, target objects.Type) (diffResult CompareDiffResult) {
 		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeName)
 	}
 
-	if source.Comment != target.Comment {
+	if (source.Comment != nil && target.Comment == nil) || (source.Comment == nil && target.Comment != nil) {
 		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeComment)
+	} else if source.Comment != nil && target.Comment != nil {
+		if *source.Comment != *target.Comment {
+			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeComment)
+		}
 	}
 
 	if source.Format != target.Format {
@@ -68,9 +72,9 @@ func CompareItem(source, target objects.Type) (diffResult CompareDiffResult) {
 	if len(source.Enums) != len(target.Enums) {
 		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeEnums)
 	} else {
-		for se := range source.Enums {
+		for _, se := range source.Enums {
 			isFound := false
-			for te := range target.Enums {
+			for _, te := range target.Enums {
 				if se == te {
 					isFound = true
 					break
@@ -87,10 +91,10 @@ func CompareItem(source, target objects.Type) (diffResult CompareDiffResult) {
 	if len(source.Attributes) != len(target.Attributes) {
 		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeAttributes)
 	} else {
-		for sa := range source.Attributes {
+		for _, sa := range source.Attributes {
 			isFound := false
-			for ta := range target.Attributes {
-				if sa == ta {
+			for _, ta := range target.Attributes {
+				if sa.Name == ta.Name && sa.TypeID == ta.TypeID {
 					isFound = true
 					break
 				}
@@ -100,17 +104,6 @@ func CompareItem(source, target objects.Type) (diffResult CompareDiffResult) {
 				updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeAttributes)
 				break
 			}
-		}
-	}
-
-	if (source.Comment != nil && target.Comment == nil) || (source.Comment == nil && target.Comment != nil) {
-		updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeComment)
-	} else if source.Comment != nil && target.Comment != nil {
-		sv := source.Comment
-		tv := target.Comment
-
-		if sv != tv {
-			updateItem.ChangeItems = append(updateItem.ChangeItems, objects.UpdateTypeComment)
 		}
 	}
 

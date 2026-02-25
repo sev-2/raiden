@@ -286,6 +286,24 @@ func TestRouter_BuildHandler(t *testing.T) {
 	assert.NotNil(t, registeredRoutes)
 }
 
+func TestRouter_RestRouteRegistersHead(t *testing.T) {
+	conf := loadConfig()
+	router := raiden.NewRouter(conf)
+
+	restRoute := raiden.Route{
+		Type:       raiden.RouteTypeRest,
+		Path:       "/rest/v1/rest_head_check",
+		Controller: &RestController{},
+		Model:      &SomeModel{},
+	}
+
+	router.Register([]*raiden.Route{&restRoute})
+	router.BuildHandler()
+
+	registeredRoutes := router.GetRegisteredRoutes()
+	assert.Contains(t, registeredRoutes[fasthttp.MethodHead], "/rest/v1/rest_head_check")
+}
+
 func TestRouter_NewRouteFromCustomController(t *testing.T) {
 	methods := []string{fasthttp.MethodGet}
 	r := raiden.NewRouteFromController(&HelloWorldController{}, methods)
@@ -313,6 +331,54 @@ func TestRouter_NewRouteFromStorageController(t *testing.T) {
 
 	assert.Equal(t, methods[0], r.Methods[0])
 	assert.Equal(t, methods[1], r.Methods[1])
+}
+
+func TestRouter_RegisterStorageHandler_TrimsPrefixes(t *testing.T) {
+	testCases := []struct {
+		name        string
+		routePath   string
+		expectedGet string
+	}{
+		{
+			name:        "bucket path",
+			routePath:   "/assets",
+			expectedGet: "/storage/v1/object/assets/{path:*}",
+		},
+		{
+			name:        "prefixed storage path",
+			routePath:   "/storage/v1/public",
+			expectedGet: "/storage/v1/object/public/{path:*}",
+		},
+		{
+			name:        "full storage object path",
+			routePath:   "/storage/v1/object/public",
+			expectedGet: "/storage/v1/object/public/{path:*}",
+		},
+		{
+			name:        "relative bucket path",
+			routePath:   "public",
+			expectedGet: "/storage/v1/object/public/{path:*}",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := loadConfig()
+			router := raiden.NewRouter(conf)
+			storageRoute := raiden.Route{
+				Type:       raiden.RouteTypeStorage,
+				Path:       tc.routePath,
+				Controller: &StorageController{},
+				Storage:    &SomeBucket{},
+			}
+
+			router.Register([]*raiden.Route{&storageRoute})
+			router.BuildHandler()
+
+			registered := router.GetRegisteredRoutes()
+			assert.Contains(t, registered[fasthttp.MethodGet], tc.expectedGet)
+		})
+	}
 }
 
 func TestRoute_BuildAppMiddleware(t *testing.T) {

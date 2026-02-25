@@ -44,6 +44,16 @@ func TestToSnakeCase(t *testing.T) {
 func TestSnakeCaseToPascalCase(t *testing.T) {
 	assert.Equal(t, "HelloWorld", utils.SnakeCaseToPascalCase("hello_world"))
 	assert.Equal(t, "HelloWorld", utils.SnakeCaseToPascalCase("Hello_World"))
+	// hyphens should be treated as word separators
+	assert.Equal(t, "GetUserCardOrder", utils.SnakeCaseToPascalCase("get-user-card-order"))
+	// double underscores should not produce empty segments
+	assert.Equal(t, "GetUserCardOrder", utils.SnakeCaseToPascalCase("get__user__card__order"))
+	// mixed hyphens and underscores
+	assert.Equal(t, "FooBarBaz", utils.SnakeCaseToPascalCase("foo-bar_baz"))
+	// empty string
+	assert.Equal(t, "", utils.SnakeCaseToPascalCase(""))
+	// single word
+	assert.Equal(t, "Hello", utils.SnakeCaseToPascalCase("hello"))
 }
 
 func TestMatchReplacer(t *testing.T) {

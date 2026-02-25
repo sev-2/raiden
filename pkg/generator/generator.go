@@ -353,6 +353,10 @@ func resolvePolicyRoles(roleNames []string, decls map[string]*modelRoleRef, exis
 		if role == "" {
 			continue
 		}
+		// "public" is a PostgreSQL pseudo-role meaning "all roles", not a real role
+		if role == "public" {
+			continue
+		}
 		if _, ok := seen[role]; ok {
 			continue
 		}

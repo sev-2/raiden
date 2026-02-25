@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/sev-2/raiden/pkg/client/net"
 	"github.com/sev-2/raiden/pkg/logger"
 	"github.com/sev-2/raiden/pkg/utils"
@@ -44,6 +45,7 @@ const (
 	RpcParamDataTypeUuid                RpcParamDataType = "UUID"
 	RpcParamDataTypeDate                RpcParamDataType = "DATE"
 	RpcParamDataTypePoint               RpcParamDataType = "POINT"
+	RpcParamDataTypeArrayOfUuid         RpcParamDataType = "UUID[]"
 	RpcParamDataTypeArrayOfInteger      RpcParamDataType = "INTEGER[]"
 	RpcParamDataTypeArrayOfNumeric      RpcParamDataType = "NUMERIC[]"
 	RpcParamDataTypeArrayOfBigInt       RpcParamDataType = "BIGINT[]"
@@ -78,6 +80,7 @@ const (
 	RpcReturnDataTypeTrigger             RpcReturnDataType = "TRIGGER"
 	RpcReturnDataTypeDate                RpcReturnDataType = "DATE"
 	RpcReturnDataTypePoint               RpcReturnDataType = "POINT"
+	RpcReturnDataTypeUUID                RpcReturnDataType = "UUID"
 	RpcReturnDataTypeArrayOfInteger      RpcReturnDataType = "INTEGER[]"
 	RpcReturnDataTypeArrayOfNumeric      RpcReturnDataType = "NUMERIC[]"
 	RpcReturnDataTypeArrayOfBigInt       RpcReturnDataType = "BIGINT[]"
@@ -103,11 +106,13 @@ func RpcParamToGoType(dataType RpcParamDataType) string {
 	case RpcParamDataTypeBytea:
 		return "[]byte"
 	case RpcParamDataTypeTimestamp, RpcParamDataTypeTimestampTZ, RpcParamDataTypeTimestampAlias, RpcParamDataTypeTimestampTZAlias:
-		return "time.Time"
+		return "postgres.DateTime"
 	case RpcParamDataTypeJSON, RpcParamDataTypeJSONB:
 		return "map[string]interface{}"
 	case RpcParamDataTypeUuid:
 		return "uuid.UUID"
+	case RpcParamDataTypeArrayOfUuid:
+		return "[]uuid.UUID"
 	case RpcParamDataTypeDate:
 		return "postgres.Date"
 	case RpcParamDataTypePoint:
@@ -184,6 +189,8 @@ func GetValidRpcParamType(pType string, returnAlias bool) (RpcParamDataType, err
 			return RpcParamDataTypeArrayOfVarcharAlias, nil
 		}
 		return RpcParamDataTypeArrayOfVarchar, nil
+	case RpcParamDataTypeArrayOfUuid:
+		return RpcParamDataTypeArrayOfUuid, nil
 	case RpcParamDataTypePoint:
 		return RpcParamDataTypePoint, nil
 	default:
@@ -206,13 +213,15 @@ func RpcReturnToGoType(dataType RpcReturnDataType) string {
 	case RpcReturnDataTypeBytea:
 		return "[]byte"
 	case RpcReturnDataTypeTimestamp, RpcReturnDataTypeTimestampTZ:
-		return "time.Time"
+		return "postgres.DateTime"
 	case RpcReturnDataTypeJSON, RpcReturnDataTypeJSONB:
 		return "map[string]interface{}"
 	case RpcReturnDataTypeDate:
 		return "postgres.Date"
 	case RpcReturnDataTypePoint:
 		return "postgres.Point"
+	case RpcReturnDataTypeUUID:
+		return "uuid.UUID"
 	case RpcReturnDataTypeArrayOfInteger, RpcReturnDataTypeArrayOfBigInt:
 		return "[]int64"
 	case RpcReturnDataTypeArrayOfReal:
@@ -291,6 +300,8 @@ func GetValidRpcReturnType(pType string, returnAlias bool) (RpcReturnDataType, e
 		return RpcReturnDataTypeArrayOfVarchar, nil
 	case RpcReturnDataTypePoint:
 		return RpcReturnDataTypePoint, nil
+	case RpcReturnDataTypeUUID:
+		return RpcReturnDataTypeUUID, nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return type  : %s", pCheckType)
 	}
@@ -358,6 +369,8 @@ func GetValidRpcReturnNameDecl(pType RpcReturnDataType, returnAlias bool) (strin
 		return "RpcReturnDataTypeArrayOfVarchar", nil
 	case RpcReturnDataTypePoint:
 		return "RpcReturnDataTypePoint", nil
+	case RpcReturnDataTypeUUID:
+		return "RpcReturnDataTypeUUID", nil
 	default:
 		return "", fmt.Errorf("unsupported rpc return name declaration  : %s", pType)
 	}
@@ -988,9 +1001,41 @@ func ExecuteRpc(ctx Context, rpc Rpc) (any, error) {
 		if paramValue.IsValid() {
 			fieldType, fieldValue := paramsType.Field(i), paramValue.Field(i)
 
-			key := ""
+			// Check if parameter has a default value by looking at the column tag
+			hasDefault := false
 			columnTagStr := fieldType.Tag.Get("column")
-			if len(columnTagStr) >= 0 {
+			if len(columnTagStr) > 0 {
+				if ct, err := UnmarshalRpcParamTag(columnTagStr); err == nil && ct.DefaultValue != "" {
+					hasDefault = true
+				}
+			}
+
+			// Skip parameters with defaults when they have zero/nil values
+			if hasDefault {
+				// Skip nil pointer values
+				if fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+					continue
+				}
+				// Skip nil slices
+				if fieldValue.Kind() == reflect.Slice && fieldValue.IsNil() {
+					continue
+				}
+				// Skip zero UUID values (uuid.UUID is a struct, not a pointer)
+				if fieldValue.Type() == reflect.TypeOf(uuid.UUID{}) {
+					if fieldValue.Interface().(uuid.UUID) == uuid.Nil {
+						continue
+					}
+				}
+				// Skip zero UUID pointer values
+				if fieldValue.Type() == reflect.TypeOf((*uuid.UUID)(nil)) && !fieldValue.IsNil() {
+					if fieldValue.Elem().Interface().(uuid.UUID) == uuid.Nil {
+						continue
+					}
+				}
+			}
+
+			key := ""
+			if len(columnTagStr) > 0 {
 				if ct, err := UnmarshalRpcParamTag(columnTagStr); err == nil {
 					key = ct.Name
 				}
