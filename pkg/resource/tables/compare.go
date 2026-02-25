@@ -217,13 +217,22 @@ func compareColumns(source, target []objects.Column) (updateItems []objects.Upda
 
 func compareRelations(mode CompareMode, table *objects.Table, source, target []objects.TablesRelationship) (updateItems []objects.UpdateRelationItem) {
 	mapTargetRelation := make(map[string]objects.TablesRelationship)
+	// Secondary index keyed by schema.table.column for fallback matching
+	// when constraint names differ (e.g., custom FK names vs generated defaults).
+	mapTargetByCol := make(map[string]objects.TablesRelationship)
 	for i := range target {
 		c := target[i]
 		if !strings.HasPrefix(c.ConstraintName, fmt.Sprintf("%s_", c.SourceSchema)) {
 			c.ConstraintName = fmt.Sprintf("%s_%s", c.SourceSchema, c.ConstraintName)
 		}
 		mapTargetRelation[c.ConstraintName] = c
+		colKey := fmt.Sprintf("%s.%s.%s", c.SourceSchema, c.SourceTableName, c.SourceColumnName)
+		mapTargetByCol[colKey] = c
 	}
+
+	// Track which source columns have been matched, so duplicate target FKs
+	// for the same column are not incorrectly flagged as deletes.
+	matchedSourceCols := make(map[string]bool)
 
 	for i := range source {
 		sc := source[i]
@@ -239,6 +248,17 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 
 		t, exist := mapTargetRelation[sc.ConstraintName]
 		if !exist {
+			// Fallback: match by source table + column when constraint
+			// names differ (e.g., custom FK names vs generated defaults).
+			colKey := fmt.Sprintf("%s.%s.%s", sc.SourceSchema, sc.SourceTableName, sc.SourceColumnName)
+			if tc, ok := mapTargetByCol[colKey]; ok {
+				t = tc
+				exist = true
+				delete(mapTargetRelation, tc.ConstraintName)
+			}
+		}
+
+		if !exist {
 			updateItems = append(updateItems, objects.UpdateRelationItem{
 				Data: sc,
 				Type: objects.UpdateRelationCreate,
@@ -246,7 +266,11 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 			continue
 		}
 
-		if t.Index == nil && sc.Index == nil && mode == CompareModeApply {
+		// Record that this source column has been matched.
+		matchedColKey := fmt.Sprintf("%s.%s.%s", sc.SourceSchema, sc.SourceTableName, sc.SourceColumnName)
+		matchedSourceCols[matchedColKey] = true
+
+		if t.Index != nil && sc.Index == nil && mode == CompareModeApply {
 			updateItems = append(updateItems, objects.UpdateRelationItem{
 				Data: sc,
 				Type: objects.UpdateRelationCreateIndex,
@@ -271,16 +295,21 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 				Logger.Debug("check on delete", "t-on-delete", t.Action.DeletionAction, "sc-on-delete", sc.Action.DeletionAction, "same", t.Action.DeletionAction == sc.Action.DeletionAction)
 			}
 		} else if t.Action != nil && sc.Action == nil {
-			updateItems = append(updateItems, objects.UpdateRelationItem{
-				Data: sc,
-				Type: objects.UpdateRelationActionOnUpdate,
-			})
+			if mode == CompareModeApply {
+				// Only flag missing remote action as a diff in apply mode.
+				// During import the remote may not have action data attached;
+				// treating that as a conflict produces false positives.
+				updateItems = append(updateItems, objects.UpdateRelationItem{
+					Data: sc,
+					Type: objects.UpdateRelationActionOnUpdate,
+				})
 
-			updateItems = append(updateItems, objects.UpdateRelationItem{
-				Data: sc,
-				Type: objects.UpdateRelationActionOnDelete,
-			})
-			Logger.Debug("create relation new action", "on-update", t.Action.UpdateAction, "on-delete", t.Action.DeletionAction)
+				updateItems = append(updateItems, objects.UpdateRelationItem{
+					Data: sc,
+					Type: objects.UpdateRelationActionOnDelete,
+				})
+				Logger.Debug("create relation new action", "on-update", t.Action.UpdateAction, "on-delete", t.Action.DeletionAction)
+			}
 		}
 
 		delete(mapTargetRelation, sc.ConstraintName)
@@ -307,6 +336,22 @@ func compareRelations(mode CompareMode, table *objects.Table, source, target []o
 	if len(mapTargetRelation) > 0 {
 		for _, r := range mapTargetRelation {
 			if r.SourceTableName != table.Name {
+				continue
+			}
+
+			// Skip cross-schema FKs (e.g., public.user_brands → auth.users).
+			// These are not represented in Go code because the target table
+			// is not in the imported model set.
+			if r.TargetTableSchema != r.SourceSchema {
+				continue
+			}
+
+			// Skip duplicate FKs whose column was already matched.
+			// The database may have multiple constraints for the same column
+			// (e.g., custom-named + default-named). Since Go structs can only
+			// represent one FK per column, these duplicates are expected.
+			colKey := fmt.Sprintf("%s.%s.%s", r.SourceSchema, r.SourceTableName, r.SourceColumnName)
+			if matchedSourceCols[colKey] {
 				continue
 			}
 
