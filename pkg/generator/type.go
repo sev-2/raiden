@@ -24,6 +24,7 @@ type GenerateTypeData struct {
 	Enums      string
 	Attributes string
 	Comment    string
+	HasComment bool
 	EnumArr    []GenerateTypeDataEnum
 }
 
@@ -74,7 +75,12 @@ func (r *{{.Name | ToGoIdentifier }}) Enums() []string {
 }
 
 func (r *{{.Name | ToGoIdentifier }}) Comment() *string {
-	return {{ .Comment }}
+{{- if .HasComment }}
+	comment := {{ .Comment }}
+	return &comment
+{{- else }}
+	return nil
+{{- end }}
 }
 
 `
@@ -121,14 +127,19 @@ func GenerateType(folderPath string, t objects.Type, generateFn GenerateFn) erro
 		Format:     t.Format,
 		Enums:      "[]string{}",
 		Attributes: "[]string{}",
-		Comment:    "nil",
+		Comment:    "",
 		EnumArr:    []GenerateTypeDataEnum{},
 	}
 
 	if len(t.Enums) > 0 {
 		enums := []string{}
 		for _, e := range t.Enums {
-			variableName := fmt.Sprintf("%s%s", utils.SnakeCaseToPascalCase(t.Name), utils.SnakeCaseToPascalCase(e))
+			variableName := fmt.Sprintf("%s%s",
+				utils.SnakeCaseToPascalCase(t.Name),
+				utils.SnakeCaseToPascalCase(
+					utils.ToSnakeCase(e),
+				),
+			)
 			enums = append(enums, variableName)
 			data.EnumArr = append(data.EnumArr, GenerateTypeDataEnum{
 				Key: variableName, Value: e,
@@ -146,7 +157,8 @@ func GenerateType(folderPath string, t objects.Type, generateFn GenerateFn) erro
 	}
 
 	if t.Comment != nil {
-		data.Comment = *t.Comment
+		data.Comment = fmt.Sprintf("%q", *t.Comment)
+		data.HasComment = true
 	}
 
 	// set input

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/sev-2/raiden"
 	"github.com/sev-2/raiden/pkg/mock"
@@ -46,6 +47,24 @@ type DataController struct {
 	// Reserved Field
 	Payload map[string]any
 	Result  map[string]any
+}
+
+type CustomHeadController struct {
+	raiden.ControllerBase
+}
+
+func (c *CustomHeadController) Head(ctx raiden.Context) error {
+	ctx.RequestContext().Response.SetStatusCode(fasthttp.StatusAccepted)
+	return nil
+}
+
+type ErrorHeadController struct {
+	raiden.ControllerBase
+	Err error
+}
+
+func (c *ErrorHeadController) Head(ctx raiden.Context) error {
+	return c.Err
 }
 
 func (h *DataController) BeforeGet(ctx raiden.Context) error {
@@ -265,6 +284,116 @@ func TestRestController(t *testing.T) {
 
 	assert.NoError(t, rest.BeforeHead(ctx))
 	assert.NoError(t, rest.AfterHead(ctx))
+}
+
+func TestRestController_HeadUsesRestProxy(t *testing.T) {
+	var receivedMethod string
+	var receivedPath string
+
+	restore := raiden.SetRestProxyDoTimeout(func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
+		receivedMethod = string(req.Header.Method())
+		receivedPath = string(req.URI().FullURI())
+		resp.SetStatusCode(fasthttp.StatusNoContent)
+		return nil
+	})
+	defer restore()
+
+	cfg := &raiden.Config{SupabasePublicUrl: "http://supabase.local"}
+	ctx := raiden.NewCtx(cfg, nil, nil)
+	ctx.RequestCtx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/rest/v1/test_table?select=*")
+	ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+
+	controller := raiden.RestController{Controller: &raiden.ControllerBase{}, TableName: "test_table"}
+	err := controller.Head(&ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, fasthttp.StatusNoContent, ctx.Response.StatusCode())
+	assert.Equal(t, fasthttp.MethodHead, receivedMethod)
+	assert.Equal(t, "http://supabase.local/rest/v1/test_table?select=*", receivedPath)
+}
+
+func TestRestController_HeadUsesRestProxyWhenControllerNil(t *testing.T) {
+	calledProxy := false
+	restore := raiden.SetRestProxyDoTimeout(func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
+		calledProxy = true
+		resp.SetStatusCode(fasthttp.StatusNoContent)
+		return nil
+	})
+	defer restore()
+
+	cfg := &raiden.Config{SupabasePublicUrl: "http://supabase.local"}
+	ctx := raiden.NewCtx(cfg, nil, nil)
+	ctx.RequestCtx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/rest/v1/test_table")
+	ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+
+	controller := raiden.RestController{Controller: nil, TableName: "test_table"}
+	err := controller.Head(&ctx)
+	assert.NoError(t, err)
+	assert.True(t, calledProxy)
+	assert.Equal(t, fasthttp.StatusNoContent, ctx.Response.StatusCode())
+}
+
+func TestRestController_HeadReturnsControllerError(t *testing.T) {
+	calledProxy := false
+	restore := raiden.SetRestProxyDoTimeout(func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
+		calledProxy = true
+		return nil
+	})
+	defer restore()
+
+	errHead := errors.New("custom head error")
+
+	cfg := &raiden.Config{SupabasePublicUrl: "http://supabase.local"}
+	ctx := raiden.NewCtx(cfg, nil, nil)
+	ctx.RequestCtx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/rest/v1/test_table")
+	ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+
+	controller := raiden.RestController{Controller: &ErrorHeadController{Err: errHead}, TableName: "test_table"}
+	err := controller.Head(&ctx)
+	assert.EqualError(t, err, errHead.Error())
+	assert.False(t, calledProxy)
+}
+
+func TestRestController_HeadPrefersControllerImplementation(t *testing.T) {
+	calledProxy := false
+	restore := raiden.SetRestProxyDoTimeout(func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
+		calledProxy = true
+		return nil
+	})
+	defer restore()
+
+	controllerImpl := &CustomHeadController{}
+	cfg := &raiden.Config{SupabasePublicUrl: "http://supabase.local"}
+	ctx := raiden.NewCtx(cfg, nil, nil)
+	ctx.RequestCtx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/rest/v1/test_table")
+	ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+
+	controller := raiden.RestController{Controller: controllerImpl, TableName: "test_table"}
+
+	err := controller.Head(&ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, fasthttp.StatusAccepted, ctx.Response.StatusCode())
+	assert.False(t, calledProxy)
+}
+
+func TestRestController_HeadReturnsProxyError(t *testing.T) {
+	restore := raiden.SetRestProxyDoTimeout(func(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
+		return errors.New("proxy failed")
+	})
+	defer restore()
+
+	cfg := &raiden.Config{SupabasePublicUrl: "http://supabase.local"}
+	ctx := raiden.NewCtx(cfg, nil, nil)
+	ctx.RequestCtx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/rest/v1/test_table")
+	ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+
+	controller := raiden.RestController{Controller: &raiden.ControllerBase{}, TableName: "test_table"}
+	err := controller.Head(&ctx)
+	assert.EqualError(t, err, "proxy failed")
 }
 
 // Test StorageController methods

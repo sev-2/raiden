@@ -11,9 +11,9 @@ const (
 	Group     = "GROUP"
 	GroupBy   = "GROUP BY"
 	Having    = "HAVING"
-	Insert    = "INSERT INTO"
+	Insert    = "INSERT"
 	Update    = "UPDATE"
-	Delete    = "DELETE FROM"
+	Delete    = "DELETE"
 	Create    = "CREATE"
 	Alter     = "ALTER"
 	Drop      = "DROP"
@@ -23,10 +23,12 @@ const (
 	Outer     = "OUTER"
 	Left      = "LEFT"
 	Right     = "RIGHT"
+	Cross     = "CROSS"
 	LeftJoin  = "LEFT JOIN"
 	RightJoin = "RIGHT JOIN"
 	InnerJoin = "INNER JOIN"
 	OuterJoin = "OUTER JOIN"
+	CrossJoin = "CROSS JOIN"
 	On        = "ON"
 	As        = "AS"
 	And       = "AND"
@@ -43,8 +45,13 @@ const (
 	Except    = "EXCEPT"
 	Asc       = "ASC"
 	Desc      = "DESC"
+	Is        = "IS"
 	IsNull    = "IS NULL"
 	IsNotNull = "IS NOT NULL"
+	Case      = "CASE"
+	When      = "WHEN"
+	Then      = "THEN"
+	Else      = "ELSE"
 	End       = "END"
 	With      = "WITH"
 )
@@ -73,10 +80,12 @@ var ReservedKeywords = map[string]struct{}{
 	Outer:     {},
 	Left:      {},
 	Right:     {},
+	Cross:     {},
 	LeftJoin:  {},
 	RightJoin: {},
 	InnerJoin: {},
 	OuterJoin: {},
+	CrossJoin: {},
 	On:        {},
 	As:        {},
 	And:       {},
@@ -93,8 +102,13 @@ var ReservedKeywords = map[string]struct{}{
 	Except:    {},
 	Asc:       {},
 	Desc:      {},
+	Is:        {},
 	IsNull:    {},
 	IsNotNull: {},
+	Case:      {},
+	When:      {},
+	Then:      {},
+	Else:      {},
 	End:       {},
 	With:      {},
 }

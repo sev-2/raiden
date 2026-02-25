@@ -35,8 +35,16 @@ func ExtractRpc(rpcState []RpcState, appRpc []raiden.Rpc) (result ExtractRpcResu
 		}
 
 		fn := state.Function
+		// Preserve the state's CompleteStatement (captured from pg_get_functiondef
+		// during the last import). BindRpcFunction rebuilds it via BuildRpc() which
+		// differs in formatting (param prefix, default quoting, search_path),
+		// causing false update detections even when no code was changed.
+		stateCompleteStatement := fn.CompleteStatement
 		if err := BindRpcFunction(r, &fn); err != nil {
 			return result, err
+		}
+		if stateCompleteStatement != "" {
+			fn.CompleteStatement = stateCompleteStatement
 		}
 
 		if fn.CompleteStatement != "" {

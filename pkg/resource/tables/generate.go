@@ -48,7 +48,7 @@ type (
 func buildGenerateMapRelations(mapTable MapTable) MapRelations {
 	mr := make(MapRelations)
 	for _, t := range mapTable {
-		r, m2m := scanGenerateTableRelation(t)
+		r, m2m := scanGenerateTableRelation(t, mapTable)
 		if len(r) == 0 {
 			continue
 		}
@@ -62,7 +62,7 @@ func buildGenerateMapRelations(mapTable MapTable) MapRelations {
 	return mr
 }
 
-func scanGenerateTableRelation(table *objects.Table) (relations []*state.Relation, manyToManyCandidates []*ManyToManyTable) {
+func scanGenerateTableRelation(table *objects.Table, mapTable MapTable) (relations []*state.Relation, manyToManyCandidates []*ManyToManyTable) {
 	// skip process if doesn`t have relation`
 	if len(table.Relationships) == 0 {
 		return
@@ -79,16 +79,15 @@ func scanGenerateTableRelation(table *objects.Table) (relations []*state.Relatio
 			relationType = raiden.RelationTypeHasOne
 			tableName = r.TargetTableName
 
+			// skip relation if target table is not in the imported tables
+			targetKey := getMapTableKey(r.TargetTableSchema, r.TargetTableName)
+			if _, exists := mapTable[targetKey]; !exists {
+				Logger.Debug("skipping relation: target table not imported",
+					"table", table.Name, "target-table", r.TargetTableName, "target-schema", r.TargetTableSchema)
+				continue
+			}
+
 			// hasOne relation is candidate to many to many relation
-			// assumption table :
-			//  table :
-			// 		- teacher
-			// 		- topic
-			// 		- class
-			// 	relation :
-			// 		- teacher has many class
-			// 		- topic has many class
-			// 		- class has one teacher and has one topic
 			manyToManyCandidates = append(manyToManyCandidates, &ManyToManyTable{
 				Table:      r.TargetTableName,
 				PivotTable: table.Name,
@@ -99,6 +98,14 @@ func scanGenerateTableRelation(table *objects.Table) (relations []*state.Relatio
 		} else {
 			typePrefix = "[]*"
 			tableName = r.SourceTableName
+
+			// skip relation if source table is not in the imported tables
+			sourceKey := getMapTableKey(r.SourceSchema, r.SourceTableName)
+			if _, exists := mapTable[sourceKey]; !exists {
+				Logger.Debug("skipping relation: source table not imported",
+					"table", table.Name, "source-table", r.SourceTableName, "source-schema", r.SourceSchema)
+				continue
+			}
 		}
 
 		relation := state.Relation{

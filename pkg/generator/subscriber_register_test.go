@@ -30,9 +30,6 @@ func TestGenerateSubscriberRegister(t *testing.T) {
 package subscribers
 
 import (
-	"errors"
-
-	"cloud.google.com/go/pubsub"
 	"github.com/sev-2/raiden"
 )
 
@@ -52,13 +49,8 @@ func (s *RideHailingSubscriber) Subscripbtion() string {
 	return "transaction.ride-hailing.new-sub"
 }
 
-func (s *RideHailingSubscriber) Consume(ctx raiden.SubscriberContext, message any) error {
-	msg, valid := message.(*pubsub.Message)
-	if !valid {
-		return errors.New("invalid google pubsub message")
-	}
-
-	raiden.Info("ride haling new status listener executed", "data", string(msg.Data))
+func (s *RideHailingSubscriber) Consume(ctx raiden.SubscriberContext, message raiden.SubscriberMessage) error {
+	raiden.Info("ride haling new status listener executed", "data", string(message.Data))
 	return nil
 }
 `

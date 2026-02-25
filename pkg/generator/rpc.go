@@ -51,11 +51,12 @@ type (
 		ReturnDecl   string
 		IsReturnArr  bool
 
-		Name     string
-		Schema   string
-		Security string
-		Behavior string
-		Language string
+		Name         string
+		OriginalName string
+		Schema       string
+		Security     string
+		Behavior     string
+		Language     string
 
 		Models     string
 		Definition string
@@ -99,7 +100,7 @@ type {{ .Name }} struct {
 }
 
 func (r *{{ .Name }}) GetName() string {
-	return "{{ .Name | ToSnakeCase }}"
+	return "{{ .OriginalName }}"
 }
 
 func (r *{{ .Name }}) GetLanguage() string {
@@ -221,6 +222,7 @@ func generateRpcItem(folderPath string, projectName string, function *objects.Fu
 		Package:        "rpc",
 		Imports:        importsPath,
 		Name:           utils.SnakeCaseToPascalCase(function.Name),
+		OriginalName:   function.Name,
 		Language:       strings.ToLower(result.Rpc.Language),
 		Params:         rpcParams,
 		UseParamPrefix: result.UseParamPrefix,
@@ -373,6 +375,7 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 	// loop for create rpc param and add to params variable
 	paramsUsePrefix := []string{}
 	paramsInCount := 0
+	seenFields := make(map[string]bool)
 	for i := range fn.Args {
 		fa := fn.Args[i]
 		if fa.Mode != "in" {
@@ -385,6 +388,12 @@ func ExtractRpcParam(fn *objects.Function) (params []raiden.RpcParam, usePrefix 
 			paramsUsePrefix = append(paramsUsePrefix, fa.Name)
 			fieldName = strings.TrimPrefix(fieldName, raiden.DefaultRpcParamPrefix)
 		}
+
+		// skip duplicate field names (e.g. in_platform_id and platform_id both resolve to platform_id)
+		if seenFields[fieldName] {
+			continue
+		}
+		seenFields[fieldName] = true
 
 		p := raiden.RpcParam{
 			Name: fieldName,
@@ -429,19 +438,35 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 	// value false if command start with select or with
 	var readMode = true
 
+	var waitingExtractFrom bool
+	var skipNextFromIdentifier bool
 	for _, f := range dFields {
 		f = strings.TrimRight(f, ";")
 		k := strings.ToUpper(f)
 
+		if strings.HasPrefix(k, "EXTRACT") {
+			waitingExtractFrom = true
+		}
+
 		switch k {
-		case postgres.Create, postgres.Update, postgres.Delete, postgres.Alter, postgres.With:
+		case postgres.Create, postgres.Update, postgres.Delete, postgres.Insert, postgres.Alter, postgres.With:
 			readMode = false
 		case postgres.Select:
 			readMode = true
 		}
 
+		if waitingExtractFrom && k == postgres.From {
+			skipNextFromIdentifier = true
+			waitingExtractFrom = false
+		}
+
 		switch lastField {
 		case postgres.From:
+			if skipNextFromIdentifier {
+				skipNextFromIdentifier = false
+				lastField = k
+				continue
+			}
 			// stop condition
 			if postgres.IsReservedKeyword(k) {
 				mapResult[foundTable.Name] = foundTable
@@ -468,13 +493,36 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 			} else {
 				foundTable.Alias = f
 			}
-		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right:
+		case postgres.Inner, postgres.Outer, postgres.Left, postgres.Right, postgres.Cross:
+			// Save any pending table before starting a new JOIN
+			if foundTable.Name != "" {
+				mapResult[foundTable.Name] = foundTable
+				mapTableOrAlias[foundTable.Name] = foundTable.Name
+				if foundTable.Alias != "" {
+					mapTableOrAlias[foundTable.Alias] = foundTable.Name
+				}
+				foundTable = &RpcScannedTable{}
+			}
 			if k == postgres.Join {
 				lastField += " " + postgres.Join
 				continue
 			}
-		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin:
+		case postgres.Join, postgres.InnerJoin, postgres.OuterJoin, postgres.LeftJoin, postgres.RightJoin, postgres.CrossJoin:
 			if k == postgres.On || postgres.IsReservedSymbol(f) || k[0] == '(' || k[0] == ')' {
+				lastField = k
+				continue
+			}
+
+			// If we encounter a JOIN keyword (LEFT/RIGHT/INNER/OUTER/CROSS), save current table first
+			if k == postgres.Left || k == postgres.Right || k == postgres.Inner || k == postgres.Outer || k == postgres.Cross {
+				if foundTable.Name != "" {
+					mapResult[foundTable.Name] = foundTable
+					mapTableOrAlias[foundTable.Name] = foundTable.Name
+					if foundTable.Alias != "" {
+						mapTableOrAlias[foundTable.Alias] = foundTable.Name
+					}
+					foundTable = &RpcScannedTable{}
+				}
 				lastField = k
 				continue
 			}
@@ -490,7 +538,21 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 				foundTable.Alias = f
 			}
 		case postgres.On:
-			if !readMode || k[0] == '(' || k[0] == ')' {
+			if k[0] == '(' || k[0] == ')' {
+				// When encountering parentheses in ON clause, save current table first
+				if foundTable.Name != "" {
+					mapResult[foundTable.Name] = foundTable
+					mapTableOrAlias[foundTable.Name] = foundTable.Name
+					if foundTable.Alias != "" {
+						mapTableOrAlias[foundTable.Alias] = foundTable.Name
+					}
+					foundTable = &RpcScannedTable{}
+				}
+				lastField = k
+				continue
+			}
+
+			if !readMode {
 				lastField = k
 				continue
 			}
@@ -556,13 +618,23 @@ func ExtractRpcTable(def string) (string, map[string]*RpcScannedTable, error) {
 
 func RpcNormalizeTableAliases(mapTables map[string]*RpcScannedTable) error {
 	mapAlias := make(map[string]bool)
-	for _, v := range mapTables {
+
+	// Sort map keys to ensure deterministic alias assignment
+	keys := make([]string, 0, len(mapTables))
+	for k := range mapTables {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		v := mapTables[k]
 		if v.Alias != "" && v.Name != "" {
 			mapAlias[v.Alias] = true
 		}
 	}
 
-	for _, v := range mapTables {
+	for _, k := range keys {
+		v := mapTables[k]
 		if (v.Alias != "" && v.Name != "") || v.Name == "" {
 			continue
 		}
@@ -628,13 +700,30 @@ func (r *ExtractRpcDataResult) GetParams(mapImports map[string]bool) (columns []
 			return
 		}
 
+		// Determine if the type should be a pointer based on having a default value
+		goType := raiden.RpcParamToGoType(p.Type)
+		hasDefault := p.Default != nil
+
+		// Make it a pointer type if it has any default value
+		if hasDefault {
+			// For array types, make the element type a pointer
+			if strings.HasPrefix(goType, "[]") {
+				goType = "[]" + "*" + strings.TrimPrefix(goType, "[]")
+			} else {
+				goType = "*" + goType
+			}
+		}
+
 		c := RpcColumn{
 			Field: utils.SnakeCaseToPascalCase(p.Name),
-			Type:  raiden.RpcParamToGoType(p.Type),
+			Type:  goType,
 			Tag:   fmt.Sprintf("json:%q column:%q", p.Name, rpcTag),
 		}
 
-		splitType := strings.Split(c.Type, ".")
+		typeDecl := c.Type
+		cleanType := strings.TrimLeft(typeDecl, "[]")
+		cleanType = strings.TrimLeft(cleanType, "*")
+		splitType := strings.Split(cleanType, ".")
 		if len(splitType) > 1 {
 			importPackage := splitType[0]
 			var importPackageName string
@@ -662,8 +751,16 @@ func (r *ExtractRpcDataResult) GetModelDecl() (modelDecl string) {
 		return
 	}
 
+	// Sort map keys to ensure deterministic output
+	keys := make([]string, 0, len(r.MapScannedTable))
+	for k := range r.MapScannedTable {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	var bindModelDeclArr []string
-	for _, v := range r.MapScannedTable {
+	for _, k := range keys {
+		v := r.MapScannedTable[k]
 		bindModelDeclArr = append(bindModelDeclArr, fmt.Sprintf("BindModel(models.%s{}, %q)", utils.SnakeCaseToPascalCase(v.Name), v.Alias))
 	}
 	return "r." + strings.Join(bindModelDeclArr, ".")
@@ -724,8 +821,18 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 				Tag:   fmt.Sprintf("json:%q column:%q", cName, rpcTag),
 			}
 
-			splitType := strings.Split(c.Type, ".")
+			typeDecl := c.Type
+			cleanType := strings.TrimLeft(typeDecl, "[]")
+			splitType := strings.Split(cleanType, ".")
+
 			if len(splitType) > 1 {
+				cleanType := strings.TrimLeft(typeDecl, "[]")
+				splitType := strings.Split(cleanType, ".")
+				if len(splitType) <= 1 {
+					returnColumns = append(returnColumns, c)
+					continue
+				}
+
 				importPackage := splitType[0]
 				var importPackageName string
 				switch importPackage {
@@ -750,6 +857,17 @@ func (r *ExtractRpcDataResult) GetReturn(mapImports map[string]bool) (returnDecl
 		isReturnArr = false
 		returnName := strings.ToUpper(string(r.OriginalReturnType))
 		returnDecl = raiden.RpcReturnToGoType(raiden.RpcReturnDataType(returnName))
+
+		// add import for return types that need external packages
+		if strings.Contains(returnDecl, ".") {
+			splitType := strings.Split(returnDecl, ".")
+			switch splitType[0] {
+			case "uuid":
+				mapImports[fmt.Sprintf("%q", "github.com/google/uuid")] = true
+			case "postgres":
+				mapImports[fmt.Sprintf("%q", "github.com/sev-2/raiden/pkg/postgres")] = true
+			}
+		}
 	}
 
 	return
